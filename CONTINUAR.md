@@ -1,10 +1,10 @@
-# Continuidad del Proyecto
+# CONTINUAR.md - Estado Actual del Proyecto Recetas Familiares
 
-Este documento resume el estado actual del proyecto para continuar en una nueva sesion sin perder contexto.
+Este documento resume el estado real del proyecto para continuar en una nueva sesion sin perder contexto.
 
-## Carpeta que debe abrirse
+## Raiz correcta del proyecto
 
-Abrir siempre la carpeta raiz del monorepo:
+Abrir siempre la raiz del monorepo:
 
 ```text
 C:\Users\GipsyDavy\MAVEN\Recetas Familiares
@@ -12,287 +12,460 @@ C:\Users\GipsyDavy\MAVEN\Recetas Familiares
 
 No abrir como proyecto principal:
 
+- `android/`
 - `desktop/`
-- `Recetas Familiares - Desktop/`
-- `Recetas Familiares - Android/`
+- carpetas antiguas locales
 
-La carpeta valida del modulo Desktop es:
+## De que va la aplicacion
 
-```text
-C:\Users\GipsyDavy\MAVEN\Recetas Familiares\desktop
-```
+Recetas Familiares es una aplicacion premium multiplataforma para familias.
 
-## Repositorio Git
+Objetivo:
 
-El repositorio Git local esta inicializado en la carpeta raiz:
+- guardar y compartir recetas familiares;
+- conservar memoria culinaria familiar;
+- gestionar ingredientes, pasos y stock;
+- planificar menus;
+- generar listas de compra;
+- funcionar en Android y Desktop;
+- soportar sincronizacion offline-first;
+- mantener una experiencia calida, moderna, emocional y premium.
 
-```text
-C:\Users\GipsyDavy\MAVEN\Recetas Familiares\.git
-```
-
-Rama principal:
-
-```text
-main
-```
-
-Remoto GitHub:
-
-```text
-origin https://github.com/GipsyDavy/Recetas-Familiares.git
-```
-
-Ultimos commits:
-
-```text
-988d832 Organize monorepo structure
-a97b8bd Initial project baseline
-```
-
-Estado esperado al retomar:
-
-```text
-git status --short --branch
-```
-
-Debe mostrar algo equivalente a:
-
-```text
-## main...origin/main
-```
-
-## Estructura versionada actual
-
-Archivos y carpetas que estan en Git:
-
-```text
-.gitignore
-CLAUDE.md
-MACRO-PROMPT-RECETAS-FAMILIA.md
-README.md
-Resumen.md
-android/README.md
-backend/README.md
-database/README.md
-desktop/.gitignore
-desktop/src/main/java/org/gipsybuho/Main.java
-docs/README.md
-docs/roadmap.md
-CONTINUAR.md
-```
-
-## Que se hizo
-
-1. Se revisaron los documentos raiz:
-   - `CLAUDE.md`
-   - `Resumen.md`
-   - `MACRO-PROMPT-RECETAS-FAMILIA.md`
-
-2. Se detecto que el proyecto estaba casi vacio:
-   - no habia repo Git;
-   - no habia build system;
-   - no habia backend Spring Boot;
-   - no habia proyecto Android real;
-   - solo habia un `Main.java` de ejemplo en Desktop.
-
-3. Se inicializo Git en la carpeta raiz `Recetas Familiares`.
-
-4. Se creo `.gitignore` global para:
-   - Java;
-   - Maven;
-   - Gradle;
-   - Android;
-   - IntelliJ;
-   - logs;
-   - builds;
-   - secretos locales.
-
-5. Se hizo el primer commit:
-
-```text
-a97b8bd Initial project baseline
-```
-
-6. Se conecto el remoto GitHub:
-
-```text
-https://github.com/GipsyDavy/Recetas-Familiares.git
-```
-
-7. Se hizo push inicial a GitHub.
-
-8. Se normalizo la estructura del monorepo:
-
-```text
-backend/
-android/
-desktop/
-database/
-docs/
-```
-
-9. Se movio el contenido versionado de `Recetas Familiares - Desktop/` a:
-
-```text
-desktop/
-```
-
-10. Se crearon README iniciales:
-
-```text
-README.md
-backend/README.md
-android/README.md
-database/README.md
-docs/README.md
-docs/roadmap.md
-```
-
-11. Se hizo commit y push:
-
-```text
-988d832 Organize monorepo structure
-```
-
-## Carpetas antiguas locales
-
-Pueden seguir existiendo localmente:
-
-```text
-Recetas Familiares - Desktop/
-Recetas Familiares - Android/
-```
-
-Esas carpetas contienen restos/metadatos ignorados de IntelliJ y no forman parte del estado versionado importante.
-
-No usarlas como raiz del proyecto.
-
-Antes de borrarlas, verificar que no contienen ningun archivo util no versionado:
-
-```text
-git status --short --ignored
-```
-
-No borrar nada automaticamente sin confirmacion del usuario.
-
-## Objetivo del producto
-
-Segun los documentos raiz, el proyecto debe ser una aplicacion premium multiplataforma para gestion familiar de recetas:
+Plataformas objetivo:
 
 - Backend Spring Boot + MySQL;
 - Android nativo;
 - Desktop JavaFX;
-- sincronizacion multiplataforma;
-- experiencia calida, moderna, emocional y premium;
-- gestion de recetas, ingredientes, stock, menus, listas de compra y memoria culinaria familiar.
+- sincronizacion cliente-servidor.
 
-## Reglas importantes del proyecto
+## Reglas obligatorias
 
-- Mantener arquitectura cliente-servidor.
-- MySQL es la fuente principal.
-- Android y Desktop se comunican mediante API HTTP.
+Antes de continuar, leer y cumplir:
+
+- `CLAUDE.md`
+- `MACRO-PROMPT-RECETAS-FAMILIA.md`
+- `Resumen.md`
+- este `CONTINUAR.md`
+
+Reglas tecnicas clave:
+
+- API versionada bajo `/api/v1`.
 - No exponer entidades JPA directamente.
 - Usar DTOs explicitos.
-- API versionada bajo `/api/v1/`.
 - Validar ownership familiar en todos los endpoints.
-- Usar JWT y refresh tokens.
-- No hardcodear secretos.
-- Usar migraciones versionadas con Flyway o Liquibase.
-- Entidades sincronizables con:
-  - `id`
-  - `createdAt`
-  - `updatedAt`
-  - `syncVersion`
-  - `deleted`
-- Soft delete obligatorio para datos sincronizados.
-- Evitar bloquear UI thread en Android y JavaFX.
+- MySQL es la fuente principal.
+- Flyway para migraciones.
+- No usar `ddl-auto=update`.
+- JWT + refresh tokens.
+- No hardcodear secretos de produccion.
+- Entidades sincronizables con `id`, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
+- Soft delete obligatorio.
+- Preparar Android/Desktop para sincronizacion offline.
 
-## Siguiente paso recomendado
+## Herramientas
 
-El siguiente paso tecnico recomendado es crear el backend real dentro de:
+Se dejo Maven y Gradle disponibles en PATH de usuario:
+
+```text
+C:\Program Files\Apache NetBeans\java\maven\bin
+C:\tmp\tools\gradle-9.5.1\bin
+```
+
+En esta sesion puede hacer falta recargar PATH:
+
+```powershell
+$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')
+```
+
+El build actual usa Java instalado en la maquina. Maven compila con release 21, aunque la JVM detectada en tests fue Java 25.
+
+Advertencia conocida:
+
+- Mockito/Byte Buddy muestra warning con Java 25.
+- No rompe build ni tests.
+- Futuro recomendado: usar JDK 21 LTS o configurar Mockito como javaagent.
+
+## Backend implementado
+
+Se creo backend Maven Spring Boot en:
 
 ```text
 backend/
 ```
 
-Recomendacion:
+Stack actual:
 
-- Java 21 LTS;
-- Spring Boot 3.x;
-- Maven o Gradle, preferiblemente escoger uno y mantenerlo;
-- Spring Web;
-- Spring Security;
-- Spring Data JPA;
-- MySQL Driver;
-- Flyway;
-- Validation;
-- OpenAPI/Swagger;
-- tests iniciales.
+- Spring Boot 3.5.14.
+- Java configurado como 21.
+- Maven.
+- Spring Web.
+- Spring Security.
+- Spring Data JPA.
+- Bean Validation.
+- Flyway.
+- MySQL.
+- H2 para tests.
+- OpenAPI/Swagger.
+- JJWT.
 
-Primer backend minimo:
+## Configuracion implementada
+
+Archivos:
+
+- `backend/pom.xml`
+- `backend/src/main/resources/application.yml`
+- `backend/src/main/resources/application-dev.yml`
+- `backend/src/main/resources/application-prod.yml`
+- `backend/src/test/resources/application-test.yml`
+
+Configuracion clave:
+
+- perfil base con variables de entorno obligatorias;
+- perfil `dev` para desarrollo local;
+- perfil `prod` con Swagger/OpenAPI desactivado;
+- perfil `test` con H2;
+- `ddl-auto: validate`;
+- Flyway activado;
+- sin secretos de produccion hardcodeados.
+
+## Seguridad implementada
+
+Implementado:
+
+- seguridad stateless;
+- JWT Bearer access token;
+- refresh tokens opacos;
+- refresh tokens almacenados como hash SHA-256;
+- rotacion de refresh token;
+- logout con revocacion;
+- BCrypt para passwords;
+- errores JSON para 401 y 403;
+- filtros JWT;
+- `UserDetailsService`;
+- endpoints publicos limitados a auth, health y Swagger/OpenAPI.
+
+## Auth implementado
+
+Endpoints:
 
 ```text
-backend/
-├─ pom.xml o build.gradle.kts
-├─ src/main/java/...
-├─ src/main/resources/application.yml
-└─ src/test/java/...
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+POST /api/v1/auth/refresh
+POST /api/v1/auth/logout
 ```
 
-Primeras capacidades backend:
+Registro crea:
 
-1. arrancar Spring Boot;
-2. health endpoint;
-3. configuracion por variables de entorno;
-4. conexion MySQL preparada;
-5. Flyway preparado;
-6. estructura de paquetes:
-   - `auth`
-   - `users`
-   - `families`
-   - `recipes`
-   - `common`
-   - `security`
+- usuario;
+- familia;
+- membership familiar con rol `OWNER`.
+
+## Familias implementado
+
+Endpoint:
+
+```text
+GET /api/v1/families
+```
+
+Devuelve solo familias del usuario autenticado.
+
+## Recetas implementado
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/recipes
+POST /api/v1/families/{familyId}/recipes
+GET /api/v1/families/{familyId}/recipes/{recipeId}
+PUT /api/v1/families/{familyId}/recipes/{recipeId}
+DELETE /api/v1/families/{familyId}/recipes/{recipeId}
+```
+
+Incluye:
+
+- listado paginado;
+- detalle;
+- creacion;
+- actualizacion;
+- soft delete;
+- ownership familiar;
+- campos de sincronizacion.
+
+## Ingredientes y pasos implementado
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/recipes/{recipeId}/ingredients
+GET /api/v1/families/{familyId}/recipes/{recipeId}/ingredients?includeDeleted=true
+PUT /api/v1/families/{familyId}/recipes/{recipeId}/ingredients
+GET /api/v1/families/{familyId}/recipes/{recipeId}/steps
+GET /api/v1/families/{familyId}/recipes/{recipeId}/steps?includeDeleted=true
+PUT /api/v1/families/{familyId}/recipes/{recipeId}/steps
+```
+
+Comportamiento:
+
+- los `PUT` reemplazan la lista completa;
+- el orden se guarda en `position`;
+- los elementos anteriores se marcan con soft delete;
+- `includeDeleted=true` permite recuperar tombstones;
+- al borrar receta se soft-deletean ingredientes y pasos.
+
+## Stock familiar implementado
+
+Endpoint base:
+
+```text
+/api/v1/families/{familyId}/stock-items
+```
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/stock-items
+POST /api/v1/families/{familyId}/stock-items
+GET /api/v1/families/{familyId}/stock-items/{stockItemId}
+PUT /api/v1/families/{familyId}/stock-items/{stockItemId}
+DELETE /api/v1/families/{familyId}/stock-items/{stockItemId}
+```
+
+Campos:
+
+- `name`
+- `quantity`
+- `unit`
+- `lowStockThreshold`
+- `expiresAt`
+- `note`
+- `createdAt`
+- `updatedAt`
+- `syncVersion`
+- `deleted`
+
+Integrado en sincronizacion como `stockItems`.
+
+## Sincronizacion implementada
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/sync/pull?since=2026-05-27T00:00:00Z
+POST /api/v1/families/{familyId}/sync/push
+```
+
+`pull` devuelve:
+
+- `serverTime`
+- `recipes`
+- `ingredients`
+- `steps`
+- `stockItems`
+
+`push` acepta:
+
+- recetas;
+- ingredientes;
+- pasos;
+- stock familiar;
+- IDs estables de cliente;
+- tombstones con `deleted=true`.
+
+Estrategia inicial:
+
+- Last Write Wins;
+- `updatedAt` asignado por servidor;
+- `syncVersion` asignado por servidor;
+- ownership familiar obligatorio;
+- borrados desconocidos se ignoran para no crear basura;
+- no se permite mover silenciosamente contenido existente a otra receta.
+
+## Migraciones Flyway
+
+Implementadas:
+
+```text
+V1__create_identity_schema.sql
+V2__create_recipes_schema.sql
+V3__create_recipe_contents_schema.sql
+V4__create_stock_schema.sql
+```
+
+Tablas principales actuales:
+
+- `users`
+- `families`
+- `family_members`
+- `refresh_tokens`
+- `recipes`
+- `recipe_ingredients`
+- `recipe_steps`
+- `stock_items`
+
+## Tests implementados
+
+Hay tests de:
+
+- contexto Spring;
+- health endpoint;
+- auth register/login/refresh/logout;
+- familias;
+- recetas;
+- ingredientes y pasos;
+- aislamiento entre familias;
+- stock familiar;
+- sync pull;
+- sync push;
+- tombstones y soft delete.
+
+Ultima verificacion ejecutada:
+
+```powershell
+$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
+```
+
+Resultado:
+
+```text
+Tests run: 25
+Failures: 0
+Errors: 0
+Skipped: 0
+BUILD SUCCESS
+```
+
+## Estado Git actual
+
+Hay cambios sin commit:
+
+```text
+ M backend/README.md
+?? backend/pom.xml
+?? backend/src/
+```
+
+No se ha hecho commit despues de implementar el backend.
+
+Antes de commitear:
+
+```powershell
+git status --short --branch
+git diff --stat
+```
+
+## Que falta
+
+Prioridad backend:
+
+1. Mejorar resolucion de conflictos sync con version cliente/servidor.
+2. Implementar menus semanales.
+3. Implementar listas de compra.
+4. Implementar favoritos.
+5. Implementar notas familiares.
+6. Implementar fotos como metadata/URLs, nunca binarios en MySQL.
+7. Implementar roles/permisos familiares mas finos.
+8. Preparar rate limiting y hardening de seguridad.
+9. Revisar Swagger/OpenAPI antes de produccion.
+10. Crear datos seed/dev si hace falta.
+
+Prioridad Android:
+
+1. Crear proyecto Android real.
+2. Retrofit client.
+3. Room local database.
+4. Repository pattern.
+5. WorkManager sync pull/push.
+6. Pantallas auth, recetas, detalle y stock.
+7. Material You 3.
+
+Prioridad Desktop:
+
+1. Crear proyecto JavaFX real con Maven.
+2. HTTP API client.
+3. Cache local.
+4. MVVM ligero.
+5. Pantallas dashboard, recetas, detalle y stock.
+6. Evitar bloquear JavaFX Thread.
+
+## Desde donde continuar
+
+Ruta:
+
+```text
+C:\Users\GipsyDavy\MAVEN\Recetas Familiares\backend
+```
+
+Comando recomendado:
+
+```powershell
+$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
+```
+
+Siguiente paso tecnico recomendado:
+
+```text
+Implementar menus semanales en backend.
+```
+
+Motivo:
+
+- depende de recetas;
+- prepara listas de compra;
+- encaja con planificacion familiar;
+- es una pieza central del MVP.
+
+Alternativa si se quiere cerrar el backend base primero:
+
+```text
+Revisar diff, hacer commit y push del estado actual.
+```
 
 ## Procedimiento al retomar
 
-1. Abrir:
+1. Abrir la raiz:
 
 ```text
 C:\Users\GipsyDavy\MAVEN\Recetas Familiares
 ```
 
-2. Comprobar estado:
-
-```text
-git status --short --branch
-```
-
-3. Leer:
+2. Leer:
 
 ```text
 CLAUDE.md
-Resumen.md
 MACRO-PROMPT-RECETAS-FAMILIA.md
+Resumen.md
 CONTINUAR.md
-docs/roadmap.md
+backend/README.md
 ```
 
-4. Continuar con el backend Spring Boot en `backend/`.
+3. Comprobar estado:
 
-5. Antes de modificar, explicar plan breve.
-
-6. Despues de modificar:
-
-```text
+```powershell
 git status --short --branch
-git diff --stat
 ```
 
-7. Commit y push cuando el cambio este verificado.
+4. Validar backend:
 
-## Nota para la siguiente sesion
+```powershell
+$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
+```
 
-No empezar desde `desktop/`. El proyecto ahora es un monorepo y la raiz correcta es `Recetas Familiares`.
+5. Continuar con menus semanales o cerrar commit.
 
-El siguiente trabajo no debe ser UI todavia. Primero conviene crear el backend base, porque Android y Desktop dependeran de sus contratos API.
+## Nota importante
+
+No empezar por Android ni Desktop hasta confirmar que los contratos backend estan suficientemente estables.
+
+El backend ya tiene base real y contratos iniciales para:
+
+- auth;
+- familias;
+- recetas;
+- ingredientes;
+- pasos;
+- stock;
+- sincronizacion pull/push.
+
+La siguiente fase debe mantener compatibilidad con Android/Desktop y no romper los contratos JSON existentes sin motivo fuerte.

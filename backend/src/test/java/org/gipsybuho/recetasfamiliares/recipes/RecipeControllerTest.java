@@ -1,0 +1,423 @@
+package org.gipsybuho.recetasfamiliares.recipes;
+
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+@ActiveProfiles("test")
+@SpringBootTest
+@AutoConfigureMockMvc
+class RecipeControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private RecipeIngredientRepository ingredientRepository;
+
+    @Autowired
+    private RecipeStepRepository stepRepository;
+
+    @Test
+    void createsAndListsRecipesForAuthenticatedFamilyMember() throws Exception {
+        RegisteredUser user = register("recipes-owner@example.com", "Familia Recetas");
+
+        createRecipe(user, "Tortilla familiar")
+                .andExpect(jsonPath("$.id", notNullValue()))
+                .andExpect(jsonPath("$.familyId").value(user.familyId()))
+                .andExpect(jsonPath("$.title").value("Tortilla familiar"))
+                .andExpect(jsonPath("$.difficulty").value("EASY"))
+                .andExpect(jsonPath("$.deleted").value(false));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("Tortilla familiar"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalItems").value(1));
+    }
+
+    @Test
+    void getsUpdatesAndSoftDeletesRecipe() throws Exception {
+        RegisteredUser user = register("recipes-crud@example.com", "Familia CRUD");
+        MvcResult created = createRecipe(user, "Gazpacho familiar").andReturn();
+        String recipeId = read(created, "id");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Gazpacho familiar"));
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Gazpacho de verano",
+                                  "description": "Version actualizada",
+                                  "servings": 6,
+                                  "prepMinutes": 15,
+                                  "cookMinutes": 0,
+                                  "difficulty": "MEDIUM"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Gazpacho de verano"))
+                .andExpect(jsonPath("$.description").value("Version actualizada"))
+                .andExpect(jsonPath("$.servings").value(6))
+                .andExpect(jsonPath("$.syncVersion", greaterThanOrEqualTo(1)));
+
+        mockMvc.perform(delete("/api/v1/families/{familyId}/recipes/{recipeId}", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalItems").value(0));
+    }
+
+    @Test
+    void blocksRecipeAccessToAnotherFamily() throws Exception {
+        RegisteredUser first = register("recipes-one@example.com", "Familia Uno");
+        RegisteredUser second = register("recipes-two@example.com", "Familia Dos");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/recipes", second.familyId())
+                        .header("Authorization", "Bearer " + first.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Receta ajena"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("request_error"));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes", second.familyId())
+                        .header("Authorization", "Bearer " + first.accessToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("request_error"));
+
+        MvcResult secondRecipe = createRecipe(second, "Receta privada").andReturn();
+        String secondRecipeId = read(secondRecipe, "id");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}", second.familyId(), secondRecipeId)
+                        .header("Authorization", "Bearer " + first.accessToken()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}", second.familyId(), secondRecipeId)
+                        .header("Authorization", "Bearer " + first.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Intento ajeno"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/v1/families/{familyId}/recipes/{recipeId}", second.familyId(), secondRecipeId)
+                        .header("Authorization", "Bearer " + first.accessToken()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void validatesRecipeInput() throws Exception {
+        RegisteredUser user = register("recipes-validation@example.com", "Familia Validacion");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/recipes", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "",
+                                  "servings": 0
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("validation_error"));
+    }
+
+    @Test
+    void replacesAndListsRecipeIngredientsInOrder() throws Exception {
+        RegisteredUser user = register("recipe-ingredients@example.com", "Familia Ingredientes");
+        MvcResult created = createRecipe(user, "Croquetas familiares").andReturn();
+        String recipeId = read(created, "id");
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "name": "Leche",
+                                      "quantity": 500,
+                                      "unit": "ml",
+                                      "note": "Entera"
+                                    },
+                                    {
+                                      "name": "Harina",
+                                      "quantity": 80,
+                                      "unit": "g"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].position").value(1))
+                .andExpect(jsonPath("$[0].name").value("Leche"))
+                .andExpect(jsonPath("$[0].deleted").value(false))
+                .andExpect(jsonPath("$[1].position").value(2))
+                .andExpect(jsonPath("$[1].name").value("Harina"));
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "name": "Jamon",
+                                      "quantity": 120,
+                                      "unit": "g"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].position").value(1))
+                .andExpect(jsonPath("$[0].name").value("Jamon"));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("Jamon"));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients?includeDeleted=true",
+                        user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[?(@.name == 'Leche' && @.deleted == true)]").exists())
+                .andExpect(jsonPath("$[?(@.name == 'Harina' && @.deleted == true)]").exists())
+                .andExpect(jsonPath("$[?(@.name == 'Jamon' && @.deleted == false)]").exists());
+    }
+
+    @Test
+    void replacesAndListsRecipeStepsInOrder() throws Exception {
+        RegisteredUser user = register("recipe-steps@example.com", "Familia Pasos");
+        MvcResult created = createRecipe(user, "Bizcocho familiar").andReturn();
+        String recipeId = read(created, "id");
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/steps", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "instruction": "Mezclar los ingredientes secos",
+                                      "timerMinutes": 0
+                                    },
+                                    {
+                                      "instruction": "Hornear hasta que quede dorado",
+                                      "timerMinutes": 35
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].position").value(1))
+                .andExpect(jsonPath("$[0].instruction").value("Mezclar los ingredientes secos"))
+                .andExpect(jsonPath("$[1].position").value(2))
+                .andExpect(jsonPath("$[1].timerMinutes").value(35));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}/steps", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].instruction").value("Hornear hasta que quede dorado"));
+    }
+
+    @Test
+    void softDeletesRecipeContentWhenDeletingRecipe() throws Exception {
+        RegisteredUser user = register("recipe-delete-content@example.com", "Familia Borrado Contenido");
+        MvcResult created = createRecipe(user, "Sopa familiar").andReturn();
+        String recipeId = read(created, "id");
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "name": "Caldo",
+                                      "quantity": 1,
+                                      "unit": "l"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/steps", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "instruction": "Calentar el caldo",
+                                      "timerMinutes": 10
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/v1/families/{familyId}/recipes/{recipeId}", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isNoContent());
+
+        List<RecipeIngredientEntity> ingredients = ingredientRepository.findByRecipe_IdOrderByPositionAsc(recipeId);
+        List<RecipeStepEntity> steps = stepRepository.findByRecipe_IdOrderByPositionAsc(recipeId);
+
+        org.assertj.core.api.Assertions.assertThat(ingredients)
+                .hasSize(1)
+                .allMatch(RecipeIngredientEntity::isDeleted);
+        org.assertj.core.api.Assertions.assertThat(steps)
+                .hasSize(1)
+                .allMatch(RecipeStepEntity::isDeleted);
+    }
+
+    @Test
+    void blocksRecipeContentAccessToAnotherFamily() throws Exception {
+        RegisteredUser first = register("recipe-content-one@example.com", "Familia Contenido Uno");
+        RegisteredUser second = register("recipe-content-two@example.com", "Familia Contenido Dos");
+        MvcResult secondRecipe = createRecipe(second, "Receta familiar privada").andReturn();
+        String secondRecipeId = read(secondRecipe, "id");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients",
+                        second.familyId(), secondRecipeId)
+                        .header("Authorization", "Bearer " + first.accessToken()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/steps",
+                        second.familyId(), secondRecipeId)
+                        .header("Authorization", "Bearer " + first.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "instruction": "Intento ajeno"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void validatesRecipeContentInput() throws Exception {
+        RegisteredUser user = register("recipe-content-validation@example.com", "Familia Contenido Validacion");
+        MvcResult created = createRecipe(user, "Arroz familiar").andReturn();
+        String recipeId = read(created, "id");
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "name": "",
+                                      "quantity": -1
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("validation_error"));
+    }
+
+    private RegisteredUser register(String email, String familyName) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s",
+                                  "displayName": "Recipe User",
+                                  "password": "very-secure-password",
+                                  "familyName": "%s"
+                                }
+                                """.formatted(email, familyName)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        return new RegisteredUser(
+                response.get("accessToken").asText(),
+                response.get("family").get("id").asText()
+        );
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createRecipe(RegisteredUser user, String title) throws Exception {
+        return mockMvc.perform(post("/api/v1/families/{familyId}/recipes", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "%s",
+                                  "description": "Receta base de casa",
+                                  "servings": 4,
+                                  "prepMinutes": 10,
+                                  "cookMinutes": 20,
+                                  "difficulty": "EASY"
+                                }
+                                """.formatted(title)))
+                .andExpect(status().isCreated());
+    }
+
+    private String read(MvcResult result, String field) throws Exception {
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        return response.get(field).asText();
+    }
+
+    private record RegisteredUser(String accessToken, String familyId) {
+    }
+}

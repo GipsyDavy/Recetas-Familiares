@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/recetas_familiares?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:recetas_app}
+    password: ${DB_PASSWORD:}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8080,http://localhost:3000}
+  security:
+    jwt:
+      secret: ${JWT_SECRET:dev-only-change-this-secret-32-bytes-minimum}
