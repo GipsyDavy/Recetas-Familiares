@@ -14,3 +14,6 @@ app:
       secret: test-only-change-this-secret-32-bytes-minimum
       access-token-ttl-minutes: 15
       refresh-token-ttl-days: 30
+    rate-limit:
+      auth:
+        enabled: false

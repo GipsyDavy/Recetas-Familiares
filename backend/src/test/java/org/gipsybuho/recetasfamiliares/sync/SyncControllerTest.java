@@ -278,6 +278,30 @@ class SyncControllerTest {
                 .andExpect(jsonPath("$.code").value("request_error"));
     }
 
+    @Test
+    void rejectsNonUuidV4SyncIds() throws Exception {
+        RegisteredUser user = register("sync-push-uuid-validation@example.com", "Familia Push Uuid");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [
+                                    {
+                                      "id": "not-a-uuid",
+                                      "title": "Offline",
+                                      "deleted": false
+                                    }
+                                  ],
+                                  "ingredients": [],
+                                  "steps": []
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("validation_error"));
+    }
+
     private RegisteredUser register(String email, String familyName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -36,3 +36,10 @@ app:
       secret: ${JWT_SECRET}
       access-token-ttl-minutes: ${JWT_ACCESS_TOKEN_TTL_MINUTES:15}
       refresh-token-ttl-days: ${JWT_REFRESH_TOKEN_TTL_DAYS:30}
+      revoked-refresh-token-retention-days: ${JWT_REVOKED_REFRESH_TOKEN_RETENTION_DAYS:7}
+      refresh-token-cleanup-cron: ${JWT_REFRESH_TOKEN_CLEANUP_CRON:0 0 3 * * *}
+    rate-limit:
+      auth:
+        enabled: ${AUTH_RATE_LIMIT_ENABLED:true}
+        max-requests: ${AUTH_RATE_LIMIT_MAX_REQUESTS:20}
+        window-seconds: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:60}

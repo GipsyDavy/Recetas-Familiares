@@ -10,7 +10,9 @@ import java.util.Base64;
 
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RefreshTokenService {
@@ -18,13 +20,16 @@ public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final SecureRandom secureRandom = new SecureRandom();
     private final Duration refreshTokenTtl;
+    private final Duration revokedTokenRetention;
 
     public RefreshTokenService(
             RefreshTokenRepository refreshTokenRepository,
-            @Value("${app.security.jwt.refresh-token-ttl-days}") long refreshTokenTtlDays
+            @Value("${app.security.jwt.refresh-token-ttl-days}") long refreshTokenTtlDays,
+            @Value("${app.security.jwt.revoked-refresh-token-retention-days:7}") long revokedTokenRetentionDays
     ) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.refreshTokenTtl = Duration.ofDays(refreshTokenTtlDays);
+        this.revokedTokenRetention = Duration.ofDays(revokedTokenRetentionDays);
     }
 
     IssuedRefreshToken issue(UserEntity user) {
@@ -56,6 +61,13 @@ public class RefreshTokenService {
                     token.revoke(Instant.now(), null);
                     refreshTokenRepository.save(token);
                 });
+    }
+
+    @Scheduled(cron = "${app.security.jwt.refresh-token-cleanup-cron:0 0 3 * * *}")
+    @Transactional
+    public void purgeExpiredAndOldRevokedTokens() {
+        Instant now = Instant.now();
+        refreshTokenRepository.deleteExpiredOrRevokedBefore(now, now.minus(revokedTokenRetention));
     }
 
     private String generateRawToken() {

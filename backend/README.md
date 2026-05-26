@@ -41,6 +41,12 @@ Health endpoint:
 GET /api/v1/health
 ```
 
+Logo del creador:
+
+```text
+GET /brand/gipsy-buho-logo.png
+```
+
 Autenticacion:
 
 ```text

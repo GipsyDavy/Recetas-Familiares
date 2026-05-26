@@ -3,6 +3,7 @@ package org.gipsybuho.recetasfamiliares.common.api;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
@@ -26,5 +27,12 @@ class HealthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"))
                 .andExpect(jsonPath("$.checkedAt", notNullValue()));
+    }
+
+    @Test
+    void creatorLogoIsPublic() throws Exception {
+        mockMvc.perform(get("/brand/gipsy-buho-logo.png"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/png"));
     }
 }

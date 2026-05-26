@@ -24,15 +24,18 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final AuthRateLimitFilter authRateLimitFilter;
     private final ApiAuthenticationEntryPoint authenticationEntryPoint;
     private final ApiAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            AuthRateLimitFilter authRateLimitFilter,
             ApiAuthenticationEntryPoint authenticationEntryPoint,
             ApiAccessDeniedHandler accessDeniedHandler
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.authRateLimitFilter = authRateLimitFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
     }
@@ -48,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/health",
+                                "/brand/**",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
@@ -64,6 +68,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler)
                 )
+                .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
