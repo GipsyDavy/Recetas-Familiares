@@ -34,7 +34,7 @@ Objetivo:
 Plataformas objetivo:
 
 - Backend Spring Boot + MySQL;
-- Android nativo;
+- Android nativo Kotlin + Compose;
 - Desktop JavaFX;
 - sincronizacion cliente-servidor.
 
@@ -108,7 +108,9 @@ Stack actual:
 - OpenAPI/Swagger.
 - JJWT.
 
-## Configuracion implementada
+Estado: **COMPLETO Y ESTABLE**. 57 tests, 0 fallos.
+
+## Configuracion backend
 
 Archivos:
 
@@ -118,407 +120,39 @@ Archivos:
 - `backend/src/main/resources/application-prod.yml`
 - `backend/src/test/resources/application-test.yml`
 
-Configuracion clave:
-
-- perfil base con variables de entorno obligatorias;
-- perfil `dev` para desarrollo local;
-- seed de desarrollo opcional solo en perfil `dev`, activable con `DEV_SEED_DATA_ENABLED=true`;
-- perfil `prod` con Swagger/OpenAPI desactivado;
-- perfil `test` con H2;
-- `ddl-auto: validate`;
-- Flyway activado;
-- sin secretos de produccion hardcodeados.
-
-## Seguridad implementada
-
-Implementado:
+## Seguridad backend implementada
 
 - seguridad stateless;
-- JWT Bearer access token;
-- refresh tokens opacos;
-- refresh tokens almacenados como hash SHA-256;
+- JWT Bearer access token (TTL 15 min por defecto);
+- refresh tokens opacos almacenados como hash SHA-256;
 - rotacion de refresh token;
 - logout con revocacion;
-- BCrypt para passwords;
+- BCrypt(12) para passwords;
 - errores JSON para 401 y 403;
 - filtros JWT;
-- `UserDetailsService`;
-- endpoints publicos limitados a auth, health y Swagger/OpenAPI.
-- OpenAPI documenta `auth` y `health` como publicos, y el resto de `/api/v1/**` con Bearer JWT.
-- permisos familiares por rol: `OWNER` y `ADMIN` pueden escribir/borrar/sync push; `MEMBER` puede leer.
-- rate limiting configurable en `POST /api/v1/auth/register`, `/login`, `/refresh` y `/logout`;
-- respuestas `429` con codigo `rate_limited` y cabecera `Retry-After`.
+- endpoints publicos limitados a auth, health y Swagger/OpenAPI;
+- permisos familiares por rol: `OWNER` y `ADMIN` escriben/borran/sync push; `MEMBER` lee;
+- rate limiting configurable en auth endpoints;
+- respuestas `429` con codigo `rate_limited` y cabecera `Retry-After`;
 - cabeceras defensivas HTTP: CSP, nosniff, frame deny, referrer policy y permissions policy;
 - HSTS configurado para HTTPS;
 - CORS deny-by-default salvo origenes configurados en `CORS_ALLOWED_ORIGINS`.
 
-## Auth implementado
-
-Endpoints:
-
-```text
-POST /api/v1/auth/register
-POST /api/v1/auth/login
-POST /api/v1/auth/refresh
-POST /api/v1/auth/logout
-```
-
-Registro crea:
-
-- usuario;
-- familia;
-- membership familiar con rol `OWNER`.
-
-## Familias implementado
-
-Endpoint:
-
-```text
-GET /api/v1/families
-```
-
-Devuelve solo familias del usuario autenticado.
-
-## Recetas implementado
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/recipes
-POST /api/v1/families/{familyId}/recipes
-GET /api/v1/families/{familyId}/recipes/{recipeId}
-PUT /api/v1/families/{familyId}/recipes/{recipeId}
-DELETE /api/v1/families/{familyId}/recipes/{recipeId}
-```
-
-Incluye:
-
-- listado paginado;
-- detalle;
-- creacion;
-- actualizacion;
-- soft delete;
-- ownership familiar;
-- campos de sincronizacion.
-
-## Ingredientes y pasos implementado
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/recipes/{recipeId}/ingredients
-GET /api/v1/families/{familyId}/recipes/{recipeId}/ingredients?includeDeleted=true
-PUT /api/v1/families/{familyId}/recipes/{recipeId}/ingredients
-GET /api/v1/families/{familyId}/recipes/{recipeId}/steps
-GET /api/v1/families/{familyId}/recipes/{recipeId}/steps?includeDeleted=true
-PUT /api/v1/families/{familyId}/recipes/{recipeId}/steps
-```
-
-Comportamiento:
-
-- los `PUT` reemplazan la lista completa;
-- el orden se guarda en `position`;
-- los elementos anteriores se marcan con soft delete;
-- `includeDeleted=true` permite recuperar tombstones;
-- al borrar receta se soft-deletean ingredientes y pasos.
-
-## Stock familiar implementado
-
-Endpoint base:
-
-```text
-/api/v1/families/{familyId}/stock-items
-```
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/stock-items
-POST /api/v1/families/{familyId}/stock-items
-GET /api/v1/families/{familyId}/stock-items/{stockItemId}
-PUT /api/v1/families/{familyId}/stock-items/{stockItemId}
-DELETE /api/v1/families/{familyId}/stock-items/{stockItemId}
-```
-
-Campos:
-
-- `name`
-- `quantity`
-- `unit`
-- `lowStockThreshold`
-- `expiresAt`
-- `note`
-- `createdAt`
-- `updatedAt`
-- `syncVersion`
-- `deleted`
-
-Integrado en sincronizacion como `stockItems`.
-
-## Menus semanales implementados
-
-Endpoint base:
-
-```text
-/api/v1/families/{familyId}/menu-items
-```
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/menu-items?weekStart=2026-06-01
-POST /api/v1/families/{familyId}/menu-items
-GET /api/v1/families/{familyId}/menu-items/{menuItemId}
-PUT /api/v1/families/{familyId}/menu-items/{menuItemId}
-DELETE /api/v1/families/{familyId}/menu-items/{menuItemId}
-```
-
-Campos:
-
-- `recipeId` opcional, siempre validado contra la misma familia;
-- `recipeTitle` en respuesta;
-- `plannedDate`;
-- `mealType`: `BREAKFAST`, `LUNCH`, `DINNER`, `SNACK`;
-- `note`;
-- `createdAt`;
-- `updatedAt`;
-- `syncVersion`;
-- `deleted`.
-
-Integrado en sincronizacion como `menuItems`.
-
-## Listas de compra implementadas
-
-Endpoint base:
-
-```text
-/api/v1/families/{familyId}/shopping-lists
-```
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/shopping-lists
-POST /api/v1/families/{familyId}/shopping-lists
-POST /api/v1/families/{familyId}/shopping-lists/generate-from-menu
-GET /api/v1/families/{familyId}/shopping-lists/{shoppingListId}
-PUT /api/v1/families/{familyId}/shopping-lists/{shoppingListId}
-DELETE /api/v1/families/{familyId}/shopping-lists/{shoppingListId}
-GET /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items
-POST /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items
-GET /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items/{itemId}
-PUT /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items/{itemId}
-DELETE /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items/{itemId}
-```
-
-Campos de lista:
-
-- `name`
-- `plannedFrom`
-- `plannedTo`
-- `note`
-- `completed`
-- `createdAt`
-- `updatedAt`
-- `syncVersion`
-- `deleted`
-
-Campos de item:
-
-- `shoppingListId`
-- `position`
-- `name`
-- `quantity`
-- `unit`
-- `checked`
-- `note`
-- `createdAt`
-- `updatedAt`
-- `syncVersion`
-- `deleted`
-
-Al borrar una lista se aplican tombstones a sus items activos.
-Integrado en sincronizacion como `shoppingLists` y `shoppingListItems`.
-
-Generacion automatica:
-
-- `generate-from-menu` recibe `name`, `startDate`, `endDate` y `note`;
-- crea una lista nueva para ese rango;
-- recorre recetas planificadas en menus semanales;
-- lee ingredientes activos de esas recetas;
-- agrupa por nombre y unidad, ignorando mayusculas/minusculas;
-- suma cantidades cuando hay cantidad;
-- crea items no marcados como comprados.
-
-## Favoritos implementados
-
-Endpoint base:
-
-```text
-/api/v1/families/{familyId}/favorite-recipes
-```
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/favorite-recipes
-POST /api/v1/families/{familyId}/favorite-recipes
-GET /api/v1/families/{familyId}/favorite-recipes/{favoriteId}
-DELETE /api/v1/families/{familyId}/favorite-recipes/{favoriteId}
-```
-
-Campos:
-
-- `familyId`
-- `recipeId`
-- `recipeTitle`
-- `createdAt`
-- `updatedAt`
-- `syncVersion`
-- `deleted`
-
-Comportamiento:
-
-- favorito familiar, no individual;
-- valida que la receta pertenece a la familia autenticada;
-- constraint unico por familia y receta;
-- si se vuelve a marcar como favorita una receta borrada logicamente del listado de favoritos, se restaura el mismo registro;
-- integrado en sincronizacion como `favoriteRecipes`.
-
-## Notas familiares implementadas
-
-Endpoint base:
-
-```text
-/api/v1/families/{familyId}/notes
-```
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/notes
-POST /api/v1/families/{familyId}/notes
-GET /api/v1/families/{familyId}/notes/{noteId}
-PUT /api/v1/families/{familyId}/notes/{noteId}
-DELETE /api/v1/families/{familyId}/notes/{noteId}
-```
-
-Campos:
-
-- `familyId`
-- `recipeId` opcional
-- `recipeTitle` en respuesta cuando hay receta
-- `title`
-- `body`
-- `pinned`
-- `createdAt`
-- `updatedAt`
-- `syncVersion`
-- `deleted`
-
-Comportamiento:
-
-- nota familiar, no individual;
-- puede asociarse a una receta de la misma familia;
-- valida ownership familiar de la receta opcional;
-- listado ordenado por `pinned` y `updatedAt`;
-- integrado en sincronizacion como `familyNotes`.
-
-## Fotos de receta implementadas
-
-Endpoint base:
-
-```text
-/api/v1/families/{familyId}/recipes/{recipeId}/photos
-```
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/recipes/{recipeId}/photos
-GET /api/v1/families/{familyId}/recipes/{recipeId}/photos?includeDeleted=true
-POST /api/v1/families/{familyId}/recipes/{recipeId}/photos
-GET /api/v1/families/{familyId}/recipes/{recipeId}/photos/{photoId}
-PUT /api/v1/families/{familyId}/recipes/{recipeId}/photos/{photoId}
-DELETE /api/v1/families/{familyId}/recipes/{recipeId}/photos/{photoId}
-```
-
-Campos:
-
-- `recipeId`
-- `position`
-- `url`
-- `thumbnailUrl`
-- `caption`
-- `contentType`
-- `sizeBytes`
-- `createdAt`
-- `updatedAt`
-- `syncVersion`
-- `deleted`
-
-Reglas:
-
-- nunca almacenar binarios en MySQL;
-- solo metadata y URLs;
-- URLs `http` o `https`;
-- tipos permitidos: `image/jpeg`, `image/png`, `image/webp`;
-- al borrar receta se soft-deletean fotos;
-- integrado en sincronizacion como `recipePhotos`.
-
-## Sincronizacion implementada
-
-Endpoints:
-
-```text
-GET /api/v1/families/{familyId}/sync/pull?since=2026-05-27T00:00:00Z
-POST /api/v1/families/{familyId}/sync/push
-```
-
-`pull` devuelve:
-
-- `serverTime`
-- `recipes`
-- `ingredients`
-- `steps`
-- `stockItems`
-- `menuItems`
-- `shoppingLists`
-- `shoppingListItems`
-- `favoriteRecipes`
-- `familyNotes`
-- `recipePhotos`
-
-`push` acepta:
-
-- recetas;
-- ingredientes;
-- pasos;
+## Modulos backend implementados
+
+- auth (register, login, refresh, logout);
+- familias;
+- recetas (CRUD + paginacion + soft delete);
+- ingredientes y pasos (PUT replace-all + tombstones);
 - stock familiar;
 - menus semanales;
-- listas de compra;
+- listas de compra (con generate-from-menu);
 - favoritos;
 - notas familiares;
-- fotos de receta;
-- IDs estables de cliente;
-- tombstones con `deleted=true`.
-
-Estrategia inicial:
-
-- compatibilidad Last Write Wins si el cliente no envia `baseSyncVersion`;
-- deteccion opcional de conflictos si el cliente envia `baseSyncVersion`;
-- respuesta `409 conflict` cuando `baseSyncVersion` no coincide con `syncVersion` actual del servidor;
-- `updatedAt` asignado por servidor;
-- `syncVersion` asignado por servidor;
-- ownership familiar obligatorio;
-- `pull` permitido para cualquier miembro activo;
-- `push` limitado a roles `OWNER` y `ADMIN`;
-- borrados desconocidos se ignoran para no crear basura;
-- no se permite mover silenciosamente contenido existente a otra receta.
+- fotos de receta (solo metadata/URLs, nunca binarios);
+- sincronizacion pull/push completa con tombstones y deteccion de conflictos.
 
 ## Migraciones Flyway
-
-Implementadas:
 
 ```text
 V1__create_identity_schema.sql
@@ -532,288 +166,120 @@ V8__create_notes_schema.sql
 V9__create_recipe_photos_schema.sql
 ```
 
-Tablas principales actuales:
+## Tests backend
 
-- `users`
-- `families`
-- `family_members`
-- `refresh_tokens`
-- `recipes`
-- `recipe_ingredients`
-- `recipe_steps`
-- `stock_items`
-- `menu_items`
-- `shopping_lists`
-- `shopping_list_items`
-- `favorite_recipes`
-- `family_notes`
-- `recipe_photos`
-
-## Tests implementados
-
-Hay tests de:
-
-- contexto Spring;
-- health endpoint;
-- auth register/login/refresh/logout;
-- familias;
-- recetas;
-- ingredientes y pasos;
-- aislamiento entre familias;
-- stock familiar;
-- menus semanales;
-- listas de compra;
-- generacion menu -> compra;
-- favoritos;
-- notas familiares;
-- fotos de receta;
-- conflictos sync con `baseSyncVersion`;
-- sync pull;
-- sync push;
-- permisos por rol familiar;
-- rate limiting de auth;
-- hardening HTTP/CORS;
-- tombstones y soft delete.
-
-Ultima verificacion ejecutada:
-
-```powershell
-$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
-```
-
-Resultado:
-
-```text
-Tests run: 57
-Failures: 0
-Errors: 0
-Skipped: 0
-BUILD SUCCESS
-```
+- 57 tests, 0 fallos, 0 errores.
+- Cubren: contexto, health, auth, familias, recetas, contenidos, stock, menus, compra, favoritos, notas, fotos, sync pull/push, permisos, rate limiting, hardening HTTP/CORS, tombstones.
 
 ## Estado Git actual
 
-Se cerraron commits locales:
+- Rama main por delante de origin/main en 3 commits.
+- No se ha hecho push todavia.
+- Commits locales pendientes de push:
+  - `ff73840 Scaffold Android client`
+  - `a58ebca Update continuation notes after backend stabilization`
+  - `2aad060 Stabilize backend OpenAPI and dev seed data`
 
-```text
-Stabilize backend OpenAPI and dev seed data
-Update continuation notes after backend stabilization
-```
+## Android - Estado actual (Sprint 2 completado)
 
-No se ha hecho push.
-
-El repositorio quedo por delante de `origin/main` en 2 commits antes de iniciar Android.
-La fase Android esta sin commitear todavia.
-
-Antes de continuar:
-
-```powershell
-git status --short --branch
-git diff --stat
-```
-
-## Que falta
-
-Prioridad backend:
-
-1. Revisar diff final y decidir si hacer push del commit backend actual.
-2. Opcional: probar manualmente Swagger UI con el perfil `dev`.
-
-## Android iniciado
-
-Se creo un proyecto Android real en:
+Ruta:
 
 ```text
 android/
 ```
 
-Stack inicial:
+Stack:
 
 - Android Gradle Plugin 9.2.0.
 - Kotlin 2.3.20.
 - Compose + Material 3.
 - Retrofit 3.
 - OkHttp logging.
-- Room 2.8.4.
+- Room 2.8.4 (version DB: 2).
 - KSP para Room.
 - WorkManager.
+- security-crypto 1.1.0-alpha06.
 - MVVM ligero sin DI framework externo.
 
-Archivos principales:
+### Corregido en Sprint 2
 
-- `android/settings.gradle.kts`
-- `android/build.gradle.kts`
-- `android/gradle.properties`
-- `android/app/build.gradle.kts`
-- `android/app/src/main/AndroidManifest.xml`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/RecetasApplication.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/MainActivity.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/core/AppContainer.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/core/SessionStore.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/remote/RecetasApi.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/remote/dto/ApiDtos.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/local/RecetasDatabase.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/local/Daos.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/local/Entities.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/repository/Repositories.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/sync/SyncWorker.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/RecetasViewModel.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/RecetasApp.kt`
-- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/theme/Theme.kt`
+1. **`isLoggedIn` reactivo** — Ahora es `StateFlow<Boolean>`. La navegacion login → main funciona correctamente.
+2. **`SyncPullDto` completo** — Las 11 colecciones del backend: recipes, ingredients, steps, stockItems, menuItems, shoppingLists, shoppingListItems, favoriteRecipes, familyNotes, recipePhotos.
+3. **`SyncPushRequestDto` tipado** — Contrato push alineado con `SyncPushRequest` del servidor. Las colecciones requeridas (recipes, ingredients, steps) se envian siempre como lista vacia si no hay cambios.
+4. **`TokenRefreshAuthenticator`** — OkHttp Authenticator que detecta 401, llama a `/api/v1/auth/refresh`, actualiza tokens y reintenta. Limpia sesion si el refresh falla.
+5. **`SessionStore` con `EncryptedSharedPreferences`** — Tokens cifrados con AES256-GCM. Incluye campo `lastSyncTime` para sync incremental.
+6. **`AppContainer` singleton** — `sessionStore` y `database` publicos. `SyncWorker` usa el `AppContainer` del `RecetasApplication` (singleton).
+7. **Logging condicional** — `HttpLoggingInterceptor.Level.BASIC` en debug, `NONE` en release.
+8. **Room version 2** — Todas las entidades: recetas, ingredientes, pasos, stock, menus, listas de compra, items de lista, favoritos, notas, fotos. `fallbackToDestructiveMigration` para desarrollo.
+9. **DAOs completos** — 10 DAOs con queries tipadas y `@Upsert`.
+10. **Mappers completos** — Todos los DTOs a entidades Room.
+11. **Sync incremental** — `SyncRepository.pullOnce()` pasa `lastSyncTime` como `since` y guarda el nuevo `serverTime`.
+12. **`allowBackup=false`** — Seguridad: no se hace backup de tokens cifrados.
 
-Implementado:
+### Bloqueo Android actual
 
-- login contra `POST /api/v1/auth/login`;
-- almacenamiento local de access token, refresh token y familyId;
-- interceptor Bearer JWT;
-- cliente Retrofit con base URL por defecto `http://10.0.2.2:8080/`;
-- Room cache para recetas y stock;
-- repositorios de auth, recetas, stock y sync;
-- WorkManager periodico para `sync/pull`;
-- pantallas Compose iniciales: login, recetas, detalle de receta y stock;
-- tema Material 3 basico;
-- README Android actualizado.
+- No existe `ANDROID_HOME` / `ANDROID_SDK_ROOT`.
+- Falta crear `android/local.properties` con `sdk.dir=...`.
+- Sin SDK no compila.
 
-Validacion ejecutada:
-
-```powershell
-cd android
-gradle tasks
-```
-
-Resultado:
-
-```text
-BUILD SUCCESSFUL
-```
-
-Tambien se intento:
-
-```powershell
-gradle :app:compileDebugKotlin
-```
-
-Resultado:
-
-```text
-SDK location not found.
-```
-
-Bloqueo actual:
-
-- no existe `ANDROID_HOME`;
-- no existe `ANDROID_SDK_ROOT`;
-- no existe SDK en `%LOCALAPPDATA%\Android\Sdk`;
-- no existe SDK en `C:\Android\Sdk`;
-- falta crear `android/local.properties` con `sdk.dir=...` o instalar/configurar Android SDK.
-
-Advertencia tecnica:
-
-- AGP 9.2 trae Kotlin integrado, pero Room/KSP necesito mantener temporalmente `org.jetbrains.kotlin.android` y `android.builtInKotlin=false` / `android.newDsl=false`.
-- Esto permite cargar tareas Gradle, pero genera warnings de deprecacion que habra que revisar cuando KSP/Room encajen mejor con Kotlin integrado de AGP 9.
-
-Prioridad Android siguiente:
+### Proximo paso Android
 
 1. Instalar/configurar Android SDK.
-2. Ejecutar `gradle :app:compileDebugKotlin`.
-3. Corregir errores de compilacion Kotlin/Android si aparecen.
-4. Ejecutar `gradle :app:assembleDebug`.
-5. Revisar UI en emulador/dispositivo.
-6. Commit del scaffold Android cuando compile.
+2. Crear `android/local.properties`:
+   ```properties
+   sdk.dir=C\:\\Users\\GipsyDavy\\AppData\\Local\\Android\\Sdk
+   ```
+3. Ejecutar:
+   ```powershell
+   cd android
+   gradle :app:compileDebugKotlin
+   gradle :app:assembleDebug
+   ```
+4. Corregir errores de compilacion si aparecen (KSP version, AGP flags).
+5. Probar en emulador con backend en dev.
 
-Prioridad Desktop:
+### Advertencia tecnica Android
 
-1. Crear proyecto JavaFX real con Maven.
+- AGP 9.2 + KSP: `android.builtInKotlin=false` / `android.newDsl=false` son workarounds temporales.
+- KSP version `2.3.0` puede estar desalineada con Kotlin `2.3.20`. Verificar y alinear cuando compile.
+- `fallbackToDestructiveMigration` activo: la DB Room se reinicia ante cambios de schema. Aceptable en desarrollo.
+
+## Desktop JavaFX
+
+Pendiente. No iniciado.
+
+Proximos pasos cuando llegue el momento:
+
+1. Crear proyecto JavaFX con Maven.
 2. HTTP API client.
 3. Cache local.
 4. MVVM ligero.
-5. Pantallas dashboard, recetas, detalle y stock.
+5. Pantallas dashboard, recetas, detalle, stock.
 6. Evitar bloquear JavaFX Thread.
-
-## Desde donde continuar
-
-Ruta:
-
-```text
-C:\Users\GipsyDavy\MAVEN\Recetas Familiares\backend
-```
-
-Comando recomendado:
-
-```powershell
-$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
-```
-
-Siguiente paso tecnico recomendado:
-
-```text
-Revisar estado Git y hacer push del commit backend actual si se quiere cerrar la fase backend.
-```
-
-Motivo:
-
-- ya existen todos los modulos MVP principales del backend;
-- los permisos familiares por rol ya estan aplicados;
-- el rate limiting de auth ya esta aplicado y testeado;
-- el hardening HTTP/CORS ya esta aplicado y testeado;
-- la exposicion y documentacion OpenAPI ya quedaron revisadas y testeadas;
-- el seed de desarrollo opcional ya quedo implementado y testeado.
-
-Alternativa si se quiere empezar clientes:
-
-```text
-Crear proyecto Android real y cliente Retrofit contra los contratos backend actuales.
-```
 
 ## Procedimiento al retomar
 
-1. Abrir la raiz:
+1. Abrir la raiz: `C:\Users\GipsyDavy\MAVEN\Recetas Familiares`
 
-```text
-C:\Users\GipsyDavy\MAVEN\Recetas Familiares
-```
-
-2. Leer:
-
-```text
-CLAUDE.md
-MACRO-PROMPT-RECETAS-FAMILIA.md
-Resumen.md
-CONTINUAR.md
-backend/README.md
-```
+2. Leer: `CLAUDE.md`, `MACRO-PROMPT-RECETAS-FAMILIA.md`, `Resumen.md`, `CONTINUAR.md`, `backend/README.md`
 
 3. Comprobar estado:
-
-```powershell
-git status --short --branch
-```
+   ```powershell
+   git status --short --branch
+   ```
 
 4. Validar backend:
+   ```powershell
+   $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
+   ```
 
-```powershell
-$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
-```
+5. Continuar con SDK Android y compilacion.
 
-5. Continuar configurando Android SDK y compilar el scaffold Android.
+## Deuda tecnica conocida y aceptada
 
-## Nota importante
-
-No empezar por Android ni Desktop hasta confirmar que los contratos backend estan suficientemente estables.
-
-El backend ya tiene base real y contratos iniciales para:
-
-- auth;
-- familias;
-- recetas;
-- ingredientes;
-- pasos;
-- stock;
-- menus semanales;
-- listas de compra;
-- favoritos;
-- notas familiares;
-- fotos de receta;
-- sincronizacion pull/push.
-
-La siguiente fase debe mantener compatibilidad con Android/Desktop y no romper los contratos JSON existentes sin motivo fuerte.
+- Push sync envia listas vacias (no hay cola de cambios offline todavia). Correcto para MVP.
+- `fallbackToDestructiveMigration` en Room: cambiar por migraciones explicitas antes de beta.
+- KSP version desalineada con Kotlin: verificar cuando compile.
+- SyncService.push() sin batch: O(n) queries individuales. Documentado, no urgente para MVP.
+- Sync pull sin paginacion: aceptable para familias pequenas.
+- Login devuelve primera familia (no determinista si hay varias): limitacion documentada para MVP.

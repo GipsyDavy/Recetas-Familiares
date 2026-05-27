@@ -1,8 +1,14 @@
 package org.gipsybuho.recetasfamiliares.data.remote.dto
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
 data class LoginRequestDto(
     val email: String,
     val password: String
+)
+
+data class RefreshRequestDto(
+    val refreshToken: String
 )
 
 data class AuthResponseDto(
@@ -23,6 +29,8 @@ data class AuthFamilyDto(
     val name: String
 )
 
+// ── Common ────────────────────────────────────────────────────────────────────
+
 data class FamilyDto(
     val id: String,
     val name: String
@@ -36,6 +44,8 @@ data class PageDto<T>(
     val totalPages: Int
 )
 
+// ── Sync pull response DTOs ───────────────────────────────────────────────────
+
 data class RecipeDto(
     val id: String,
     val familyId: String,
@@ -45,6 +55,32 @@ data class RecipeDto(
     val prepMinutes: Int?,
     val cookMinutes: Int?,
     val difficulty: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+data class RecipeIngredientDto(
+    val id: String,
+    val recipeId: String,
+    val position: Int,
+    val name: String,
+    val quantity: Double?,
+    val unit: String?,
+    val note: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+data class RecipeStepDto(
+    val id: String,
+    val recipeId: String,
+    val position: Int,
+    val instruction: String,
+    val timerMinutes: Int?,
     val createdAt: String,
     val updatedAt: String,
     val syncVersion: Long,
@@ -66,8 +102,226 @@ data class StockItemDto(
     val deleted: Boolean
 )
 
+data class MenuItemDto(
+    val id: String,
+    val familyId: String,
+    val recipeId: String?,
+    val recipeTitle: String?,
+    val plannedDate: String,
+    val mealType: String,
+    val note: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+data class ShoppingListDto(
+    val id: String,
+    val familyId: String,
+    val name: String,
+    val plannedFrom: String?,
+    val plannedTo: String?,
+    val note: String?,
+    val completed: Boolean,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+data class ShoppingListItemDto(
+    val id: String,
+    val shoppingListId: String,
+    val position: Int,
+    val name: String,
+    val quantity: Double?,
+    val unit: String?,
+    val checked: Boolean,
+    val note: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+data class FavoriteRecipeDto(
+    val id: String,
+    val familyId: String,
+    val recipeId: String,
+    val recipeTitle: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+data class FamilyNoteDto(
+    val id: String,
+    val familyId: String,
+    val recipeId: String?,
+    val recipeTitle: String?,
+    val title: String,
+    val body: String,
+    val pinned: Boolean,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+data class RecipePhotoDto(
+    val id: String,
+    val recipeId: String,
+    val position: Int,
+    val url: String,
+    val thumbnailUrl: String?,
+    val caption: String?,
+    val contentType: String?,
+    val sizeBytes: Long?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+// ── Sync pull response container ──────────────────────────────────────────────
+
 data class SyncPullDto(
     val serverTime: String,
-    val recipes: List<RecipeDto>,
-    val stockItems: List<StockItemDto>
+    val recipes: List<RecipeDto>?,
+    val ingredients: List<RecipeIngredientDto>?,
+    val steps: List<RecipeStepDto>?,
+    val stockItems: List<StockItemDto>?,
+    val menuItems: List<MenuItemDto>?,
+    val shoppingLists: List<ShoppingListDto>?,
+    val shoppingListItems: List<ShoppingListItemDto>?,
+    val favoriteRecipes: List<FavoriteRecipeDto>?,
+    val familyNotes: List<FamilyNoteDto>?,
+    val recipePhotos: List<RecipePhotoDto>?
+)
+
+// ── Sync push request DTOs ────────────────────────────────────────────────────
+
+data class SyncPushRequestDto(
+    val recipes: List<SyncRecipePushItemDto> = emptyList(),
+    val ingredients: List<SyncIngredientPushItemDto> = emptyList(),
+    val steps: List<SyncStepPushItemDto> = emptyList(),
+    val stockItems: List<SyncStockItemPushItemDto>? = null,
+    val menuItems: List<SyncMenuItemPushItemDto>? = null,
+    val shoppingLists: List<SyncShoppingListPushItemDto>? = null,
+    val shoppingListItems: List<SyncShoppingListItemPushItemDto>? = null,
+    val favoriteRecipes: List<SyncFavoriteRecipePushItemDto>? = null,
+    val familyNotes: List<SyncFamilyNotePushItemDto>? = null,
+    val recipePhotos: List<SyncRecipePhotoPushItemDto>? = null
+)
+
+data class SyncRecipePushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val servings: Int? = null,
+    val prepMinutes: Int? = null,
+    val cookMinutes: Int? = null,
+    val difficulty: String? = null,
+    val deleted: Boolean = false
+)
+
+data class SyncIngredientPushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val recipeId: String,
+    val position: Int,
+    val name: String? = null,
+    val quantity: Double? = null,
+    val unit: String? = null,
+    val note: String? = null,
+    val deleted: Boolean = false
+)
+
+data class SyncStepPushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val recipeId: String,
+    val position: Int,
+    val instruction: String? = null,
+    val timerMinutes: Int? = null,
+    val deleted: Boolean = false
+)
+
+data class SyncStockItemPushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val name: String? = null,
+    val quantity: Double? = null,
+    val unit: String? = null,
+    val lowStockThreshold: Double? = null,
+    val expiresAt: String? = null,
+    val note: String? = null,
+    val deleted: Boolean = false
+)
+
+data class SyncMenuItemPushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val recipeId: String? = null,
+    val plannedDate: String? = null,
+    val mealType: String? = null,
+    val note: String? = null,
+    val deleted: Boolean = false
+)
+
+data class SyncShoppingListPushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val name: String? = null,
+    val plannedFrom: String? = null,
+    val plannedTo: String? = null,
+    val note: String? = null,
+    val completed: Boolean = false,
+    val deleted: Boolean = false
+)
+
+data class SyncShoppingListItemPushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val shoppingListId: String,
+    val position: Int,
+    val name: String? = null,
+    val quantity: Double? = null,
+    val unit: String? = null,
+    val checked: Boolean = false,
+    val note: String? = null,
+    val deleted: Boolean = false
+)
+
+data class SyncFavoriteRecipePushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val recipeId: String? = null,
+    val deleted: Boolean = false
+)
+
+data class SyncFamilyNotePushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val recipeId: String? = null,
+    val title: String? = null,
+    val body: String? = null,
+    val pinned: Boolean = false,
+    val deleted: Boolean = false
+)
+
+data class SyncRecipePhotoPushItemDto(
+    val id: String,
+    val baseSyncVersion: Long? = null,
+    val recipeId: String? = null,
+    val position: Int? = null,
+    val url: String? = null,
+    val thumbnailUrl: String? = null,
+    val caption: String? = null,
+    val contentType: String? = null,
+    val sizeBytes: Long? = null,
+    val deleted: Boolean = false
 )

@@ -7,6 +7,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.PageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPullDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -14,6 +15,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface RecetasApi {
+
     @POST("api/v1/auth/login")
     suspend fun login(@Body request: LoginRequestDto): AuthResponseDto
 
@@ -49,6 +51,6 @@ interface RecetasApi {
     @POST("api/v1/families/{familyId}/sync/push")
     suspend fun pushSync(
         @Path("familyId") familyId: String,
-        @Body request: Map<String, List<Any>> = emptyMap()
+        @Body request: SyncPushRequestDto
     ): SyncPullDto
 }

@@ -2,14 +2,32 @@ package org.gipsybuho.recetasfamiliares.data.repository
 
 import kotlinx.coroutines.flow.Flow
 import org.gipsybuho.recetasfamiliares.core.SessionStore
+import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
+import org.gipsybuho.recetasfamiliares.data.local.FavoriteRecipeEntity
+import org.gipsybuho.recetasfamiliares.data.local.MenuItemEntity
+import org.gipsybuho.recetasfamiliares.data.local.RecetasDatabase
 import org.gipsybuho.recetasfamiliares.data.local.RecipeDao
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
+import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
+import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
+import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
+import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
+import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockDao
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.MenuItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipePhotoDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 
 class AuthRepository(
     private val api: RecetasApi,
@@ -62,49 +80,105 @@ class StockRepository(
 
 class SyncRepository(
     private val api: RecetasApi,
-    private val recipeDao: RecipeDao,
-    private val stockDao: StockDao,
+    private val database: RecetasDatabase,
     private val sessionStore: SessionStore
 ) {
     suspend fun pullOnce() {
         val familyId = sessionStore.familyId ?: return
-        val response = api.pullSync(familyId)
-        recipeDao.upsertAll(response.recipes.map { it.toEntity() })
-        stockDao.upsertAll(response.stockItems.map { it.toEntity() })
+        val response = api.pullSync(familyId, sessionStore.lastSyncTime)
+
+        database.recipeDao().upsertAll(response.recipes.orEmpty().map { it.toEntity() })
+        database.recipeIngredientDao().upsertAll(response.ingredients.orEmpty().map { it.toEntity() })
+        database.recipeStepDao().upsertAll(response.steps.orEmpty().map { it.toEntity() })
+        database.stockDao().upsertAll(response.stockItems.orEmpty().map { it.toEntity() })
+        database.menuItemDao().upsertAll(response.menuItems.orEmpty().map { it.toEntity() })
+        database.shoppingListDao().upsertAll(response.shoppingLists.orEmpty().map { it.toEntity() })
+        database.shoppingListItemDao().upsertAll(response.shoppingListItems.orEmpty().map { it.toEntity() })
+        database.favoriteRecipeDao().upsertAll(response.favoriteRecipes.orEmpty().map { it.toEntity() })
+        database.familyNoteDao().upsertAll(response.familyNotes.orEmpty().map { it.toEntity() })
+        database.recipePhotoDao().upsertAll(response.recipePhotos.orEmpty().map { it.toEntity() })
+
+        sessionStore.lastSyncTime = response.serverTime
     }
 
     suspend fun pushThenPull() {
         val familyId = sessionStore.familyId ?: return
-        val response = api.pushSync(familyId)
-        recipeDao.upsertAll(response.recipes.map { it.toEntity() })
-        stockDao.upsertAll(response.stockItems.map { it.toEntity() })
+        val response = api.pushSync(familyId, SyncPushRequestDto())
+
+        database.recipeDao().upsertAll(response.recipes.orEmpty().map { it.toEntity() })
+        database.recipeIngredientDao().upsertAll(response.ingredients.orEmpty().map { it.toEntity() })
+        database.recipeStepDao().upsertAll(response.steps.orEmpty().map { it.toEntity() })
+        database.stockDao().upsertAll(response.stockItems.orEmpty().map { it.toEntity() })
+        database.menuItemDao().upsertAll(response.menuItems.orEmpty().map { it.toEntity() })
+        database.shoppingListDao().upsertAll(response.shoppingLists.orEmpty().map { it.toEntity() })
+        database.shoppingListItemDao().upsertAll(response.shoppingListItems.orEmpty().map { it.toEntity() })
+        database.favoriteRecipeDao().upsertAll(response.favoriteRecipes.orEmpty().map { it.toEntity() })
+        database.familyNoteDao().upsertAll(response.familyNotes.orEmpty().map { it.toEntity() })
+        database.recipePhotoDao().upsertAll(response.recipePhotos.orEmpty().map { it.toEntity() })
+
+        sessionStore.lastSyncTime = response.serverTime
     }
 }
 
+// ── Entity mappers ─────────────────────────────────────────────────────────────
+
 private fun RecipeDto.toEntity() = RecipeEntity(
-    id = id,
-    familyId = familyId,
-    title = title,
-    description = description,
-    servings = servings,
-    prepMinutes = prepMinutes,
-    cookMinutes = cookMinutes,
-    difficulty = difficulty,
-    updatedAt = updatedAt,
-    syncVersion = syncVersion,
-    deleted = deleted
+    id = id, familyId = familyId, title = title, description = description,
+    servings = servings, prepMinutes = prepMinutes, cookMinutes = cookMinutes,
+    difficulty = difficulty, createdAt = createdAt, updatedAt = updatedAt,
+    syncVersion = syncVersion, deleted = deleted
+)
+
+private fun RecipeIngredientDto.toEntity() = RecipeIngredientEntity(
+    id = id, recipeId = recipeId, position = position, name = name,
+    quantity = quantity, unit = unit, note = note, createdAt = createdAt,
+    updatedAt = updatedAt, syncVersion = syncVersion, deleted = deleted
+)
+
+private fun RecipeStepDto.toEntity() = RecipeStepEntity(
+    id = id, recipeId = recipeId, position = position, instruction = instruction,
+    timerMinutes = timerMinutes, createdAt = createdAt, updatedAt = updatedAt,
+    syncVersion = syncVersion, deleted = deleted
 )
 
 private fun StockItemDto.toEntity() = StockItemEntity(
-    id = id,
-    familyId = familyId,
-    name = name,
-    quantity = quantity,
-    unit = unit,
-    lowStockThreshold = lowStockThreshold,
-    expiresAt = expiresAt,
-    note = note,
-    updatedAt = updatedAt,
-    syncVersion = syncVersion,
-    deleted = deleted
+    id = id, familyId = familyId, name = name, quantity = quantity, unit = unit,
+    lowStockThreshold = lowStockThreshold, expiresAt = expiresAt, note = note,
+    createdAt = createdAt, updatedAt = updatedAt, syncVersion = syncVersion, deleted = deleted
+)
+
+private fun MenuItemDto.toEntity() = MenuItemEntity(
+    id = id, familyId = familyId, recipeId = recipeId, recipeTitle = recipeTitle,
+    plannedDate = plannedDate, mealType = mealType, note = note,
+    createdAt = createdAt, updatedAt = updatedAt, syncVersion = syncVersion, deleted = deleted
+)
+
+private fun ShoppingListDto.toEntity() = ShoppingListEntity(
+    id = id, familyId = familyId, name = name, plannedFrom = plannedFrom,
+    plannedTo = plannedTo, note = note, completed = completed,
+    createdAt = createdAt, updatedAt = updatedAt, syncVersion = syncVersion, deleted = deleted
+)
+
+private fun ShoppingListItemDto.toEntity() = ShoppingListItemEntity(
+    id = id, shoppingListId = shoppingListId, position = position, name = name,
+    quantity = quantity, unit = unit, checked = checked, note = note,
+    createdAt = createdAt, updatedAt = updatedAt, syncVersion = syncVersion, deleted = deleted
+)
+
+private fun FavoriteRecipeDto.toEntity() = FavoriteRecipeEntity(
+    id = id, familyId = familyId, recipeId = recipeId, recipeTitle = recipeTitle,
+    createdAt = createdAt, updatedAt = updatedAt, syncVersion = syncVersion, deleted = deleted
+)
+
+private fun FamilyNoteDto.toEntity() = FamilyNoteEntity(
+    id = id, familyId = familyId, recipeId = recipeId, recipeTitle = recipeTitle,
+    title = title, body = body, pinned = pinned,
+    createdAt = createdAt, updatedAt = updatedAt, syncVersion = syncVersion, deleted = deleted
+)
+
+private fun RecipePhotoDto.toEntity() = RecipePhotoEntity(
+    id = id, recipeId = recipeId, position = position, url = url,
+    thumbnailUrl = thumbnailUrl, caption = caption, contentType = contentType,
+    sizeBytes = sizeBytes, createdAt = createdAt, updatedAt = updatedAt,
+    syncVersion = syncVersion, deleted = deleted
 )

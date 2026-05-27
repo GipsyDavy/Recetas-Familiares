@@ -44,14 +44,16 @@ private enum class MainTab { RECIPES, STOCK }
 @Composable
 fun RecetasApp(viewModel: RecetasViewModel) {
     val context = LocalContext.current
-    LaunchedEffect(viewModel.isLoggedIn) {
-        if (viewModel.isLoggedIn) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
             viewModel.scheduleSync(WorkManager.getInstance(context))
             viewModel.refresh()
         }
     }
 
-    if (!viewModel.isLoggedIn) {
+    if (!isLoggedIn) {
         LoginScreen(viewModel)
     } else {
         MainShell(viewModel)
@@ -60,7 +62,7 @@ fun RecetasApp(viewModel: RecetasViewModel) {
 
 @Composable
 private fun LoginScreen(viewModel: RecetasViewModel) {
-    var email by remember { mutableStateOf("demo@recetas.local") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -84,7 +86,7 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password") },
+            label = { Text("Contraseña") },
             visualTransformation = PasswordVisualTransformation(),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()

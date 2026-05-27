@@ -2,9 +2,22 @@ package org.gipsybuho.recetasfamiliares.core
 
 import android.content.Context
 import androidx.core.content.edit
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 class SessionStore(context: Context) {
-    private val preferences = context.getSharedPreferences("recetas_session", Context.MODE_PRIVATE)
+
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private val preferences = EncryptedSharedPreferences.create(
+        context,
+        "recetas_session_secure",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
     var accessToken: String?
         get() = preferences.getString("access_token", null)
@@ -17,6 +30,10 @@ class SessionStore(context: Context) {
     var familyId: String?
         get() = preferences.getString("family_id", null)
         set(value) = preferences.edit { putString("family_id", value) }
+
+    var lastSyncTime: String?
+        get() = preferences.getString("last_sync_time", null)
+        set(value) = preferences.edit { putString("last_sync_time", value) }
 
     fun clear() {
         preferences.edit { clear() }

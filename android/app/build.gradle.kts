@@ -53,6 +53,7 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.11.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

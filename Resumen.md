@@ -1,70 +1,105 @@
 Resumen Descriptivo Completo - "Recetas Familia"
-"Recetas Familia" es una aplicación premium multiplataforma diseñada para ayudar a las familias a organizar, compartir y disfrutar de su cocina de forma moderna, emocional y eficiente.
-Propósito Principal
-Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar y cocinar recetas de forma colaborativa, manteniendo vivas las tradiciones culinarias familiares y facilitando la organización diaria de las comidas.
+"Recetas Familia" es una aplicacion premium multiplataforma disenada para ayudar a las familias a organizar, compartir y disfrutar de su cocina de forma moderna, emocional y eficiente.
 
-Características Principales
-Gestión de Recetas
+## Proposito Principal
 
-Creación y edición avanzada de recetas con ingredientes, pasos detallados, tiempos de preparación/cocción, dificultad, porciones y valor nutricional.
-Soporte para múltiples fotos por receta (antes, durante y resultado final).
-Variaciones de recetas (ej: versión vegana, sin gluten, más picante, etc.).
-Etiquetas y categorías inteligentes (Desayuno, Almuerzo, Cena, Postres, Navideñas, Rápidas, etc.).
-Sistema de valoración y comentarios familiares.
+Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar y cocinar recetas de forma colaborativa, manteniendo vivas las tradiciones culinarias familiares y facilitando la organizacion diaria de las comidas.
 
-Ingredientes y Stock Familiar
+## Caracteristicas Principales
 
-Base de datos compartida de ingredientes con control de stock.
-Alertas inteligentes de "bajo stock" o "caducidad próxima".
-Lista de la compra generada automáticamente según los menús planificados.
+### Gestion de Recetas
 
-Planificación Familiar
+- Creacion y edicion avanzada de recetas con ingredientes, pasos detallados, tiempos de preparacion/coccion, dificultad, porciones.
+- Soporte para multiples fotos por receta.
+- Etiquetas y categorias.
+- Sistema de valoracion y comentarios familiares.
 
-Menús semanales y mensuales colaborativos.
-Calendario de comidas con asignación de quién cocina cada día.
-Sugerencias automáticas de menús según ingredientes disponibles y preferencias familiares.
+### Ingredientes y Stock Familiar
 
-Aspecto Social y Familiar
+- Base de datos compartida de ingredientes con control de stock.
+- Alertas de bajo stock o caducidad proxima.
+- Lista de la compra generada automaticamente desde menus planificados.
 
-Perfiles de cada miembro de la familia.
-Sistema de "recetas favoritas" compartidas.
-Notas personales y anécdotas asociadas a cada receta (historia familiar).
-Modo "Cocina en Familia" con temporizadores compartidos.
+### Planificacion Familiar
 
+- Menus semanales y mensuales colaborativos.
+- Calendario de comidas.
+- Sugerencias automaticas de menus.
 
-Experiencia por Plataforma
-Desktop (JavaFX) - Experiencia Principal
+### Aspecto Social y Familiar
 
-Interfaz completa y potente pensada para uso en cocina o mesa.
-Sidebar lateral con navegación rápida.
-Dashboard visual con recetas destacadas, menús de la semana y stock crítico.
-Vista de receta en pantalla completa con modo "Modo Cocina" (letra grande, temporizadores grandes, pasos a paso).
-Gestión avanzada de datos (filtros potentes, búsqueda global, exportación a PDF).
-Soporte para múltiples perfiles familiares en una misma instalación.
+- Sistema de recetas favoritas compartidas.
+- Notas personales y anecdotas asociadas a cada receta.
+- Modo Cocina en Familia con temporizadores compartidos.
 
-Android - Experiencia Móvil
+## Experiencia por Plataforma
 
-Diseño Material You 3 dinámico y hermoso.
-Bottom Navigation + Navigation Drawer.
-Acceso rápido desde la cocina (modo manos libres con voz).
-Widgets en pantalla de inicio (receta del día, lista de compra, temporizador).
-Cámara integrada para añadir fotos rápidamente a las recetas.
-Modo offline completo (sincronización cuando haya conexión).
+### Desktop (JavaFX) - Experiencia Principal
 
+- Interfaz completa pensada para uso en cocina o mesa.
+- Sidebar lateral con navegacion rapida.
+- Dashboard visual con recetas destacadas, menus de la semana y stock critico.
+- Modo Cocina (letra grande, temporizadores, pasos a paso).
+- Gestion avanzada (filtros, busqueda global, exportacion).
 
-Estilo Visual y UX General
+### Android - Experiencia Movil
 
-Estilo: Cálido, moderno, premium y emocional (combinación de Notion + Material You + Apple Design).
-Paleta de colores: Tonos tierra, verdes suaves, naranjas y amarillos apetecibles.
-Dark Mode espectacular y Light Mode acogedor.
-Micro-interacciones suaves y satisfactorias (animaciones al guardar receta, al añadir ingrediente, etc.).
-Enfoque en placer visual y facilidad de uso en la cocina.
+- Disenio Material You 3 dinamico.
+- Bottom Navigation + Navigation Drawer.
+- Acceso rapido desde la cocina.
+- Modo offline completo con sincronizacion cuando hay conexion.
 
+## Estilo Visual y UX
 
-Diferenciadores Clave
+- Estilo: Calido, moderno, premium y emocional (Notion + Material You + Apple Design).
+- Paleta de colores: Tonos tierra, verdes suaves, naranjas y amarillos apetecibles.
+- Dark Mode espectacular y Light Mode acogedor.
+- Micro-interacciones suaves y satisfactorias.
 
-Enfoque familiar real (no solo individual).
-Historia y memoria emocional de las recetas.
-Inteligencia práctica (sugerencias según stock, temporada, preferencias).
-Experiencia coherente y sincronizada entre móvil y escritorio.
-Privacidad y control total de los datos familiares.
+## Diferenciadores Clave
+
+- Enfoque familiar real (no solo individual).
+- Historia y memoria emocional de las recetas.
+- Inteligencia practica (sugerencias segun stock, temporada, preferencias).
+- Experiencia coherente y sincronizada entre movil y escritorio.
+- Privacidad y control total de los datos familiares.
+
+---
+
+## Estado del Proyecto por Modulo
+
+### Backend Spring Boot (COMPLETO)
+
+- Spring Boot 3.5.14 + Java 21 + MySQL + Flyway.
+- Auth JWT + refresh tokens + rate limiting.
+- CRUD completo: recetas, ingredientes, pasos, stock, menus, listas de compra, favoritos, notas, fotos.
+- Sync pull/push con tombstones, LWW y deteccion de conflictos.
+- 57 tests, 0 fallos.
+- Hardening HTTP: CSP, HSTS, CORS deny-by-default.
+- OpenAPI/Swagger desactivado en produccion.
+- Seed de desarrollo opcional.
+
+### Android Kotlin + Compose (EN PROGRESO - Sprint 2 completado)
+
+Corregidos en Sprint 2:
+- `isLoggedIn` como `StateFlow<Boolean>` — navegacion reactiva.
+- `SyncPullDto` con las 11 colecciones del backend.
+- `SyncPushRequestDto` tipado — contrato push correcto.
+- `TokenRefreshAuthenticator` — renovacion automatica de tokens ante 401.
+- `SessionStore` con `EncryptedSharedPreferences` — tokens cifrados.
+- Singleton `AppContainer` en `RecetasApplication`.
+- `SyncWorker` usa el singleton (no instancia nuevo `AppContainer`).
+- Logging `NONE` en release.
+- Room version 2: 10 entidades + 10 DAOs completos.
+- Sync incremental con `lastSyncTime` y `serverTime`.
+- `allowBackup=false`.
+
+Bloqueante pendiente: instalar Android SDK y verificar compilacion.
+
+### Desktop JavaFX (PENDIENTE)
+
+No iniciado.
+
+### Base de Datos MySQL
+
+9 migraciones Flyway. 14 tablas principales con soft delete, syncVersion y UUID como PK.
