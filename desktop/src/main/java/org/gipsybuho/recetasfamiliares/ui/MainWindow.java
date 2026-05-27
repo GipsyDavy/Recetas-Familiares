@@ -16,6 +16,7 @@ public class MainWindow {
     private final Stage stage;
     private final AppContext context;
     private final BorderPane root = new BorderPane();
+    private DashboardView dashboardView;
     private RecipeListView recipeListView;
     private StockView stockView;
 
@@ -54,12 +55,13 @@ public class MainWindow {
     // ── Main shell ───────────────────────────────────────────────────────────
 
     private void showMain() {
+        dashboardView = new DashboardView(context, this::triggerSync, () -> navigateTo("recipes"));
         recipeListView = new RecipeListView(context);
         stockView = new StockView(context);
 
         VBox sidebar = buildSidebar();
         root.setLeft(sidebar);
-        navigateTo("recipes");
+        navigateTo("dashboard");
     }
 
     private VBox buildSidebar() {
@@ -74,6 +76,7 @@ public class MainWindow {
         header.getStyleClass().add("sidebar-header");
         header.setPadding(new Insets(24, 16, 16, 16));
 
+        Button btnDashboard = sidebarButton("Inicio", "dashboard");
         Button btnRecipes = sidebarButton("Recetas", "recipes");
         Button btnStock = sidebarButton("Stock", "stock");
 
@@ -93,7 +96,7 @@ public class MainWindow {
         VBox bottom = new VBox(8, syncBtn, logoutBtn);
         bottom.setPadding(new Insets(8, 16, 24, 16));
 
-        sidebar.getChildren().addAll(header, btnRecipes, btnStock, spacer, bottom);
+        sidebar.getChildren().addAll(header, btnDashboard, btnRecipes, btnStock, spacer, bottom);
         return sidebar;
     }
 
@@ -108,6 +111,10 @@ public class MainWindow {
 
     private void navigateTo(String view) {
         switch (view) {
+            case "dashboard" -> {
+                root.setCenter(dashboardView);
+                dashboardView.refresh();
+            }
             case "recipes" -> {
                 root.setCenter(recipeListView);
                 recipeListView.refresh();
@@ -136,8 +143,9 @@ public class MainWindow {
             try {
                 context.getSyncRepository().pull();
                 Platform.runLater(() -> {
-                    if (root.getCenter() instanceof RecipeListView) recipeListView.refresh();
-                    if (root.getCenter() instanceof StockView) stockView.refresh();
+                    if (root.getCenter() instanceof DashboardView) dashboardView.refresh();
+                    else if (root.getCenter() instanceof RecipeListView) recipeListView.refresh();
+                    else if (root.getCenter() instanceof StockView) stockView.refresh();
                 });
             } catch (Exception ex) {
                 Platform.runLater(() ->

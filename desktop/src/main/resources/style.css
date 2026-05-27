@@ -239,3 +239,111 @@
     -fx-border-color: #E8D8C4;
     -fx-border-width: 1 0 0 0;
 }
+
+/* ── Dashboard ───────────────────────────────────────────────────────────────── */
+.dashboard-scroll {
+    -fx-background-color: #FAF7F2;
+}
+
+.dashboard-root {
+    -fx-background-color: #FAF7F2;
+}
+
+.dashboard-greeting-box {
+    -fx-padding: 0 0 4 0;
+}
+
+.dashboard-greeting {
+    -fx-fill: #3D2B1F;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+}
+
+.dashboard-subtitle {
+    -fx-fill: #8B6F5E;
+    -fx-font-size: 15px;
+}
+
+.quick-actions {
+    -fx-padding: 0 0 4 0;
+}
+
+.action-button-primary {
+    -fx-background-color: #C17D52;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+}
+
+.action-button-primary:hover {
+    -fx-background-color: #A86840;
+}
+
+.action-button-secondary {
+    -fx-background-color: #F0E6D8;
+    -fx-text-fill: #3D2B1F;
+    -fx-font-size: 14px;
+    -fx-background-radius: 8;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+}
+
+.action-button-secondary:hover {
+    -fx-background-color: #E4D4C0;
+}
+
+.dashboard-section {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 8, 0, 0, 2);
+}
+
+.dashboard-section-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3D2B1F;
+}
+
+.dashboard-section-link {
+    -fx-font-size: 13px;
+    -fx-text-fill: #C17D52;
+}
+
+.dashboard-recipe-card {
+    -fx-background-color: #FAF7F2;
+    -fx-background-radius: 8;
+    -fx-border-color: #EDE0D0;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.dashboard-recipe-desc {
+    -fx-font-size: 12px;
+    -fx-text-fill: #8B6F5E;
+}
+
+.stock-expiring-row {
+    -fx-padding: 6 8;
+    -fx-background-color: #FFF3F0;
+    -fx-background-radius: 6;
+}
+
+.stock-expiring-name {
+    -fx-font-size: 13px;
+    -fx-text-fill: #3D2B1F;
+}
+
+.stock-expiring-date {
+    -fx-font-size: 12px;
+    -fx-text-fill: #C0392B;
+    -fx-font-weight: bold;
+}
+
+.no-data-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #B09A8A;
+    -fx-font-style: italic;
+}
