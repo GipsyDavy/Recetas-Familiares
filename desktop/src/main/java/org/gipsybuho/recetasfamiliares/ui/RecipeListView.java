@@ -17,7 +17,7 @@ public class RecipeListView extends SplitPane {
 
     public RecipeListView(AppContext context) {
         this.context = context;
-        this.detailView = new RecipeDetailView(context);
+        this.detailView = new RecipeDetailView(context, this::refresh);
         build();
     }
 
@@ -75,11 +75,11 @@ public class RecipeListView extends SplitPane {
     }
 
     private void openNewRecipeForm() {
-        var dialog = new RecipeFormDialog(
+        var dialog = RecipeFormDialog.forCreate(
                 getScene().getWindow(),
                 context,
                 created -> {
-                    refresh(); // Reload list after creation
+                    refresh();
                     statusLabel.setText("Receta creada: " + created.title());
                 }
         );

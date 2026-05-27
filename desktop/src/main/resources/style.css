@@ -300,6 +300,15 @@
     -fx-background-color: #E4D4C0;
 }
 
+.delete-button {
+    -fx-text-fill: #C0392B;
+    -fx-border-color: #D4837A;
+}
+
+.delete-button:hover {
+    -fx-background-color: #FDE8E6;
+}
+
 .dashboard-section {
     -fx-background-color: #FFFFFF;
     -fx-background-radius: 12;

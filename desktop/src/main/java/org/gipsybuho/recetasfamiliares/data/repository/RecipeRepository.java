@@ -49,6 +49,16 @@ public class RecipeRepository {
         return List.of(result);
     }
 
+    public RecipeDtos.RecipeDto update(String recipeId, RecipeCreateDtos.UpdateRecipeRequest request) throws ApiException {
+        String familyId = session.getFamilyId();
+        return api.put("api/v1/families/" + familyId + "/recipes/" + recipeId, request, RecipeDtos.RecipeDto.class);
+    }
+
+    public void delete(String recipeId) throws ApiException {
+        String familyId = session.getFamilyId();
+        api.delete("api/v1/families/" + familyId + "/recipes/" + recipeId);
+    }
+
     public RecipeDtos.RecipeDto create(RecipeCreateDtos.CreateRecipeRequest request) throws ApiException {
         String familyId = session.getFamilyId();
         return api.post("api/v1/families/" + familyId + "/recipes", request, RecipeDtos.RecipeDto.class);

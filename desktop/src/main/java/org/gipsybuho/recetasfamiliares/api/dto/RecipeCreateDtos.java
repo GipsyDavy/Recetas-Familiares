@@ -28,6 +28,15 @@ public final class RecipeCreateDtos {
             Integer durationMinutes
     ) {}
 
+    public record UpdateRecipeRequest(
+            String title,
+            String description,
+            Integer servings,
+            Integer prepMinutes,
+            Integer cookMinutes,
+            String difficulty
+    ) {}
+
     public record ReplaceIngredientsRequest(List<CreateIngredientRequest> ingredients) {}
 
     public record ReplaceStepsRequest(List<CreateStepRequest> steps) {}

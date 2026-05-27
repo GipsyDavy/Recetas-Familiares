@@ -17,12 +17,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-/** Modal dialog for creating a new recipe with basic metadata, ingredients and steps. */
+/** Modal dialog for creating or editing a recipe. */
 public class RecipeFormDialog {
 
+    // null = create mode; non-null = edit mode
+    private final String editRecipeId;
     private final Stage dialog;
     private final AppContext context;
-    private final Consumer<RecipeDtos.RecipeDto> onCreated;
+    private final Consumer<RecipeDtos.RecipeDto> onSaved;
 
     // Metadata fields
     private final TextField titleField = new TextField();
@@ -32,23 +34,42 @@ public class RecipeFormDialog {
     private final TextField cookField = new TextField();
     private final ComboBox<String> difficultyBox = new ComboBox<>();
 
-    // Ingredients
+    // Ingredients + steps
     private final VBox ingredientsContainer = new VBox(6);
     private final List<IngredientRow> ingredientRows = new ArrayList<>();
-
-    // Steps
     private final VBox stepsContainer = new VBox(6);
     private final List<StepRow> stepRows = new ArrayList<>();
 
     private final Label statusLabel = new Label();
 
-    public RecipeFormDialog(Window owner, AppContext context, Consumer<RecipeDtos.RecipeDto> onCreated) {
+    // ── Factory methods ───────────────────────────────────────────────────────
+
+    public static RecipeFormDialog forCreate(Window owner, AppContext context,
+                                             Consumer<RecipeDtos.RecipeDto> onCreated) {
+        return new RecipeFormDialog(owner, context, null, onCreated);
+    }
+
+    public static RecipeFormDialog forEdit(Window owner, AppContext context,
+                                           RecipeDtos.RecipeDto recipe,
+                                           List<RecipeDtos.RecipeIngredientDto> ingredients,
+                                           List<RecipeDtos.RecipeStepDto> steps,
+                                           Consumer<RecipeDtos.RecipeDto> onUpdated) {
+        RecipeFormDialog dlg = new RecipeFormDialog(owner, context, recipe.id(), onUpdated);
+        dlg.prefill(recipe, ingredients, steps);
+        return dlg;
+    }
+
+    // ── Constructor ───────────────────────────────────────────────────────────
+
+    private RecipeFormDialog(Window owner, AppContext context,
+                             String editRecipeId, Consumer<RecipeDtos.RecipeDto> onSaved) {
         this.context = context;
-        this.onCreated = onCreated;
+        this.editRecipeId = editRecipeId;
+        this.onSaved = onSaved;
         this.dialog = new Stage();
         dialog.initOwner(owner);
         dialog.initModality(Modality.WINDOW_MODAL);
-        dialog.setTitle("Nueva receta");
+        dialog.setTitle(editRecipeId == null ? "Nueva receta" : "Editar receta");
         dialog.setMinWidth(560);
         dialog.setMinHeight(600);
         build();
@@ -58,6 +79,39 @@ public class RecipeFormDialog {
         dialog.show();
     }
 
+    // ── Pre-fill (edit mode) ──────────────────────────────────────────────────
+
+    private void prefill(RecipeDtos.RecipeDto recipe,
+                         List<RecipeDtos.RecipeIngredientDto> ingredients,
+                         List<RecipeDtos.RecipeStepDto> steps) {
+        titleField.setText(recipe.title() != null ? recipe.title() : "");
+        descriptionField.setText(recipe.description() != null ? recipe.description() : "");
+        if (recipe.servings() != null) servingsField.setText(recipe.servings().toString());
+        if (recipe.prepMinutes() != null) prepField.setText(recipe.prepMinutes().toString());
+        if (recipe.cookMinutes() != null) cookField.setText(recipe.cookMinutes().toString());
+        if (recipe.difficulty() != null) difficultyBox.setValue(recipe.difficulty());
+
+        // Replace the default empty rows with server data
+        ingredientRows.clear();
+        ingredientsContainer.getChildren().clear();
+        if (ingredients != null && !ingredients.isEmpty()) {
+            for (var ing : ingredients) addIngredientRow(ing.name(), ing.quantity(), ing.unit());
+        } else {
+            addIngredientRow(null, null, null);
+        }
+
+        stepRows.clear();
+        stepsContainer.getChildren().clear();
+        if (steps != null && !steps.isEmpty()) {
+            for (var step : steps) addStepRow(step.description(),
+                    step.durationMinutes() != null ? step.durationMinutes().toString() : "");
+        } else {
+            addStepRow(null, null);
+        }
+    }
+
+    // ── Build UI ──────────────────────────────────────────────────────────────
+
     private void build() {
         ScrollPane scroll = new ScrollPane();
         scroll.setFitToWidth(true);
@@ -66,14 +120,12 @@ public class RecipeFormDialog {
         VBox content = new VBox(20);
         content.setPadding(new Insets(24));
         content.getStyleClass().add("form-content");
-
         content.getChildren().addAll(
                 buildMetadataSection(),
                 buildIngredientsSection(),
                 buildStepsSection(),
                 buildFooter()
         );
-
         scroll.setContent(content);
 
         Scene scene = new Scene(scroll, 580, 680);
@@ -81,8 +133,6 @@ public class RecipeFormDialog {
                 Objects.requireNonNull(getClass().getResource("/style.css")).toExternalForm());
         dialog.setScene(scene);
     }
-
-    // ── Metadata ─────────────────────────────────────────────────────────────
 
     private VBox buildMetadataSection() {
         titleField.setPromptText("Título de la receta *");
@@ -114,54 +164,29 @@ public class RecipeFormDialog {
         return buildFormSection("Información básica", titleField, descriptionField, numericRow);
     }
 
-    // ── Ingredients ───────────────────────────────────────────────────────────
-
     private VBox buildIngredientsSection() {
         Button addBtn = new Button("+ Añadir ingrediente");
         addBtn.getStyleClass().add("form-add-button");
-        addBtn.setOnAction(e -> addIngredientRow());
+        addBtn.setOnAction(e -> addIngredientRow(null, null, null));
 
-        addIngredientRow(); // Start with one empty row
+        if (editRecipeId == null) addIngredientRow(null, null, null); // create: start with one empty
 
         VBox wrapper = buildFormSection("Ingredientes", ingredientsContainer);
         wrapper.getChildren().add(addBtn);
         return wrapper;
     }
 
-    private void addIngredientRow() {
-        IngredientRow row = new IngredientRow();
-        ingredientRows.add(row);
-        ingredientsContainer.getChildren().add(row.build(() -> {
-            ingredientRows.remove(row);
-            ingredientsContainer.getChildren().remove(row.build(() -> {}));
-        }));
-    }
-
-    // ── Steps ──────────────────────────────────────────────────────────────────
-
     private VBox buildStepsSection() {
         Button addBtn = new Button("+ Añadir paso");
         addBtn.getStyleClass().add("form-add-button");
-        addBtn.setOnAction(e -> addStepRow());
+        addBtn.setOnAction(e -> addStepRow(null, null));
 
-        addStepRow(); // Start with one empty row
+        if (editRecipeId == null) addStepRow(null, null); // create: start with one empty
 
         VBox wrapper = buildFormSection("Pasos", stepsContainer);
         wrapper.getChildren().add(addBtn);
         return wrapper;
     }
-
-    private void addStepRow() {
-        int num = stepRows.size() + 1;
-        StepRow row = new StepRow(num);
-        stepRows.add(row);
-        stepsContainer.getChildren().add(row.build(() -> {
-            stepRows.remove(row);
-            stepsContainer.getChildren().remove(row.build(() -> {}));
-        }));
-    }
-
-    // ── Footer ────────────────────────────────────────────────────────────────
 
     private HBox buildFooter() {
         statusLabel.getStyleClass().add("status-label");
@@ -170,7 +195,8 @@ public class RecipeFormDialog {
         cancelBtn.getStyleClass().add("action-button-secondary");
         cancelBtn.setOnAction(e -> dialog.close());
 
-        Button saveBtn = new Button("Guardar receta");
+        String saveLabel = editRecipeId == null ? "Guardar receta" : "Guardar cambios";
+        Button saveBtn = new Button(saveLabel);
         saveBtn.getStyleClass().add("action-button-primary");
         saveBtn.setOnAction(e -> doSave(saveBtn));
 
@@ -182,62 +208,82 @@ public class RecipeFormDialog {
         return footer;
     }
 
+    // ── Row helpers ───────────────────────────────────────────────────────────
+
+    private void addIngredientRow(String name, String qty, String unit) {
+        IngredientRow row = new IngredientRow(name, qty, unit);
+        ingredientRows.add(row);
+        ingredientsContainer.getChildren().add(row.build(() -> {
+            int idx = ingredientRows.indexOf(row);
+            ingredientRows.remove(row);
+            if (idx >= 0 && idx < ingredientsContainer.getChildren().size())
+                ingredientsContainer.getChildren().remove(idx);
+        }));
+    }
+
+    private void addStepRow(String description, String duration) {
+        int num = stepRows.size() + 1;
+        StepRow row = new StepRow(num, description, duration);
+        stepRows.add(row);
+        stepsContainer.getChildren().add(row.build(() -> {
+            int idx = stepRows.indexOf(row);
+            stepRows.remove(row);
+            if (idx >= 0 && idx < stepsContainer.getChildren().size())
+                stepsContainer.getChildren().remove(idx);
+        }));
+    }
+
     // ── Save ──────────────────────────────────────────────────────────────────
 
     private void doSave(Button saveBtn) {
         String title = titleField.getText().trim();
-        if (title.isBlank()) {
-            statusLabel.setText("El título es obligatorio.");
-            return;
-        }
+        if (title.isBlank()) { statusLabel.setText("El título es obligatorio."); return; }
 
         saveBtn.setDisable(true);
         statusLabel.setText("Guardando...");
 
-        var request = new RecipeCreateDtos.CreateRecipeRequest(
-                title,
-                descriptionField.getText().trim().isEmpty() ? null : descriptionField.getText().trim(),
-                parseIntOrNull(servingsField.getText()),
-                parseIntOrNull(prepField.getText()),
-                parseIntOrNull(cookField.getText()),
-                difficultyBox.getValue()
-        );
+        String desc = descriptionField.getText().trim().isEmpty() ? null : descriptionField.getText().trim();
+        Integer servings = parseIntOrNull(servingsField.getText());
+        Integer prep = parseIntOrNull(prepField.getText());
+        Integer cook = parseIntOrNull(cookField.getText());
+        String diff = difficultyBox.getValue();
+
+        List<RecipeCreateDtos.CreateIngredientRequest> ingredients = ingredientRows.stream()
+                .filter(r -> !r.getName().isBlank())
+                .map(r -> new RecipeCreateDtos.CreateIngredientRequest(
+                        r.getName(), r.getQuantity(), r.getUnit(), ingredientRows.indexOf(r) + 1))
+                .toList();
+
+        List<RecipeCreateDtos.CreateStepRequest> steps = stepRows.stream()
+                .filter(s -> !s.getDescription().isBlank())
+                .map(s -> new RecipeCreateDtos.CreateStepRequest(
+                        stepRows.indexOf(s) + 1, s.getDescription(), parseIntOrNull(s.getDuration())))
+                .toList();
 
         Thread.ofVirtual().start(() -> {
             try {
-                RecipeDtos.RecipeDto created = context.getRecipeRepository().create(request);
-
-                List<RecipeCreateDtos.CreateIngredientRequest> ingredients = ingredientRows.stream()
-                        .filter(r -> !r.getName().isBlank())
-                        .map(r -> new RecipeCreateDtos.CreateIngredientRequest(
-                                r.getName(), r.getQuantity(), r.getUnit(), ingredientRows.indexOf(r) + 1))
-                        .toList();
-
-                if (!ingredients.isEmpty()) {
-                    context.getRecipeRepository().replaceIngredients(
-                            created.id(), new RecipeCreateDtos.ReplaceIngredientsRequest(ingredients));
+                RecipeDtos.RecipeDto saved;
+                if (editRecipeId == null) {
+                    // Create
+                    saved = context.getRecipeRepository().create(
+                            new RecipeCreateDtos.CreateRecipeRequest(title, desc, servings, prep, cook, diff));
+                } else {
+                    // Update
+                    saved = context.getRecipeRepository().update(editRecipeId,
+                            new RecipeCreateDtos.UpdateRecipeRequest(title, desc, servings, prep, cook, diff));
                 }
 
-                List<RecipeCreateDtos.CreateStepRequest> steps = stepRows.stream()
-                        .filter(s -> !s.getDescription().isBlank())
-                        .map(s -> new RecipeCreateDtos.CreateStepRequest(
-                                stepRows.indexOf(s) + 1, s.getDescription(), parseIntOrNull(s.getDuration())))
-                        .toList();
+                if (!ingredients.isEmpty())
+                    context.getRecipeRepository().replaceIngredients(saved.id(),
+                            new RecipeCreateDtos.ReplaceIngredientsRequest(ingredients));
 
-                if (!steps.isEmpty()) {
-                    context.getRecipeRepository().replaceSteps(
-                            created.id(), new RecipeCreateDtos.ReplaceStepsRequest(steps));
-                }
+                if (!steps.isEmpty())
+                    context.getRecipeRepository().replaceSteps(saved.id(),
+                            new RecipeCreateDtos.ReplaceStepsRequest(steps));
 
-                Platform.runLater(() -> {
-                    onCreated.accept(created);
-                    dialog.close();
-                });
+                Platform.runLater(() -> { onSaved.accept(saved); dialog.close(); });
             } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    saveBtn.setDisable(false);
-                    statusLabel.setText("Error: " + ex.getMessage());
-                });
+                Platform.runLater(() -> { saveBtn.setDisable(false); statusLabel.setText("Error: " + ex.getMessage()); });
             }
         });
     }
@@ -269,6 +315,12 @@ public class RecipeFormDialog {
         private final TextField unitField = new TextField();
         private HBox node;
 
+        IngredientRow(String name, String qty, String unit) {
+            if (name != null) nameField.setText(name);
+            if (qty != null) qtyField.setText(qty);
+            if (unit != null) unitField.setText(unit);
+        }
+
         HBox build(Runnable onRemove) {
             if (node != null) return node;
             nameField.setPromptText("Nombre *");
@@ -298,7 +350,11 @@ public class RecipeFormDialog {
         private final TextField durationField = new TextField();
         private HBox node;
 
-        StepRow(int number) { this.number = number; }
+        StepRow(int number, String description, String duration) {
+            this.number = number;
+            if (description != null) descArea.setText(description);
+            if (duration != null) durationField.setText(duration);
+        }
 
         HBox build(Runnable onRemove) {
             if (node != null) return node;
