@@ -15,6 +15,13 @@ import java.util.List;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.gipsybuho.recetasfamiliares.families.FamilyEntity;
+import org.gipsybuho.recetasfamiliares.families.FamilyMemberEntity;
+import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
+import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
+import org.gipsybuho.recetasfamiliares.families.FamilyRole;
+import org.gipsybuho.recetasfamiliares.users.UserEntity;
+import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +46,15 @@ class RecipeControllerTest {
 
     @Autowired
     private RecipeStepRepository stepRepository;
+
+    @Autowired
+    private FamilyRepository familyRepository;
+
+    @Autowired
+    private FamilyMemberRepository familyMemberRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Test
     void createsAndListsRecipesForAuthenticatedFamilyMember() throws Exception {
@@ -146,6 +162,42 @@ class RecipeControllerTest {
 
         mockMvc.perform(delete("/api/v1/families/{familyId}/recipes/{recipeId}", second.familyId(), secondRecipeId)
                         .header("Authorization", "Bearer " + first.accessToken()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsFamilyMembersToReadButOnlyOwnersAndAdminsCanWrite() throws Exception {
+        RegisteredUser owner = register("recipes-role-owner@example.com", "Familia Roles");
+        RegisteredUser member = register("recipes-role-member@example.com", "Familia Invitada");
+        addFamilyMember(owner.familyId(), "recipes-role-member@example.com", FamilyRole.MEMBER);
+        createRecipe(owner, "Receta visible para miembro");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes", owner.familyId())
+                        .header("Authorization", "Bearer " + member.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("Receta visible para miembro"));
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/recipes", owner.familyId())
+                        .header("Authorization", "Bearer " + member.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Intento de miembro"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", owner.familyId())
+                        .header("Authorization", "Bearer " + member.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": []
+                                }
+                                """))
                 .andExpect(status().isForbidden());
     }
 
@@ -394,6 +446,12 @@ class RecipeControllerTest {
                 response.get("accessToken").asText(),
                 response.get("family").get("id").asText()
         );
+    }
+
+    private void addFamilyMember(String familyId, String email, FamilyRole role) {
+        FamilyEntity family = familyRepository.findById(familyId).orElseThrow();
+        UserEntity user = userRepository.findByEmailIgnoreCaseAndDeletedFalse(email).orElseThrow();
+        familyMemberRepository.save(new FamilyMemberEntity(family, user, role));
     }
 
     private org.springframework.test.web.servlet.ResultActions createRecipe(RegisteredUser user, String title) throws Exception {

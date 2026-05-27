@@ -1,9 +1,14 @@
 package org.gipsybuho.recetasfamiliares.recipes;
 
+import java.util.List;
+
 import org.gipsybuho.recetasfamiliares.common.api.PageResponse;
 import org.gipsybuho.recetasfamiliares.families.FamilyEntity;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
+import org.gipsybuho.recetasfamiliares.families.FamilyRole;
+import org.gipsybuho.recetasfamiliares.photos.RecipePhotoEntity;
+import org.gipsybuho.recetasfamiliares.photos.RecipePhotoRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +24,7 @@ public class RecipeService {
     private final RecipeRepository recipeRepository;
     private final RecipeIngredientRepository ingredientRepository;
     private final RecipeStepRepository stepRepository;
+    private final RecipePhotoRepository photoRepository;
     private final FamilyRepository familyRepository;
     private final FamilyMemberRepository familyMemberRepository;
 
@@ -26,12 +32,14 @@ public class RecipeService {
             RecipeRepository recipeRepository,
             RecipeIngredientRepository ingredientRepository,
             RecipeStepRepository stepRepository,
+            RecipePhotoRepository photoRepository,
             FamilyRepository familyRepository,
             FamilyMemberRepository familyMemberRepository
     ) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.stepRepository = stepRepository;
+        this.photoRepository = photoRepository;
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
     }
@@ -52,7 +60,7 @@ public class RecipeService {
 
     @Transactional
     public RecipeResponse createRecipe(String familyId, String userId, CreateRecipeRequest request) {
-        requireMembership(familyId, userId);
+        requireEditor(familyId, userId);
         FamilyEntity family = familyRepository.findById(familyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
         RecipeEntity recipe = new RecipeEntity(
@@ -75,7 +83,7 @@ public class RecipeService {
 
     @Transactional
     public RecipeResponse updateRecipe(String familyId, String recipeId, String userId, UpdateRecipeRequest request) {
-        requireMembership(familyId, userId);
+        requireEditor(familyId, userId);
         RecipeEntity recipe = requireActiveRecipe(familyId, recipeId);
         recipe.update(
                 request.title().trim(),
@@ -90,12 +98,14 @@ public class RecipeService {
 
     @Transactional
     public void deleteRecipe(String familyId, String recipeId, String userId) {
-        requireMembership(familyId, userId);
+        requireEditor(familyId, userId);
         RecipeEntity recipe = requireActiveRecipe(familyId, recipeId);
         ingredientRepository.findByRecipe_IdAndDeletedFalseOrderByPositionAsc(recipeId)
                 .forEach(RecipeIngredientEntity::softDelete);
         stepRepository.findByRecipe_IdAndDeletedFalseOrderByPositionAsc(recipeId)
                 .forEach(RecipeStepEntity::softDelete);
+        photoRepository.findByRecipe_IdAndDeletedFalseOrderByPositionAsc(recipeId)
+                .forEach(RecipePhotoEntity::softDelete);
         recipe.softDelete();
         recipeRepository.save(recipe);
     }
@@ -103,6 +113,16 @@ public class RecipeService {
     private void requireMembership(String familyId, String userId) {
         if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family access denied");
+        }
+    }
+
+    private void requireEditor(String familyId, String userId) {
+        if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndRoleInAndDeletedFalse(
+                familyId,
+                userId,
+                List.of(FamilyRole.OWNER, FamilyRole.ADMIN)
+        )) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family write access denied");
         }
     }
 

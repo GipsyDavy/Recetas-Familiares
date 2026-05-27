@@ -12,6 +12,8 @@ public record SyncRecipePushItem(
         @Pattern(regexp = SyncIds.UUID_V4_PATTERN, message = "must be a UUID v4")
         String id,
 
+        Long baseSyncVersion,
+
         @Size(max = 180)
         String title,
 

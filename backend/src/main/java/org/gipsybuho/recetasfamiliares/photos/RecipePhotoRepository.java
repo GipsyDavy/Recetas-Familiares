@@ -1,0 +1,24 @@
+package org.gipsybuho.recetasfamiliares.photos;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface RecipePhotoRepository extends JpaRepository<RecipePhotoEntity, String> {
+
+    List<RecipePhotoEntity> findByRecipe_IdAndDeletedFalseOrderByPositionAsc(String recipeId);
+
+    List<RecipePhotoEntity> findByRecipe_IdOrderByPositionAsc(String recipeId);
+
+    Optional<RecipePhotoEntity> findByIdAndRecipe_IdAndRecipe_Family_IdAndDeletedFalse(
+            String id,
+            String recipeId,
+            String familyId
+    );
+
+    Optional<RecipePhotoEntity> findByIdAndRecipe_Family_Id(String id, String familyId);
+
+    List<RecipePhotoEntity> findByRecipe_Family_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(String familyId, Instant since);
+}

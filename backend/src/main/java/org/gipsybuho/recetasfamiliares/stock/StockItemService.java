@@ -1,9 +1,12 @@
 package org.gipsybuho.recetasfamiliares.stock;
 
+import java.util.List;
+
 import org.gipsybuho.recetasfamiliares.common.api.PageResponse;
 import org.gipsybuho.recetasfamiliares.families.FamilyEntity;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
+import org.gipsybuho.recetasfamiliares.families.FamilyRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -46,7 +49,7 @@ public class StockItemService {
 
     @Transactional
     public StockItemResponse createStockItem(String familyId, String userId, CreateStockItemRequest request) {
-        requireMembership(familyId, userId);
+        requireEditor(familyId, userId);
         FamilyEntity family = familyRepository.findById(familyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
         StockItemEntity stockItem = new StockItemEntity(
@@ -74,7 +77,7 @@ public class StockItemService {
             String userId,
             UpdateStockItemRequest request
     ) {
-        requireMembership(familyId, userId);
+        requireEditor(familyId, userId);
         StockItemEntity stockItem = requireActiveStockItem(familyId, stockItemId);
         stockItem.update(
                 request.name().trim(),
@@ -89,7 +92,7 @@ public class StockItemService {
 
     @Transactional
     public void deleteStockItem(String familyId, String stockItemId, String userId) {
-        requireMembership(familyId, userId);
+        requireEditor(familyId, userId);
         StockItemEntity stockItem = requireActiveStockItem(familyId, stockItemId);
         stockItem.softDelete();
         stockItemRepository.save(stockItem);
@@ -98,6 +101,16 @@ public class StockItemService {
     private void requireMembership(String familyId, String userId) {
         if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family access denied");
+        }
+    }
+
+    private void requireEditor(String familyId, String userId) {
+        if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndRoleInAndDeletedFalse(
+                familyId,
+                userId,
+                List.of(FamilyRole.OWNER, FamilyRole.ADMIN)
+        )) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family write access denied");
         }
     }
 

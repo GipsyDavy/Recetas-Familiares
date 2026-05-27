@@ -143,6 +143,12 @@ Implementado:
 - filtros JWT;
 - `UserDetailsService`;
 - endpoints publicos limitados a auth, health y Swagger/OpenAPI.
+- permisos familiares por rol: `OWNER` y `ADMIN` pueden escribir/borrar/sync push; `MEMBER` puede leer.
+- rate limiting configurable en `POST /api/v1/auth/register`, `/login`, `/refresh` y `/logout`;
+- respuestas `429` con codigo `rate_limited` y cabecera `Retry-After`.
+- cabeceras defensivas HTTP: CSP, nosniff, frame deny, referrer policy y permissions policy;
+- HSTS configurado para HTTPS;
+- CORS deny-by-default salvo origenes configurados en `CORS_ALLOWED_ORIGINS`.
 
 ## Auth implementado
 
@@ -247,6 +253,217 @@ Campos:
 
 Integrado en sincronizacion como `stockItems`.
 
+## Menus semanales implementados
+
+Endpoint base:
+
+```text
+/api/v1/families/{familyId}/menu-items
+```
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/menu-items?weekStart=2026-06-01
+POST /api/v1/families/{familyId}/menu-items
+GET /api/v1/families/{familyId}/menu-items/{menuItemId}
+PUT /api/v1/families/{familyId}/menu-items/{menuItemId}
+DELETE /api/v1/families/{familyId}/menu-items/{menuItemId}
+```
+
+Campos:
+
+- `recipeId` opcional, siempre validado contra la misma familia;
+- `recipeTitle` en respuesta;
+- `plannedDate`;
+- `mealType`: `BREAKFAST`, `LUNCH`, `DINNER`, `SNACK`;
+- `note`;
+- `createdAt`;
+- `updatedAt`;
+- `syncVersion`;
+- `deleted`.
+
+Integrado en sincronizacion como `menuItems`.
+
+## Listas de compra implementadas
+
+Endpoint base:
+
+```text
+/api/v1/families/{familyId}/shopping-lists
+```
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/shopping-lists
+POST /api/v1/families/{familyId}/shopping-lists
+POST /api/v1/families/{familyId}/shopping-lists/generate-from-menu
+GET /api/v1/families/{familyId}/shopping-lists/{shoppingListId}
+PUT /api/v1/families/{familyId}/shopping-lists/{shoppingListId}
+DELETE /api/v1/families/{familyId}/shopping-lists/{shoppingListId}
+GET /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items
+POST /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items
+GET /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items/{itemId}
+PUT /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items/{itemId}
+DELETE /api/v1/families/{familyId}/shopping-lists/{shoppingListId}/items/{itemId}
+```
+
+Campos de lista:
+
+- `name`
+- `plannedFrom`
+- `plannedTo`
+- `note`
+- `completed`
+- `createdAt`
+- `updatedAt`
+- `syncVersion`
+- `deleted`
+
+Campos de item:
+
+- `shoppingListId`
+- `position`
+- `name`
+- `quantity`
+- `unit`
+- `checked`
+- `note`
+- `createdAt`
+- `updatedAt`
+- `syncVersion`
+- `deleted`
+
+Al borrar una lista se aplican tombstones a sus items activos.
+Integrado en sincronizacion como `shoppingLists` y `shoppingListItems`.
+
+Generacion automatica:
+
+- `generate-from-menu` recibe `name`, `startDate`, `endDate` y `note`;
+- crea una lista nueva para ese rango;
+- recorre recetas planificadas en menus semanales;
+- lee ingredientes activos de esas recetas;
+- agrupa por nombre y unidad, ignorando mayusculas/minusculas;
+- suma cantidades cuando hay cantidad;
+- crea items no marcados como comprados.
+
+## Favoritos implementados
+
+Endpoint base:
+
+```text
+/api/v1/families/{familyId}/favorite-recipes
+```
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/favorite-recipes
+POST /api/v1/families/{familyId}/favorite-recipes
+GET /api/v1/families/{familyId}/favorite-recipes/{favoriteId}
+DELETE /api/v1/families/{familyId}/favorite-recipes/{favoriteId}
+```
+
+Campos:
+
+- `familyId`
+- `recipeId`
+- `recipeTitle`
+- `createdAt`
+- `updatedAt`
+- `syncVersion`
+- `deleted`
+
+Comportamiento:
+
+- favorito familiar, no individual;
+- valida que la receta pertenece a la familia autenticada;
+- constraint unico por familia y receta;
+- si se vuelve a marcar como favorita una receta borrada logicamente del listado de favoritos, se restaura el mismo registro;
+- integrado en sincronizacion como `favoriteRecipes`.
+
+## Notas familiares implementadas
+
+Endpoint base:
+
+```text
+/api/v1/families/{familyId}/notes
+```
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/notes
+POST /api/v1/families/{familyId}/notes
+GET /api/v1/families/{familyId}/notes/{noteId}
+PUT /api/v1/families/{familyId}/notes/{noteId}
+DELETE /api/v1/families/{familyId}/notes/{noteId}
+```
+
+Campos:
+
+- `familyId`
+- `recipeId` opcional
+- `recipeTitle` en respuesta cuando hay receta
+- `title`
+- `body`
+- `pinned`
+- `createdAt`
+- `updatedAt`
+- `syncVersion`
+- `deleted`
+
+Comportamiento:
+
+- nota familiar, no individual;
+- puede asociarse a una receta de la misma familia;
+- valida ownership familiar de la receta opcional;
+- listado ordenado por `pinned` y `updatedAt`;
+- integrado en sincronizacion como `familyNotes`.
+
+## Fotos de receta implementadas
+
+Endpoint base:
+
+```text
+/api/v1/families/{familyId}/recipes/{recipeId}/photos
+```
+
+Endpoints:
+
+```text
+GET /api/v1/families/{familyId}/recipes/{recipeId}/photos
+GET /api/v1/families/{familyId}/recipes/{recipeId}/photos?includeDeleted=true
+POST /api/v1/families/{familyId}/recipes/{recipeId}/photos
+GET /api/v1/families/{familyId}/recipes/{recipeId}/photos/{photoId}
+PUT /api/v1/families/{familyId}/recipes/{recipeId}/photos/{photoId}
+DELETE /api/v1/families/{familyId}/recipes/{recipeId}/photos/{photoId}
+```
+
+Campos:
+
+- `recipeId`
+- `position`
+- `url`
+- `thumbnailUrl`
+- `caption`
+- `contentType`
+- `sizeBytes`
+- `createdAt`
+- `updatedAt`
+- `syncVersion`
+- `deleted`
+
+Reglas:
+
+- nunca almacenar binarios en MySQL;
+- solo metadata y URLs;
+- URLs `http` o `https`;
+- tipos permitidos: `image/jpeg`, `image/png`, `image/webp`;
+- al borrar receta se soft-deletean fotos;
+- integrado en sincronizacion como `recipePhotos`.
+
 ## Sincronizacion implementada
 
 Endpoints:
@@ -263,6 +480,12 @@ POST /api/v1/families/{familyId}/sync/push
 - `ingredients`
 - `steps`
 - `stockItems`
+- `menuItems`
+- `shoppingLists`
+- `shoppingListItems`
+- `favoriteRecipes`
+- `familyNotes`
+- `recipePhotos`
 
 `push` acepta:
 
@@ -270,15 +493,24 @@ POST /api/v1/families/{familyId}/sync/push
 - ingredientes;
 - pasos;
 - stock familiar;
+- menus semanales;
+- listas de compra;
+- favoritos;
+- notas familiares;
+- fotos de receta;
 - IDs estables de cliente;
 - tombstones con `deleted=true`.
 
 Estrategia inicial:
 
-- Last Write Wins;
+- compatibilidad Last Write Wins si el cliente no envia `baseSyncVersion`;
+- deteccion opcional de conflictos si el cliente envia `baseSyncVersion`;
+- respuesta `409 conflict` cuando `baseSyncVersion` no coincide con `syncVersion` actual del servidor;
 - `updatedAt` asignado por servidor;
 - `syncVersion` asignado por servidor;
 - ownership familiar obligatorio;
+- `pull` permitido para cualquier miembro activo;
+- `push` limitado a roles `OWNER` y `ADMIN`;
 - borrados desconocidos se ignoran para no crear basura;
 - no se permite mover silenciosamente contenido existente a otra receta.
 
@@ -291,6 +523,11 @@ V1__create_identity_schema.sql
 V2__create_recipes_schema.sql
 V3__create_recipe_contents_schema.sql
 V4__create_stock_schema.sql
+V5__create_menu_schema.sql
+V6__create_shopping_schema.sql
+V7__create_favorites_schema.sql
+V8__create_notes_schema.sql
+V9__create_recipe_photos_schema.sql
 ```
 
 Tablas principales actuales:
@@ -303,6 +540,12 @@ Tablas principales actuales:
 - `recipe_ingredients`
 - `recipe_steps`
 - `stock_items`
+- `menu_items`
+- `shopping_lists`
+- `shopping_list_items`
+- `favorite_recipes`
+- `family_notes`
+- `recipe_photos`
 
 ## Tests implementados
 
@@ -316,8 +559,18 @@ Hay tests de:
 - ingredientes y pasos;
 - aislamiento entre familias;
 - stock familiar;
+- menus semanales;
+- listas de compra;
+- generacion menu -> compra;
+- favoritos;
+- notas familiares;
+- fotos de receta;
+- conflictos sync con `baseSyncVersion`;
 - sync pull;
 - sync push;
+- permisos por rol familiar;
+- rate limiting de auth;
+- hardening HTTP/CORS;
 - tombstones y soft delete.
 
 Ultima verificacion ejecutada:
@@ -329,7 +582,7 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Enviro
 Resultado:
 
 ```text
-Tests run: 25
+Tests run: 53
 Failures: 0
 Errors: 0
 Skipped: 0
@@ -359,16 +612,8 @@ git diff --stat
 
 Prioridad backend:
 
-1. Mejorar resolucion de conflictos sync con version cliente/servidor.
-2. Implementar menus semanales.
-3. Implementar listas de compra.
-4. Implementar favoritos.
-5. Implementar notas familiares.
-6. Implementar fotos como metadata/URLs, nunca binarios en MySQL.
-7. Implementar roles/permisos familiares mas finos.
-8. Preparar rate limiting y hardening de seguridad.
-9. Revisar Swagger/OpenAPI antes de produccion.
-10. Crear datos seed/dev si hace falta.
+1. Revisar Swagger/OpenAPI antes de produccion.
+2. Crear datos seed/dev si hace falta.
 
 Prioridad Android:
 
@@ -406,15 +651,16 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Enviro
 Siguiente paso tecnico recomendado:
 
 ```text
-Implementar menus semanales en backend.
+Revisar Swagger/OpenAPI antes de produccion.
 ```
 
 Motivo:
 
-- depende de recetas;
-- prepara listas de compra;
-- encaja con planificacion familiar;
-- es una pieza central del MVP.
+- ya existen todos los modulos MVP principales del backend;
+- los permisos familiares por rol ya estan aplicados;
+- el rate limiting de auth ya esta aplicado y testeado;
+- el hardening HTTP/CORS ya esta aplicado y testeado;
+- falta revisar la exposicion y documentacion OpenAPI antes de abrir clientes Android/Desktop.
 
 Alternativa si se quiere cerrar el backend base primero:
 
@@ -452,7 +698,7 @@ git status --short --branch
 $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
 ```
 
-5. Continuar con menus semanales o cerrar commit.
+5. Continuar con revision Swagger/OpenAPI o cerrar commit.
 
 ## Nota importante
 
@@ -466,6 +712,11 @@ El backend ya tiene base real y contratos iniciales para:
 - ingredientes;
 - pasos;
 - stock;
+- menus semanales;
+- listas de compra;
+- favoritos;
+- notas familiares;
+- fotos de receta;
 - sincronizacion pull/push.
 
 La siguiente fase debe mantener compatibilidad con Android/Desktop y no romper los contratos JSON existentes sin motivo fuerte.

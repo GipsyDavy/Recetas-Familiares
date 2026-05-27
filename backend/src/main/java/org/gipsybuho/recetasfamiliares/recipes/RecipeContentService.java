@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.recipes;
 
 import java.util.List;
 
+import org.gipsybuho.recetasfamiliares.families.FamilyRole;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -52,7 +53,8 @@ public class RecipeContentService {
             String userId,
             RecipeIngredientListRequest request
     ) {
-        RecipeEntity recipe = requireActiveRecipeForMember(familyId, recipeId, userId);
+        requireEditor(familyId, userId);
+        RecipeEntity recipe = requireActiveRecipe(familyId, recipeId);
         List<RecipeIngredientEntity> existing = ingredientRepository
                 .findByRecipe_IdAndDeletedFalseOrderByPositionAsc(recipeId);
         existing.forEach(RecipeIngredientEntity::softDelete);
@@ -89,7 +91,8 @@ public class RecipeContentService {
             String userId,
             RecipeStepListRequest request
     ) {
-        RecipeEntity recipe = requireActiveRecipeForMember(familyId, recipeId, userId);
+        requireEditor(familyId, userId);
+        RecipeEntity recipe = requireActiveRecipe(familyId, recipeId);
         List<RecipeStepEntity> existing = stepRepository.findByRecipe_IdAndDeletedFalseOrderByPositionAsc(recipeId);
         existing.forEach(RecipeStepEntity::softDelete);
 
@@ -107,6 +110,21 @@ public class RecipeContentService {
         }
         return recipeRepository.findByIdAndFamily_IdAndDeletedFalse(recipeId, familyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipe not found"));
+    }
+
+    private RecipeEntity requireActiveRecipe(String familyId, String recipeId) {
+        return recipeRepository.findByIdAndFamily_IdAndDeletedFalse(recipeId, familyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipe not found"));
+    }
+
+    private void requireEditor(String familyId, String userId) {
+        if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndRoleInAndDeletedFalse(
+                familyId,
+                userId,
+                List.of(FamilyRole.OWNER, FamilyRole.ADMIN)
+        )) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family write access denied");
+        }
     }
 
     private List<RecipeIngredientEntity> createIngredients(

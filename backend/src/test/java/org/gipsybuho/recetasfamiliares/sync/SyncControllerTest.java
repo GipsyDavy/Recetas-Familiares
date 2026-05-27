@@ -236,6 +236,415 @@ class SyncControllerTest {
     }
 
     @Test
+    void pushesAndPullsMenuItems() throws Exception {
+        RegisteredUser user = register("sync-menu@example.com", "Familia Sync Menu");
+        String recipeId = "99999999-9999-4999-8999-999999999999";
+        String menuItemId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+        String ingredientId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        String stepId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+        pushRecipeGraph(user, recipeId, ingredientId, stepId);
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "menuItems": [
+                                    {
+                                      "id": "%s",
+                                      "recipeId": "%s",
+                                      "plannedDate": "2026-06-01",
+                                      "mealType": "LUNCH",
+                                      "note": "Comida del lunes",
+                                      "deleted": false
+                                    }
+                                  ]
+                                }
+                                """.formatted(menuItemId, recipeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.menuItems.length()").value(1))
+                .andExpect(jsonPath("$.menuItems[0].id").value(menuItemId))
+                .andExpect(jsonPath("$.menuItems[0].recipeId").value(recipeId))
+                .andExpect(jsonPath("$.menuItems[0].recipeTitle").value("Caldo offline"))
+                .andExpect(jsonPath("$.menuItems[0].mealType").value("LUNCH"))
+                .andExpect(jsonPath("$.menuItems[0].deleted").value(false));
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "menuItems": [
+                                    {
+                                      "id": "%s",
+                                      "deleted": true
+                                    }
+                                  ]
+                                }
+                                """.formatted(menuItemId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.menuItems[0].id").value(menuItemId))
+                .andExpect(jsonPath("$.menuItems[0].deleted").value(true));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.menuItems.length()").value(1))
+                .andExpect(jsonPath("$.menuItems[0].id").value(menuItemId))
+                .andExpect(jsonPath("$.menuItems[0].deleted").value(true));
+    }
+
+    @Test
+    void pushesAndPullsShoppingListsAndItems() throws Exception {
+        RegisteredUser user = register("sync-shopping@example.com", "Familia Sync Compra");
+        String shoppingListId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+        String itemId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "shoppingLists": [
+                                    {
+                                      "id": "%s",
+                                      "name": "Compra offline",
+                                      "plannedFrom": "2026-06-01",
+                                      "plannedTo": "2026-06-07",
+                                      "note": "Semana planificada",
+                                      "completed": false,
+                                      "deleted": false
+                                    }
+                                  ],
+                                  "shoppingListItems": [
+                                    {
+                                      "id": "%s",
+                                      "shoppingListId": "%s",
+                                      "position": 1,
+                                      "name": "Pan",
+                                      "quantity": 2,
+                                      "unit": "ud",
+                                      "checked": false,
+                                      "deleted": false
+                                    }
+                                  ]
+                                }
+                                """.formatted(shoppingListId, itemId, shoppingListId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shoppingLists.length()").value(1))
+                .andExpect(jsonPath("$.shoppingLists[0].id").value(shoppingListId))
+                .andExpect(jsonPath("$.shoppingLists[0].name").value("Compra offline"))
+                .andExpect(jsonPath("$.shoppingListItems.length()").value(1))
+                .andExpect(jsonPath("$.shoppingListItems[0].id").value(itemId))
+                .andExpect(jsonPath("$.shoppingListItems[0].shoppingListId").value(shoppingListId));
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "shoppingLists": [
+                                    {
+                                      "id": "%s",
+                                      "deleted": true
+                                    }
+                                  ],
+                                  "shoppingListItems": []
+                                }
+                                """.formatted(shoppingListId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shoppingLists[0].id").value(shoppingListId))
+                .andExpect(jsonPath("$.shoppingLists[0].deleted").value(true));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shoppingLists.length()").value(1))
+                .andExpect(jsonPath("$.shoppingLists[0].id").value(shoppingListId))
+                .andExpect(jsonPath("$.shoppingLists[0].deleted").value(true))
+                .andExpect(jsonPath("$.shoppingListItems.length()").value(1))
+                .andExpect(jsonPath("$.shoppingListItems[0].id").value(itemId))
+                .andExpect(jsonPath("$.shoppingListItems[0].deleted").value(true));
+    }
+
+    @Test
+    void pushesAndPullsFavoriteRecipes() throws Exception {
+        RegisteredUser user = register("sync-favorite@example.com", "Familia Sync Favoritos");
+        String recipeId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+        String ingredientId = "12121212-1212-4212-8212-121212121212";
+        String stepId = "34343434-3434-4434-8434-343434343434";
+        String favoriteId = "56565656-5656-4656-8656-565656565656";
+
+        pushRecipeGraph(user, recipeId, ingredientId, stepId);
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "favoriteRecipes": [
+                                    {
+                                      "id": "%s",
+                                      "recipeId": "%s",
+                                      "deleted": false
+                                    }
+                                  ]
+                                }
+                                """.formatted(favoriteId, recipeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.favoriteRecipes.length()").value(1))
+                .andExpect(jsonPath("$.favoriteRecipes[0].id").value(favoriteId))
+                .andExpect(jsonPath("$.favoriteRecipes[0].recipeId").value(recipeId))
+                .andExpect(jsonPath("$.favoriteRecipes[0].recipeTitle").value("Caldo offline"))
+                .andExpect(jsonPath("$.favoriteRecipes[0].deleted").value(false));
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "favoriteRecipes": [
+                                    {
+                                      "id": "%s",
+                                      "deleted": true
+                                    }
+                                  ]
+                                }
+                                """.formatted(favoriteId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.favoriteRecipes[0].id").value(favoriteId))
+                .andExpect(jsonPath("$.favoriteRecipes[0].deleted").value(true));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.favoriteRecipes.length()").value(1))
+                .andExpect(jsonPath("$.favoriteRecipes[0].id").value(favoriteId))
+                .andExpect(jsonPath("$.favoriteRecipes[0].deleted").value(true));
+    }
+
+    @Test
+    void pushesAndPullsFamilyNotes() throws Exception {
+        RegisteredUser user = register("sync-note@example.com", "Familia Sync Notas");
+        String recipeId = "78787878-7878-4878-8878-787878787878";
+        String ingredientId = "90909090-9090-4090-8090-909090909090";
+        String stepId = "abababab-abab-4bab-8bab-abababababab";
+        String noteId = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
+
+        pushRecipeGraph(user, recipeId, ingredientId, stepId);
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "familyNotes": [
+                                    {
+                                      "id": "%s",
+                                      "recipeId": "%s",
+                                      "title": "Nota offline",
+                                      "body": "Recuerdo creado sin conexion",
+                                      "pinned": true,
+                                      "deleted": false
+                                    }
+                                  ]
+                                }
+                                """.formatted(noteId, recipeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.familyNotes.length()").value(1))
+                .andExpect(jsonPath("$.familyNotes[0].id").value(noteId))
+                .andExpect(jsonPath("$.familyNotes[0].recipeId").value(recipeId))
+                .andExpect(jsonPath("$.familyNotes[0].recipeTitle").value("Caldo offline"))
+                .andExpect(jsonPath("$.familyNotes[0].title").value("Nota offline"))
+                .andExpect(jsonPath("$.familyNotes[0].pinned").value(true))
+                .andExpect(jsonPath("$.familyNotes[0].deleted").value(false));
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "familyNotes": [
+                                    {
+                                      "id": "%s",
+                                      "deleted": true
+                                    }
+                                  ]
+                                }
+                                """.formatted(noteId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.familyNotes[0].id").value(noteId))
+                .andExpect(jsonPath("$.familyNotes[0].deleted").value(true));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.familyNotes.length()").value(1))
+                .andExpect(jsonPath("$.familyNotes[0].id").value(noteId))
+                .andExpect(jsonPath("$.familyNotes[0].deleted").value(true));
+    }
+
+    @Test
+    void pushesAndPullsRecipePhotos() throws Exception {
+        RegisteredUser user = register("sync-photo@example.com", "Familia Sync Fotos");
+        String recipeId = "edededed-eded-4ded-8ded-edededededed";
+        String ingredientId = "fafafafa-fafa-4afa-8afa-fafafafafafa";
+        String stepId = "10101010-1010-4010-8010-101010101010";
+        String photoId = "23232323-2323-4323-8323-232323232323";
+
+        pushRecipeGraph(user, recipeId, ingredientId, stepId);
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "recipePhotos": [
+                                    {
+                                      "id": "%s",
+                                      "recipeId": "%s",
+                                      "position": 1,
+                                      "url": "https://cdn.example.com/offline.jpg",
+                                      "thumbnailUrl": "https://cdn.example.com/offline-thumb.jpg",
+                                      "caption": "Foto offline",
+                                      "contentType": "image/jpeg",
+                                      "sizeBytes": 1234,
+                                      "deleted": false
+                                    }
+                                  ]
+                                }
+                                """.formatted(photoId, recipeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipePhotos.length()").value(1))
+                .andExpect(jsonPath("$.recipePhotos[0].id").value(photoId))
+                .andExpect(jsonPath("$.recipePhotos[0].recipeId").value(recipeId))
+                .andExpect(jsonPath("$.recipePhotos[0].url").value("https://cdn.example.com/offline.jpg"))
+                .andExpect(jsonPath("$.recipePhotos[0].contentType").value("image/jpeg"))
+                .andExpect(jsonPath("$.recipePhotos[0].deleted").value(false));
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [],
+                                  "ingredients": [],
+                                  "steps": [],
+                                  "recipePhotos": [
+                                    {
+                                      "id": "%s",
+                                      "deleted": true
+                                    }
+                                  ]
+                                }
+                                """.formatted(photoId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipePhotos[0].id").value(photoId))
+                .andExpect(jsonPath("$.recipePhotos[0].deleted").value(true));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipePhotos.length()").value(1))
+                .andExpect(jsonPath("$.recipePhotos[0].id").value(photoId))
+                .andExpect(jsonPath("$.recipePhotos[0].deleted").value(true));
+    }
+
+    @Test
+    void rejectsPushWhenBaseSyncVersionIsStale() throws Exception {
+        RegisteredUser user = register("sync-conflict@example.com", "Familia Sync Conflict");
+        String recipeId = "45454545-4545-4545-8545-454545454545";
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [
+                                    {
+                                      "id": "%s",
+                                      "title": "Version inicial",
+                                      "deleted": false
+                                    }
+                                  ],
+                                  "ingredients": [],
+                                  "steps": []
+                                }
+                                """.formatted(recipeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipes[0].syncVersion").value(1));
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [
+                                    {
+                                      "id": "%s",
+                                      "baseSyncVersion": 0,
+                                      "title": "Cambio obsoleto",
+                                      "deleted": false
+                                    }
+                                  ],
+                                  "ingredients": [],
+                                  "steps": []
+                                }
+                                """.formatted(recipeId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("conflict"));
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipes": [
+                                    {
+                                      "id": "%s",
+                                      "baseSyncVersion": 1,
+                                      "title": "Cambio aceptado",
+                                      "deleted": false
+                                    }
+                                  ],
+                                  "ingredients": [],
+                                  "steps": []
+                                }
+                                """.formatted(recipeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipes[0].title").value("Cambio aceptado"))
+                .andExpect(jsonPath("$.recipes[0].syncVersion").value(2));
+    }
+
+    @Test
     void blocksSyncPushForAnotherFamily() throws Exception {
         RegisteredUser first = register("sync-push-one@example.com", "Familia Push Uno");
         RegisteredUser second = register("sync-push-two@example.com", "Familia Push Dos");
