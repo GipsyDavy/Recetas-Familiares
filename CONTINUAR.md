@@ -593,13 +593,17 @@ BUILD SUCCESS
 
 ## Estado Git actual
 
-Se cerro un commit local:
+Se cerraron commits locales:
 
 ```text
 Stabilize backend OpenAPI and dev seed data
+Update continuation notes after backend stabilization
 ```
 
 No se ha hecho push.
+
+El repositorio quedo por delante de `origin/main` en 2 commits antes de iniciar Android.
+La fase Android esta sin commitear todavia.
 
 Antes de continuar:
 
@@ -615,15 +619,107 @@ Prioridad backend:
 1. Revisar diff final y decidir si hacer push del commit backend actual.
 2. Opcional: probar manualmente Swagger UI con el perfil `dev`.
 
-Prioridad Android:
+## Android iniciado
 
-1. Crear proyecto Android real.
-2. Retrofit client.
-3. Room local database.
-4. Repository pattern.
-5. WorkManager sync pull/push.
-6. Pantallas auth, recetas, detalle y stock.
-7. Material You 3.
+Se creo un proyecto Android real en:
+
+```text
+android/
+```
+
+Stack inicial:
+
+- Android Gradle Plugin 9.2.0.
+- Kotlin 2.3.20.
+- Compose + Material 3.
+- Retrofit 3.
+- OkHttp logging.
+- Room 2.8.4.
+- KSP para Room.
+- WorkManager.
+- MVVM ligero sin DI framework externo.
+
+Archivos principales:
+
+- `android/settings.gradle.kts`
+- `android/build.gradle.kts`
+- `android/gradle.properties`
+- `android/app/build.gradle.kts`
+- `android/app/src/main/AndroidManifest.xml`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/RecetasApplication.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/MainActivity.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/core/AppContainer.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/core/SessionStore.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/remote/RecetasApi.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/remote/dto/ApiDtos.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/local/RecetasDatabase.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/local/Daos.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/local/Entities.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/repository/Repositories.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/sync/SyncWorker.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/RecetasViewModel.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/RecetasApp.kt`
+- `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/theme/Theme.kt`
+
+Implementado:
+
+- login contra `POST /api/v1/auth/login`;
+- almacenamiento local de access token, refresh token y familyId;
+- interceptor Bearer JWT;
+- cliente Retrofit con base URL por defecto `http://10.0.2.2:8080/`;
+- Room cache para recetas y stock;
+- repositorios de auth, recetas, stock y sync;
+- WorkManager periodico para `sync/pull`;
+- pantallas Compose iniciales: login, recetas, detalle de receta y stock;
+- tema Material 3 basico;
+- README Android actualizado.
+
+Validacion ejecutada:
+
+```powershell
+cd android
+gradle tasks
+```
+
+Resultado:
+
+```text
+BUILD SUCCESSFUL
+```
+
+Tambien se intento:
+
+```powershell
+gradle :app:compileDebugKotlin
+```
+
+Resultado:
+
+```text
+SDK location not found.
+```
+
+Bloqueo actual:
+
+- no existe `ANDROID_HOME`;
+- no existe `ANDROID_SDK_ROOT`;
+- no existe SDK en `%LOCALAPPDATA%\Android\Sdk`;
+- no existe SDK en `C:\Android\Sdk`;
+- falta crear `android/local.properties` con `sdk.dir=...` o instalar/configurar Android SDK.
+
+Advertencia tecnica:
+
+- AGP 9.2 trae Kotlin integrado, pero Room/KSP necesito mantener temporalmente `org.jetbrains.kotlin.android` y `android.builtInKotlin=false` / `android.newDsl=false`.
+- Esto permite cargar tareas Gradle, pero genera warnings de deprecacion que habra que revisar cuando KSP/Room encajen mejor con Kotlin integrado de AGP 9.
+
+Prioridad Android siguiente:
+
+1. Instalar/configurar Android SDK.
+2. Ejecutar `gradle :app:compileDebugKotlin`.
+3. Corregir errores de compilacion Kotlin/Android si aparecen.
+4. Ejecutar `gradle :app:assembleDebug`.
+5. Revisar UI en emulador/dispositivo.
+6. Commit del scaffold Android cuando compile.
 
 Prioridad Desktop:
 
@@ -699,7 +795,7 @@ git status --short --branch
 $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
 ```
 
-5. Continuar con push del commit backend o empezar Android.
+5. Continuar configurando Android SDK y compilar el scaffold Android.
 
 ## Nota importante
 
