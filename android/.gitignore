@@ -1,0 +1,14 @@
+# Local SDK path — never commit
+local.properties
+
+# Build outputs
+.gradle/
+build/
+app/build/
+
+# IDE
+.idea/
+*.iml
+
+# Kotlin generated
+.kotlin/
