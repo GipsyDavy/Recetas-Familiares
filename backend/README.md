@@ -38,6 +38,16 @@ Comando:
 mvn spring-boot:run
 ```
 
+Seed de desarrollo opcional:
+
+```text
+DEV_SEED_DATA_ENABLED=true
+DEV_SEED_EMAIL=demo@recetas.local
+DEV_SEED_PASSWORD=change-this-local-password
+```
+
+El seed solo funciona con el perfil `dev`, esta desactivado por defecto y requiere `DEV_SEED_PASSWORD` de al menos 12 caracteres cuando se activa. Crea una familia demo con recetas, ingredientes, stock, menu, lista de compra, favoritos, notas y foto de ejemplo si no existe ya el email configurado.
+
 Health endpoint:
 
 ```text

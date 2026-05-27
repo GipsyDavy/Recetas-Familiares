@@ -5,6 +5,13 @@ spring:
     password: ${DB_PASSWORD:}
 
 app:
+  dev:
+    seed-data:
+      enabled: ${DEV_SEED_DATA_ENABLED:false}
+      email: ${DEV_SEED_EMAIL:demo@recetas.local}
+      password: ${DEV_SEED_PASSWORD:}
+      display-name: ${DEV_SEED_DISPLAY_NAME:Demo Recetas}
+      family-name: ${DEV_SEED_FAMILY_NAME:Familia Demo}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8080,http://localhost:3000}
   security:
