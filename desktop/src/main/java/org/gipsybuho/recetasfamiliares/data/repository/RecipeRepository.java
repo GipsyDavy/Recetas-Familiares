@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.data.repository;
 
 import org.gipsybuho.recetasfamiliares.api.ApiClient;
 import org.gipsybuho.recetasfamiliares.api.ApiException;
+import org.gipsybuho.recetasfamiliares.api.dto.RecipeCreateDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
 import org.gipsybuho.recetasfamiliares.data.cache.SimpleCache;
@@ -46,6 +47,21 @@ public class RecipeRepository {
         String path = "api/v1/families/" + familyId + "/recipes/" + recipeId + "/steps";
         RecipeDtos.RecipeStepDto[] result = api.get(path, RecipeDtos.RecipeStepDto[].class);
         return List.of(result);
+    }
+
+    public RecipeDtos.RecipeDto create(RecipeCreateDtos.CreateRecipeRequest request) throws ApiException {
+        String familyId = session.getFamilyId();
+        return api.post("api/v1/families/" + familyId + "/recipes", request, RecipeDtos.RecipeDto.class);
+    }
+
+    public void replaceIngredients(String recipeId, RecipeCreateDtos.ReplaceIngredientsRequest request) throws ApiException {
+        String familyId = session.getFamilyId();
+        api.put("api/v1/families/" + familyId + "/recipes/" + recipeId + "/ingredients", request);
+    }
+
+    public void replaceSteps(String recipeId, RecipeCreateDtos.ReplaceStepsRequest request) throws ApiException {
+        String familyId = session.getFamilyId();
+        api.put("api/v1/families/" + familyId + "/recipes/" + recipeId + "/steps", request);
     }
 
     /** Replace recipe cache with data received from a sync pull. */

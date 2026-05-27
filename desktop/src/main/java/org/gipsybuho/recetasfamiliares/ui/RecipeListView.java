@@ -29,6 +29,11 @@ public class RecipeListView extends SplitPane {
         searchField.getStyleClass().add("search-field");
         searchField.textProperty().addListener((obs, oldVal, newVal) -> filterList(newVal));
 
+        Button newRecipeBtn = new Button("+ Nueva receta");
+        newRecipeBtn.getStyleClass().add("action-button-primary");
+        newRecipeBtn.setMaxWidth(Double.MAX_VALUE);
+        newRecipeBtn.setOnAction(e -> openNewRecipeForm());
+
         listView.getStyleClass().add("recipe-list");
         listView.setCellFactory(lv -> new RecipeCell());
         listView.getSelectionModel().selectedItemProperty().addListener((obs, old, recipe) -> {
@@ -41,7 +46,7 @@ public class RecipeListView extends SplitPane {
 
         statusLabel.getStyleClass().add("status-label");
 
-        VBox leftPanel = new VBox(10, searchField, listView, statusLabel);
+        VBox leftPanel = new VBox(10, searchField, newRecipeBtn, listView, statusLabel);
         leftPanel.setPadding(new Insets(16));
         VBox.setVgrow(listView, Priority.ALWAYS);
         leftPanel.setMinWidth(280);
@@ -67,6 +72,18 @@ public class RecipeListView extends SplitPane {
                 Platform.runLater(() -> statusLabel.setText("Error al cargar recetas."));
             }
         });
+    }
+
+    private void openNewRecipeForm() {
+        var dialog = new RecipeFormDialog(
+                getScene().getWindow(),
+                context,
+                created -> {
+                    refresh(); // Reload list after creation
+                    statusLabel.setText("Receta creada: " + created.title());
+                }
+        );
+        dialog.show();
     }
 
     private void filterList(String query) {

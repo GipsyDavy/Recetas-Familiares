@@ -347,3 +347,69 @@
     -fx-text-fill: #B09A8A;
     -fx-font-style: italic;
 }
+
+/* ── Form dialog ─────────────────────────────────────────────────────────────── */
+.form-content {
+    -fx-background-color: #FAF7F2;
+}
+
+.form-section {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 6, 0, 0, 1);
+}
+
+.form-section-header {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3D2B1F;
+}
+
+.form-field {
+    -fx-background-color: #F7F1EA;
+    -fx-border-color: #D4BBA8;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 8 10;
+    -fx-font-size: 13px;
+}
+
+.form-field:focused {
+    -fx-border-color: #C17D52;
+}
+
+.form-field-small {
+    -fx-background-color: #F7F1EA;
+    -fx-border-color: #D4BBA8;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6 8;
+    -fx-font-size: 13px;
+}
+
+.form-add-button {
+    -fx-background-color: transparent;
+    -fx-border-color: #C17D52;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-text-fill: #C17D52;
+    -fx-font-size: 13px;
+    -fx-padding: 6 12;
+    -fx-cursor: hand;
+}
+
+.form-add-button:hover {
+    -fx-background-color: #FBF0E8;
+}
+
+.form-remove-button {
+    -fx-background-color: transparent;
+    -fx-border-color: #D4837A;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-text-fill: #D4837A;
+    -fx-font-size: 14px;
+    -fx-padding: 2 8;
+    -fx-cursor: hand;
+    -fx-min-width: 28;
+}

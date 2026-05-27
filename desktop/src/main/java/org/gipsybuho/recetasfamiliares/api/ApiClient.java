@@ -57,6 +57,26 @@ public class ApiClient {
         return execute(request, responseType);
     }
 
+    public <T> T put(String path, Object body, Class<T> responseType) throws ApiException {
+        RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
+        Request request = new Request.Builder()
+                .url(BASE_URL + path)
+                .header("Authorization", "Bearer " + session.getAccessToken())
+                .put(rb)
+                .build();
+        return execute(request, responseType);
+    }
+
+    public void put(String path, Object body) throws ApiException {
+        RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
+        Request request = new Request.Builder()
+                .url(BASE_URL + path)
+                .header("Authorization", "Bearer " + session.getAccessToken())
+                .put(rb)
+                .build();
+        executeVoid(request);
+    }
+
     public void delete(String path) throws ApiException {
         Request request = new Request.Builder()
                 .url(BASE_URL + path)
