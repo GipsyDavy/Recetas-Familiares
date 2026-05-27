@@ -96,9 +96,12 @@ Corregidos en Sprint 2:
 
 Bloqueante pendiente: instalar Android SDK y verificar compilacion.
 
-### Desktop JavaFX (Sprint 1 completado)
+### Desktop JavaFX (Sprint 2 completado)
 
-Scaffold completo. JavaFX 21 + OkHttp + Gson. Login funcional, lista de recetas con SplitPane, detalle con ingredientes y pasos, stock en TableView, sidebar con navegacion y sync. CSS paleta calida. module-info Java 9+. Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`.
+JavaFX 21 + OkHttp + Gson. Compila y genera fat JAR. Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
+
+Sprint 1: Login, RecipeList (SplitPane + filtro), StockView (TableView), MainWindow (sidebar), CSS paleta calida.
+Sprint 2: Dashboard GridPane 2 col (recetas recientes + stock expirando), formulario creacion receta (modal), edicion receta pre-rellenada, borrado con confirmacion. Desktop completamente usable CRUD de recetas.
 
 ### Base de Datos MySQL
 
