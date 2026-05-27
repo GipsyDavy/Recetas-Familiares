@@ -122,6 +122,7 @@ Configuracion clave:
 
 - perfil base con variables de entorno obligatorias;
 - perfil `dev` para desarrollo local;
+- seed de desarrollo opcional solo en perfil `dev`, activable con `DEV_SEED_DATA_ENABLED=true`;
 - perfil `prod` con Swagger/OpenAPI desactivado;
 - perfil `test` con H2;
 - `ddl-auto: validate`;
@@ -143,6 +144,7 @@ Implementado:
 - filtros JWT;
 - `UserDetailsService`;
 - endpoints publicos limitados a auth, health y Swagger/OpenAPI.
+- OpenAPI documenta `auth` y `health` como publicos, y el resto de `/api/v1/**` con Bearer JWT.
 - permisos familiares por rol: `OWNER` y `ADMIN` pueden escribir/borrar/sync push; `MEMBER` puede leer.
 - rate limiting configurable en `POST /api/v1/auth/register`, `/login`, `/refresh` y `/logout`;
 - respuestas `429` con codigo `rate_limited` y cabecera `Retry-After`.
@@ -582,7 +584,7 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Enviro
 Resultado:
 
 ```text
-Tests run: 53
+Tests run: 57
 Failures: 0
 Errors: 0
 Skipped: 0
@@ -591,17 +593,15 @@ BUILD SUCCESS
 
 ## Estado Git actual
 
-Hay cambios sin commit:
+Se cerro un commit local:
 
 ```text
- M backend/README.md
-?? backend/pom.xml
-?? backend/src/
+Stabilize backend OpenAPI and dev seed data
 ```
 
-No se ha hecho commit despues de implementar el backend.
+No se ha hecho push.
 
-Antes de commitear:
+Antes de continuar:
 
 ```powershell
 git status --short --branch
@@ -612,8 +612,8 @@ git diff --stat
 
 Prioridad backend:
 
-1. Revisar Swagger/OpenAPI antes de produccion.
-2. Crear datos seed/dev si hace falta.
+1. Revisar diff final y decidir si hacer push del commit backend actual.
+2. Opcional: probar manualmente Swagger UI con el perfil `dev`.
 
 Prioridad Android:
 
@@ -651,7 +651,7 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Enviro
 Siguiente paso tecnico recomendado:
 
 ```text
-Revisar Swagger/OpenAPI antes de produccion.
+Revisar estado Git y hacer push del commit backend actual si se quiere cerrar la fase backend.
 ```
 
 Motivo:
@@ -660,12 +660,13 @@ Motivo:
 - los permisos familiares por rol ya estan aplicados;
 - el rate limiting de auth ya esta aplicado y testeado;
 - el hardening HTTP/CORS ya esta aplicado y testeado;
-- falta revisar la exposicion y documentacion OpenAPI antes de abrir clientes Android/Desktop.
+- la exposicion y documentacion OpenAPI ya quedaron revisadas y testeadas;
+- el seed de desarrollo opcional ya quedo implementado y testeado.
 
-Alternativa si se quiere cerrar el backend base primero:
+Alternativa si se quiere empezar clientes:
 
 ```text
-Revisar diff, hacer commit y push del estado actual.
+Crear proyecto Android real y cliente Retrofit contra los contratos backend actuales.
 ```
 
 ## Procedimiento al retomar
@@ -698,7 +699,7 @@ git status --short --branch
 $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
 ```
 
-5. Continuar con revision Swagger/OpenAPI o cerrar commit.
+5. Continuar con push del commit backend o empezar Android.
 
 ## Nota importante
 
