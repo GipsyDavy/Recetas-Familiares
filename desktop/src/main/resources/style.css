@@ -1,0 +1,241 @@
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+.root {
+    -fx-font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -fx-font-size: 14px;
+    -fx-background-color: #FAF7F2;
+}
+
+/* ── Login ──────────────────────────────────────────────────────────────────── */
+.login-view {
+    -fx-background-color: #FAF7F2;
+}
+
+.login-title {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-fill: #3D2B1F;
+}
+
+.login-subtitle {
+    -fx-font-size: 15px;
+    -fx-fill: #8B6F5E;
+}
+
+.login-field {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #D4BBA8;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10 14;
+    -fx-font-size: 14px;
+}
+
+.login-field:focused {
+    -fx-border-color: #C17D52;
+}
+
+.login-button {
+    -fx-background-color: #C17D52;
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 12 0;
+    -fx-cursor: hand;
+}
+
+.login-button:hover {
+    -fx-background-color: #A86840;
+}
+
+.login-error {
+    -fx-text-fill: #C0392B;
+    -fx-font-size: 13px;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────────── */
+.sidebar {
+    -fx-background-color: #3D2B1F;
+}
+
+.sidebar-header {
+    -fx-background-color: #2E1F14;
+}
+
+.sidebar-title {
+    -fx-fill: #F5E8DA;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-line-spacing: 4;
+}
+
+.sidebar-nav-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #D4BBA8;
+    -fx-font-size: 14px;
+    -fx-alignment: CENTER-LEFT;
+    -fx-padding: 10 16;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.sidebar-nav-button:hover {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-text-fill: #FAF7F2;
+}
+
+.sync-button {
+    -fx-text-fill: #8DBF8A;
+}
+
+.logout-button {
+    -fx-text-fill: #D4837A;
+}
+
+/* ── Recipe list ─────────────────────────────────────────────────────────────── */
+.recipe-list-view {
+    -fx-background-color: #FAF7F2;
+}
+
+.search-field {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #D4BBA8;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 8 12;
+}
+
+.search-field:focused {
+    -fx-border-color: #C17D52;
+}
+
+.recipe-list {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.recipe-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 4 0;
+}
+
+.recipe-list .list-cell:selected .recipe-cell {
+    -fx-background-color: #F0E6D8;
+}
+
+.recipe-cell {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 8;
+    -fx-padding: 10 14;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 4, 0, 0, 1);
+}
+
+.recipe-cell-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3D2B1F;
+}
+
+.recipe-cell-meta {
+    -fx-font-size: 12px;
+    -fx-text-fill: #8B6F5E;
+}
+
+/* ── Recipe detail ───────────────────────────────────────────────────────────── */
+.detail-view {
+    -fx-background-color: #FAF7F2;
+}
+
+.recipe-title {
+    -fx-fill: #3D2B1F;
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+}
+
+.recipe-meta {
+    -fx-fill: #8B6F5E;
+    -fx-font-size: 13px;
+}
+
+.recipe-desc {
+    -fx-fill: #5C4033;
+    -fx-font-size: 14px;
+}
+
+.section-header {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #C17D52;
+}
+
+.ingredient-item {
+    -fx-font-size: 13px;
+    -fx-text-fill: #3D2B1F;
+}
+
+.step-box {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 8;
+    -fx-padding: 12 16;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.04), 3, 0, 0, 1);
+}
+
+.step-number {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #C17D52;
+}
+
+.step-desc {
+    -fx-font-size: 14px;
+    -fx-text-fill: #3D2B1F;
+}
+
+/* ── Stock ───────────────────────────────────────────────────────────────────── */
+.stock-view {
+    -fx-background-color: #FAF7F2;
+}
+
+.view-header {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3D2B1F;
+}
+
+.stock-table {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.stock-table .table-view {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 8;
+}
+
+.stock-table .column-header-background {
+    -fx-background-color: #F0E6D8;
+}
+
+.stock-table .column-header .label {
+    -fx-font-weight: bold;
+    -fx-text-fill: #3D2B1F;
+}
+
+/* ── Shared ──────────────────────────────────────────────────────────────────── */
+.status-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #8B6F5E;
+}
+
+.scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.separator .line {
+    -fx-border-color: #E8D8C4;
+    -fx-border-width: 1 0 0 0;
+}

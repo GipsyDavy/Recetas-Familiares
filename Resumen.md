@@ -96,9 +96,9 @@ Corregidos en Sprint 2:
 
 Bloqueante pendiente: instalar Android SDK y verificar compilacion.
 
-### Desktop JavaFX (PENDIENTE)
+### Desktop JavaFX (Sprint 1 completado)
 
-No iniciado.
+Scaffold completo. JavaFX 21 + OkHttp + Gson. Login funcional, lista de recetas con SplitPane, detalle con ingredientes y pasos, stock en TableView, sidebar con navegacion y sync. CSS paleta calida. module-info Java 9+. Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`.
 
 ### Base de Datos MySQL
 

@@ -244,18 +244,51 @@ Stack:
 - KSP version `2.3.0` puede estar desalineada con Kotlin `2.3.20`. Verificar y alinear cuando compile.
 - `fallbackToDestructiveMigration` activo: la DB Room se reinicia ante cambios de schema. Aceptable en desarrollo.
 
-## Desktop JavaFX
+## Desktop JavaFX (Sprint 1 completado)
 
-Pendiente. No iniciado.
+Scaffold completo creado. Ruta:
 
-Proximos pasos cuando llegue el momento:
+```text
+desktop/
+```
 
-1. Crear proyecto JavaFX con Maven.
-2. HTTP API client.
-3. Cache local.
-4. MVVM ligero.
-5. Pantallas dashboard, recetas, detalle, stock.
-6. Evitar bloquear JavaFX Thread.
+Stack:
+
+- Java 21 + JavaFX 21.0.2.
+- OkHttp 4.12.0 (cliente HTTP con TokenRefresh Authenticator).
+- Gson 2.10.1.
+- Maven con javafx-maven-plugin.
+
+### Implementado en Sprint 1
+
+1. **`pom.xml`** — JavaFX 21, OkHttp, Gson, maven-shade-plugin para fat jar.
+2. **`DesktopApp`** — `Application` JavaFX. Punto de entrada.
+3. **`AppSession`** — tokens en memoria, `familyId` y `lastSyncTime` en `java.util.prefs`.
+4. **`AppContext`** — singleton container sin DI framework.
+5. **`ApiClient`** — OkHttp con `Authenticator` para refresh JWT automático en 401. Cliente de refresh separado para evitar bucles.
+6. **DTOs** — `AuthDtos`, `RecipeDtos`, `StockDtos`, `SyncDtos` con Java records.
+7. **`SimpleCache<T>`** — `ObservableList` para binding directo en JavaFX.
+8. **Repositorios** — `AuthRepository`, `RecipeRepository`, `StockRepository`, `SyncRepository`.
+9. **`LoginView`** — formulario login con feedback de error y llamada en hilo virtual.
+10. **`RecipeListView`** — `SplitPane` lista filtrable + `RecipeDetailView` con ingredientes y pasos.
+11. **`StockView`** — `TableView` con ingrediente, cantidad y fecha de caducidad.
+12. **`MainWindow`** — `BorderPane` con sidebar oscuro, navegacion Recetas/Stock, boton Sincronizar, logout.
+13. **`style.css`** — paleta calida: tonos tierra (`#3D2B1F`, `#C17D52`, `#FAF7F2`).
+14. **`module-info.java`** — modulo Java 9+.
+
+### Ejecutar Desktop
+
+```powershell
+cd "C:\Users\GipsyDavy\MAVEN\Recetas Familiares\desktop"
+mvn javafx:run -Dapi.base.url=http://localhost:8080/
+```
+
+### Deuda tecnica Desktop
+
+- Tokens no se persisten entre reinicios (solo en memoria). Pendiente: keystore OS o cifrado similar a EncryptedSharedPreferences.
+- Push sync envia listas vacias — sin cola de cambios offline todavia.
+- Sin paginacion en scroll infinito — aceptable para MVP.
+- Modo Cocina (letra grande, temporizadores) no implementado todavia.
 
 ## Procedimiento al retomar
 
@@ -273,7 +306,7 @@ Proximos pasos cuando llegue el momento:
    $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
    ```
 
-5. Continuar con SDK Android y compilacion.
+5. Continuar con SDK Android o compilar Desktop con `mvn javafx:run`.
 
 ## Deuda tecnica conocida y aceptada
 
