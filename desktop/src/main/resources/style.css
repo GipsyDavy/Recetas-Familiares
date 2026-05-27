@@ -243,6 +243,11 @@
 /* ── Dashboard ───────────────────────────────────────────────────────────────── */
 .dashboard-scroll {
     -fx-background-color: #FAF7F2;
+    -fx-background: #FAF7F2;
+}
+
+.dashboard-scroll > .viewport {
+    -fx-background-color: #FAF7F2;
 }
 
 .dashboard-root {

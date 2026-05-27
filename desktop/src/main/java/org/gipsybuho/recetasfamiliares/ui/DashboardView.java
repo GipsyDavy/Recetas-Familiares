@@ -13,6 +13,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Dashboard principal — GridPane 2 columnas:
+ *   Col 0 (60%): recetas recientes (tarjetas verticales, scroll propio)
+ *   Col 1 (40%): stock próximo a caducar + acciones rápidas
+ * Fila 0 (colspan 2): saludo + acciones rápidas
+ */
 public class DashboardView extends ScrollPane {
 
     private final AppContext context;
@@ -30,71 +36,105 @@ public class DashboardView extends ScrollPane {
 
     private void build() {
         setFitToWidth(true);
+        setFitToHeight(true);
         setHbarPolicy(ScrollBarPolicy.NEVER);
         getStyleClass().add("dashboard-scroll");
 
-        VBox root = new VBox(28);
-        root.setPadding(new Insets(28, 32, 28, 32));
-        root.getStyleClass().add("dashboard-root");
+        // ── Header row (colspan 2) ────────────────────────────────────────────
+        VBox header = buildHeader();
 
-        root.getChildren().addAll(
-                buildGreeting(),
-                buildQuickActions(),
-                buildSection("Recetas recientes", recipesSection, "Ver todas", onNavigateRecipes),
-                buildSection("Stock próximo a caducar", stockSection, null, null)
-        );
+        // ── Column 0: recetas recientes ───────────────────────────────────────
+        VBox recipesCard = buildCard("Recetas recientes", recipesSection, "Ver todas", onNavigateRecipes);
+        GridPane.setVgrow(recipesCard, Priority.ALWAYS);
+        GridPane.setHgrow(recipesCard, Priority.ALWAYS);
 
-        setContent(root);
+        // ── Column 1: stock + sync ────────────────────────────────────────────
+        VBox stockCard = buildCard("Stock próximo a caducar", stockSection, null, null);
+
+        Button syncBtn = new Button("Sincronizar ahora");
+        syncBtn.getStyleClass().add("action-button-primary");
+        syncBtn.setMaxWidth(Double.MAX_VALUE);
+        syncBtn.setOnAction(e -> onSyncRequested.run());
+
+        Button recipesBtn = new Button("Todas las recetas");
+        recipesBtn.getStyleClass().add("action-button-secondary");
+        recipesBtn.setMaxWidth(Double.MAX_VALUE);
+        recipesBtn.setOnAction(e -> onNavigateRecipes.run());
+
+        VBox rightCol = new VBox(16, stockCard, syncBtn, recipesBtn);
+        GridPane.setVgrow(rightCol, Priority.ALWAYS);
+
+        // ── Grid assembly ─────────────────────────────────────────────────────
+        GridPane grid = new GridPane();
+        grid.setHgap(20);
+        grid.setVgap(0);
+        grid.setPadding(new Insets(24, 28, 28, 28));
+        grid.getStyleClass().add("dashboard-root");
+
+        ColumnConstraints col0 = new ColumnConstraints();
+        col0.setPercentWidth(60);
+        col0.setHgrow(Priority.ALWAYS);
+
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setPercentWidth(40);
+        col1.setHgrow(Priority.ALWAYS);
+
+        grid.getColumnConstraints().addAll(col0, col1);
+
+        RowConstraints rowHeader = new RowConstraints();
+        rowHeader.setVgrow(Priority.NEVER);
+
+        RowConstraints rowContent = new RowConstraints();
+        rowContent.setVgrow(Priority.ALWAYS);
+
+        grid.getRowConstraints().addAll(rowHeader, rowContent);
+
+        GridPane.setColumnSpan(header, 2);
+        grid.add(header, 0, 0);
+        grid.add(recipesCard, 0, 1);
+        grid.add(rightCol, 1, 1);
+
+        setContent(grid);
     }
 
-    // ── Sections ──────────────────────────────────────────────────────────────
+    // ── Header (colspan 2) ────────────────────────────────────────────────────
 
-    private VBox buildGreeting() {
+    private VBox buildHeader() {
         Text greeting = new Text("¡Bienvenido de vuelta!");
         greeting.getStyleClass().add("dashboard-greeting");
         Text subtitle = new Text("¿Qué cocinamos hoy?");
         subtitle.getStyleClass().add("dashboard-subtitle");
         VBox box = new VBox(4, greeting, subtitle);
         box.getStyleClass().add("dashboard-greeting-box");
+        box.setPadding(new Insets(0, 0, 20, 0));
         return box;
     }
 
-    private HBox buildQuickActions() {
-        Button syncBtn = new Button("Sincronizar ahora");
-        syncBtn.getStyleClass().add("action-button-primary");
-        syncBtn.setOnAction(e -> onSyncRequested.run());
+    // ── Card builder ──────────────────────────────────────────────────────────
 
-        Button recipesBtn = new Button("Todas las recetas");
-        recipesBtn.getStyleClass().add("action-button-secondary");
-        recipesBtn.setOnAction(e -> onNavigateRecipes.run());
-
-        HBox box = new HBox(12, syncBtn, recipesBtn);
-        box.getStyleClass().add("quick-actions");
-        return box;
-    }
-
-    private VBox buildSection(String title, VBox content, String linkText, Runnable linkAction) {
+    private VBox buildCard(String title, VBox content, String linkText, Runnable linkAction) {
         HBox header = new HBox();
         header.setSpacing(8);
 
         Label sectionTitle = new Label(title);
         sectionTitle.getStyleClass().add("dashboard-section-title");
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
         header.getChildren().add(sectionTitle);
         if (linkText != null && linkAction != null) {
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
             Hyperlink link = new Hyperlink(linkText);
             link.getStyleClass().add("dashboard-section-link");
             link.setOnAction(e -> linkAction.run());
             header.getChildren().addAll(spacer, link);
         }
 
-        VBox section = new VBox(10, header, content);
-        section.getStyleClass().add("dashboard-section");
-        section.setPadding(new Insets(18));
-        return section;
+        VBox.setVgrow(content, Priority.ALWAYS);
+        VBox card = new VBox(12, header, content);
+        card.getStyleClass().add("dashboard-section");
+        card.setPadding(new Insets(18));
+        VBox.setVgrow(card, Priority.ALWAYS);
+        return card;
     }
 
     // ── Data loading ──────────────────────────────────────────────────────────
@@ -105,46 +145,35 @@ public class DashboardView extends ScrollPane {
     }
 
     private void loadRecentRecipes() {
-        recipesSection.getChildren().clear();
-        Label placeholder = new Label("Cargando...");
-        placeholder.getStyleClass().add("status-label");
-        recipesSection.getChildren().add(placeholder);
+        recipesSection.getChildren().setAll(loadingLabel());
 
         Thread.ofVirtual().start(() -> {
             try {
                 var page = context.getRecipeRepository().loadPage(0, 5);
                 List<RecipeDtos.RecipeDto> recent = page.content().stream()
-                        .filter(r -> !r.deleted())
-                        .limit(5)
-                        .toList();
+                        .filter(r -> !r.deleted()).limit(5).toList();
                 Platform.runLater(() -> renderRecipeCards(recent));
             } catch (Exception ex) {
                 Platform.runLater(() -> {
-                    // Show from cache if available
                     var cached = context.getRecipeRepository().getCache().getItems();
-                    if (!cached.isEmpty()) {
-                        renderRecipeCards(cached.stream().limit(5).toList());
-                    } else {
-                        recipesSection.getChildren().setAll(noDataLabel("Sin recetas. Sincroniza para cargar."));
-                    }
+                    if (!cached.isEmpty()) renderRecipeCards(cached.stream().limit(5).toList());
+                    else recipesSection.getChildren().setAll(noDataLabel("Sin recetas. Sincroniza para cargar."));
                 });
             }
         });
     }
 
     private void loadExpiringStock() {
-        stockSection.getChildren().clear();
-        Label placeholder = new Label("Cargando...");
-        placeholder.getStyleClass().add("status-label");
-        stockSection.getChildren().add(placeholder);
+        stockSection.getChildren().setAll(loadingLabel());
 
         Thread.ofVirtual().start(() -> {
             try {
                 var items = context.getStockRepository().load();
                 String horizon = LocalDate.now().plusDays(7).format(DateTimeFormatter.ISO_DATE);
                 List<StockDtos.StockItemDto> expiring = items.stream()
-                        .filter(i -> !i.deleted() && i.expiresAt() != null && i.expiresAt().compareTo(horizon) <= 0)
-                        .limit(4)
+                        .filter(i -> !i.deleted() && i.expiresAt() != null
+                                && i.expiresAt().compareTo(horizon) <= 0)
+                        .limit(6)
                         .toList();
                 Platform.runLater(() -> renderExpiringStock(expiring));
             } catch (Exception ex) {
@@ -177,6 +206,7 @@ public class DashboardView extends ScrollPane {
 
         Label title = new Label(recipe.title());
         title.getStyleClass().add("recipe-cell-title");
+        title.setWrapText(false);
 
         Label meta = new Label(buildMeta(recipe));
         meta.getStyleClass().add("recipe-cell-meta");
@@ -186,8 +216,8 @@ public class DashboardView extends ScrollPane {
         if (recipe.description() != null && !recipe.description().isBlank()) {
             Label desc = new Label(recipe.description());
             desc.getStyleClass().add("dashboard-recipe-desc");
-            desc.setWrapText(false);
-            desc.setMaxWidth(400);
+            desc.setWrapText(true);
+            desc.setMaxWidth(Double.MAX_VALUE);
             info.getChildren().add(desc);
         }
 
@@ -210,8 +240,7 @@ public class DashboardView extends ScrollPane {
             HBox.setHgrow(name, Priority.ALWAYS);
 
             String exp = item.expiresAt() != null
-                    ? item.expiresAt().substring(0, Math.min(10, item.expiresAt().length()))
-                    : "—";
+                    ? item.expiresAt().substring(0, Math.min(10, item.expiresAt().length())) : "—";
             Label date = new Label(exp);
             date.getStyleClass().add("stock-expiring-date");
 
@@ -225,6 +254,12 @@ public class DashboardView extends ScrollPane {
     private Label noDataLabel(String text) {
         Label l = new Label(text);
         l.getStyleClass().add("no-data-label");
+        return l;
+    }
+
+    private Label loadingLabel() {
+        Label l = new Label("Cargando...");
+        l.getStyleClass().add("status-label");
         return l;
     }
 
