@@ -166,25 +166,31 @@ Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de 
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-### iOS KMP + Compose Multiplatform (PENDIENTE DE INICIAR)
+### iOS KMP + Compose Multiplatform (SPRINT 16 COMPLETADO — 2026-05-29)
 
-Stack decidido:
-- Kotlin Multiplatform + Compose Multiplatform
-- Ktor (HTTP client, reemplaza Retrofit)
-- SQLDelight (DB local, reemplaza Room)
-- iOS Background Tasks (reemplaza WorkManager)
-- Keychain (reemplaza EncryptedSharedPreferences)
+Stack implementado:
+- Kotlin Multiplatform + Compose Multiplatform (Kotlin 2.0.21, Compose 1.7.0)
+- Ktor 3.0.3 (HttpClient Darwin — iOS engine)
+- NSUserDefaults para sesion MVP (Keychain en Sprint 17+)
+- Targets: iosX64, iosArm64, iosSimulatorArm64
 
-Estado:
-- Carpeta `ios/` creada en la raiz del monorepo: SI
-- Modulo `shared/` KMP: pendiente de crear
-- Implementacion de pantallas: pendiente
-- Prioridad: siguiente fase tras Sprint 15
+Pantallas implementadas (Sprint 16):
+- `LoginScreen` (Compose M3, coroutines, error handling)
+- `RecipeListScreen` (LazyColumn, loading/error/empty/datos, dificultad localizada)
 
-Limitaciones documentadas:
-- Modo manos libres CookingScreen (botones volumen): solo Android
-- Widgets: WidgetKit iOS requiere Swift separado
-- Desktop JavaFX permanece independiente (no migra a KMP)
+Arquitectura ios/ (proyecto Gradle KMP independiente):
+- `composeApp/src/commonMain/` — UI Compose + repositorios + DTOs (multiplataforma)
+- `composeApp/src/iosMain/` — MainViewController (puente Swift↔Compose) + SessionStore.ios.kt
+- `iosApp/` — Entry point SwiftUI: iosApp.swift + ContentView.swift
+
+Compilacion: requiere macOS + Xcode para generar binario/framework.
+En Windows: edicion Kotlin completa via Android Studio.
+
+Pendiente Sprint 17:
+- TabView iOS (5 tabs: Recetas, Stock, Lista, Notas, Menú)
+- StockScreen, NotesScreen iOS
+- SQLDelight (persistencia offline iOS)
+- Keychain para tokens
 
 ### Base de Datos MySQL
 
@@ -247,7 +253,12 @@ Limitaciones documentadas:
 | 15.3 | 2026-05-29 | Filtros dificultad recetas Android: FilterChip Fácil/Media/Difícil |
 | 15.4 | 2026-05-29 | Exportar lista de la compra Desktop: botón "💾 Exportar" → FileChooser .txt |
 | 15.5 | 2026-05-29 | Ordenar stock por caducidad Android: icono Sort toggle, color primary cuando activo |
+| 16.1 | 2026-05-29 | iOS Gradle KMP setup: settings, libs.versions.toml, wrapper local, composeApp targets |
+| 16.2 | 2026-05-29 | iOS core: SwiftUI entry point, ComposeUIViewController, SessionStore expect/actual |
+| 16.3 | 2026-05-29 | iOS Ktor network layer: ApiClient (Darwin engine + JWT) + 10 DTOs @Serializable |
+| 16.4 | 2026-05-29 | iOS auth: AuthRepository (Ktor login/logout) + LoginScreen Compose M3 |
+| 16.5 | 2026-05-29 | iOS RecipeListScreen básica: RecipeRepository (paginado) + LazyColumn M3 |
 
-## Proximos Pasos — Sprint 16
+## Proximos Pasos — Sprint 17
 
 Ver CONTINUAR.md para contexto técnico completo.

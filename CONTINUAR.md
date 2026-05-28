@@ -766,38 +766,67 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
 
 ---
 
-## iOS (KMP + Compose Multiplatform) — PENDIENTE DE INICIAR
+## Sprint 16 — COMPLETADO (2026-05-29)
 
-Carpeta `ios/` creada en la raiz del monorepo.
+### Sprint 16.1 — Gradle KMP setup iOS ✅
 
-### Decision tecnica
+- `ios/settings.gradle.kts`: proyecto `RecetasFamiliaresIOS`, include `:composeApp`.
+- `ios/gradle/libs.versions.toml`: kotlin 2.0.21, compose 1.7.0, ktor 3.0.3, coroutines 1.9.0.
+- `ios/gradle/wrapper/gradle-wrapper.properties`: distribucion local (`file:///C:/tmp/tools/gradle-9.5.1-bin.zip`).
+- `ios/composeApp/build.gradle.kts`: targets `iosX64`, `iosArm64`, `iosSimulatorArm64`. Framework estatico `ComposeApp`.
 
-- **Stack**: Kotlin Multiplatform (KMP) + Compose Multiplatform para la UI.
-- **Red**: Ktor (reemplaza Retrofit en modulo compartido).
-- **DB local**: SQLDelight (reemplaza Room; cross-platform Android + iOS).
-- **Auth storage**: Keychain (reemplaza EncryptedSharedPreferences).
-- **Background sync**: iOS Background Tasks (reemplaza WorkManager).
-- **UI**: Compose Multiplatform — reutiliza composables de Android donde sea posible.
+### Sprint 16.2 — Core iOS ✅
 
-### Estrategia de migracion (incremental, no big-bang)
+- `ios/iosApp/iosApp/iosApp.swift`: `@main iOSApp: App` (SwiftUI entry point).
+- `ios/iosApp/iosApp/ContentView.swift`: `ComposeView: UIViewControllerRepresentable` → `MainViewControllerKt.MainViewController()`.
+- `ios/composeApp/src/iosMain/.../MainViewController.kt`: `ComposeUIViewController { App() }`.
+- `ios/composeApp/src/commonMain/.../core/SessionStore.kt`: clase `expect`.
+- `ios/composeApp/src/iosMain/.../core/SessionStore.ios.kt`: `actual` con `NSUserDefaults` (MVP; Keychain en Sprint 17+).
+- `ios/composeApp/src/commonMain/.../App.kt`: raiz Compose con DI manual (SessionStore, ApiClient, repos) y navegacion login/main.
 
-1. Crear modulo `shared/` KMP en la raiz (Gradle KMP project).
-2. Mover repositories y logica de negocio de Android → `shared/`.
-3. Reemplazar Room por SQLDelight en `shared/` (Android sigue compilando con la capa KMP).
-4. Reemplazar Retrofit por Ktor en `shared/`.
-5. Construir la app iOS en `ios/` usando `shared/` + Compose Multiplatform.
-6. Android y Desktop no se tocan hasta que el modulo compartido este estable.
+### Sprint 16.3 — Ktor network layer ✅
 
-### Limitaciones conocidas y aceptadas
+- `network/ApiDtos.kt`: 10 DTOs `@Serializable` (LoginRequest, AuthResponse, User, Family, Recipe, Stock, FamilyNote, MenuItem, ShoppingList, ShoppingListItem, PageDto<T>). Alineados con contratos del backend.
+- `network/ApiClient.kt`: `HttpClient(Darwin)` con `ContentNegotiation`, `defaultRequest` URL + auth header JWT automatico.
 
-- Botones de volumen en CookingScreen: feature exclusiva Android, no portable a iOS.
-- Android Widgets (RecipeWidget, StockWidget): no hay equivalente KMP; iOS usaria WidgetKit en Swift si se implementa.
-- Desktop JavaFX: no migra a KMP, permanece independiente.
-- Compose Multiplatform iOS: beta avanzada (JetBrains), estable para MVP.
+### Sprint 16.4 — Auth flow ✅
 
-### Estado actual
+- `auth/AuthRepository.kt`: `login()` POST Ktor → sesion; `logout()`.
+- `auth/LoginScreen.kt`: Compose M3, coroutines, estados loading/error.
 
-- `ios/` carpeta creada: SI
-- Modulo `shared/` KMP: NO (pendiente crear)
-- Implementacion iOS: NO iniciada
-- Prioridad: despues de estabilizar Android + Desktop en Sprint 15
+### Sprint 16.5 — RecipeListScreen iOS basica ✅
+
+- `recipes/RecipeRepository.kt`: `loadRecipes()` paginado via Ktor GET.
+- `recipes/RecipeListScreen.kt`: LazyColumn estados loading / error / empty / datos. `difficultyLabel()` localizado.
+
+Commit: `d0bef39`
+
+### Para compilar en macOS (instrucciones para cuando tengas un Mac)
+
+```bash
+# Desde ios/ en macOS con Xcode instalado:
+cd ios/
+./gradlew :composeApp:assembleXCFramework   # Genera el .xcframework
+# Android Studio abre ios/ como proyecto Gradle independiente para editar Kotlin
+# Xcode abre ios/iosApp/ para ejecutar en Simulator/dispositivo
+```
+
+### Limitaciones documentadas y aceptadas
+
+- Compilacion binaria iOS (.ipa): requiere macOS + Xcode. En Windows solo se edita el Kotlin.
+- `SessionStore.ios.kt` usa NSUserDefaults (no cifrado). Migrar a Keychain en Sprint 17+.
+- Botones de volumen en CookingScreen: solo Android, no portable a iOS.
+- Android Widgets: sin equivalente directo en KMP; WidgetKit requiere Swift.
+- Desktop JavaFX: permanece independiente, no migra a KMP.
+
+---
+
+## Proximos Pasos — Sprint 17 (iOS ampliacion)
+
+Candidatos:
+
+1. **Navegacion por tabs iOS** — TabView con 4-5 tabs (Recetas, Stock, Lista, Notas, Menu). Actualmente solo hay login + lista de recetas.
+2. **StockScreen iOS** — pantalla de stock con `StockRepository` Ktor.
+3. **NotesScreen iOS** — CRUD de notas familiares.
+4. **SQLDelight persistencia local iOS** — cache offline para recetas y stock. Actualmente la app es 100% online.
+5. **Keychain para tokens** — reemplazar NSUserDefaults por SecItem API en `SessionStore.ios.kt`.
