@@ -2,7 +2,14 @@ package org.gipsybuho.recetasfamiliares.core;
 
 import java.util.prefs.Preferences;
 
-/** In-memory session with optional persistence via java.util.prefs. */
+/**
+ * In-memory session with optional persistence via java.util.prefs.
+ *
+ * SECURITY NOTE (MVP): Tokens are stored in java.util.prefs (Windows Registry /
+ * ~/.java/.userPrefs on Linux). This storage is NOT encrypted. Acceptable for a
+ * private family desktop app on a trusted device; for production use, replace with
+ * OS credential store (Windows Credential Manager / macOS Keychain / libsecret).
+ */
 public class AppSession {
 
     private static final String PREF_NODE     = "recetas-familiares";

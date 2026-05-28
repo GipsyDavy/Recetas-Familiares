@@ -199,6 +199,14 @@ public class RecipePhotoService {
         }
     }
 
+    private static final java.util.regex.Pattern PRIVATE_HOST = java.util.regex.Pattern.compile(
+            "(?i)https?://(?:localhost|127\\.\\d+\\.\\d+\\.\\d+|0\\.0\\.0\\.0" +
+            "|10\\.\\d+\\.\\d+\\.\\d+" +
+            "|172\\.(?:1[6-9]|2\\d|3[01])\\.\\d+\\.\\d+" +
+            "|192\\.168\\.\\d+\\.\\d+" +
+            "|169\\.254\\.\\d+\\.\\d+" +
+            "|\\[::1\\]|\\[::ffff:)(?:[:/].*)?$");
+
     private static void validateHttpsUrl(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
@@ -206,6 +214,10 @@ public class RecipePhotoService {
         String normalized = value.trim().toLowerCase();
         if (!normalized.startsWith("https://") && !normalized.startsWith("http://")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+        }
+        if (PRIVATE_HOST.matcher(normalized).find()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Photo URL must not point to internal network addresses");
         }
     }
 

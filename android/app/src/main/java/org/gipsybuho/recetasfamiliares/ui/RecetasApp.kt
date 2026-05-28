@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
@@ -1653,7 +1654,7 @@ private fun RecipeForm(
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = { if (ingredients.size > 1) ingredients.removeAt(i) }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Eliminar", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.Close, contentDescription = "Eliminar fila", modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -1693,7 +1694,7 @@ private fun RecipeForm(
                     modifier = Modifier.width(70.dp)
                 )
                 IconButton(onClick = { if (steps.size > 1) steps.removeAt(i) }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Eliminar", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.Close, contentDescription = "Eliminar fila", modifier = Modifier.size(18.dp))
                 }
             }
         }
