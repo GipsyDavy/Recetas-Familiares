@@ -203,6 +203,22 @@ data class SyncPullDto(
 
 // ── Mutation request DTOs ─────────────────────────────────────────────────────
 
+data class CreateRecipeRequestDto(
+    val title: String,
+    val description: String?,
+    val servings: Int?,
+    val prepMinutes: Int?,
+    val cookMinutes: Int?,
+    val difficulty: String?
+)
+
+data class CreateNoteRequestDto(
+    val title: String,
+    val body: String,
+    val pinned: Boolean = false,
+    val recipeId: String? = null
+)
+
 data class AddFavoriteRequestDto(val recipeId: String)
 
 data class UpdateShoppingListItemRequestDto(
@@ -337,4 +353,11 @@ data class SyncRecipePhotoPushItemDto(
     val contentType: String? = null,
     val sizeBytes: Long? = null,
     val deleted: Boolean = false
+)
+
+data class UpdateNoteRequestDto(
+    val title: String,
+    val body: String,
+    val pinned: Boolean = false,
+    val recipeId: String? = null
 )

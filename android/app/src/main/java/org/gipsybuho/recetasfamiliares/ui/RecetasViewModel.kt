@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
+import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
@@ -55,6 +56,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             container.recipeRepository.refresh()
             container.stockRepository.refresh()
+            runCatching { container.syncRepository.pullOnce() }
         }
     }
 
@@ -94,6 +96,29 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     fun checkItem(item: ShoppingListItemEntity, checked: Boolean) {
         viewModelScope.launch {
             runCatching { container.shoppingListRepository.checkItem(item, checked) }
+        }
+    }
+
+    val notes: StateFlow<List<FamilyNoteEntity>> = container.familyNoteRepository.notes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun createNote(title: String, body: String, pinned: Boolean, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching { container.familyNoteRepository.create(title, body, pinned) }
+                .onFailure { onError(it.message ?: "Error al crear nota") }
+        }
+    }
+
+    fun updateNote(note: FamilyNoteEntity, title: String, body: String, pinned: Boolean, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching { container.familyNoteRepository.update(note, title, body, pinned) }
+                .onFailure { onError(it.message ?: "Error al actualizar nota") }
+        }
+    }
+
+    fun deleteNote(note: FamilyNoteEntity) {
+        viewModelScope.launch {
+            runCatching { container.familyNoteRepository.delete(note) }
         }
     }
 }

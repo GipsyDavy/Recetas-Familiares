@@ -4,6 +4,7 @@ import org.gipsybuho.recetasfamiliares.api.ApiClient;
 import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.FavoriteRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.MenuRepository;
+import org.gipsybuho.recetasfamiliares.data.repository.NoteRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.ShoppingListRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository;
@@ -23,6 +24,7 @@ public final class AppContext {
     private final SyncRepository syncRepository;
     private final ShoppingListRepository shoppingListRepository;
     private final FavoriteRepository favoriteRepository;
+    private final NoteRepository noteRepository;
 
     private AppContext() {
         session = new AppSession();
@@ -34,6 +36,7 @@ public final class AppContext {
         syncRepository = new SyncRepository(apiClient, session, recipeRepository, stockRepository);
         shoppingListRepository = new ShoppingListRepository(apiClient, session);
         favoriteRepository = new FavoriteRepository(apiClient, session);
+        noteRepository = new NoteRepository(apiClient, session);
     }
 
     public static synchronized AppContext getInstance() {
@@ -50,6 +53,7 @@ public final class AppContext {
     public SyncRepository getSyncRepository() { return syncRepository; }
     public ShoppingListRepository getShoppingListRepository() { return shoppingListRepository; }
     public FavoriteRepository getFavoriteRepository() { return favoriteRepository; }
+    public NoteRepository getNoteRepository() { return noteRepository; }
 
     public void shutdown() {
         apiClient.shutdown();

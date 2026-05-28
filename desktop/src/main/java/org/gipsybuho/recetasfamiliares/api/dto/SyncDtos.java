@@ -141,7 +141,21 @@ public final class SyncDtos {
 
     public static final class NoteDtos {
         private NoteDtos() {}
-        public record FamilyNoteDto(String id, String content) {}
+
+        public record FamilyNoteDto(
+                String id, String familyId, String recipeId, String recipeTitle,
+                String title, String body, boolean pinned, String createdAt,
+                String updatedAt, long syncVersion, boolean deleted
+        ) {}
+
+        public record NotePageResponse(
+                java.util.List<FamilyNoteDto> content,
+                int totalElements, int totalPages, int number
+        ) {}
+
+        public record CreateNoteRequest(String title, String body, boolean pinned) {}
+
+        public record UpdateNoteRequest(String title, String body, boolean pinned) {}
     }
 
     public static final class PhotoDtos {

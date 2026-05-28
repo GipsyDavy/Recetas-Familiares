@@ -19,6 +19,8 @@ import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.MenuItemDto
@@ -167,6 +169,32 @@ class FavoriteRepository(
             val dto = api.addFavorite(familyId, AddFavoriteRequestDto(recipeId))
             database.favoriteRecipeDao().upsertAll(listOf(dto.toEntity()))
         }
+    }
+}
+
+class FamilyNoteRepository(
+    private val api: RecetasApi,
+    private val database: RecetasDatabase,
+    private val sessionStore: SessionStore
+) {
+    val notes: Flow<List<FamilyNoteEntity>> = database.familyNoteDao().observeNotes()
+
+    suspend fun create(title: String, body: String, pinned: Boolean) {
+        val familyId = sessionStore.familyId ?: return
+        val dto = api.createNote(familyId, CreateNoteRequestDto(title, body, pinned))
+        database.familyNoteDao().upsertAll(listOf(dto.toEntity()))
+    }
+
+    suspend fun update(note: FamilyNoteEntity, title: String, body: String, pinned: Boolean) {
+        val familyId = sessionStore.familyId ?: return
+        val dto = api.updateNote(familyId, note.id, UpdateNoteRequestDto(title, body, pinned))
+        database.familyNoteDao().upsertAll(listOf(dto.toEntity()))
+    }
+
+    suspend fun delete(note: FamilyNoteEntity) {
+        val familyId = sessionStore.familyId ?: return
+        api.deleteNote(familyId, note.id)
+        database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true)))
     }
 }
 

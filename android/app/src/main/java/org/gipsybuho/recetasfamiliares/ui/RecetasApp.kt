@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Restaurant
@@ -32,6 +33,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -49,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.work.WorkManager
+import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
@@ -58,7 +61,7 @@ import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-private enum class MainTab { RECIPES, STOCK, SHOPPING }
+private enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES }
 
 @Composable
 fun RecetasApp(viewModel: RecetasViewModel) {
@@ -130,6 +133,7 @@ private fun MainShell(viewModel: RecetasViewModel) {
     val recipes by viewModel.recipes.collectAsState()
     val stockItems by viewModel.stockItems.collectAsState()
     val shoppingLists by viewModel.shoppingLists.collectAsState()
+    val notes by viewModel.notes.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -152,6 +156,12 @@ private fun MainShell(viewModel: RecetasViewModel) {
                     icon = { Icon(Icons.Outlined.ShoppingCart, contentDescription = null) },
                     label = { Text("Lista") }
                 )
+                NavigationBarItem(
+                    selected = tab == MainTab.NOTES,
+                    onClick = { tab = MainTab.NOTES },
+                    icon = { Icon(Icons.Outlined.Description, contentDescription = null) },
+                    label = { Text("Notas") }
+                )
             }
         }
     ) { padding ->
@@ -159,6 +169,7 @@ private fun MainShell(viewModel: RecetasViewModel) {
             MainTab.RECIPES -> RecipeList(recipes, Modifier.padding(padding), viewModel, viewModel::refresh)
             MainTab.STOCK -> StockList(stockItems, Modifier.padding(padding), viewModel::refresh)
             MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
+            MainTab.NOTES -> NotesScreen(notes, Modifier.padding(padding), viewModel)
         }
     }
 }
@@ -509,6 +520,208 @@ private fun ShoppingItemRow(
                     else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
+    }
+}
+
+// ── Notes ──────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun NotesScreen(
+    notes: List<FamilyNoteEntity>,
+    modifier: Modifier,
+    viewModel: RecetasViewModel
+) {
+    var selectedNote by remember { mutableStateOf<FamilyNoteEntity?>(null) }
+    var editingNote by remember { mutableStateOf<FamilyNoteEntity?>(null) }
+    var showCreateForm by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    Column(modifier.padding(16.dp)) {
+        when {
+            showCreateForm -> NoteForm(
+                initialTitle = "",
+                initialBody = "",
+                initialPinned = false,
+                onSave = { title, body, pinned ->
+                    viewModel.createNote(title, body, pinned) { error = it }
+                    showCreateForm = false
+                },
+                onCancel = { showCreateForm = false }
+            )
+            editingNote != null -> NoteForm(
+                initialTitle = editingNote!!.title,
+                initialBody = editingNote!!.body,
+                initialPinned = editingNote!!.pinned,
+                onSave = { title, body, pinned ->
+                    viewModel.updateNote(editingNote!!, title, body, pinned) { error = it }
+                    editingNote = null
+                    selectedNote = null
+                },
+                onCancel = { editingNote = null }
+            )
+            selectedNote != null -> NoteDetail(
+                note = selectedNote!!,
+                onBack = { selectedNote = null },
+                onEdit = { editingNote = selectedNote },
+                onDelete = {
+                    viewModel.deleteNote(selectedNote!!)
+                    selectedNote = null
+                }
+            )
+            else -> {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Notas familiares", style = MaterialTheme.typography.headlineSmall)
+                    Button(onClick = { showCreateForm = true }) { Text("Nueva nota") }
+                }
+                error?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(12.dp))
+                if (notes.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Sin notas — crea tu primera nota familiar",
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(notes, key = { it.id }) { note ->
+                            NoteCard(note, onClick = { selectedNote = note; error = null })
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NoteCard(note: FamilyNoteEntity, onClick: () -> Unit) {
+    Card(onClick = onClick) {
+        ListItem(
+            headlineContent = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (note.pinned) {
+                        Text("📌", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Text(note.title)
+                }
+            },
+            supportingContent = {
+                val preview = note.body.take(80).replace('\n', ' ')
+                Text(
+                    if (note.body.length > 80) "$preview…" else preview,
+                    maxLines = 2,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            trailingContent = note.recipeTitle?.let {
+                { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline) }
+            }
+        )
+    }
+}
+
+@Composable
+private fun NoteDetail(
+    note: FamilyNoteEntity,
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(onClick = onBack) { Text("← Volver") }
+                Text(
+                    note.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (note.pinned) MetaChip("📌 Fijada")
+                note.recipeTitle?.let { MetaChip(it) }
+            }
+        }
+        item {
+            Text(
+                note.body,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onEdit) { Text("Editar") }
+                OutlinedButton(onClick = onDelete) { Text("Eliminar") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteForm(
+    initialTitle: String,
+    initialBody: String,
+    initialPinned: Boolean,
+    onSave: (String, String, Boolean) -> Unit,
+    onCancel: () -> Unit
+) {
+    var title by remember(initialTitle) { mutableStateOf(initialTitle) }
+    var body by remember(initialBody) { mutableStateOf(initialBody) }
+    var pinned by remember(initialPinned) { mutableStateOf(initialPinned) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            if (initialTitle.isEmpty()) "Nueva nota" else "Editar nota",
+            style = MaterialTheme.typography.headlineSmall
+        )
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Título") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = body,
+            onValueChange = { body = it },
+            label = { Text("Contenido") },
+            minLines = 6,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Checkbox(checked = pinned, onCheckedChange = { pinned = it })
+            Text("Fijar nota")
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { if (title.isNotBlank()) onSave(title.trim(), body.trim(), pinned) },
+                enabled = title.isNotBlank()
+            ) { Text("Guardar") }
+            OutlinedButton(onClick = onCancel) { Text("Cancelar") }
+        }
     }
 }
 
