@@ -21,18 +21,25 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,11 +48,12 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.LaunchedEffect
@@ -140,9 +148,15 @@ internal fun RecipeList(
                         onCookingMode = { cookingMode = true }
                     )
                     else -> {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text("Recetas", style = MaterialTheme.typography.headlineSmall)
-                            Button(onClick = onRefresh) { Text("Actualizar") }
+                            IconButton(onClick = onRefresh) {
+                                Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
+                            }
                         }
                         error?.let {
                             Spacer(Modifier.height(Spacing.xs))
@@ -187,12 +201,7 @@ internal fun RecipeList(
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                                 items(filtered, key = { it.id }) { recipe ->
-                                    Card(onClick = { selectedRecipe = recipe; error = null }) {
-                                        ListItem(
-                                            headlineContent = { Text(recipe.title) },
-                                            supportingContent = { Text(recipe.description ?: "Sin descripción") }
-                                        )
-                                    }
+                                    RecipeCard(recipe) { selectedRecipe = recipe; error = null }
                                 }
                                 if (recipeHasMore && query.isBlank()) {
                                     item {
@@ -211,7 +220,15 @@ internal fun RecipeList(
                 FloatingActionButton(
                     onClick = { showCreateForm = true; error = null },
                     modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.xl)
-                ) { Icon(Icons.Filled.Favorite, contentDescription = "Nueva receta") }
+                ) { Icon(Icons.Filled.Add, contentDescription = "Nueva receta") }
+            }
+            if (selectedRecipe != null && editingRecipe == null && !cookingMode && !showCreateForm) {
+                ExtendedFloatingActionButton(
+                    onClick = { cookingMode = true },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.xl),
+                    icon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                    text = { Text("Cocinar") }
+                )
             }
         }
     }

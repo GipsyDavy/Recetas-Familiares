@@ -9,8 +9,12 @@ import javafx.scene.layout.*;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import javafx.stage.FileChooser;
 
 public class ShoppingListView extends VBox {
 
@@ -39,7 +43,11 @@ public class ShoppingListView extends VBox {
         refreshBtn.getStyleClass().add("action-button-secondary");
         refreshBtn.setOnAction(e -> onSync.run());
 
-        HBox toolbar = new HBox(12, refreshBtn);
+        Button exportBtn = new Button("💾  Exportar");
+        exportBtn.getStyleClass().add("action-button-secondary");
+        exportBtn.setOnAction(e -> exportToFile());
+
+        HBox toolbar = new HBox(12, refreshBtn, exportBtn);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(8, 0, 16, 0));
 
@@ -167,6 +175,67 @@ public class ShoppingListView extends VBox {
             });
             content.getChildren().add(cb);
         }
+    }
+
+    private void exportToFile() {
+        var selected = listView.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            statusLabel.setText("Selecciona una lista para exportar.");
+            return;
+        }
+
+        statusLabel.setText("Preparando exportación...");
+        Thread.ofVirtual().start(() -> {
+            try {
+                List<SyncDtos.ShoppingDtos.ShoppingListItemDto> items =
+                        context.getShoppingListRepository().loadItems(selected.id());
+                Platform.runLater(() -> saveListToFile(selected, items));
+            } catch (Exception ex) {
+                Platform.runLater(() -> statusLabel.setText("Error al exportar: " + ex.getMessage()));
+            }
+        });
+    }
+
+    private void saveListToFile(
+            SyncDtos.ShoppingDtos.ShoppingListDto list,
+            List<SyncDtos.ShoppingDtos.ShoppingListItemDto> items
+    ) {
+        String text = buildExportText(list, items);
+        String safeTitle = list.name().replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Exportar lista de la compra");
+        chooser.setInitialFileName(safeTitle + ".txt");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Texto plano", "*.txt"));
+        File file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) {
+            statusLabel.setText("");
+            return;
+        }
+
+        try {
+            Files.writeString(file.toPath(), text, StandardCharsets.UTF_8);
+            statusLabel.setText("Lista exportada: " + file.getName() + " ✓");
+        } catch (Exception ex) {
+            statusLabel.setText("Error al exportar: " + ex.getMessage());
+        }
+    }
+
+    private String buildExportText(
+            SyncDtos.ShoppingDtos.ShoppingListDto list,
+            List<SyncDtos.ShoppingDtos.ShoppingListItemDto> items
+    ) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("🛒 ").append(list.name()).append("\n\n");
+        for (var item : items) {
+            sb.append(item.checked() ? "✅  " : "☐ ");
+            sb.append(item.name());
+            if (item.quantity() != null) sb.append(" ").append(item.quantity());
+            if (item.unit() != null && !item.unit().isBlank()) sb.append(" ").append(item.unit());
+            if (item.checked()) sb.append(" (marcado)");
+            sb.append("\n");
+        }
+        return sb.toString().trim();
     }
 
     private String buildItemLabel(SyncDtos.ShoppingDtos.ShoppingListItemDto item) {
