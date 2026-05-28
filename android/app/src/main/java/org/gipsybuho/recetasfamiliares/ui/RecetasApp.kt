@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -25,7 +26,10 @@ import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +42,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -58,7 +64,9 @@ import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
 private enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES }
@@ -167,7 +175,7 @@ private fun MainShell(viewModel: RecetasViewModel) {
     ) { padding ->
         when (tab) {
             MainTab.RECIPES -> RecipeList(recipes, Modifier.padding(padding), viewModel, viewModel::refresh)
-            MainTab.STOCK -> StockList(stockItems, Modifier.padding(padding), viewModel::refresh)
+            MainTab.STOCK -> StockList(stockItems, Modifier.padding(padding), viewModel)
             MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
             MainTab.NOTES -> NotesScreen(notes, Modifier.padding(padding), viewModel)
         }
@@ -386,26 +394,76 @@ private fun MetaChip(label: String) {
 private fun StockList(
     stockItems: List<StockItemEntity>,
     modifier: Modifier,
-    onRefresh: () -> Unit
+    viewModel: RecetasViewModel
 ) {
-    Column(modifier.padding(16.dp)) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Stock Familiar", style = MaterialTheme.typography.headlineSmall)
-            Button(onClick = onRefresh) { Text("Actualizar") }
-        }
-        Spacer(Modifier.height(12.dp))
-        if (stockItems.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Sin artículos en stock", color = MaterialTheme.colorScheme.outline)
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(stockItems, key = { it.id }) { item ->
-                    StockItemCard(item)
+    var selectedItem by remember { mutableStateOf<StockItemEntity?>(null) }
+    var editingItem by remember { mutableStateOf<StockItemEntity?>(null) }
+    var showCreateForm by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    Box(modifier) {
+        Column(Modifier.padding(16.dp)) {
+            when {
+                showCreateForm -> StockForm(
+                    initial = null,
+                    onSave = { name, qty, unit, threshold, expires, note ->
+                        viewModel.createStockItem(name, qty, unit, threshold, expires, note) { error = it }
+                        showCreateForm = false
+                    },
+                    onCancel = { showCreateForm = false }
+                )
+                editingItem != null -> StockForm(
+                    initial = editingItem,
+                    onSave = { name, qty, unit, threshold, expires, note ->
+                        viewModel.updateStockItem(editingItem!!, name, qty, unit, threshold, expires, note) { error = it }
+                        editingItem = null
+                        selectedItem = null
+                    },
+                    onCancel = { editingItem = null }
+                )
+                selectedItem != null -> StockDetail(
+                    item = selectedItem!!,
+                    onBack = { selectedItem = null },
+                    onEdit = { editingItem = selectedItem },
+                    onDelete = {
+                        viewModel.deleteStockItem(selectedItem!!)
+                        selectedItem = null
+                    }
+                )
+                else -> {
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Stock Familiar", style = MaterialTheme.typography.headlineSmall)
+                        Button(onClick = { viewModel.refresh() }) { Text("Actualizar") }
+                    }
+                    error?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    if (stockItems.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Sin artículos en stock", color = MaterialTheme.colorScheme.outline)
+                        }
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(stockItems, key = { it.id }) { item ->
+                                StockItemCard(item, onClick = { selectedItem = item; error = null })
+                            }
+                        }
+                    }
                 }
+            }
+        }
+
+        if (!showCreateForm && editingItem == null && selectedItem == null) {
+            FloatingActionButton(
+                onClick = { showCreateForm = true; error = null },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Nuevo item de stock")
             }
         }
     }
@@ -725,8 +783,9 @@ private fun NoteForm(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StockItemCard(item: StockItemEntity) {
+private fun StockItemCard(item: StockItemEntity, onClick: () -> Unit = {}) {
     val expiryDays = remember(item.expiresAt) {
         item.expiresAt?.let { dateStr ->
             runCatching {
@@ -743,7 +802,7 @@ private fun StockItemCard(item: StockItemEntity) {
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Card {
+    Card(onClick = onClick) {
         ListItem(
             headlineContent = {
                 Row(
@@ -783,5 +842,166 @@ private fun StockItemCard(item: StockItemEntity) {
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun StockDetail(
+    item: StockItemEntity,
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val isLowStock = item.lowStockThreshold != null && item.quantity != null &&
+            item.quantity <= item.lowStockThreshold
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = onBack) { Text("← Volver") }
+            Text(item.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val qty = "${item.quantity ?: "—"} ${item.unit ?: ""}".trim()
+            MetaChip(qty)
+            item.expiresAt?.let { MetaChip("Caduca: ${it.take(10)}") }
+            item.lowStockThreshold?.let {
+                MetaChip(if (isLowStock) "⚠ Bajo stock (mín: $it)" else "Mín: $it")
+            }
+        }
+        item.note?.takeIf { it.isNotBlank() }?.let {
+            Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onEdit) { Text("Editar") }
+            OutlinedButton(onClick = onDelete) { Text("Eliminar") }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StockForm(
+    initial: StockItemEntity?,
+    onSave: (name: String, quantity: Double?, unit: String?, lowStockThreshold: Double?, expiresAt: String?, note: String?) -> Unit,
+    onCancel: () -> Unit
+) {
+    var name by remember(initial) { mutableStateOf(initial?.name ?: "") }
+    var quantity by remember(initial) { mutableStateOf(initial?.quantity?.toString() ?: "") }
+    var unit by remember(initial) { mutableStateOf(initial?.unit ?: "") }
+    var expiresAt by remember(initial) { mutableStateOf(initial?.expiresAt?.take(10) ?: "") }
+    var lowStockThreshold by remember(initial) { mutableStateOf(initial?.lowStockThreshold?.toString() ?: "") }
+    var note by remember(initial) { mutableStateOf(initial?.note ?: "") }
+    var showAdvanced by remember {
+        mutableStateOf(initial?.lowStockThreshold != null || !initial?.note.isNullOrEmpty())
+    }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var nameError by remember { mutableStateOf(false) }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initial?.expiresAt?.take(10)?.let {
+            runCatching {
+                LocalDate.parse(it).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            }.getOrNull()
+        }
+    )
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePicker = false
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        expiresAt = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                    }
+                }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            if (initial == null) "Nuevo item de stock" else "Editar item de stock",
+            style = MaterialTheme.typography.headlineSmall
+        )
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it; nameError = false },
+            label = { Text("Nombre *") },
+            isError = nameError,
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = quantity,
+                onValueChange = { quantity = it },
+                label = { Text("Cantidad") },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = unit,
+                onValueChange = { unit = it },
+                label = { Text("Unidad") },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        OutlinedTextField(
+            value = if (expiresAt.isEmpty()) "" else "Caduca: $expiresAt",
+            onValueChange = {},
+            label = { Text("Fecha de caducidad") },
+            readOnly = true,
+            trailingIcon = {
+                TextButton(onClick = { showDatePicker = true }) { Text("Seleccionar") }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedButton(
+            onClick = { showAdvanced = !showAdvanced },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (showAdvanced) "Ocultar avanzado ▲" else "Mostrar avanzado ▼")
+        }
+        if (showAdvanced) {
+            OutlinedTextField(
+                value = lowStockThreshold,
+                onValueChange = { lowStockThreshold = it },
+                label = { Text("Umbral de stock bajo") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Notas") },
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                if (name.isBlank()) { nameError = true; return@Button }
+                onSave(
+                    name.trim(),
+                    quantity.toDoubleOrNull(),
+                    unit.trim().ifBlank { null },
+                    lowStockThreshold.toDoubleOrNull(),
+                    expiresAt.ifBlank { null },
+                    note.trim().ifBlank { null }
+                )
+            }) { Text(if (initial == null) "Guardar" else "Guardar cambios") }
+            OutlinedButton(onClick = onCancel) { Text("Cancelar") }
+        }
     }
 }

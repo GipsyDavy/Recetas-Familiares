@@ -361,3 +361,21 @@ data class UpdateNoteRequestDto(
     val pinned: Boolean = false,
     val recipeId: String? = null
 )
+
+data class CreateStockItemRequestDto(
+    val name: String,
+    val quantity: Double?,
+    val unit: String?,
+    val lowStockThreshold: Double?,
+    val expiresAt: String?,
+    val note: String?
+)
+
+data class UpdateStockItemRequestDto(
+    val name: String,
+    val quantity: Double?,
+    val unit: String?,
+    val lowStockThreshold: Double?,
+    val expiresAt: String?,
+    val note: String?
+)

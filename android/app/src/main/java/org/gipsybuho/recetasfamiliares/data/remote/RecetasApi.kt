@@ -3,6 +3,7 @@ package org.gipsybuho.recetasfamiliares.data.remote
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AuthResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
@@ -15,6 +16,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPullDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -82,6 +84,25 @@ interface RecetasApi {
         @Path("itemId") itemId: String,
         @Body request: UpdateShoppingListItemRequestDto
     ): ShoppingListItemDto
+
+    @POST("api/v1/families/{familyId}/stock-items")
+    suspend fun createStockItem(
+        @Path("familyId") familyId: String,
+        @Body request: CreateStockItemRequestDto
+    ): StockItemDto
+
+    @PUT("api/v1/families/{familyId}/stock-items/{itemId}")
+    suspend fun updateStockItem(
+        @Path("familyId") familyId: String,
+        @Path("itemId") itemId: String,
+        @Body request: UpdateStockItemRequestDto
+    ): StockItemDto
+
+    @DELETE("api/v1/families/{familyId}/stock-items/{itemId}")
+    suspend fun deleteStockItem(
+        @Path("familyId") familyId: String,
+        @Path("itemId") itemId: String
+    )
 
     @POST("api/v1/families/{familyId}/notes")
     suspend fun createNote(

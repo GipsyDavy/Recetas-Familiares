@@ -20,7 +20,9 @@ import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.MenuItemDto
@@ -80,6 +82,34 @@ class StockRepository(
         val familyId = sessionStore.familyId ?: return
         val page = api.stockItems(familyId)
         stockDao.upsertAll(page.items.map { it.toEntity() })
+    }
+
+    suspend fun create(
+        name: String, quantity: Double?, unit: String?,
+        lowStockThreshold: Double?, expiresAt: String?, note: String?
+    ) {
+        val familyId = sessionStore.familyId ?: return
+        val dto = api.createStockItem(
+            familyId, CreateStockItemRequestDto(name, quantity, unit, lowStockThreshold, expiresAt, note)
+        )
+        stockDao.upsertAll(listOf(dto.toEntity()))
+    }
+
+    suspend fun update(
+        item: StockItemEntity, name: String, quantity: Double?, unit: String?,
+        lowStockThreshold: Double?, expiresAt: String?, note: String?
+    ) {
+        val familyId = sessionStore.familyId ?: return
+        val dto = api.updateStockItem(
+            familyId, item.id, UpdateStockItemRequestDto(name, quantity, unit, lowStockThreshold, expiresAt, note)
+        )
+        stockDao.upsertAll(listOf(dto.toEntity()))
+    }
+
+    suspend fun delete(item: StockItemEntity) {
+        val familyId = sessionStore.familyId ?: return
+        api.deleteStockItem(familyId, item.id)
+        stockDao.upsertAll(listOf(item.copy(deleted = true)))
     }
 }
 

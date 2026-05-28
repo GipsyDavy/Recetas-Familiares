@@ -102,6 +102,36 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     val notes: StateFlow<List<FamilyNoteEntity>> = container.familyNoteRepository.notes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    fun createStockItem(
+        name: String, quantity: Double?, unit: String?,
+        lowStockThreshold: Double?, expiresAt: String?, note: String?,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                container.stockRepository.create(name, quantity, unit, lowStockThreshold, expiresAt, note)
+            }.onFailure { onError(it.message ?: "Error al crear item de stock") }
+        }
+    }
+
+    fun updateStockItem(
+        item: StockItemEntity, name: String, quantity: Double?, unit: String?,
+        lowStockThreshold: Double?, expiresAt: String?, note: String?,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                container.stockRepository.update(item, name, quantity, unit, lowStockThreshold, expiresAt, note)
+            }.onFailure { onError(it.message ?: "Error al actualizar item de stock") }
+        }
+    }
+
+    fun deleteStockItem(item: StockItemEntity) {
+        viewModelScope.launch {
+            runCatching { container.stockRepository.delete(item) }
+        }
+    }
+
     fun createNote(title: String, body: String, pinned: Boolean, onError: (String) -> Unit) {
         viewModelScope.launch {
             runCatching { container.familyNoteRepository.create(title, body, pinned) }
