@@ -72,10 +72,10 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 
 - Spring Boot 3.5.14 + Java 21 + MySQL + Flyway.
 - Auth JWT + refresh tokens + rate limiting.
-- CRUD completo: recetas, ingredientes, pasos, stock, menus, listas de compra, favoritos, notas, fotos.
+- CRUD completo: recetas, ingredientes, pasos, stock, menus, listas de compra, favoritos, notas, fotos, valoraciones.
 - Sync pull/push con tombstones, LWW y deteccion de conflictos.
-- 57 tests, 0 fallos.
-- Hardening HTTP: CSP, HSTS, CORS deny-by-default.
+- **62 tests, 0 fallos** (incluye RecipeRatingControllerTest x5).
+- Hardening HTTP: CSP, HSTS, CORS deny-by-default. Fix SSRF en validateHttpsUrl.
 - OpenAPI/Swagger desactivado en produccion.
 - Seed de desarrollo: demo@recetas.local / Demo1234!Familia
 
@@ -99,7 +99,7 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT 6 COMPLETO — 2026-05-28)
+### Android Kotlin + Compose (SPRINT 9 COMPLETO — 2026-05-28)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -107,13 +107,17 @@ Stack completo verificado:
 - Retrofit 3 + OkHttp 5 + Room 2.8.4 (v2) + WorkManager 2.11.2
 - MVVM + AppContainer (DI manual) + EncryptedSharedPreferences
 
-Pantallas implementadas (Sprint 1-6):
+Pantallas implementadas (Sprint 1-9):
 - LoginScreen
-- RecipeListScreen + RecipeDetailScreen (ingredientes + pasos desde Room)
-- StockScreen (badges bajo stock, colores caducidad)
+- RecipeListScreen (paginación, búsqueda, pull-to-refresh, FAB crear) + RecipeDetailScreen (fotos carrusel, valoraciones, menú ⋮)
+- RecipeForm (SegmentedButton dificultad, filas dinámicas ingredientes/pasos)
+- CookingScreen (paso a paso, temporizador countdown, keep screen on)
+- StockScreen (badges bajo stock, colores caducidad, FAB crear, CRUD inline, notificaciones caducidad)
 - ShoppingListScreen
-- NotesScreen (CRUD completo: crear, editar, eliminar notas familiares)
+- NotesScreen (CRUD completo, búsqueda, empty states)
 - Bottom Navigation: 4 tabs (RECIPES, STOCK, SHOPPING, NOTES)
+- Snackbar feedback en todas las mutaciones
+- SyncWorker push offline-resilient (pushThenPull, syncVersion=0 fallback)
 
 Compilar y desplegar:
 ```
@@ -126,33 +130,26 @@ SDK: C:\Users\GipsyDavy\AndroidSDK
 AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-### Desktop JavaFX (SPRINT 6 + FIXES COMPLETO — 2026-05-28)
+### Desktop JavaFX (SPRINT 9 + AUDITORÍA COMPLETA — 2026-05-28)
 
-JavaFX 21 + OkHttp + Gson. Compila y genera fat JAR (13.3 MB).
+JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
 
-Pantallas implementadas (Sprint 1-6):
+Pantallas implementadas (Sprint 1-9):
 - LoginView
 - DashboardView (GridPane 2 columnas: recetas recientes + stock expirando)
-- RecipeListView (SplitPane filtrable + detalle + edicion)
-- RecipeDetailView (ingredientes, pasos, Editar, Eliminar)
+- RecipeListView (SplitPane filtrable, búsqueda, contador "Mostrando X de Y")
+- RecipeDetailView (ingredientes, pasos, fotos async, Editar, Eliminar, Modo Cocina)
 - RecipeFormDialog (modal crear/editar)
-- StockView (TableView — solo lectura, CRUD pendiente Sprint 7)
+- CookingView (Stage maximizado, paso a paso, temporizador JavaFX Timeline)
+- StockView (TableView con toolbar, CRUD completo, columna "Mín. stock", empty state)
 - WeeklyMenuView (calendario semanal, CRUD assign/remove)
-- ShoppingListView
-- NotesView (SplitPane lista + editor inline, CRUD completo)
+- ShoppingListView (empty state ilustrado)
+- NotesView (SplitPane lista + editor inline, CRUD completo, empty state, 📌)
 
-Sidebar: Inicio | Recetas | Stock | Menu semanal | Lista de la compra | Notas familiares
+Sidebar: Inicio | Recetas | Stock | Menú semanal | Lista de la compra | Notas familiares
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
-
-Fixes criticos en commit 5404a7b (no revertir):
-- StockDtos: name (NO ingredientName)
-- RecipeDtos: campos alineados con backend (quantity Double, position, instruction, timerMinutes, items/totalItems)
-- StockRepository: /stock-items (NO /stock)
-- NoteRepository: /notes (NO /family-notes)
-- SyncRepository: actualiza cache menu+shopping+favorites
-- AppContext: SyncRepository recibe 6 repos
 
 ### Base de Datos MySQL
 
@@ -170,22 +167,36 @@ Fixes criticos en commit 5404a7b (no revertir):
 | 1 | 2026-05 | Login + RecipeList + StockView Desktop; Login + RecipeList Android |
 | 2 | 2026-05-27 | Dashboard Desktop, RecipeFormDialog, RecipeDetailView |
 | 3 | 2026-05-28 | RecipeDetail Android, StockScreen mejorada, WeeklyMenuView Desktop |
-| 4 | 2026-05-28 | Persistencia tokens Desktop, CRUD menu semanal, MIGRATION_1_2 Android |
+| 4 | 2026-05-28 | Persistencia tokens Desktop, CRUD menú semanal, MIGRATION_1_2 Android |
 | 5 | 2026-05-28 | ShoppingListView Desktop+Android, FavoriteRepository Desktop+Android |
 | 6 | 2026-05-28 | NotesView Desktop + NotesScreen Android (CRUD completo) |
 | fix | 2026-05-28 | 8 bugs contratos DTO Desktop + URLs endpoints (commit 5404a7b) |
-| 7.1 | 2026-05-28 | CRUD Stock Items Desktop: StockFormDialog + StockRepository create/update/delete + toolbar StockView |
-| 7.2 | 2026-05-28 | CRUD Stock Items Android: FAB + StockForm (DatePickerDialog) + StockDetail + navegación inline |
-| 7.3 | 2026-05-28 | Crear/Editar Receta Android: RecipeForm con SegmentedButton, filas dinámicas, RecipeDetail menú ⋮ |
-| 7.4 | 2026-05-28 | SyncWorker push: offline-resilient creates (syncVersion=0) + pushThenPull real |
+| 7.1 | 2026-05-28 | CRUD Stock Items Desktop: StockFormDialog + toolbar StockView |
+| 7.2 | 2026-05-28 | CRUD Stock Items Android: FAB + StockForm + StockDetail |
+| 7.3 | 2026-05-28 | Crear/Editar Receta Android: RecipeForm SegmentedButton + filas dinámicas |
+| 7.4 | 2026-05-28 | SyncWorker push offline-resilient (syncVersion=0 + pushThenPull) |
+| 8.1 | 2026-05-28 | Snackbar feedback + Pull-to-refresh Android |
+| 8.2 | 2026-05-28 | Búsqueda global Android (recetas, stock, notas) + contador filtro Desktop |
+| 8.3 | 2026-05-28 | Modo Cocina Android (paso a paso, temporizador, keep screen on) |
+| 8.4 | 2026-05-28 | Modo Cocina Desktop (CookingView, Stage maximizado, Timeline JavaFX) |
+| 8.5 | 2026-05-28 | Empty states ilustrados Android + Desktop (notas, stock, compra) |
+| 8.6 | 2026-05-28 | CRUD update/delete offline-resilient Android (stock + notas) |
+| 8.7 | 2026-05-28 | Fotos de receta: upload multipart Backend + carrusel Android + galería Desktop |
+| 9.1 | 2026-05-28 | Notificaciones de caducidad stock Android (WorkManager diario) |
+| 9.2 | 2026-05-28 | Valoraciones familiares: endpoint backend + 5 tests + UI Android |
+| 9.3 | 2026-05-28 | Paginación de recetas Android (carga incremental) |
+| audit | 2026-05-28 | Auditoría completa Sprint 1-9: seguridad, tests, calidad, limpieza |
+| fix-audit | 2026-05-28 | Fixes auditoría: CancellationException Android, timeouts+Authorization Desktop, timeouts Android |
 
-## Proximos Pasos — Sprint 7 (EN CURSO)
+## Proximos Pasos — Sprint 10 (PENDIENTE)
 
-Orden recomendado por prioridad:
+Candidatos ordenados por valor de usuario:
 
-1. **CRUD Stock Items Desktop** ✅ — StockFormDialog, create/update/delete en StockRepository, toolbar + columna "Min. stock" en StockView.
-2. **CRUD Stock Items Android** ✅ — FAB + StockForm (DatePickerDialog M3) + StockDetail + navegación inline, mutaciones en API/Repository/ViewModel.
-3. **Crear/Editar Receta Android** ✅ — FAB + RecipeForm (SegmentedButton, filas dinámicas ing/pasos) + RecipeDetail con menú ⋮.
-4. **SyncWorker Android push** ✅ — Creates offline-resilient (syncVersion=0); pushThenPull() empuja pendientes en cada ciclo.
+1. **Widgets Android** — widget de receta del día o stock crítico en pantalla de inicio.
+2. **Búsqueda global Desktop** — búsqueda unificada por receta, nota e ingrediente.
+3. **CRUD update/delete offline-resilient recetas** — alinear recetas con el patrón de stock/notas.
+4. **Design tokens Android** — sistema de espaciado y tipografía (eliminar magic numbers de RecetasApp.kt).
+5. **Refactor RecetasApp.kt** — extraer composables > 80 líneas a ficheros propios.
+6. **Pull-to-refresh Desktop** — sincronización manual desde la UI.
 
-Ver CONTINUAR.md para detalle exacto de archivos a tocar en cada tarea.
+Ver CONTINUAR.md para contexto técnico completo.

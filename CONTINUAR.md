@@ -189,7 +189,7 @@ Migraciones Flyway V1-V9 (tablas: users, families, family_members, recipes, ingr
 
 ---
 
-## Android Kotlin + Compose — SPRINT 6 COMPLETO (2026-05-28)
+## Android Kotlin + Compose — SPRINT 9 COMPLETO (2026-05-28)
 
 Stack:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -217,43 +217,49 @@ Stack:
 - `RecetasViewModel`: StateFlows para recipes, stock, shoppingItems, favorites, notes
 - `AppContainer`: contiene todos los repositories incluyendo `familyNoteRepository`
 
-### Pantallas implementadas (Sprint 1-6)
+### Pantallas implementadas (Sprint 1-9)
 - `LoginScreen`
-- `RecipeListScreen` + `RecipeDetailScreen` (ingredientes + pasos)
-- `StockScreen` (badges bajo stock, colores caducidad)
+- `RecipeListScreen` (paginación, búsqueda, pull-to-refresh, FAB) + `RecipeDetailScreen` (fotos carrusel, valoraciones, menú ⋮)
+- `RecipeForm` (SegmentedButton dificultad, filas dinámicas ingredientes/pasos)
+- `CookingScreen` (paso a paso, temporizador countdown, keep screen on)
+- `StockScreen` (CRUD completo, notificaciones caducidad WorkManager, búsqueda)
 - `ShoppingListScreen`
-- `NotesScreen` + `NoteCard` + `NoteDetail` + `NoteForm`
+- `NotesScreen` (CRUD completo, búsqueda, empty states)
 - Bottom Navigation: 4 tabs — RECIPES, STOCK, SHOPPING, NOTES
+- Snackbar feedback global; SyncWorker pushThenPull offline-resilient
 
 ### RecetasApi.kt — endpoints implementados
 - login, families
-- recipes (list, detail)
-- stockItems (list)
+- recipes (list paginado, detail, create, update, delete)
+- stockItems (list, create, update, delete)
+- photos (list, upload multipart, delete)
+- ratings (create, update, delete, list)
 - pullSync, pushSync
 - addFavorite, removeFavorite
 - updateShoppingListItem
-- createNote, updateNote, deleteNote (rutas correctas: `/notes`)
+- createNote, updateNote, deleteNote (rutas: `/notes`)
 
 Build: `gradle assembleDebug` desde `android/` — EXITOSO
 
 ---
 
-## Desktop JavaFX — SPRINT 6 + FIXES COMPLETO (2026-05-28)
+## Desktop JavaFX — SPRINT 9 + AUDITORÍA COMPLETA (2026-05-28)
 
 Stack: Java 21 + JavaFX 21.0.2 + OkHttp 4.12.0 + Gson 2.10.1 + Maven.
 
 Fat JAR: 13.3 MB. SSL fix: `desktop/.mvn/jvm.config` con Windows-ROOT truststore.
 
-### Pantallas implementadas (Sprint 1-6)
+### Pantallas implementadas (Sprint 1-9)
 - `LoginView`
 - `DashboardView` — GridPane 2 columnas: recetas recientes + stock expirando + acciones
-- `RecipeListView` — SplitPane lista filtrable + detalle
-- `RecipeDetailView` — ingredientes, pasos, Editar + Eliminar
+- `RecipeListView` — SplitPane filtrable, búsqueda, contador "Mostrando X de Y"
+- `RecipeDetailView` — ingredientes, pasos, fotos async ScrollPane, Editar + Eliminar + Modo Cocina
 - `RecipeFormDialog` — modal `forCreate()` / `forEdit()`
-- `StockView` — TableView (solo lectura por ahora)
+- `CookingView` — Stage maximizado, paso a paso, temporizador JavaFX Timeline, pantalla "¡Buen provecho!"
+- `StockView` — TableView con toolbar CRUD completo, columna "Mín. stock", empty state
 - `WeeklyMenuView` — calendario 8x5, nav semanas, CRUD assign/remove
-- `ShoppingListView`
-- `NotesView` — SplitPane lista + editor inline, CRUD completo, NoteCell con 📌
+- `ShoppingListView` — empty state ilustrado
+- `NotesView` — SplitPane lista + editor inline, CRUD completo, NoteCell con 📌, empty state
 
 ### Sidebar completa
 Inicio | Recetas | Stock | Menú semanal | Lista de la compra | Notas familiares | [Sincronizar] [Cerrar sesión]
@@ -280,16 +286,16 @@ mvn compile — EXITOSO
 
 ## Estado Git (2026-05-28)
 
-Rama: `main` — limpio, sin cambios pendientes. 6 commits adelantados al remoto (no pusheado).
+Rama: `main` — limpio, sin cambios pendientes. Pusheado a origin.
 
 Commits recientes:
 ```
-4b56070 docs: Sprint 7 completo — actualizar CONTINUAR y Resumen  ← HEAD
-15079bc feat: Sprint 7.4 — SyncWorker push de cambios pendientes
-7253983 feat: Sprint 7.3 — crear y editar recetas desde Android
-9b4533a feat: Sprint 7.2 — CRUD stock items en Android
-287395a feat: Sprint 7.1 — CRUD stock items en Desktop
-5404a7b fix: corregir contratos DTO Desktop y URLs de endpoints
+b22fdaf fix: Auditoría Fase 6 — Authorization POST + timeouts OkHttp Desktop y Android  ← HEAD
+58bcf2a fix: Auditoría Codex Desktop — timeouts OkHttp + shutdown completo
+f7d19eb fix: Auditoría Codex Android — CancellationException + isRefreshing try/finally
+0fab8d1 audit: Auditoría completa Sprint 1-9 — seguridad, tests, calidad y limpieza
+c88d359 feat: Sprint 9.3 — Paginación de recetas Android
+e2461c9 feat: Sprint 9.1/9.2 — Notificaciones caducidad + Valoraciones familiares
 ```
 
 ---
@@ -355,11 +361,11 @@ Build SUCCESSFUL.
    ```
    Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
 
-6. Continuar con Sprint 8 pendiente (ver seccion Sprint 8 mas abajo).
+6. Continuar con Sprint 10 (ver candidatos al final de este documento).
 
 ---
 
-## Sprint 8 — EN CURSO (2026-05-28)
+## Sprint 8 — COMPLETADO (2026-05-28)
 
 ### Sprint 8.1 — Feedback Snackbar + Pull-to-refresh Android ✅ COMPLETADO (2026-05-28)
 
@@ -462,12 +468,26 @@ Archivos modificados (commit 20d5ac0):
 
 ---
 
-## Sprint 8 — PENDIENTE
+---
 
-### Candidatos restantes
-- **Paginacion de recetas** — RecipeList Android carga todas las recetas sin paginar.
-- **Paginacion de recetas** — RecipeList Android carga todas las recetas sin paginar (MVP aceptable para familias pequeñas).
-- **Sprint 9** — valorar nuevas funcionalidades: valoraciones/comentarios, widgets Android, notificaciones, mejoras IA.
+## Sprint 9 — COMPLETADO (2026-05-28)
+
+### Sprint 9.1 — Notificaciones de caducidad stock Android ✅ COMPLETADO
+
+WorkManager diario que revisa stock próximo a caducar y lanza notificación local al usuario.
+
+### Sprint 9.2 — Valoraciones familiares ✅ COMPLETADO
+
+**Backend** (commit e2461c9):
+- Endpoint CRUD valoraciones: `GET/POST/PUT/DELETE /api/v1/families/{fid}/recipes/{rid}/ratings`
+- RecipeRatingControllerTest: 5 tests (CRUD, conflicto, validación, acceso cruzado). 57→62 tests.
+
+**Android** (commit e2461c9):
+- RecipeRatingRepository + UI en RecipeDetailScreen.
+
+### Sprint 9.3 — Paginación de recetas Android ✅ COMPLETADO (commit c88d359)
+
+RecipeListScreen con carga incremental. PageResponse<T> ya soportado en el backend.
 
 ---
 
@@ -505,3 +525,16 @@ Archivos modificados (commit 20d5ac0):
   * Bug corregido — Timeouts OkHttp ausentes en Desktop (ambos clientes) y Android.
     commit 58bcf2a solo añadió shutdown(), no los timeouts.
     Ahora: connectTimeout 10s, readTimeout 30s (client principal), readTimeout 15s (refreshClient).
+
+---
+
+## Sprint 10 — PENDIENTE
+
+Candidatos ordenados por valor de usuario:
+
+1. **Widgets Android** — widget receta del día o stock crítico en pantalla de inicio.
+2. **Búsqueda global Desktop** — búsqueda unificada por receta, nota e ingrediente.
+3. **CRUD update/delete offline-resilient recetas** — alinear recetas con el patrón de stock/notas.
+4. **Design tokens Android** — eliminar magic numbers de RecetasApp.kt (espaciado, tipografía).
+5. **Refactor RecetasApp.kt** — extraer composables > 80 líneas a ficheros propios.
+6. **Pull-to-refresh Desktop** — sincronización manual desde la UI.
