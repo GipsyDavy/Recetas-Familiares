@@ -49,6 +49,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFamilyNotePushItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFavoriteRecipePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncIngredientPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncRecipePushItemDto
@@ -276,13 +277,15 @@ class SyncRepository(
     suspend fun pushThenPull() {
         val familyId = sessionStore.familyId ?: return
 
-        val pendingRecipes      = database.recipeDao().findPendingCreate()
-        val pendingRecipeDel    = database.recipeDao().findPendingDelete()
-        val pendingStock        = database.stockDao().findPendingCreate()
-        val pendingStockDelete  = database.stockDao().findPendingDelete()
-        val pendingNotes        = database.familyNoteDao().findPendingCreate()
-        val pendingNoteDelete   = database.familyNoteDao().findPendingDelete()
-        val pendingShoppingItems = database.shoppingListItemDao().findPendingCheck()
+        val pendingRecipes        = database.recipeDao().findPendingCreate()
+        val pendingRecipeDel      = database.recipeDao().findPendingDelete()
+        val pendingStock          = database.stockDao().findPendingCreate()
+        val pendingStockDelete    = database.stockDao().findPendingDelete()
+        val pendingNotes          = database.familyNoteDao().findPendingCreate()
+        val pendingNoteDelete     = database.familyNoteDao().findPendingDelete()
+        val pendingShoppingItems  = database.shoppingListItemDao().findPendingCheck()
+        val pendingFavorites      = database.favoriteRecipeDao().findPendingCreate()
+        val pendingFavoriteDel    = database.favoriteRecipeDao().findPendingDelete()
 
         val recipeIds = pendingRecipes.map { it.id }
         val pendingIngredients = if (recipeIds.isNotEmpty())
@@ -336,12 +339,19 @@ class SyncRepository(
             )
         }
 
+        val favoritePushItems = pendingFavorites.map {
+            SyncFavoriteRecipePushItemDto(id = it.id, baseSyncVersion = null, recipeId = it.recipeId, deleted = false)
+        } + pendingFavoriteDel.map {
+            SyncFavoriteRecipePushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
+        }
+
         val pushRequest = SyncPushRequestDto(
             recipes = recipePushItems,
             ingredients = ingredientPushItems,
             steps = stepPushItems,
             stockItems = stockPushItems.ifEmpty { null },
             shoppingListItems = shoppingItemPushItems.ifEmpty { null },
+            favoriteRecipes = favoritePushItems.ifEmpty { null },
             familyNotes = notePushItems.ifEmpty { null }
         )
 
@@ -406,11 +416,26 @@ class FavoriteRepository(
         val familyId = sessionStore.familyId ?: return
         val existing = database.favoriteRecipeDao().findByRecipeId(recipeId)
         if (existing != null) {
-            api.removeFavorite(familyId, existing.id)
-            database.favoriteRecipeDao().upsertAll(listOf(existing.copy(deleted = true)))
+            try {
+                api.removeFavorite(familyId, existing.id)
+                database.favoriteRecipeDao().upsertAll(listOf(existing.copy(deleted = true)))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                // Offline: mark deleted locally, SyncWorker will push on next sync
+                database.favoriteRecipeDao().upsertAll(listOf(existing.copy(deleted = true, syncVersion = 0L)))
+            }
         } else {
-            val dto = api.addFavorite(familyId, AddFavoriteRequestDto(recipeId))
-            database.favoriteRecipeDao().upsertAll(listOf(dto.toEntity()))
+            try {
+                val dto = api.addFavorite(familyId, AddFavoriteRequestDto(recipeId))
+                database.favoriteRecipeDao().upsertAll(listOf(dto.toEntity()))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                // Offline: save locally with syncVersion=0 for SyncWorker to push later
+                val now = Instant.now().toString()
+                database.favoriteRecipeDao().upsertAll(listOf(
+                    FavoriteRecipeEntity(UUID.randomUUID().toString(), familyId, recipeId, null, now, now, 0L, false)
+                ))
+            }
         }
     }
 }

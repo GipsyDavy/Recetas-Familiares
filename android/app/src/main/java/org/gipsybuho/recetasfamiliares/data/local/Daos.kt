@@ -117,6 +117,12 @@ interface FavoriteRecipeDao {
     @Query("SELECT * FROM favorite_recipes WHERE recipeId = :recipeId AND deleted = 0 LIMIT 1")
     suspend fun findByRecipeId(recipeId: String): FavoriteRecipeEntity?
 
+    @Query("SELECT * FROM favorite_recipes WHERE syncVersion = 0 AND deleted = 0")
+    suspend fun findPendingCreate(): List<FavoriteRecipeEntity>
+
+    @Query("SELECT * FROM favorite_recipes WHERE syncVersion = 0 AND deleted = 1")
+    suspend fun findPendingDelete(): List<FavoriteRecipeEntity>
+
     @Upsert
     suspend fun upsertAll(favorites: List<FavoriteRecipeEntity>)
 }
