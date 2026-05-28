@@ -52,4 +52,19 @@ public final class RecipeDtos {
             long totalItems,
             int totalPages
     ) {}
+
+    public record RecipePhotoResponse(
+            String id,
+            String recipeId,
+            int position,
+            String url,
+            String thumbnailUrl,
+            String caption,
+            String contentType,
+            Long sizeBytes,
+            String createdAt,
+            String updatedAt,
+            long syncVersion,
+            boolean deleted
+    ) {}
 }

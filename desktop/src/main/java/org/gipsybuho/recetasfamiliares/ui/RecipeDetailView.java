@@ -2,12 +2,17 @@ package org.gipsybuho.recetasfamiliares.ui;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
+import javafx.stage.FileChooser;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,12 +26,16 @@ public class RecipeDetailView extends VBox {
     private final Text descText = new Text();
     private final VBox ingredientsList = new VBox(6);
     private final VBox stepsList = new VBox(10);
+    private final HBox photosList = new HBox(10);
+    private final Label photosStatusLabel = new Label();
     private final Label statusLabel = new Label();
     private final HBox actionBar = new HBox(10);
     private final Button favBtn = new Button("♡  Favorito");
+    private final Button addPhotoBtn = new Button("Añadir foto");
 
     private RecipeDtos.RecipeDto currentRecipe;
     private List<RecipeDtos.RecipeStepDto> currentSteps = new ArrayList<>();
+    private List<RecipeDtos.RecipePhotoResponse> currentPhotos = new ArrayList<>();
 
     public RecipeDetailView(AppContext context, Runnable onRecipeChanged) {
         this.context = context;
@@ -48,6 +57,9 @@ public class RecipeDetailView extends VBox {
         favBtn.getStyleClass().add("action-button-secondary");
         favBtn.setOnAction(e -> toggleFavorite());
 
+        addPhotoBtn.getStyleClass().add("action-button-secondary");
+        addPhotoBtn.setOnAction(e -> chooseAndUploadPhoto());
+
         Button cookingBtn = new Button("👨‍🍳  Modo Cocina");
         cookingBtn.getStyleClass().add("action-button-secondary");
         cookingBtn.setOnAction(e -> openCookingMode());
@@ -62,7 +74,7 @@ public class RecipeDetailView extends VBox {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        actionBar.getChildren().addAll(spacer, favBtn, cookingBtn, editBtn, deleteBtn);
+        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, editBtn, deleteBtn);
         actionBar.setPadding(new Insets(12, 16, 8, 16));
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -72,6 +84,19 @@ public class RecipeDetailView extends VBox {
 
         Label stepsLabel = new Label("Pasos");
         stepsLabel.getStyleClass().add("section-header");
+
+        Label photosLabel = new Label("Fotos");
+        photosLabel.getStyleClass().add("section-header");
+
+        photosList.setPadding(new Insets(4, 0, 4, 0));
+        ScrollPane photosScroll = new ScrollPane(photosList);
+        photosScroll.setFitToHeight(true);
+        photosScroll.setFitToWidth(true);
+        photosScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        photosScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        photosScroll.setPrefViewportHeight(110);
+        photosScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        photosStatusLabel.getStyleClass().add("status-label");
 
         statusLabel.getStyleClass().add("status-label");
         statusLabel.setVisible(false);
@@ -86,6 +111,8 @@ public class RecipeDetailView extends VBox {
                 ingLabel, ingredientsList,
                 new Separator(),
                 stepsLabel, stepsList,
+                new Separator(),
+                photosLabel, photosScroll, photosStatusLabel,
                 statusLabel
         );
         content.setPadding(new Insets(16, 24, 24, 24));
@@ -104,6 +131,8 @@ public class RecipeDetailView extends VBox {
         descText.setText(recipe.description() != null ? recipe.description() : "");
         ingredientsList.getChildren().clear();
         stepsList.getChildren().clear();
+        photosList.getChildren().clear();
+        photosStatusLabel.setText("");
         statusLabel.setText("Cargando...");
         statusLabel.setVisible(true);
         actionBar.setVisible(true);
@@ -131,6 +160,9 @@ public class RecipeDetailView extends VBox {
         descText.setText("");
         ingredientsList.getChildren().clear();
         stepsList.getChildren().clear();
+        photosList.getChildren().clear();
+        photosStatusLabel.setText("");
+        currentPhotos = new ArrayList<>();
         statusLabel.setVisible(false);
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -174,6 +206,115 @@ public class RecipeDetailView extends VBox {
         }
         if (steps.isEmpty())
             stepsList.getChildren().add(noDataLabel("Sin pasos."));
+
+        loadAndRenderPhotos();
+    }
+
+    private void loadAndRenderPhotos() {
+        if (currentRecipe == null) return;
+
+        RecipeDtos.RecipeDto recipe = currentRecipe;
+        photosStatusLabel.setText("Cargando fotos...");
+        photosList.getChildren().clear();
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                String familyId = familyId(recipe);
+                var photos = context.getRecipeRepository().loadPhotos(familyId, recipe.id());
+                Platform.runLater(() -> {
+                    if (currentRecipe == null || !recipe.id().equals(currentRecipe.id())) return;
+                    currentPhotos = photos != null ? photos : new ArrayList<>();
+                    renderPhotos();
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> photosStatusLabel.setText("No se pudieron cargar las fotos."));
+            }
+        });
+    }
+
+    private void renderPhotos() {
+        photosList.getChildren().clear();
+
+        if (currentPhotos.isEmpty()) {
+            photosStatusLabel.setText("Sin fotos.");
+            return;
+        }
+
+        photosStatusLabel.setText(currentPhotos.size() + " foto" + (currentPhotos.size() == 1 ? "" : "s"));
+        for (var photo : currentPhotos) {
+            photosList.getChildren().add(buildPhotoNode(photo));
+        }
+    }
+
+    private Node buildPhotoNode(RecipeDtos.RecipePhotoResponse photo) {
+        ImageView imageView = new ImageView(new Image(photo.url(), true));
+        imageView.setFitWidth(110);
+        imageView.setFitHeight(80);
+        imageView.setPreserveRatio(false);
+        imageView.setStyle("-fx-background-color: #FAF7F2; -fx-border-color: #C17D52; -fx-border-radius: 4;");
+
+        MenuItem deleteItem = new MenuItem("Eliminar foto");
+        deleteItem.setOnAction(e -> deletePhoto(photo));
+        ContextMenu menu = new ContextMenu(deleteItem);
+        imageView.setOnContextMenuRequested(e -> menu.show(imageView, e.getScreenX(), e.getScreenY()));
+
+        VBox box = new VBox(4, imageView);
+        if (photo.caption() != null && !photo.caption().isBlank()) {
+            Label caption = new Label(photo.caption());
+            caption.getStyleClass().add("recipe-meta");
+            caption.setMaxWidth(110);
+            caption.setWrapText(true);
+            box.getChildren().add(caption);
+        }
+        return box;
+    }
+
+    private void chooseAndUploadPhoto() {
+        if (currentRecipe == null) return;
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Añadir foto");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Imágenes", "*.jpg", "*.jpeg", "*.png")
+        );
+        File file = chooser.showOpenDialog(getScene().getWindow());
+        if (file == null) return;
+
+        RecipeDtos.RecipeDto recipe = currentRecipe;
+        String contentType = contentType(file);
+        addPhotoBtn.setDisable(true);
+        photosStatusLabel.setText("Subiendo foto...");
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                context.getRecipeRepository().uploadPhoto(familyId(recipe), recipe.id(), file, contentType, null);
+                Platform.runLater(() -> {
+                    addPhotoBtn.setDisable(false);
+                    loadAndRenderPhotos();
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    addPhotoBtn.setDisable(false);
+                    photosStatusLabel.setText("Error al subir foto: " + ex.getMessage());
+                });
+            }
+        });
+    }
+
+    private void deletePhoto(RecipeDtos.RecipePhotoResponse photo) {
+        if (currentRecipe == null) return;
+
+        RecipeDtos.RecipeDto recipe = currentRecipe;
+        photosStatusLabel.setText("Eliminando foto...");
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                context.getRecipeRepository().deletePhoto(familyId(recipe), recipe.id(), photo.id());
+                Platform.runLater(this::loadAndRenderPhotos);
+            } catch (Exception ex) {
+                Platform.runLater(() -> photosStatusLabel.setText("Error al eliminar foto: " + ex.getMessage()));
+            }
+        });
     }
 
     // ── Cooking mode ──────────────────────────────────────────────────────────
@@ -292,6 +433,17 @@ public class RecipeDetailView extends VBox {
         Label l = new Label(text);
         l.getStyleClass().add("no-data-label");
         return l;
+    }
+
+    private String familyId(RecipeDtos.RecipeDto recipe) {
+        return recipe.familyId() != null ? recipe.familyId() : context.getSession().getFamilyId();
+    }
+
+    private String contentType(File file) {
+        String name = file.getName().toLowerCase();
+        if (name.endsWith(".png")) return "image/png";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        return "application/octet-stream";
     }
 
     private String buildMeta(RecipeDtos.RecipeDto r) {
