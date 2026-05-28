@@ -99,7 +99,7 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT 13 COMPLETO — 2026-05-28)
+### Android Kotlin + Compose (SPRINT 14 COMPLETO — 2026-05-29)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -107,20 +107,22 @@ Stack completo verificado:
 - Retrofit 3 + OkHttp 5 + Room 2.8.4 (v2) + WorkManager 2.11.2
 - MVVM + AppContainer (DI manual) + EncryptedSharedPreferences
 
-Pantallas implementadas (Sprint 1-13):
+Pantallas implementadas (Sprint 1-14):
 - LoginScreen
 - TopAppBar con búsqueda global unificada (Recetas + Stock + Notas)
 - RecipeListScreen (paginación, búsqueda, pull-to-refresh, FAB crear) + RecipeDetailScreen (fotos carrusel, valoraciones, menú ⋮ con **"Compartir"**)
 - RecipeForm (SegmentedButton dificultad, filas dinámicas ingredientes/pasos)
 - CookingScreen (paso a paso, temporizador countdown, keep screen on, **volumen ↑↓ cambia paso**)
 - StockScreen (badges bajo stock, colores caducidad, FAB crear, CRUD inline, notificaciones caducidad)
-- ShoppingListScreen (check offline-resilient)
+- ShoppingListScreen (check offline-resilient, **botón "Compartir" → Intent.ACTION_SEND**)
 - NotesScreen (CRUD completo, búsqueda, empty states)
 - GlobalSearchScreen (resultados agrupados entre tabs)
+- **MenuScreen** (5º tab "Menú", navegación ← → semanas, cards por día, mealType localizado, empty state)
 - Widgets: RecipeWidget (receta del día) + StockWidget (ítems críticos)
-- Bottom Navigation: 4 tabs (RECIPES, STOCK, SHOPPING, NOTES)
+- Bottom Navigation: **5 tabs** (RECIPES, STOCK, SHOPPING, NOTES, MENU)
 - Snackbar feedback en todas las mutaciones
 - **SyncWorker pushThenPull: 7 tipos** — Recetas + Ingredientes + Pasos + Stock + Shopping items + Favoritos + Notas
+- **Notificaciones caducidad**: HOY urgente (PRIORITY_HIGH) + esta semana 1-7 días (PRIORITY_DEFAULT)
 
 Compilar y desplegar:
 ```
@@ -133,19 +135,19 @@ SDK: C:\Users\GipsyDavy\AndroidSDK
 AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-### Desktop JavaFX (SPRINT 13 COMPLETO — 2026-05-28)
+### Desktop JavaFX (SPRINT 14 COMPLETO — 2026-05-29)
 
 JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
 
-Pantallas implementadas (Sprint 1-13):
+Pantallas implementadas (Sprint 1-14):
 - LoginView
 - DashboardView (GridPane 2 columnas: recetas recientes + stock expirando + **acciones rápidas: Stock familiar / Notas familiares**)
 - RecipeListView (SplitPane filtrable, búsqueda, paginación incremental 30/pág, botón "Actualizar")
-- RecipeDetailView (ingredientes, pasos, fotos async, Editar, Eliminar, Modo Cocina, **botón "📋 Copiar"**)
+- RecipeDetailView (ingredientes, pasos, fotos async, Editar, Eliminar, Modo Cocina, **"📋 Copiar"**, **"💾 Exportar" → .txt**)
 - RecipeFormDialog (modal crear/editar)
 - CookingView (Stage maximizado, paso a paso, temporizador JavaFX Timeline)
-- StockView (TableView con toolbar CRUD, búsqueda, botón "Actualizar")
+- StockView (TableView con toolbar CRUD, búsqueda, **paginación client-side PAGE_SIZE=50, "Cargar más"**, botón "Actualizar")
 - WeeklyMenuView (calendario semanal, navegación ← semanas →, CRUD assign/remove, botón "Actualizar")
 - ShoppingListView (empty state, botón "Actualizar" → sync completo)
 - NotesView (SplitPane lista + editor inline, CRUD, búsqueda, paginación 30/pág, botón "Actualizar")
@@ -207,15 +209,12 @@ Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 | 13.1 | 2026-05-28 | Compartir receta Android: Intent.ACTION_SEND desde menú ⋮ de RecipeDetail |
 | 13.2 | 2026-05-28 | Modo manos libres CookingScreen Android: volumen ↑↓ navega pasos sin tocar pantalla |
 | 13.3 | 2026-05-28 | Dashboard acciones rápidas Desktop: botones "Stock familiar" y "Notas familiares" |
+| 14.1 | 2026-05-29 | Menú semanal Android: 5º tab + MenuScreen.kt nav ← → semanas, cards por día |
+| 14.2 | 2026-05-29 | Paginación stock Desktop: PAGE_SIZE=50 client-side, botón "Cargar más (N de total)" |
+| 14.3 | 2026-05-29 | Exportar receta Desktop a .txt: botón "💾 Exportar" + FileChooser + Files.writeString |
+| 14.4 | 2026-05-29 | Compartir lista de la compra Android: botón "Compartir" + Intent.ACTION_SEND |
+| 14.5 | 2026-05-29 | Notificaciones caducidad Android mejoradas: HOY (PRIORITY_HIGH) + esta semana (7 días) |
 
-## Proximos Pasos — Sprint 14 (PENDIENTE)
-
-Candidatos:
-
-1. **Historial de menús Android** — navegación ← → semanas pasadas (Desktop ya lo tiene).
-2. **Paginación stock Desktop** — el endpoint de stock devuelve array plano; valorar si el backend lo necesita.
-3. **Exportar receta Desktop a archivo** — guardar como .txt con FileChooser desde RecipeDetailView.
-4. **Compartir lista de la compra Android** — Intent.ACTION_SEND con los ítems pendientes.
-5. **Notificaciones caducidad stock Android mejoradas** — agrupar por urgencia (hoy / esta semana).
+## Proximos Pasos — Sprint 15
 
 Ver CONTINUAR.md para contexto técnico completo.

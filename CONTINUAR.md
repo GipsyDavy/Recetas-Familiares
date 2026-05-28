@@ -682,7 +682,7 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
 
 ---
 
-## Sprint 14 — EN CURSO (2026-05-28)
+## Sprint 14 — COMPLETADO (2026-05-29)
 
 ### Sprint 14.1 — Historial de menús Android ✅ COMPLETADO (Claude Code)
 
@@ -706,12 +706,17 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
   Cada grupo dispara su propia notificación solo si no está vacío.
 - Build: incluido en el mismo BUILD SUCCESSFUL.
 
-### Sprint 14.2 — Paginación stock Desktop ⏳ PENDIENTE Codex
+### Sprint 14.2 — Paginación stock Desktop ✅ COMPLETADO (Codex, commit 6ce1ba8)
 
-- `StockView.java`: paginación client-side PAGE_SIZE=50. displayItems + refreshDisplay() + botón "Cargar más".
-- Bloque Codex generado — pendiente de ejecución por el usuario.
+- `StockView.java`: paginación client-side PAGE_SIZE=50. `displayItems` ObservableList + `refreshDisplay()`.
+  Botón "Cargar más (N de total)". Se oculta al filtrar. Se resetea al cambiar filtro o recargar.
+  `filteredItems` listener resetea `currentLimit` automáticamente en cada cambio.
+  `refreshDisplay()` llamado en create/edit/delete y `refresh()`.
+- mvn compile — BUILD SUCCESS.
 
-### Sprint 14.3 — Exportar receta Desktop a archivo ⏳ PENDIENTE Codex
+### Sprint 14.3 — Exportar receta Desktop a archivo ✅ COMPLETADO (Codex, commit 6ce1ba8)
 
-- `RecipeDetailView.java`: botón "💾 Exportar", método `exportToFile()`. FileChooser .txt, Files.writeString.
-- Bloque Codex generado — pendiente de ejecución por el usuario.
+- `RecipeDetailView.java`: botón "💾 Exportar" en action bar entre Copiar y Editar.
+  `exportToFile()`: FileChooser .txt + `Files.writeString` UTF-8. Feedback en `statusLabel`.
+  Imports: `java.nio.charset.StandardCharsets`, `java.nio.file.Files`.
+- mvn compile — BUILD SUCCESS.
