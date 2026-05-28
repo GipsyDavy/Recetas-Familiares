@@ -183,7 +183,7 @@ Orden recomendado por prioridad:
 
 1. **CRUD Stock Items Desktop** ✅ — StockFormDialog, create/update/delete en StockRepository, toolbar + columna "Min. stock" en StockView.
 2. **CRUD Stock Items Android** ✅ — FAB + StockForm (DatePickerDialog M3) + StockDetail + navegación inline, mutaciones en API/Repository/ViewModel.
-3. **Crear/Editar Receta Android** — RecipeListScreen tiene FAB sin accion. Implementar RecipeFormScreen composable.
-4. **SyncWorker Android push** — Actualmente solo hace PULL. Implementar pushPendingChanges() para subir cambios offline.
+3. **Crear/Editar Receta Android** ✅ — FAB + RecipeForm (SegmentedButton, filas dinámicas ing/pasos) + RecipeDetail con menú ⋮.
+4. **SyncWorker Android push** ✅ — Creates offline-resilient (syncVersion=0); pushThenPull() empuja pendientes en cada ciclo.
 
 Ver CONTINUAR.md para detalle exacto de archivos a tocar en cada tarea.

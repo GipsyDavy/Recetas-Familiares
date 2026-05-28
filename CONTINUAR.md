@@ -316,23 +316,19 @@ Archivos modificados (commit 9b4533a):
 
 Build: `gradle assembleDebug` — BUILD SUCCESSFUL.
 
-### Tarea 3 — Crear/Editar Receta desde Android (PRIORIDAD MEDIA)
+### Tarea 3 — Crear/Editar Receta desde Android ✅ COMPLETADA (2026-05-28)
 
-`RecipeListScreen` tiene FAB pero no navega a ningún formulario.
+Archivos modificados (commit 7253983): ApiDtos, RecetasApi, Repositories, AppContainer, RecetasViewModel, RecetasApp.
+RecipeList con FAB + navegación inline; RecipeDetail con menú ⋮; RecipeForm con SegmentedButton dificultad + filas dinámicas.
+Build SUCCESSFUL.
 
-Archivos a tocar:
-1. `RecetasApi.kt` — anadir POST/PUT/DELETE recipes
-2. `ApiDtos.kt` — `CreateRecipeRequestDto`, `UpdateRecipeRequestDto`
-3. `Repositories.kt` — expandir `RecipeRepository`
-4. `RecetasViewModel.kt` — anadir mutaciones
-5. `RecetasApp.kt` — nuevo composable `RecipeFormScreen`
+### Tarea 4 — SyncWorker Android push ✅ COMPLETADA (2026-05-28)
 
-Referencia de campos: ver `RecipeFormDialog.java` en Desktop.
-
-### Tarea 4 — SyncWorker Android push (PRIORIDAD MEDIA-BAJA)
-
-Actualmente solo hace PULL. Cambios offline nunca suben.
-En `SyncRepository.kt` Android: implementar `pushPendingChanges()`.
+Archivos modificados (commit 15079bc): Daos, Repositories, SyncWorker.
+- StockRepository.create() y FamilyNoteRepository.create() son ahora offline-resilient: si el API falla, guardan con syncVersion=0.
+- SyncRepository.pushThenPull() empuja pendientes (syncVersion=0) antes del pull.
+- SyncWorker llama a pushThenPull() en lugar de pullOnce().
+Build SUCCESSFUL.
 
 ---
 
