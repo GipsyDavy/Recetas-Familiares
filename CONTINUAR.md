@@ -658,13 +658,36 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
 
 ---
 
-## Sprint 13 — PENDIENTE
+## Sprint 13 — COMPLETADO (2026-05-28)
+
+### Sprint 13.1 — Compartir receta Android ✅ COMPLETADO (commit d6063b8)
+
+- `RecipeScreens.kt`: opción "Compartir" en DropdownMenu de RecipeDetail.
+- `shareRecipe()`: construye texto con 🍳 título, meta, 🥗 ingredientes y 👨‍🍳 pasos.
+  Lanza `Intent.ACTION_SEND` (text/plain) con `Intent.createChooser`.
+
+### Sprint 13.2 — Modo manos libres CookingScreen Android ✅ COMPLETADO (commit 8ba01b7)
+
+- `CookingScreen.kt`: `FocusRequester` + `focusable()` + `onKeyEvent` en Surface.
+  Volumen ↑ → siguiente paso (o finaliza si es el último).
+  Volumen ↓ → paso anterior.
+  El evento se consume (no cambia volumen del sistema).
+  Timer se detiene automáticamente al cambiar paso (via `remember(currentIndex)`).
+
+### Sprint 13.3 — Dashboard acciones rápidas Desktop ✅ COMPLETADO (commit 94bf99a)
+
+- `DashboardView.java`: constructor ampliado con `onNavigateStock` y `onNavigateNotes`.
+  Botones "Stock familiar" y "Notas familiares" en columna derecha.
+- `MainWindow.java`: pasa `() -> navigateTo("stock")` y `() -> navigateTo("notes")`.
+
+---
+
+## Sprint 14 — PENDIENTE
 
 Candidatos:
 
-1. **Exportar receta Android** — Intent de compartir texto/HTML con la receta.
-2. **Modo manos libres CookingScreen** — botones de volumen para avanzar pasos (Android).
-3. **Historial de menús** — ver semanas pasadas en WeeklyMenuView Desktop + Android.
-4. **Acceso rápido Dashboard** — tarjetas de acción rápida (nueva receta, añadir stock, nueva nota).
-5. **Paginación stock Desktop** — el endpoint actual devuelve array plano; valorar si el backend lo necesita.
-6. **Pull-to-refresh Desktop** — sincronización manual desde la UI.
+1. **Historial de menús Android** — navegación ← → semanas pasadas en la pantalla de menú (Desktop ya lo tiene desde Sprint 1).
+2. **Paginación stock Desktop** — el endpoint actual devuelve array plano; añadir `loadNextPage()` si el stock crece mucho.
+3. **Exportar receta Desktop a archivo** — guardar como .txt desde RecipeDetailView (FileChooser).
+4. **Compartir lista de la compra Android** — Intent.ACTION_SEND con los ítems pendientes.
+5. **Notificaciones caducidad stock Android mejoradas** — agrupar por urgencia (hoy / esta semana).
