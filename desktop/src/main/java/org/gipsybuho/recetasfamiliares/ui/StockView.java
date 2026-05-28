@@ -29,7 +29,7 @@ public class StockView extends VBox {
         header.getStyleClass().add("view-header");
 
         TableColumn<StockDtos.StockItemDto, String> nameCol = new TableColumn<>("Ingrediente");
-        nameCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().ingredientName()));
+        nameCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().name()));
         nameCol.setPrefWidth(240);
 
         TableColumn<StockDtos.StockItemDto, String> qtyCol = new TableColumn<>("Cantidad");

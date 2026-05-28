@@ -24,10 +24,11 @@ public final class RecipeDtos {
     public record RecipeIngredientDto(
             String id,
             String recipeId,
+            Integer position,
             String name,
-            String quantity,
+            Double quantity,
             String unit,
-            Integer sortOrder,
+            String note,
             String updatedAt,
             long syncVersion,
             boolean deleted
@@ -36,18 +37,19 @@ public final class RecipeDtos {
     public record RecipeStepDto(
             String id,
             String recipeId,
-            Integer stepNumber,
-            String description,
-            Integer durationMinutes,
+            Integer position,
+            String instruction,
+            Integer timerMinutes,
             String updatedAt,
             long syncVersion,
             boolean deleted
     ) {}
 
     public record RecipePageResponse(
-            List<RecipeDto> content,
-            int totalElements,
-            int totalPages,
-            int number
+            List<RecipeDto> items,
+            int page,
+            int size,
+            long totalItems,
+            int totalPages
     ) {}
 }

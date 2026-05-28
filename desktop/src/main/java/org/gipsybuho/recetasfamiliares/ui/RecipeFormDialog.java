@@ -95,7 +95,8 @@ public class RecipeFormDialog {
         ingredientRows.clear();
         ingredientsContainer.getChildren().clear();
         if (ingredients != null && !ingredients.isEmpty()) {
-            for (var ing : ingredients) addIngredientRow(ing.name(), ing.quantity(), ing.unit());
+            for (var ing : ingredients) addIngredientRow(ing.name(),
+                    ing.quantity() != null ? ing.quantity().toString() : "", ing.unit());
         } else {
             addIngredientRow(null, null, null);
         }
@@ -103,8 +104,8 @@ public class RecipeFormDialog {
         stepRows.clear();
         stepsContainer.getChildren().clear();
         if (steps != null && !steps.isEmpty()) {
-            for (var step : steps) addStepRow(step.description(),
-                    step.durationMinutes() != null ? step.durationMinutes().toString() : "");
+            for (var step : steps) addStepRow(step.instruction(),
+                    step.timerMinutes() != null ? step.timerMinutes().toString() : "");
         } else {
             addStepRow(null, null);
         }

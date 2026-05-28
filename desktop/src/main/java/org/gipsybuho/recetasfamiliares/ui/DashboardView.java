@@ -150,7 +150,7 @@ public class DashboardView extends ScrollPane {
         Thread.ofVirtual().start(() -> {
             try {
                 var page = context.getRecipeRepository().loadPage(0, 5);
-                List<RecipeDtos.RecipeDto> recent = page.content().stream()
+                List<RecipeDtos.RecipeDto> recent = page.items().stream()
                         .filter(r -> !r.deleted()).limit(5).toList();
                 Platform.runLater(() -> renderRecipeCards(recent));
             } catch (Exception ex) {
@@ -235,7 +235,7 @@ public class DashboardView extends ScrollPane {
             HBox row = new HBox(12);
             row.getStyleClass().add("stock-expiring-row");
 
-            Label name = new Label(item.ingredientName());
+            Label name = new Label(item.name());
             name.getStyleClass().add("stock-expiring-name");
             HBox.setHgrow(name, Priority.ALWAYS);
 

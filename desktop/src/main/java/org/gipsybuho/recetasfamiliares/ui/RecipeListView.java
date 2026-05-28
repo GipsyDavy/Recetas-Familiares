@@ -65,8 +65,8 @@ public class RecipeListView extends SplitPane {
                 var page = context.getRecipeRepository().loadPage(0, 100);
                 Platform.runLater(() -> {
                     context.getRecipeRepository().getCache().replaceAll(
-                            page.content().stream().filter(r -> !r.deleted()).toList());
-                    statusLabel.setText(page.totalElements() + " recetas");
+                            page.items().stream().filter(r -> !r.deleted()).toList());
+                    statusLabel.setText(page.totalItems() + " recetas");
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> statusLabel.setText("Error al cargar recetas."));

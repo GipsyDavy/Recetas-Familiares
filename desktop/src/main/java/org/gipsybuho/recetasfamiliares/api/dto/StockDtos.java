@@ -7,7 +7,7 @@ public final class StockDtos {
     public record StockItemDto(
             String id,
             String familyId,
-            String ingredientName,
+            String name,
             Double quantity,
             String unit,
             String expiresAt,

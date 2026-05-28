@@ -45,4 +45,8 @@ public class ShoppingListRepository {
                 + "/items/" + item.id();
         return api.put(path, req, SyncDtos.ShoppingDtos.ShoppingListItemDto.class);
     }
+
+    public void updateFromSync(List<SyncDtos.ShoppingDtos.ShoppingListDto> lists) {
+        // No cache in ShoppingListRepository yet.
+    }
 }

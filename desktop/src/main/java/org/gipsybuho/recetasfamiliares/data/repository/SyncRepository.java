@@ -13,13 +13,25 @@ public class SyncRepository {
     private final AppSession session;
     private final RecipeRepository recipeRepo;
     private final StockRepository stockRepo;
+    private final MenuRepository menuRepository;
+    private final ShoppingListRepository shoppingListRepository;
+    private final FavoriteRepository favoriteRepository;
+    private final NoteRepository noteRepository;
 
     public SyncRepository(ApiClient api, AppSession session,
-                          RecipeRepository recipeRepo, StockRepository stockRepo) {
+                          RecipeRepository recipeRepo, StockRepository stockRepo,
+                          MenuRepository menuRepository,
+                          ShoppingListRepository shoppingListRepository,
+                          FavoriteRepository favoriteRepository,
+                          NoteRepository noteRepository) {
         this.api = api;
         this.session = session;
         this.recipeRepo = recipeRepo;
         this.stockRepo = stockRepo;
+        this.menuRepository = menuRepository;
+        this.shoppingListRepository = shoppingListRepository;
+        this.favoriteRepository = favoriteRepository;
+        this.noteRepository = noteRepository;
     }
 
     /** Pull incremental changes from server and update in-memory caches. */
@@ -33,6 +45,11 @@ public class SyncRepository {
 
         recipeRepo.updateFromSync(response.recipes(), response.ingredients(), response.steps());
         stockRepo.updateFromSync(response.stockItems());
+        menuRepository.updateFromSync(response.menuItems());
+        shoppingListRepository.updateFromSync(response.shoppingLists());
+        favoriteRepository.getCache().replaceAll(response.favoriteRecipes() != null
+                ? response.favoriteRecipes().stream().filter(f -> !f.deleted()).toList()
+                : List.of());
         session.setLastSyncTime(response.serverTime());
     }
 

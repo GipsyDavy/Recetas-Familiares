@@ -83,20 +83,20 @@ interface RecetasApi {
         @Body request: UpdateShoppingListItemRequestDto
     ): ShoppingListItemDto
 
-    @POST("api/v1/families/{familyId}/family-notes")
+    @POST("api/v1/families/{familyId}/notes")
     suspend fun createNote(
         @Path("familyId") familyId: String,
         @Body request: CreateNoteRequestDto
     ): FamilyNoteDto
 
-    @PUT("api/v1/families/{familyId}/family-notes/{noteId}")
+    @PUT("api/v1/families/{familyId}/notes/{noteId}")
     suspend fun updateNote(
         @Path("familyId") familyId: String,
         @Path("noteId") noteId: String,
         @Body request: UpdateNoteRequestDto
     ): FamilyNoteDto
 
-    @DELETE("api/v1/families/{familyId}/family-notes/{noteId}")
+    @DELETE("api/v1/families/{familyId}/notes/{noteId}")
     suspend fun deleteNote(
         @Path("familyId") familyId: String,
         @Path("noteId") noteId: String

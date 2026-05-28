@@ -33,10 +33,11 @@ public final class AppContext {
         recipeRepository = new RecipeRepository(apiClient, session);
         stockRepository = new StockRepository(apiClient, session);
         menuRepository = new MenuRepository(apiClient, session);
-        syncRepository = new SyncRepository(apiClient, session, recipeRepository, stockRepository);
         shoppingListRepository = new ShoppingListRepository(apiClient, session);
         favoriteRepository = new FavoriteRepository(apiClient, session);
         noteRepository = new NoteRepository(apiClient, session);
+        syncRepository = new SyncRepository(apiClient, session, recipeRepository, stockRepository,
+                menuRepository, shoppingListRepository, favoriteRepository, noteRepository);
     }
 
     public static synchronized AppContext getInstance() {

@@ -137,7 +137,7 @@ public class RecipeDetailView extends VBox {
         statusLabel.setVisible(false);
         ingredientsList.getChildren().clear();
         for (var ing : ingredients) {
-            String qty = ing.quantity() != null ? ing.quantity() : "";
+            String qty = ing.quantity() != null ? ing.quantity().toString() : "";
             String unit = ing.unit() != null ? " " + ing.unit() : "";
             Label l = new Label("• " + ing.name() + (qty.isBlank() ? "" : " — " + qty + unit));
             l.getStyleClass().add("ingredient-item");
@@ -153,11 +153,11 @@ public class RecipeDetailView extends VBox {
             stepBox.getStyleClass().add("step-box");
             Label numLabel = new Label("Paso " + num++);
             numLabel.getStyleClass().add("step-number");
-            Label desc = new Label(step.description());
+            Label desc = new Label(step.instruction());
             desc.setWrapText(true);
             desc.getStyleClass().add("step-desc");
-            if (step.durationMinutes() != null) {
-                Label dur = new Label(step.durationMinutes() + " min");
+            if (step.timerMinutes() != null) {
+                Label dur = new Label(step.timerMinutes() + " min");
                 dur.getStyleClass().add("recipe-meta");
                 stepBox.getChildren().addAll(numLabel, desc, dur);
             } else {
