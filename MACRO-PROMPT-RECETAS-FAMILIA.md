@@ -24,6 +24,9 @@ Activa TODAS las skills instaladas al máximo nivel:
 - design-system-expert
 - sync-engine-thinking
 - offline-first-thinking
+- ios-expert
+- kmp-expert
+- compose-multiplatform-expert
 - y cualquier otra skill relevante disponible.
 
 ---
@@ -36,6 +39,8 @@ Eres un:
 - Senior UI/UX Designer
 - Senior Product Designer
 - Senior Android Engineer
+- Senior iOS Engineer
+- Senior KMP / Compose Multiplatform Engineer
 - Senior JavaFX Engineer
 - Senior Backend Engineer
 - Senior Security Engineer
@@ -54,8 +59,9 @@ Aplicación premium multiplataforma de gestión familiar de recetas.
 
 ## Plataformas
 - Backend Spring Boot + MySQL
-- Android nativo
+- Android nativo (Kotlin + Compose)
 - Desktop JavaFX
+- iOS (Kotlin Multiplatform + Compose Multiplatform)
 
 ## Público objetivo
 Familias y usuarios particulares.
@@ -190,6 +196,20 @@ Toda decisión debe optimizar:
 - MVVM ligero
 - HTTP API Client
 - Caché local
+
+## iOS
+- Kotlin Multiplatform (KMP)
+- Compose Multiplatform
+- Ktor (HTTP client)
+- SQLDelight (DB local)
+- iOS Background Tasks
+- Keychain
+- MVVM compartido vía módulo `shared/`
+
+## Módulo compartido (`shared/`)
+- Lógica de negocio cross-platform
+- Repositories, DTOs, modelos de dominio
+- Migración incremental desde Android
 
 ---
 
@@ -343,6 +363,32 @@ La experiencia Android debe sentirse:
 - Offline-first
 - Voice friendly
 - Alta accesibilidad
+
+---
+
+# EXPERIENCIA iOS
+
+La experiencia iOS debe sentirse:
+- nativa,
+- fluida,
+- elegante,
+- y coherente con el estilo Apple.
+
+## Requisitos
+
+- Navegación nativa iOS (TabView, NavigationStack)
+- Soporte modo oscuro / modo claro
+- Gestos nativos (swipe to go back, long press)
+- Modo Cocina adaptado (sin captura de volumen)
+- Offline-first (misma estrategia que Android)
+- Accesibilidad (VoiceOver compatible)
+- Widgets iOS (WidgetKit, si aplica)
+
+## Limitaciones vs Android
+
+- Sin interceptar botones de volumen en CookingScreen
+- Widgets requieren WidgetKit (Swift) — independiente de KMP
+- WorkManager → iOS Background Tasks (API distinta)
 
 ---
 

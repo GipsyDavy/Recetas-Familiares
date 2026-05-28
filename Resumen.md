@@ -1,5 +1,5 @@
 Resumen Descriptivo Completo - "Recetas Familia"
-"Recetas Familia" es una aplicacion premium multiplataforma disenada para ayudar a las familias a organizar, compartir y disfrutar de su cocina de forma moderna, emocional y eficiente.
+"Recetas Familia" es una aplicacion premium multiplataforma (Android, Desktop e iOS) disenada para ayudar a las familias a organizar, compartir y disfrutar de su cocina de forma moderna, emocional y eficiente.
 
 ## Proposito Principal
 
@@ -49,6 +49,14 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 - Acceso rapido desde la cocina.
 - Modo offline completo con sincronizacion cuando hay conexion.
 
+### iOS - Experiencia Movil Apple (EN DESARROLLO)
+
+- Kotlin Multiplatform + Compose Multiplatform.
+- Navegacion nativa iOS (TabView, NavigationStack).
+- Offline-first con SQLDelight y Ktor.
+- UI coherente con Android, adaptada a las convenciones iOS.
+- Carpeta `ios/` creada; implementacion pendiente de iniciar.
+
 ## Estilo Visual y UX
 
 - Estilo: Calido, moderno, premium y emocional (Notion + Material You + Apple Design).
@@ -61,7 +69,7 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 - Enfoque familiar real (no solo individual).
 - Historia y memoria emocional de las recetas.
 - Inteligencia practica (sugerencias segun stock, temporada, preferencias).
-- Experiencia coherente y sincronizada entre movil y escritorio.
+- Experiencia coherente y sincronizada entre movil (Android + iOS) y escritorio.
 - Privacidad y control total de los datos familiares.
 
 ---
@@ -157,6 +165,26 @@ Pantallas implementadas (Sprint 1-14):
 Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de la compra | Notas
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
+
+### iOS KMP + Compose Multiplatform (PENDIENTE DE INICIAR)
+
+Stack decidido:
+- Kotlin Multiplatform + Compose Multiplatform
+- Ktor (HTTP client, reemplaza Retrofit)
+- SQLDelight (DB local, reemplaza Room)
+- iOS Background Tasks (reemplaza WorkManager)
+- Keychain (reemplaza EncryptedSharedPreferences)
+
+Estado:
+- Carpeta `ios/` creada en la raiz del monorepo: SI
+- Modulo `shared/` KMP: pendiente de crear
+- Implementacion de pantallas: pendiente
+- Prioridad: siguiente fase tras Sprint 15
+
+Limitaciones documentadas:
+- Modo manos libres CookingScreen (botones volumen): solo Android
+- Widgets: WidgetKit iOS requiere Swift separado
+- Desktop JavaFX permanece independiente (no migra a KMP)
 
 ### Base de Datos MySQL
 

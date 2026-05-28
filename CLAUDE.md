@@ -25,8 +25,9 @@ Estas reglas deben respetar siempre:
 El proyecto es un ecosistema distribuido compuesto por:
 
 - Backend Spring Boot
-- Aplicación Android nativa
+- Aplicación Android nativa (Kotlin + Compose)
 - Aplicación Desktop JavaFX
+- Aplicación iOS (Kotlin Multiplatform + Compose Multiplatform)
 - Base de datos MySQL
 - Sincronización multiplataforma
 
@@ -95,6 +96,24 @@ El foco principal es:
 - MVVM ligero
 - Caché local
 
+## iOS
+
+- Kotlin Multiplatform (KMP)
+- Compose Multiplatform (UI compartida con Android donde sea posible)
+- Ktor (cliente HTTP cross-platform, reemplaza Retrofit en módulo compartido)
+- SQLDelight (base de datos local cross-platform, reemplaza Room)
+- iOS Background Tasks (reemplaza WorkManager)
+- Keychain (reemplaza EncryptedSharedPreferences)
+- MVVM compartido con Android vía módulo `shared/`
+
+## Módulo Compartido KMP (`shared/`)
+
+- Lógica de negocio (repositories, use cases, modelos de dominio)
+- DTOs de red compartidos
+- Clientes HTTP Ktor
+- Esquemas SQLDelight
+- Estrategia: extraer incrementalmente desde Android sin romper lo existente
+
 ## Base de Datos
 
 - MySQL como base principal.
@@ -106,8 +125,10 @@ El foco principal es:
 # ESTRUCTURA DEL PROYECTO
 
 - `backend/` → Backend Spring Boot
-- `android/` → Aplicación Android
+- `android/` → Aplicación Android (Kotlin + Compose)
 - `desktop/` → Aplicación JavaFX
+- `ios/` → Aplicación iOS (KMP + Compose Multiplatform)
+- `shared/` → Módulo KMP compartido Android + iOS (a crear)
 - `database/` → Scripts y migraciones
 - `docs/` → Documentación
 
@@ -222,7 +243,8 @@ Antes de modificar:
 validar impacto simultáneo en:
 - Backend,
 - Android,
-- Desktop.
+- Desktop,
+- iOS (cuando el módulo compartido esté activo).
 
 Nunca asumir que un cambio backend es transparente para Android o Desktop.
 
@@ -456,7 +478,43 @@ La IA debe ser:
 
 ---
 
-# 13. BACKEND
+# 13. iOS (KMP + COMPOSE MULTIPLATFORM)
+
+## Arquitectura
+
+- Kotlin Multiplatform + Compose Multiplatform
+- MVVM compartido con Android (módulo `shared/`)
+- SQLDelight para base de datos local
+- Ktor para red
+- iOS Background Tasks para sincronización periódica
+- Keychain para almacenamiento seguro de tokens
+
+## UX
+
+- Navegación nativa iOS (NavigationStack / TabView via Compose Multiplatform)
+- Soporte Dynamic Island / widgets iOS (WidgetKit, en Swift si necesario)
+- Gestos nativos iOS
+- Modo cocina adaptado a iOS
+- Offline-first (misma estrategia que Android)
+
+## Reglas
+
+- No duplicar lógica de negocio: extraer al módulo `shared/`.
+- Mantener Android y Desktop estables durante la construcción de iOS.
+- Migración incremental: un repositorio cada sprint, no big-bang.
+- Usar `expect/actual` para APIs platform-specific (Keychain, BackgroundTasks).
+- iOS no intercepta botones de volumen — el modo manos libres se adapta con gestos.
+- Android Widgets ≠ iOS Widgets: WidgetKit requiere código Swift separado.
+
+## Limitaciones conocidas (documentadas, no bloqueantes)
+
+- Botones de volumen en CookingScreen: solo funciona en Android.
+- Android Widgets (RecipeWidget, StockWidget): sin equivalente directo en KMP.
+- Desktop JavaFX no migra a KMP — permanece independiente.
+
+---
+
+# 14. BACKEND
 
 ## Arquitectura
 
@@ -474,7 +532,7 @@ La IA debe ser:
 
 ---
 
-# 14. SEGURIDAD
+# 15. SEGURIDAD
 
 Aplicar OWASP siempre que exista:
 - autenticación,

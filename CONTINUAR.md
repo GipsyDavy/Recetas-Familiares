@@ -27,7 +27,7 @@ Objetivo:
 - gestionar ingredientes, pasos y stock;
 - planificar menus;
 - generar listas de compra;
-- funcionar en Android y Desktop;
+- funcionar en Android, Desktop e iOS;
 - soportar sincronizacion offline-first;
 - mantener una experiencia calida, moderna, emocional y premium.
 
@@ -36,6 +36,7 @@ Plataformas objetivo:
 - Backend Spring Boot + MySQL;
 - Android nativo Kotlin + Compose;
 - Desktop JavaFX;
+- iOS Kotlin Multiplatform + Compose Multiplatform (en desarrollo);
 - sincronizacion cliente-servidor.
 
 ## Reglas obligatorias
@@ -60,7 +61,8 @@ Reglas tecnicas clave:
 - No hardcodear secretos de produccion.
 - Entidades sincronizables con `id`, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
 - Soft delete obligatorio.
-- Preparar Android/Desktop para sincronizacion offline.
+- Preparar Android/Desktop/iOS para sincronizacion offline.
+- iOS usa KMP + Compose Multiplatform (carpeta `ios/` ya creada en la raiz).
 
 ---
 
@@ -761,3 +763,41 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
 - `StockScreens.kt`: icono Sort en header de StockList. Toggle `sortByExpiry: Boolean`.
   Ordena por `expiresAt` ASC cuando activo (null al final como "9999-99-99").
   Icono coloreado (primary) cuando activo para indicar estado visual.
+
+---
+
+## iOS (KMP + Compose Multiplatform) — PENDIENTE DE INICIAR
+
+Carpeta `ios/` creada en la raiz del monorepo.
+
+### Decision tecnica
+
+- **Stack**: Kotlin Multiplatform (KMP) + Compose Multiplatform para la UI.
+- **Red**: Ktor (reemplaza Retrofit en modulo compartido).
+- **DB local**: SQLDelight (reemplaza Room; cross-platform Android + iOS).
+- **Auth storage**: Keychain (reemplaza EncryptedSharedPreferences).
+- **Background sync**: iOS Background Tasks (reemplaza WorkManager).
+- **UI**: Compose Multiplatform — reutiliza composables de Android donde sea posible.
+
+### Estrategia de migracion (incremental, no big-bang)
+
+1. Crear modulo `shared/` KMP en la raiz (Gradle KMP project).
+2. Mover repositories y logica de negocio de Android → `shared/`.
+3. Reemplazar Room por SQLDelight en `shared/` (Android sigue compilando con la capa KMP).
+4. Reemplazar Retrofit por Ktor en `shared/`.
+5. Construir la app iOS en `ios/` usando `shared/` + Compose Multiplatform.
+6. Android y Desktop no se tocan hasta que el modulo compartido este estable.
+
+### Limitaciones conocidas y aceptadas
+
+- Botones de volumen en CookingScreen: feature exclusiva Android, no portable a iOS.
+- Android Widgets (RecipeWidget, StockWidget): no hay equivalente KMP; iOS usaria WidgetKit en Swift si se implementa.
+- Desktop JavaFX: no migra a KMP, permanece independiente.
+- Compose Multiplatform iOS: beta avanzada (JetBrains), estable para MVP.
+
+### Estado actual
+
+- `ios/` carpeta creada: SI
+- Modulo `shared/` KMP: NO (pendiente crear)
+- Implementacion iOS: NO iniciada
+- Prioridad: despues de estabilizar Android + Desktop en Sprint 15
