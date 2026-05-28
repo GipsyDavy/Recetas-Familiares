@@ -305,16 +305,16 @@ Archivos modificados/creados:
 
 Compilación: `mvn compile` — EXITOSO.
 
-### Tarea 2 — CRUD Stock Items en Android (PRIORIDAD ALTA)
+### Tarea 2 — CRUD Stock Items en Android ✅ COMPLETADA (2026-05-28)
 
-`StockScreen` es solo lectura. Falta FAB crear + gesto editar/eliminar.
+Archivos modificados (commit 9b4533a):
+- `ApiDtos.kt`: CreateStockItemRequestDto, UpdateStockItemRequestDto
+- `RecetasApi.kt`: createStockItem(), updateStockItem(), deleteStockItem()
+- `Repositories.kt`: StockRepository expandido con create/update/delete + soft-delete Room
+- `RecetasViewModel.kt`: createStockItem(), updateStockItem(), deleteStockItem()
+- `RecetasApp.kt`: StockList con FAB + navegación inline (patrón NotesScreen) + StockDetail + StockForm (DatePickerDialog M3, sección avanzada colapsable)
 
-Archivos a tocar:
-1. `android/.../data/remote/dto/ApiDtos.kt` — anadir `CreateStockItemRequestDto`, `UpdateStockItemRequestDto`
-2. `android/.../data/remote/RecetasApi.kt` — anadir `@POST`, `@PUT`, `@DELETE` stock-items
-3. `android/.../data/repository/Repositories.kt` — expandir `StockRepository` con create/update/delete
-4. `android/.../ui/RecetasViewModel.kt` — anadir funciones de mutacion stock
-5. `android/.../ui/RecetasApp.kt` — FAB en `StockScreen`, composable `StockForm`
+Build: `gradle assembleDebug` — BUILD SUCCESSFUL.
 
 ### Tarea 3 — Crear/Editar Receta desde Android (PRIORIDAD MEDIA)
 

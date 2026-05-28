@@ -175,13 +175,14 @@ Fixes criticos en commit 5404a7b (no revertir):
 | 6 | 2026-05-28 | NotesView Desktop + NotesScreen Android (CRUD completo) |
 | fix | 2026-05-28 | 8 bugs contratos DTO Desktop + URLs endpoints (commit 5404a7b) |
 | 7.1 | 2026-05-28 | CRUD Stock Items Desktop: StockFormDialog + StockRepository create/update/delete + toolbar StockView |
+| 7.2 | 2026-05-28 | CRUD Stock Items Android: FAB + StockForm (DatePickerDialog) + StockDetail + navegación inline |
 
 ## Proximos Pasos — Sprint 7 (EN CURSO)
 
 Orden recomendado por prioridad:
 
 1. **CRUD Stock Items Desktop** ✅ — StockFormDialog, create/update/delete en StockRepository, toolbar + columna "Min. stock" en StockView.
-2. **CRUD Stock Items Android** — StockScreen solo es lectura. Anadir FAB + StockForm composable, metodos en RecetasApi + StockRepository + ViewModel.
+2. **CRUD Stock Items Android** ✅ — FAB + StockForm (DatePickerDialog M3) + StockDetail + navegación inline, mutaciones en API/Repository/ViewModel.
 3. **Crear/Editar Receta Android** — RecipeListScreen tiene FAB sin accion. Implementar RecipeFormScreen composable.
 4. **SyncWorker Android push** — Actualmente solo hace PULL. Implementar pushPendingChanges() para subir cambios offline.
 

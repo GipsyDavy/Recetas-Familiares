@@ -7,7 +7,6 @@ import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.FavoriteRecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.MenuItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecetasDatabase
-import org.gipsybuho.recetasfamiliares.data.local.RecipeDao
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
@@ -20,8 +19,14 @@ import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateStockItemRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceIngredientsRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceStepsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
@@ -57,17 +62,55 @@ class AuthRepository(
 
 class RecipeRepository(
     private val api: RecetasApi,
-    private val recipeDao: RecipeDao,
+    private val database: RecetasDatabase,
     private val sessionStore: SessionStore
 ) {
-    val recipes: Flow<List<RecipeEntity>> = recipeDao.observeRecipes()
+    val recipes: Flow<List<RecipeEntity>> = database.recipeDao().observeRecipes()
 
-    fun recipe(id: String): Flow<RecipeEntity?> = recipeDao.observeRecipe(id)
+    fun recipe(id: String): Flow<RecipeEntity?> = database.recipeDao().observeRecipe(id)
 
     suspend fun refresh() {
         val familyId = sessionStore.familyId ?: return
         val page = api.recipes(familyId)
-        recipeDao.upsertAll(page.items.map { it.toEntity() })
+        database.recipeDao().upsertAll(page.items.map { it.toEntity() })
+    }
+
+    suspend fun create(
+        title: String, description: String?, servings: Int?,
+        prepMinutes: Int?, cookMinutes: Int?, difficulty: String?,
+        ingredients: List<RecipeIngredientItemDto>, steps: List<RecipeStepItemDto>
+    ) {
+        val familyId = sessionStore.familyId ?: return
+        val dto = api.createRecipe(familyId, CreateRecipeRequestDto(title, description, servings, prepMinutes, cookMinutes, difficulty))
+        database.recipeDao().upsertAll(listOf(dto.toEntity()))
+        if (ingredients.isNotEmpty()) {
+            val ingDtos = api.replaceIngredients(familyId, dto.id, ReplaceIngredientsRequestDto(ingredients))
+            database.recipeIngredientDao().upsertAll(ingDtos.map { it.toEntity() })
+        }
+        if (steps.isNotEmpty()) {
+            val stepDtos = api.replaceSteps(familyId, dto.id, ReplaceStepsRequestDto(steps))
+            database.recipeStepDao().upsertAll(stepDtos.map { it.toEntity() })
+        }
+    }
+
+    suspend fun update(
+        recipe: RecipeEntity, title: String, description: String?, servings: Int?,
+        prepMinutes: Int?, cookMinutes: Int?, difficulty: String?,
+        ingredients: List<RecipeIngredientItemDto>, steps: List<RecipeStepItemDto>
+    ) {
+        val familyId = sessionStore.familyId ?: return
+        val dto = api.updateRecipe(familyId, recipe.id, UpdateRecipeRequestDto(title, description, servings, prepMinutes, cookMinutes, difficulty))
+        database.recipeDao().upsertAll(listOf(dto.toEntity()))
+        val ingDtos = api.replaceIngredients(familyId, recipe.id, ReplaceIngredientsRequestDto(ingredients))
+        database.recipeIngredientDao().upsertAll(ingDtos.map { it.toEntity() })
+        val stepDtos = api.replaceSteps(familyId, recipe.id, ReplaceStepsRequestDto(steps))
+        database.recipeStepDao().upsertAll(stepDtos.map { it.toEntity() })
+    }
+
+    suspend fun delete(recipe: RecipeEntity) {
+        val familyId = sessionStore.familyId ?: return
+        api.deleteRecipe(familyId, recipe.id)
+        database.recipeDao().upsertAll(listOf(recipe.copy(deleted = true)))
     }
 }
 

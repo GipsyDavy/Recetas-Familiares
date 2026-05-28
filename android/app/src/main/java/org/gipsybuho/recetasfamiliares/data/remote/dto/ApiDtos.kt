@@ -212,6 +212,30 @@ data class CreateRecipeRequestDto(
     val difficulty: String?
 )
 
+data class UpdateRecipeRequestDto(
+    val title: String,
+    val description: String?,
+    val servings: Int?,
+    val prepMinutes: Int?,
+    val cookMinutes: Int?,
+    val difficulty: String?
+)
+
+data class RecipeIngredientItemDto(
+    val name: String,
+    val quantity: Double?,
+    val unit: String?,
+    val note: String?
+)
+
+data class RecipeStepItemDto(
+    val instruction: String,
+    val timerMinutes: Int?
+)
+
+data class ReplaceIngredientsRequestDto(val items: List<RecipeIngredientItemDto>)
+data class ReplaceStepsRequestDto(val items: List<RecipeStepItemDto>)
+
 data class CreateNoteRequestDto(
     val title: String,
     val body: String,

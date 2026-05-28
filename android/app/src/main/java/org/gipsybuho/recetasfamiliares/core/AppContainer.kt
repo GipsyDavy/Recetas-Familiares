@@ -57,7 +57,7 @@ class AppContainer(context: Context) {
         .create(RecetasApi::class.java)
 
     val authRepository = AuthRepository(api, sessionStore)
-    val recipeRepository = RecipeRepository(api, database.recipeDao(), sessionStore)
+    val recipeRepository = RecipeRepository(api, database, sessionStore)
     val stockRepository = StockRepository(api, database.stockDao(), sessionStore)
     val syncRepository = SyncRepository(api, database, sessionStore)
     val shoppingListRepository = ShoppingListRepository(api, database, sessionStore)

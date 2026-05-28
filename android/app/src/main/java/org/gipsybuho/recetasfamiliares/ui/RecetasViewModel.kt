@@ -18,6 +18,8 @@ import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
@@ -101,6 +103,38 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     val notes: StateFlow<List<FamilyNoteEntity>> = container.familyNoteRepository.notes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun createRecipe(
+        title: String, description: String?, servings: Int?,
+        prepMinutes: Int?, cookMinutes: Int?, difficulty: String?,
+        ingredients: List<RecipeIngredientItemDto>, steps: List<RecipeStepItemDto>,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                container.recipeRepository.create(title, description, servings, prepMinutes, cookMinutes, difficulty, ingredients, steps)
+            }.onFailure { onError(it.message ?: "Error al crear receta") }
+        }
+    }
+
+    fun updateRecipe(
+        recipe: RecipeEntity, title: String, description: String?, servings: Int?,
+        prepMinutes: Int?, cookMinutes: Int?, difficulty: String?,
+        ingredients: List<RecipeIngredientItemDto>, steps: List<RecipeStepItemDto>,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                container.recipeRepository.update(recipe, title, description, servings, prepMinutes, cookMinutes, difficulty, ingredients, steps)
+            }.onFailure { onError(it.message ?: "Error al actualizar receta") }
+        }
+    }
+
+    fun deleteRecipe(recipe: RecipeEntity) {
+        viewModelScope.launch {
+            runCatching { container.recipeRepository.delete(recipe) }
+        }
+    }
 
     fun createStockItem(
         name: String, quantity: Double?, unit: String?,
