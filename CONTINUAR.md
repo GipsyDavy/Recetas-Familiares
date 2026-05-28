@@ -189,7 +189,7 @@ Migraciones Flyway V1-V9 (tablas: users, families, family_members, recipes, ingr
 
 ---
 
-## Android Kotlin + Compose — SPRINT 9 COMPLETO (2026-05-28)
+## Android Kotlin + Compose — SPRINT 11 COMPLETO (2026-05-28)
 
 Stack:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -217,16 +217,19 @@ Stack:
 - `RecetasViewModel`: StateFlows para recipes, stock, shoppingItems, favorites, notes
 - `AppContainer`: contiene todos los repositories incluyendo `familyNoteRepository`
 
-### Pantallas implementadas (Sprint 1-9)
+### Pantallas implementadas (Sprint 1-11)
 - `LoginScreen`
-- `RecipeListScreen` (paginación, búsqueda, pull-to-refresh, FAB) + `RecipeDetailScreen` (fotos carrusel, valoraciones, menú ⋮)
+- `TopAppBar` con búsqueda global unificada → `GlobalSearchScreen` (Recetas/Stock/Notas)
+- `RecipeListScreen` (paginación, búsqueda, pull-to-refresh, FAB) + `RecipeDetailScreen` (fotos, valoraciones, menú ⋮)
 - `RecipeForm` (SegmentedButton dificultad, filas dinámicas ingredientes/pasos)
 - `CookingScreen` (paso a paso, temporizador countdown, keep screen on)
 - `StockScreen` (CRUD completo, notificaciones caducidad WorkManager, búsqueda)
-- `ShoppingListScreen`
+- `ShoppingListScreen` (check offline-resilient)
 - `NotesScreen` (CRUD completo, búsqueda, empty states)
 - Bottom Navigation: 4 tabs — RECIPES, STOCK, SHOPPING, NOTES
-- Snackbar feedback global; SyncWorker pushThenPull offline-resilient
+- Snackbar feedback global
+- SyncWorker pushThenPull: Recetas + Ingredientes + Pasos + Stock + Notas + Shopping items
+- Widgets: `RecipeWidget` (receta del día, 4×2) + `StockWidget` (ítems críticos, 2×2)
 
 ### RecetasApi.kt — endpoints implementados
 - login, families
@@ -243,23 +246,24 @@ Build: `gradle assembleDebug` desde `android/` — EXITOSO
 
 ---
 
-## Desktop JavaFX — SPRINT 9 + AUDITORÍA COMPLETA (2026-05-28)
+## Desktop JavaFX — SPRINT 11 COMPLETO (2026-05-28)
 
 Stack: Java 21 + JavaFX 21.0.2 + OkHttp 4.12.0 + Gson 2.10.1 + Maven.
 
 Fat JAR: 13.3 MB. SSL fix: `desktop/.mvn/jvm.config` con Windows-ROOT truststore.
 
-### Pantallas implementadas (Sprint 1-9)
+### Pantallas implementadas (Sprint 1-11)
 - `LoginView`
 - `DashboardView` — GridPane 2 columnas: recetas recientes + stock expirando + acciones
-- `RecipeListView` — SplitPane filtrable, búsqueda, contador "Mostrando X de Y"
-- `RecipeDetailView` — ingredientes, pasos, fotos async ScrollPane, Editar + Eliminar + Modo Cocina
+- `RecipeListView` — SplitPane filtrable, búsqueda, paginación 30/pág + "Cargar más", botón "Actualizar"
+- `RecipeDetailView` — ingredientes, pasos, fotos async, Editar + Eliminar + Modo Cocina
 - `RecipeFormDialog` — modal `forCreate()` / `forEdit()`
-- `CookingView` — Stage maximizado, paso a paso, temporizador JavaFX Timeline, pantalla "¡Buen provecho!"
-- `StockView` — TableView con toolbar CRUD completo, columna "Mín. stock", empty state
-- `WeeklyMenuView` — calendario 8x5, nav semanas, CRUD assign/remove
-- `ShoppingListView` — empty state ilustrado
-- `NotesView` — SplitPane lista + editor inline, CRUD completo, NoteCell con 📌, empty state
+- `CookingView` — Stage maximizado, paso a paso, temporizador JavaFX Timeline
+- `StockView` — TableView CRUD, búsqueda, columna "Mín. stock", botón "Actualizar"
+- `WeeklyMenuView` — calendario 8x5, nav semanas, CRUD assign/remove, botón "Actualizar"
+- `ShoppingListView` — dialog de items con check, botón "Actualizar" → sync completo
+- `NotesView` — SplitPane lista + editor inline, búsqueda FilteredList, botón "Actualizar"
+- `GlobalSearchView` — resultados agrupados Recetas/Stock/Notas desde sidebar (Sprint 10.2)
 
 ### Sidebar completa
 Inicio | Recetas | Stock | Menú semanal | Lista de la compra | Notas familiares | [Sincronizar] [Cerrar sesión]
@@ -572,23 +576,59 @@ RecipeListScreen con carga incremental. PageResponse<T> ya soportado en el backe
 
 Rama: `main` — limpio, pusheado a origin.
 
-Commits Sprint 10:
+Commits Sprint 11:
 ```
-b97c0cd refactor: Sprint 10.4 — Design tokens + extracción composables RecetasApp.kt  ← HEAD
-1b9292b feat: Sprint 10.3 — CRUD offline-resilient recetas Android
-e91420a feat: Sprint 10.2 — Búsqueda global Desktop (recetas, stock, notas)
-4eab106 feat: Sprint 10.1 — Widgets Android (Receta del día + Stock crítico)
+624f900 feat: Sprint 11.4 — Paginación recetas Desktop (RecipeListView)  ← HEAD
+663f973 feat: Sprint 11.3 — Offline-resilient lista de la compra Android
+0bc5b46 feat: Sprint 11.2 — Pull-to-refresh Desktop en todas las vistas
+3850bd9 feat: Sprint 11.1 — Búsqueda global Android
 ```
 
 ---
 
-## Sprint 11 — PENDIENTE
+## Sprint 11 — COMPLETADO (2026-05-28)
 
-Candidatos para el próximo sprint:
+### Sprint 11.1 — Búsqueda global Android ✅ COMPLETADO (commit 3850bd9)
 
-1. **Búsqueda global Android** — barra de búsqueda unificada entre tabs (recetas + stock + notas).
-2. **Pull-to-refresh Desktop** — botón/gesto de sincronización manual en todas las vistas.
-3. **Modo offline-resilient shopping** — alinear lista de la compra con patrón de offline de recetas/stock.
-4. **Paginación Desktop recetas** — RecipeListView carga todas las recetas de una vez; aplicar paginación.
-5. **Notificaciones caducidad Desktop** — equivalent al WorkManager Android para alertas de stock.
+- `MainShell`: `TopAppBar` con ícono de búsqueda. Al activar → `OutlinedTextField` en el top bar.
+  Con ≥2 chars → `GlobalSearchScreen` reemplaza el contenido del tab activo.
+  Al tocar resultado → navega al tab correspondiente y cierra búsqueda.
+- `GlobalSearchScreen` (nuevo): resultados agrupados Recetas / Stock / Notas.
+  Filtro local sobre StateFlows — sin llamada de red.
+- `MainTab`: `private` → `internal` para ser accesible desde el nuevo fichero.
+
+### Sprint 11.2 — Pull-to-refresh Desktop ✅ COMPLETADO (commit 0bc5b46)
+
+- Patrón consistente: `Runnable onSync` en todas las vistas; "Actualizar" dispara `triggerSync()` completo.
+- `RecipeListView`: constructor(onSync) + botón "Actualizar" añadido.
+- `StockView`: constructor(onSync) + botón "Actualizar" en toolbar.
+- `WeeklyMenuView`: constructor(onSync) + botón "Actualizar" en navBar.
+- `NotesView` + `ShoppingListView`: constructor(onSync); botones existentes conectados a onSync.
+- `MainWindow.showMain()`: pasa `this::triggerSync` a las 5 vistas.
+
+### Sprint 11.3 — Offline-resilient lista de la compra Android ✅ COMPLETADO (commit 663f973)
+
+- `ShoppingListRepository.checkItem()`: try/catch → fallback local `item.copy(checked=checked, syncVersion=0L)`.
+- `SyncRepository.pushThenPull()`: incluye `shoppingListItems` pendientes vía `SyncShoppingListItemPushItemDto`.
+- `Daos.kt`: `ShoppingListItemDao.findPendingCheck()` — `WHERE syncVersion=0 AND deleted=0`.
+
+### Sprint 11.4 — Paginación recetas Desktop ✅ COMPLETADO (commit 624f900)
+
+- `RecipeListView`: `PAGE_SIZE=30` (antes 100), campos `currentPage` + `hasMore`.
+- `refresh()`: carga página 0, determina `hasMore = totalPages > 1`.
+- `loadNextPage()`: append incremental al cache (no replace); botón deshabilitado mientras carga.
+- `updateLoadMoreBtn()`: muestra "Cargar más (página N de …)" sólo sin filtro activo.
+- `filterList()`: oculta botón "Cargar más" cuando hay búsqueda activa.
+
+---
+
+## Sprint 12 — PENDIENTE
+
+Candidatos:
+
+1. **Notificaciones caducidad Desktop** — equivalente al WorkManager Android; alerta de stock próximo a caducar.
+2. **Offline-resilient favoritos** — `toggleFavorite()` con fallback local (patrón stock/notas).
+3. **Paginación notas/stock Desktop** — las vistas cargan todo de una vez; añadir carga incremental.
+4. **Modo manos libres CookingScreen Android** — control por gestos/volumen para avanzar pasos.
+5. **Exportar/compartir receta** — generar texto o PDF de una receta para compartir fuera de la app.
 6. **Pull-to-refresh Desktop** — sincronización manual desde la UI.
