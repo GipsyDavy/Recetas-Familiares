@@ -3,6 +3,7 @@ package org.gipsybuho.recetasfamiliares.ui;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
@@ -41,7 +42,11 @@ public class ShoppingListView extends VBox {
         toolbar.setPadding(new Insets(8, 0, 16, 0));
 
         listView.getStyleClass().add("shopping-list");
-        listView.setPlaceholder(new Label("Sin listas — sincroniza para cargar"));
+        listView.setPlaceholder(buildEmptyState(
+                "🛒",
+                "Sin listas de la compra",
+                "Las listas se generan desde el menú semanal o se crean en el servidor"
+        ));
         listView.setCellFactory(lv -> new ShoppingListCell());
         listView.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
@@ -168,6 +173,25 @@ public class ShoppingListView extends VBox {
         if (item.unit() != null && !item.unit().isBlank()) sb.append(" ").append(item.unit());
         if (item.note() != null && !item.note().isBlank()) sb.append(" (").append(item.note()).append(")");
         return sb.toString();
+    }
+
+    private Node buildEmptyState(String emoji, String title, String subtitle) {
+        Label emojiLabel = new Label(emoji);
+        emojiLabel.setStyle("-fx-font-size: 48px;");
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #3D2B1F;");
+
+        Label subtitleLabel = new Label(subtitle);
+        subtitleLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #8B6F5E; -fx-text-alignment: center;");
+        subtitleLabel.setWrapText(true);
+        subtitleLabel.setMaxWidth(320);
+        subtitleLabel.setAlignment(Pos.CENTER);
+
+        VBox box = new VBox(12, emojiLabel, titleLabel, subtitleLabel);
+        box.setAlignment(Pos.CENTER);
+        box.setPadding(new Insets(40));
+        return box;
     }
 
     // ── Cell ───────────────────────────────────────────────────────────────────

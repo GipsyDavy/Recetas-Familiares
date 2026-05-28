@@ -412,14 +412,34 @@ mvn compile: BUILD SUCCESS.
 
 ---
 
+### Sprint 8.5 — Empty states ilustrados ✅ COMPLETADO (2026-05-28)
+
+**Android** (commit 20d5ac0):
+- EmptyStateView composable: icono 72dp + titulo + subtitulo + CTA opcional.
+- RecipeList, StockList, ShoppingListScreen, ShoppingListDetail, NotesScreen mejorados.
+- Busqueda sin resultados mantiene texto simple.
+
+**Desktop** (Codex):
+- NotesView.java, StockView.java, ShoppingListView.java: VBox centrado con emoji 48px,
+  titulo bold y subtitulo en colores del proyecto (#3D2B1F, #8B6F5E).
+- mvn compile: BUILD SUCCESS.
+
+### Sprint 8.6 — CRUD Update/Delete offline resilient Android ✅ COMPLETADO (2026-05-28)
+
+Archivos modificados (commit 20d5ac0):
+- Daos.kt: findPendingDelete() en StockDao y FamilyNoteDao (syncVersion=0 AND deleted=1).
+- Repositories.kt: StockRepository.update/delete y FamilyNoteRepository.update/delete
+  con try/catch; fallo -> upsert local con syncVersion=0 (y deleted=true para delete).
+  SyncRepository.pushThenPull() incluye pendingStockDelete y pendingNoteDelete en el batch.
+
+---
+
 ## Sprint 8 — PENDIENTE
 
-### Candidatos restantes (orden recomendado)
-- **Fotos de receta** — subida y visualizacion de fotos (Android + Desktop).
-- **Empty states ilustrados** — ilustraciones con CTA en pantallas vacias.
-- **CRUD Update/Delete offline Android** — solo Create es offline-resilient actualmente.
+### Candidatos restantes
+- **Fotos de receta** — subida y visualizacion de fotos (Android + Desktop). Complejo: requiere almacenamiento de ficheros en backend.
 - **Paginacion de recetas** — RecipeList Android carga todas las recetas sin paginar.
-- **Push git al remoto** — rama main tiene 9 commits sin pushear.
+- **Push git al remoto** — rama main tiene 11 commits sin pushear.
 
 ---
 

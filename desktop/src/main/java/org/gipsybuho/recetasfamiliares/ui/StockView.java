@@ -3,6 +3,8 @@ package org.gipsybuho.recetasfamiliares.ui;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
@@ -64,6 +66,11 @@ public class StockView extends VBox {
         table.setItems(context.getStockRepository().getCache().getItems());
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.getStyleClass().add("stock-table");
+        table.setPlaceholder(buildEmptyState(
+                "🥫",
+                "Stock vacío",
+                "Registra ingredientes de casa para controlar caducidades y bajo stock"
+        ));
         VBox.setVgrow(table, Priority.ALWAYS);
 
         statusLabel.getStyleClass().add("status-label");
@@ -145,6 +152,25 @@ public class StockView extends VBox {
                 });
             }
         });
+    }
+
+    private Node buildEmptyState(String emoji, String title, String subtitle) {
+        Label emojiLabel = new Label(emoji);
+        emojiLabel.setStyle("-fx-font-size: 48px;");
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #3D2B1F;");
+
+        Label subtitleLabel = new Label(subtitle);
+        subtitleLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #8B6F5E; -fx-text-alignment: center;");
+        subtitleLabel.setWrapText(true);
+        subtitleLabel.setMaxWidth(320);
+        subtitleLabel.setAlignment(Pos.CENTER);
+
+        VBox box = new VBox(12, emojiLabel, titleLabel, subtitleLabel);
+        box.setAlignment(Pos.CENTER);
+        box.setPadding(new Insets(40));
+        return box;
     }
 
     public void refresh() {

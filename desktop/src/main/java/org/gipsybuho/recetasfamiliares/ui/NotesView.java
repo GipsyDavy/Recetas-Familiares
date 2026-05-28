@@ -4,6 +4,7 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
@@ -57,7 +58,11 @@ public class NotesView extends VBox {
         // ── List (left) ───────────────────────────────────────────────────────
 
         listView.getStyleClass().add("notes-list");
-        listView.setPlaceholder(new Label("Sin notas — crea la primera"));
+        listView.setPlaceholder(buildEmptyState(
+                "📝",
+                "Sin notas familiares",
+                "Escribe recuerdos, anécdotas y secretos culinarios de vuestra familia"
+        ));
         listView.setCellFactory(lv -> new NoteCell());
         listView.getSelectionModel().selectedItemProperty().addListener((obs, old, sel) -> {
             if (sel != null) loadForEdit(sel);
@@ -239,6 +244,25 @@ public class NotesView extends VBox {
                 });
             }
         });
+    }
+
+    private Node buildEmptyState(String emoji, String title, String subtitle) {
+        Label emojiLabel = new Label(emoji);
+        emojiLabel.setStyle("-fx-font-size: 48px;");
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #3D2B1F;");
+
+        Label subtitleLabel = new Label(subtitle);
+        subtitleLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #8B6F5E; -fx-text-alignment: center;");
+        subtitleLabel.setWrapText(true);
+        subtitleLabel.setMaxWidth(320);
+        subtitleLabel.setAlignment(Pos.CENTER);
+
+        VBox box = new VBox(12, emojiLabel, titleLabel, subtitleLabel);
+        box.setAlignment(Pos.CENTER);
+        box.setPadding(new Insets(40));
+        return box;
     }
 
     // ── Cell ───────────────────────────────────────────────────────────────────
