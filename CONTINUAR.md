@@ -74,8 +74,8 @@ Reglas tecnicas clave:
 
 ### Gradle (Android)
 - Instalacion global: `C:\tmp\tools\gradle-9.5.1\bin\gradle.bat`
-- **No hay gradlew en el proyecto** — usar gradle global
-- Compilar APK: ejecutar `gradle assembleDebug` desde `android/`
+- `gradlew` disponible en `android/` (añadido Sprint 14, commit d79e89a) — el IDE lo usa
+- Compilar APK: `./gradlew assembleDebug` (o `gradle assembleDebug` global) desde `android/`
 
 ### Maven (Desktop + Backend)
 - Disponible en PATH: `C:\Program Files\Apache NetBeans\java\maven\bin`
@@ -191,7 +191,7 @@ Migraciones Flyway V1-V9 (tablas: users, families, family_members, recipes, ingr
 
 ---
 
-## Android Kotlin + Compose — SPRINT 12 COMPLETO (2026-05-28)
+## Android Kotlin + Compose — SPRINT UI COMPLETO (2026-05-29)
 
 Stack:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -219,23 +219,27 @@ Stack:
 - `RecetasViewModel`: StateFlows para recipes, stock, shoppingItems, favorites, notes
 - `AppContainer`: contiene todos los repositories incluyendo `familyNoteRepository`
 
-### Pantallas implementadas (Sprint 1-11)
-- `LoginScreen`
+### Pantallas implementadas (Sprint 1-16 + UI sprint)
+- **`LoginScreen`** — ícono brand circular, tipografía centrada, botón "Entrar →"
 - `TopAppBar` con búsqueda global unificada → `GlobalSearchScreen` (Recetas/Stock/Notas)
-- `RecipeListScreen` (paginación, búsqueda, pull-to-refresh, FAB) + `RecipeDetailScreen` (fotos, valoraciones, menú ⋮)
+- **`RecipeListScreen`** — tarjetas visuales con gradiente + placeholder icon + chips (⏱ tiempo, dificultad, porciones); paginación; búsqueda; FilterChips dificultad; pull-to-refresh; FAB "+"
+- **`RecipeDetailScreen`** — `←` IconButton back; ❤️ favorito; ⋮ menú (Compartir, Modo Cocina, Editar, Eliminar); fotos carrusel; valoraciones; ExtendedFAB "▶ Cocinar"
 - `RecipeForm` (SegmentedButton dificultad, filas dinámicas ingredientes/pasos)
-- `CookingScreen` (paso a paso, temporizador countdown, keep screen on)
-- `StockScreen` (CRUD completo, notificaciones caducidad WorkManager, búsqueda)
-- `ShoppingListScreen` (check offline-resilient)
-- `NotesScreen` (CRUD completo, búsqueda, empty states)
-- Bottom Navigation: 4 tabs — RECIPES, STOCK, SHOPPING, NOTES
-- Snackbar feedback global
-- **SyncWorker pushThenPull: 7 tipos** — Recetas + Ingredientes + Pasos + Stock + Shopping items + Favoritos + Notas
-- Widgets: `RecipeWidget` (receta del día, 4×2) + `StockWidget` (ítems críticos, 2×2)
+- `CookingScreen` (paso a paso, temporizador countdown, keep screen on, **volumen ↑↓ cambia paso**)
+- **`StockScreen`** — Sort toggle caducidad, FAB crear, CRUD inline; `StockDetail` con `←` IconButton + ✏ Editar / 🗑 Eliminar con ícono
+- **`ShoppingListScreen`** — `←` IconButton back; check offline-resilient; tachado en ítems marcados; botón "Compartir"
+- **`NotesScreen`** — `←` IconButton back; `+` IconButton crear; `NoteDetail` con ✏ Editar / 🗑 Eliminar con ícono; CRUD completo; búsqueda; empty states
+- `GlobalSearchScreen` (resultados agrupados entre tabs)
+- **`MenuScreen`** — 5º tab; nav ← → semanas; CRUD assign/remove; tap comida → "Ver receta" / "Eliminar"
+- `Widgets`: `RecipeWidget` (receta del día, 4×2) + `StockWidget` (ítems críticos, 2×2)
+- Bottom Navigation: **5 tabs** (RECIPES, STOCK, SHOPPING, NOTES, MENU)
+- Snackbar feedback en todas las mutaciones
+- **SyncWorker pushThenPull: 7 tipos**
+- **Notificaciones caducidad**: HOY (PRIORITY_HIGH, ID 1001) + esta semana (PRIORITY_DEFAULT, ID 1002)
 
 ### RecetasApi.kt — endpoints implementados
 - login, families
-- recipes (list paginado, detail, create, update, delete)
+- recipes (list paginado, detail, create, update, delete) + ingredientes + pasos
 - stockItems (list, create, update, delete)
 - photos (list, upload multipart, delete)
 - ratings (create, update, delete, list)
@@ -243,66 +247,51 @@ Stack:
 - addFavorite, removeFavorite
 - updateShoppingListItem
 - createNote, updateNote, deleteNote (rutas: `/notes`)
+- **assignMenuItem, removeMenuItem** (menú semanal, Sprint 15.1)
 
-Build: `gradle assembleDebug` desde `android/` — EXITOSO
+Build: `./gradlew assembleDebug` desde `android/` — BUILD SUCCESSFUL
 
 ---
 
-## Desktop JavaFX — SPRINT 12 COMPLETO (2026-05-28)
+## Desktop JavaFX — SPRINT 15 COMPLETO (2026-05-29)
 
 Stack: Java 21 + JavaFX 21.0.2 + OkHttp 4.12.0 + Gson 2.10.1 + Maven.
 
 Fat JAR: 13.3 MB. SSL fix: `desktop/.mvn/jvm.config` con Windows-ROOT truststore.
 
-### Pantallas implementadas (Sprint 1-11)
+### Pantallas implementadas (Sprint 1-15)
 - `LoginView`
-- `DashboardView` — GridPane 2 columnas: recetas recientes + stock expirando + acciones
+- `DashboardView` — GridPane 2 columnas: recetas recientes + stock expirando + acciones rápidas (Stock / Notas)
 - `RecipeListView` — SplitPane filtrable, búsqueda, paginación 30/pág + "Cargar más", botón "Actualizar"
-- `RecipeDetailView` — ingredientes, pasos, fotos async, Editar + Eliminar + Modo Cocina + **"📋 Copiar"**
+- `RecipeDetailView` — ingredientes, pasos, fotos async, Editar, Eliminar, Modo Cocina, **"📋 Copiar"**, **"💾 Exportar" → .txt**
 - `RecipeFormDialog` — modal `forCreate()` / `forEdit()`
 - `CookingView` — Stage maximizado, paso a paso, temporizador JavaFX Timeline
-- `StockView` — TableView CRUD, búsqueda, columna "Mín. stock", botón "Actualizar"
+- `StockView` — TableView CRUD, búsqueda, paginación client-side PAGE_SIZE=50, "Cargar más", botón "Actualizar"
 - `WeeklyMenuView` — calendario 8x5, nav semanas, CRUD assign/remove, botón "Actualizar"
-- `ShoppingListView` — dialog de items con check, botón "Actualizar" → sync completo
+- `ShoppingListView` — ítems con check, **"💾 Exportar" → .txt**, botón "Actualizar"
 - `NotesView` — SplitPane lista + editor inline, búsqueda, paginación 30/pág, botón "Actualizar"
 - `GlobalSearchView` — resultados agrupados Recetas/Stock/Notas desde sidebar
 - `ExpiryNotificationService` — toast bottom-right tras sync si stock ≤3 días caducidad
 
 ### Sidebar completa
-Inicio | Recetas | Stock | Menú semanal | Lista de la compra | Notas familiares | [Sincronizar] [Cerrar sesión]
+Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de la compra | Notas familiares
 
-### AppContext — dependencias completas
-```java
-syncRepository = new SyncRepository(apiClient, session,
-    recipeRepository, stockRepository, menuRepository,
-    shoppingListRepository, favoriteRepository, noteRepository);
-```
-
-### Fixes criticos aplicados en commit 5404a7b (no revertir)
-- `StockDtos.java`: campo `name` (NO `ingredientName`)
-- `RecipeDtos.java`: `quantity` Double, `position`, `note` en ingredientes; `instruction`/`timerMinutes` en pasos; `RecipePageResponse` usa `items`/`totalItems`/`totalPages`
-- `StockRepository.java`: endpoint `/stock-items` (NO `/stock`)
-- `NoteRepository.java`: endpoint `/notes` (NO `/family-notes`)
-- `SyncRepository.java`: actualiza cache de menu, shopping, favorites (antes solo recipes+stock)
-- `ShoppingListRepository.java`: metodo `updateFromSync()` anadido
-- DashboardView, StockView, RecipeDetailView, RecipeListView, RecipeFormDialog: referencias actualizadas
-
-mvn compile — EXITOSO
+mvn compile — BUILD SUCCESS. Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
 ---
 
-## Estado Git (2026-05-28)
+## Estado Git (2026-05-29)
 
-Rama: `main` — limpio, sin cambios pendientes. Pusheado a origin.
+Rama: `main`. HEAD limpio en el último commit documentado.
 
 Commits recientes:
 ```
-b22fdaf fix: Auditoría Fase 6 — Authorization POST + timeouts OkHttp Desktop y Android  ← HEAD
-58bcf2a fix: Auditoría Codex Desktop — timeouts OkHttp + shutdown completo
-f7d19eb fix: Auditoría Codex Android — CancellationException + isRefreshing try/finally
-0fab8d1 audit: Auditoría completa Sprint 1-9 — seguridad, tests, calidad y limpieza
-c88d359 feat: Sprint 9.3 — Paginación de recetas Android
-e2461c9 feat: Sprint 9.1/9.2 — Notificaciones caducidad + Valoraciones familiares
+fee80cb docs: Sprint 16 completado — cerrar sesion y preparar Sprint 17  ← HEAD
+d0bef39 feat: Sprint 16 — scaffolding KMP + Compose Multiplatform iOS
+ca12b99 docs: añadir iOS (KMP + Compose Multiplatform) como nueva plataforma objetivo
+94cee4c docs: Sprint 15 completado — actualizar Resumen.md y CONTINUAR.md
+2edfc88 feat: Sprint 15.4 — Exportar lista de la compra Desktop (.txt)
+e67d734 feat: Sprint 15.1-15.3+15.5 — CRUD menú + filtros recetas + sort stock Android
 ```
 
 ---
@@ -725,7 +714,7 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
 
 ---
 
-## Sprint 15 — EN CURSO (2026-05-29)
+## Sprint 15 — COMPLETADO (2026-05-29)
 
 ### Sprint 15.1 — CRUD menú semanal Android ✅ COMPLETADO (commit e67d734)
 
@@ -821,6 +810,50 @@ cd ios/
 
 ---
 
+## Sprint UI-Android — Rediseño visual Android ✅ COMPLETADO (2026-05-29)
+
+Mejoras visuales sobre Android sin cambios de arquitectura, contratos API ni sincronización.
+
+### Cambios aplicados
+
+**LoginScreen**
+- Ícono circular brand 88dp (`primaryContainer`) centrado arriba.
+- Tipografía: `headlineMedium` + `bodyMedium` muted, centrados.
+- Botón "Entrar →" con `Icons.AutoMirrored.Filled.ArrowForward` de trailing.
+
+**RecipeCard (composable nuevo en RecipeScreens.kt)**
+- Reemplaza `Card { ListItem(...) }` por card visual full-width.
+- Header 152dp: fondo `secondaryContainer` + `Icons.Outlined.Restaurant` semitransparente.
+- `Brush.verticalGradient` oscuro → título y descripción en blanco overlay bottom-start.
+- Fila de `MetaChip` bajo header: ⏱ Xm, dificultad, N porciones.
+- `CardDefaults.cardElevation(2.dp)`, `MaterialTheme.shapes.large`.
+
+**Navegación — texto → ícono**
+- `Button("← Volver")` → `IconButton(Icons.AutoMirrored.Filled.ArrowBack)` en: RecipeDetail, ShoppingListDetail, StockDetail, NoteDetail.
+- `Button("Actualizar")` → `IconButton(Icons.Filled.Refresh)` en: RecipeList, ShoppingList, Stock, Notes.
+- `Button("Nueva nota")` → `IconButton(Icons.Filled.Add)` en header de NotesScreen.
+
+**FABs**
+- Bug fix: FAB "Nueva receta" usaba `Icons.Filled.Favorite` → corregido a `Icons.Filled.Add`.
+- Nuevo `ExtendedFloatingActionButton("▶ Cocinar", Icons.Filled.PlayArrow)` visible cuando `selectedRecipe != null && !cookingMode`.
+
+**Interacciones**
+- Shopping items: `TextDecoration.LineThrough` cuando `item.checked == true`.
+- StockDetail y NoteDetail: botones Editar/Eliminar con ícono leading (`Icons.Filled.Edit` / `Icons.Filled.Delete`).
+
+### Archivos modificados
+- `RecetasApp.kt`
+- `RecipeScreens.kt`
+- `StockScreens.kt`
+- `NotesScreens.kt`
+
+Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (1 warning deprecation Sort pre-existente).
+Verificado en emulador Pixel_9_Pro API 36: LoginScreen, RecipeList, RecipeDetail+FAB Cocinar, ShoppingList+tachado, StockDetail+iconos.
+
+> ⚠️ **Pendiente commit y push**: los cambios están en el working tree sin commitar. Hacer commit antes de continuar mañana.
+
+---
+
 ## Proximos Pasos — Sprint 17 (iOS ampliacion)
 
 Candidatos:
@@ -830,3 +863,4 @@ Candidatos:
 3. **NotesScreen iOS** — CRUD de notas familiares.
 4. **SQLDelight persistencia local iOS** — cache offline para recetas y stock. Actualmente la app es 100% online.
 5. **Keychain para tokens** — reemplazar NSUserDefaults por SecItem API en `SessionStore.ios.kt`.
+6. **UI-Android commit** — commitar y pushear los cambios del rediseño visual si no se hizo al cerrar sesión.

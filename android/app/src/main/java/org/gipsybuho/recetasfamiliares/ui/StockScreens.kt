@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import java.time.Instant
 import java.time.LocalDate
@@ -230,8 +231,16 @@ internal fun StockDetail(item: StockItemEntity, onBack: () -> Unit, onEdit: () -
         }
         Spacer(Modifier.height(Spacing.xs))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Button(onClick = onEdit) { Text("Editar") }
-            OutlinedButton(onClick = onDelete) { Text("Eliminar") }
+            Button(onClick = onEdit) {
+                Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(Spacing.xs))
+                Text("Editar")
+            }
+            OutlinedButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(Spacing.xs))
+                Text("Eliminar")
+            }
         }
     }
 }

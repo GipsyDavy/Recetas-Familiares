@@ -234,6 +234,70 @@ internal fun RecipeList(
     }
 }
 
+@Composable
+private fun RecipeCard(recipe: RecipeEntity, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(152.dp)
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Icon(
+                Icons.Outlined.Restaurant,
+                contentDescription = null,
+                modifier = Modifier.size(56.dp).align(Alignment.Center),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.30f)
+            )
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.58f)),
+                        startY = 64f
+                    )
+                )
+            )
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+            ) {
+                Text(
+                    recipe.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    maxLines = 2
+                )
+                recipe.description?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.78f),
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+        val totalMin = (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
+        val hasMeta = totalMin > 0 || recipe.difficulty != null || recipe.servings != null
+        if (hasMeta) {
+            Row(
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                if (totalMin > 0) MetaChip("⏱ ${totalMin}m")
+                recipe.difficulty?.let { MetaChip(it) }
+                recipe.servings?.let { MetaChip("$it porciones") }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun RecipeDetail(
@@ -264,8 +328,10 @@ internal fun RecipeDetail(
 
     LazyColumn(contentPadding = PaddingValues(bottom = Spacing.xxl), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Button(onClick = onBack) { Text("← Volver") }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                }
                 Text(recipe.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                 IconButton(onClick = { viewModel.toggleFavorite(recipe.id) }) {
                     Icon(

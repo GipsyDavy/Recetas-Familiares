@@ -55,7 +55,7 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 - Navegacion nativa iOS (TabView, NavigationStack).
 - Offline-first con SQLDelight y Ktor.
 - UI coherente con Android, adaptada a las convenciones iOS.
-- Carpeta `ios/` creada; implementacion pendiente de iniciar.
+- Sprint 16 completado: scaffolding completo en `ios/` (commit d0bef39).
 
 ## Estilo Visual y UX
 
@@ -107,7 +107,7 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT 15 COMPLETO — 2026-05-29)
+### Android Kotlin + Compose (SPRINT UI COMPLETO — 2026-05-29)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -115,17 +115,18 @@ Stack completo verificado:
 - Retrofit 3 + OkHttp 5 + Room 2.8.4 (v2) + WorkManager 2.11.2
 - MVVM + AppContainer (DI manual) + EncryptedSharedPreferences
 
-Pantallas implementadas (Sprint 1-14):
-- LoginScreen
+Pantallas implementadas (Sprint 1-15 + UI):
+- **LoginScreen** rediseñada — ícono brand circular, tipografía centrada, botón "Entrar →"
 - TopAppBar con búsqueda global unificada (Recetas + Stock + Notas)
-- RecipeListScreen (paginación, búsqueda, pull-to-refresh, FAB crear) + RecipeDetailScreen (fotos carrusel, valoraciones, menú ⋮ con **"Compartir"**)
+- **RecipeListScreen** — **tarjetas visuales** con gradiente + placeholder + chips (⏱ tiempo, dificultad, porciones); paginación; búsqueda; FilterChips dificultad; pull-to-refresh; **FAB "+"**
+- **RecipeDetailScreen** — `←` IconButton back; ❤️ favorito; ⋮ menú; fotos carrusel; valoraciones; **ExtendedFAB "▶ Cocinar"** visible
 - RecipeForm (SegmentedButton dificultad, filas dinámicas ingredientes/pasos)
 - CookingScreen (paso a paso, temporizador countdown, keep screen on, **volumen ↑↓ cambia paso**)
-- StockScreen (badges bajo stock, colores caducidad, FAB crear, CRUD inline, notificaciones caducidad)
-- ShoppingListScreen (check offline-resilient, **botón "Compartir" → Intent.ACTION_SEND**)
-- NotesScreen (CRUD completo, búsqueda, empty states)
+- **StockScreen** — badges bajo stock, colores caducidad, Sort toggle, FAB crear, CRUD inline, notificaciones caducidad; **`←` IconButton back; botones ✏ Editar / 🗑 Eliminar con ícono**
+- **ShoppingListScreen** — `←` IconButton back; check offline-resilient; **tachado en ítems marcados**; botón "Compartir"
+- **NotesScreen** — `←` IconButton back; botones ✏ Editar / 🗑 Eliminar con ícono; CRUD completo; búsqueda; empty states
 - GlobalSearchScreen (resultados agrupados entre tabs)
-- **MenuScreen** (5º tab "Menú", navegación ← → semanas, cards por día, mealType localizado, empty state)
+- **MenuScreen** (5º tab "Menú", navegación ← → semanas, CRUD assign/remove, "Ver receta")
 - Widgets: RecipeWidget (receta del día) + StockWidget (ítems críticos)
 - Bottom Navigation: **5 tabs** (RECIPES, STOCK, SHOPPING, NOTES, MENU)
 - Snackbar feedback en todas las mutaciones
@@ -148,7 +149,7 @@ API base URL en emulador: http://10.0.2.2:8080/
 JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
 
-Pantallas implementadas (Sprint 1-14):
+Pantallas implementadas (Sprint 1-15):
 - LoginView
 - DashboardView (GridPane 2 columnas: recetas recientes + stock expirando + **acciones rápidas: Stock familiar / Notas familiares**)
 - RecipeListView (SplitPane filtrable, búsqueda, paginación incremental 30/pág, botón "Actualizar")
@@ -195,7 +196,7 @@ Pendiente Sprint 17:
 ### Base de Datos MySQL
 
 - MySQL80 service en localhost:3306
-- Usuario: recetas_app / Recetas2024!
+- Usuario: recetas_app / lee 
 - Base de datos: recetas_familiares
 - 9 migraciones Flyway. 14 tablas principales con soft delete, syncVersion y UUID como PK.
 
@@ -258,6 +259,7 @@ Pendiente Sprint 17:
 | 16.3 | 2026-05-29 | iOS Ktor network layer: ApiClient (Darwin engine + JWT) + 10 DTOs @Serializable |
 | 16.4 | 2026-05-29 | iOS auth: AuthRepository (Ktor login/logout) + LoginScreen Compose M3 |
 | 16.5 | 2026-05-29 | iOS RecipeListScreen básica: RecipeRepository (paginado) + LazyColumn M3 |
+| UI-Android | 2026-05-29 | Rediseño visual Android: LoginScreen brand, RecipeCards gradiente+chips, IconButton nav, FAB Cocinar, tachado shopping, iconos Editar/Eliminar |
 
 ## Proximos Pasos — Sprint 17
 

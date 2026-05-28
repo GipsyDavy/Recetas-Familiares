@@ -12,8 +12,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.Button
@@ -37,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,9 +91,15 @@ internal fun NotesScreen(
                     onDelete = { viewModel.deleteNote(selectedNote!!); selectedNote = null }
                 )
                 else -> {
-                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("Notas familiares", style = MaterialTheme.typography.headlineSmall)
-                        Button(onClick = { showCreateForm = true }) { Text("Nueva nota") }
+                        IconButton(onClick = { showCreateForm = true }) {
+                            Icon(Icons.Filled.Add, contentDescription = "Nueva nota")
+                        }
                     }
                     error?.let {
                         Spacer(Modifier.height(Spacing.md))
@@ -155,8 +168,10 @@ internal fun NoteCard(note: FamilyNoteEntity, onClick: () -> Unit) {
 internal fun NoteDetail(note: FamilyNoteEntity, onBack: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     LazyColumn(contentPadding = PaddingValues(bottom = Spacing.xxl), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Button(onClick = onBack) { Text("← Volver") }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                }
                 Text(note.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
             }
         }
@@ -169,8 +184,16 @@ internal fun NoteDetail(note: FamilyNoteEntity, onBack: () -> Unit, onEdit: () -
         item { Text(note.body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Button(onClick = onEdit) { Text("Editar") }
-                OutlinedButton(onClick = onDelete) { Text("Eliminar") }
+                Button(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text("Editar")
+                }
+                OutlinedButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text("Eliminar")
+                }
             }
         }
     }
