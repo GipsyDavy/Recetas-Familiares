@@ -1,6 +1,9 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -16,7 +19,10 @@ public class NotesView extends VBox {
 
     private final AppContext context;
     private final Label statusLabel = new Label();
+    private final ObservableList<SyncDtos.NoteDtos.FamilyNoteDto> allNotes = FXCollections.observableArrayList();
+    private final FilteredList<SyncDtos.NoteDtos.FamilyNoteDto> filteredNotes = new FilteredList<>(allNotes);
     private final ListView<SyncDtos.NoteDtos.FamilyNoteDto> listView = new ListView<>();
+    private final TextField filterField = new TextField();
 
     // Right-panel controls
     private final TextField titleField = new TextField();
@@ -57,6 +63,14 @@ public class NotesView extends VBox {
 
         // ── List (left) ───────────────────────────────────────────────────────
 
+        filterField.setPromptText("Buscar notas...");
+        filterField.getStyleClass().add("search-field");
+        filterField.textProperty().addListener((obs, old, val) ->
+            filteredNotes.setPredicate(val == null || val.isBlank() ? null :
+                n -> (n.title() != null && n.title().toLowerCase().contains(val.toLowerCase()))
+                  || (n.body()  != null && n.body() .toLowerCase().contains(val.toLowerCase()))));
+
+        listView.setItems(filteredNotes);
         listView.getStyleClass().add("notes-list");
         listView.setPlaceholder(buildEmptyState(
                 "📝",
@@ -101,7 +115,9 @@ public class NotesView extends VBox {
         VBox.setVgrow(detailPane, Priority.ALWAYS);
         setDetailEnabled(false);
 
-        SplitPane split = new SplitPane(listView, detailPane);
+        VBox listPane = new VBox(8, filterField, listView);
+        VBox.setVgrow(listView, Priority.ALWAYS);
+        SplitPane split = new SplitPane(listPane, detailPane);
         split.setOrientation(Orientation.HORIZONTAL);
         split.setDividerPositions(0.38);
         VBox.setVgrow(split, Priority.ALWAYS);
@@ -120,13 +136,18 @@ public class NotesView extends VBox {
             try {
                 List<SyncDtos.NoteDtos.FamilyNoteDto> notes = context.getNoteRepository().loadAll();
                 Platform.runLater(() -> {
-                    listView.getItems().setAll(notes);
+                    allNotes.setAll(notes);
+                    context.getNoteRepository().updateCache(notes);
                     statusLabel.setText(notes.size() + " notas");
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> statusLabel.setText("Error al cargar: " + ex.getMessage()));
             }
         });
+    }
+
+    public void filterBy(String query) {
+        filterField.setText(query != null ? query : "");
     }
 
     // ── Form helpers ───────────────────────────────────────────────────────────
@@ -187,17 +208,17 @@ public class NotesView extends VBox {
                 Platform.runLater(() -> {
                     // Replace or add in list
                     if (target == null) {
-                        listView.getItems().add(0, finalSaved);
+                        allNotes.add(0, finalSaved);
                     } else {
-                        int idx = listView.getItems().indexOf(target);
-                        if (idx >= 0) listView.getItems().set(idx, finalSaved);
+                        int idx = allNotes.indexOf(target);
+                        if (idx >= 0) allNotes.set(idx, finalSaved);
                     }
                     editing = finalSaved;
                     deleteBtn.setVisible(true);
                     deleteBtn.setManaged(true);
                     saveBtn.setDisable(false);
                     detailStatus.setText("Guardada");
-                    statusLabel.setText(listView.getItems().size() + " notas");
+                    statusLabel.setText(allNotes.size() + " notas");
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
@@ -226,7 +247,7 @@ public class NotesView extends VBox {
             try {
                 context.getNoteRepository().delete(note.id());
                 Platform.runLater(() -> {
-                    listView.getItems().remove(note);
+                    allNotes.remove(note);
                     editing = null;
                     titleField.clear();
                     bodyArea.clear();
@@ -235,7 +256,7 @@ public class NotesView extends VBox {
                     deleteBtn.setManaged(false);
                     deleteBtn.setDisable(false);
                     setDetailEnabled(false);
-                    statusLabel.setText(listView.getItems().size() + " notas");
+                    statusLabel.setText(allNotes.size() + " notas");
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {

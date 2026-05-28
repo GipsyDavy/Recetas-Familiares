@@ -4,6 +4,7 @@ import org.gipsybuho.recetasfamiliares.api.ApiClient;
 import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
+import org.gipsybuho.recetasfamiliares.data.cache.SimpleCache;
 
 import java.util.List;
 
@@ -11,6 +12,14 @@ public class NoteRepository {
 
     private final ApiClient api;
     private final AppSession session;
+    private final SimpleCache<SyncDtos.NoteDtos.FamilyNoteDto> cache = new SimpleCache<>();
+
+    public SimpleCache<SyncDtos.NoteDtos.FamilyNoteDto> getCache() { return cache; }
+
+    /** Must be called on the JavaFX Application Thread. */
+    public void updateCache(List<SyncDtos.NoteDtos.FamilyNoteDto> notes) {
+        cache.replaceAll(notes);
+    }
 
     public NoteRepository(ApiClient api, AppSession session) {
         this.api = api;

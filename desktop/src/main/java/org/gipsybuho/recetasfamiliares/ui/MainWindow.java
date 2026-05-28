@@ -22,6 +22,10 @@ public class MainWindow {
     private WeeklyMenuView weeklyMenuView;
     private ShoppingListView shoppingListView;
     private NotesView notesView;
+    private GlobalSearchView searchResultsView;
+    private String activeView = "dashboard";
+    private boolean navigating = false;
+    private final TextField globalSearch = new TextField();
 
     public MainWindow(Stage stage, AppContext context) {
         this.stage = stage;
@@ -82,6 +86,21 @@ public class MainWindow {
         header.getStyleClass().add("sidebar-header");
         header.setPadding(new Insets(24, 16, 16, 16));
 
+        globalSearch.setPromptText("Buscar en todo...");
+        globalSearch.getStyleClass().add("search-field");
+        globalSearch.setMaxWidth(Double.MAX_VALUE);
+        VBox.setMargin(globalSearch, new Insets(0, 8, 8, 8));
+        globalSearch.textProperty().addListener((obs, old, query) -> {
+            if (navigating) return;
+            if (query == null || query.trim().length() < 2) {
+                if (searchResultsView != null && root.getCenter() == searchResultsView) {
+                    navigateTo(activeView);
+                }
+            } else {
+                showSearchResults(query.trim());
+            }
+        });
+
         Button btnDashboard = sidebarButton("Inicio", "dashboard");
         Button btnRecipes = sidebarButton("Recetas", "recipes");
         Button btnStock = sidebarButton("Stock", "stock");
@@ -105,7 +124,7 @@ public class MainWindow {
         VBox bottom = new VBox(8, syncBtn, logoutBtn);
         bottom.setPadding(new Insets(8, 16, 24, 16));
 
-        sidebar.getChildren().addAll(header, btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, spacer, bottom);
+        sidebar.getChildren().addAll(header, globalSearch, btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, spacer, bottom);
         return sidebar;
     }
 
@@ -118,7 +137,29 @@ public class MainWindow {
         return btn;
     }
 
+    private void showSearchResults(String query) {
+        if (searchResultsView == null) {
+            searchResultsView = new GlobalSearchView(context, this::onSearchResultClicked);
+        }
+        searchResultsView.search(query);
+        root.setCenter(searchResultsView);
+    }
+
+    private void onSearchResultClicked(String viewKey) {
+        String query = globalSearch.getText().trim();
+        navigateTo(viewKey);
+        switch (viewKey) {
+            case "recipes" -> recipeListView.filterBy(query);
+            case "stock"   -> stockView.filterBy(query);
+            case "notes"   -> notesView.filterBy(query);
+        }
+    }
+
     private void navigateTo(String view) {
+        navigating = true;
+        activeView = view;
+        globalSearch.clear();
+        navigating = false;
         switch (view) {
             case "dashboard" -> {
                 root.setCenter(dashboardView);

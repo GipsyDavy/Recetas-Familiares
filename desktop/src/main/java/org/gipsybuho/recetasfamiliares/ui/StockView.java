@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.ui;
 
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -15,6 +16,8 @@ public class StockView extends VBox {
     private final AppContext context;
     private final TableView<StockDtos.StockItemDto> table = new TableView<>();
     private final Label statusLabel = new Label();
+    private final TextField filterField = new TextField();
+    private FilteredList<StockDtos.StockItemDto> filteredItems;
 
     public StockView(AppContext context) {
         this.context = context;
@@ -63,7 +66,8 @@ public class StockView extends VBox {
         lowStockCol.setPrefWidth(110);
 
         table.getColumns().addAll(nameCol, qtyCol, expiresCol, lowStockCol);
-        table.setItems(context.getStockRepository().getCache().getItems());
+        filteredItems = new FilteredList<>(context.getStockRepository().getCache().getItems());
+        table.setItems(filteredItems);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.getStyleClass().add("stock-table");
         table.setPlaceholder(buildEmptyState(
@@ -75,7 +79,13 @@ public class StockView extends VBox {
 
         statusLabel.getStyleClass().add("status-label");
 
-        getChildren().addAll(header, buildToolbar(), table, statusLabel);
+        filterField.setPromptText("Buscar en stock...");
+        filterField.getStyleClass().add("search-field");
+        filterField.textProperty().addListener((obs, old, val) ->
+            filteredItems.setPredicate(val == null || val.isBlank() ? null :
+                s -> s.name() != null && s.name().toLowerCase().contains(val.toLowerCase())));
+
+        getChildren().addAll(header, filterField, buildToolbar(), table, statusLabel);
     }
 
     private HBox buildToolbar() {
@@ -171,6 +181,10 @@ public class StockView extends VBox {
         box.setAlignment(Pos.CENTER);
         box.setPadding(new Insets(40));
         return box;
+    }
+
+    public void filterBy(String query) {
+        filterField.setText(query != null ? query : "");
     }
 
     public void refresh() {

@@ -63,6 +63,10 @@ public class RecipeListView extends SplitPane {
         setDividerPositions(0.35);
     }
 
+    public void filterBy(String query) {
+        searchField.setText(query != null ? query : "");
+    }
+
     public void refresh() {
         loadingRecipes = true;
         statusLabel.setText("Cargando...");
