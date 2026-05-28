@@ -6,6 +6,8 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
@@ -34,6 +36,7 @@ public class RecipeDetailView extends VBox {
     private final Button addPhotoBtn = new Button("Añadir foto");
 
     private RecipeDtos.RecipeDto currentRecipe;
+    private List<RecipeDtos.RecipeIngredientDto> currentIngredients = new ArrayList<>();
     private List<RecipeDtos.RecipeStepDto> currentSteps = new ArrayList<>();
     private List<RecipeDtos.RecipePhotoResponse> currentPhotos = new ArrayList<>();
 
@@ -64,6 +67,10 @@ public class RecipeDetailView extends VBox {
         cookingBtn.getStyleClass().add("action-button-secondary");
         cookingBtn.setOnAction(e -> openCookingMode());
 
+        Button copyBtn = new Button("📋  Copiar");
+        copyBtn.getStyleClass().add("action-button-secondary");
+        copyBtn.setOnAction(e -> copyToClipboard());
+
         Button editBtn = new Button("Editar");
         editBtn.getStyleClass().add("action-button-secondary");
         editBtn.setOnAction(e -> openEditForm());
@@ -74,7 +81,7 @@ public class RecipeDetailView extends VBox {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, editBtn, deleteBtn);
+        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, copyBtn, editBtn, deleteBtn);
         actionBar.setPadding(new Insets(12, 16, 8, 16));
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -172,6 +179,7 @@ public class RecipeDetailView extends VBox {
 
     private void renderContent(List<RecipeDtos.RecipeIngredientDto> ingredients,
                                List<RecipeDtos.RecipeStepDto> steps) {
+        this.currentIngredients = ingredients != null ? ingredients : new ArrayList<>();
         this.currentSteps = steps != null ? steps : new ArrayList<>();
         statusLabel.setVisible(false);
         ingredientsList.getChildren().clear();
@@ -428,6 +436,56 @@ public class RecipeDetailView extends VBox {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void copyToClipboard() {
+        if (currentRecipe == null) return;
+        var sb = new StringBuilder();
+
+        sb.append("🍳  ").append(currentRecipe.title()).append("\n");
+
+        // Meta
+        var meta = new ArrayList<String>();
+        if (currentRecipe.servings() != null) meta.add(currentRecipe.servings() + " porciones");
+        int totalMin = (currentRecipe.prepMinutes() != null ? currentRecipe.prepMinutes() : 0)
+                     + (currentRecipe.cookMinutes() != null ? currentRecipe.cookMinutes() : 0);
+        if (totalMin > 0) meta.add(totalMin + " min");
+        if (currentRecipe.difficulty() != null) meta.add(currentRecipe.difficulty());
+        if (!meta.isEmpty()) sb.append(String.join("  ·  ", meta)).append("\n");
+
+        if (currentRecipe.description() != null && !currentRecipe.description().isBlank()) {
+            sb.append("\n").append(currentRecipe.description()).append("\n");
+        }
+
+        // Ingredients
+        if (!currentIngredients.isEmpty()) {
+            sb.append("\n🥗  Ingredientes\n");
+            for (var ing : currentIngredients) {
+                sb.append("• ").append(ing.name());
+                if (ing.quantity() != null) {
+                    sb.append("  —  ").append(java.math.BigDecimal.valueOf(ing.quantity()).stripTrailingZeros().toPlainString());
+                    if (ing.unit() != null && !ing.unit().isBlank()) sb.append(" ").append(ing.unit());
+                }
+                sb.append("\n");
+            }
+        }
+
+        // Steps
+        if (!currentSteps.isEmpty()) {
+            sb.append("\n👨‍🍳  Preparación\n");
+            int num = 1;
+            for (var step : currentSteps) {
+                sb.append(num++).append(". ").append(step.instruction());
+                if (step.timerMinutes() != null) sb.append("  [").append(step.timerMinutes()).append(" min]");
+                sb.append("\n");
+            }
+        }
+
+        ClipboardContent content = new ClipboardContent();
+        content.putString(sb.toString().trim());
+        Clipboard.getSystemClipboard().setContent(content);
+        statusLabel.setText("Receta copiada al portapapeles ✓");
+        statusLabel.setVisible(true);
+    }
 
     private Label noDataLabel(String text) {
         Label l = new Label(text);
