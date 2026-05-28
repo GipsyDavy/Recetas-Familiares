@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Restaurant
@@ -33,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,7 +53,7 @@ import androidx.work.WorkManager
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 
-private enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES }
+internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES }
 
 @Composable
 fun RecetasApp(viewModel: RecetasViewModel) {
@@ -95,9 +99,12 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainShell(viewModel: RecetasViewModel) {
     var tab by remember { mutableStateOf(MainTab.RECIPES) }
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     val recipes by viewModel.recipes.collectAsState()
     val stockItems by viewModel.stockItems.collectAsState()
     val shoppingLists by viewModel.shoppingLists.collectAsState()
@@ -109,6 +116,40 @@ private fun MainShell(viewModel: RecetasViewModel) {
     }
 
     Scaffold(
+        topBar = {
+            if (searchActive) {
+                TopAppBar(
+                    title = {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Buscar recetas, stock, notas...") },
+                            singleLine = true,
+                            trailingIcon = if (searchQuery.isNotEmpty()) {
+                                { IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Filled.Clear, contentDescription = "Borrar")
+                                }}
+                            } else null,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { searchActive = false; searchQuery = "" }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cerrar búsqueda")
+                        }
+                    }
+                )
+            } else {
+                TopAppBar(
+                    title = { Text("Recetas Familiares") },
+                    actions = {
+                        IconButton(onClick = { searchActive = true }) {
+                            Icon(Icons.Filled.Search, contentDescription = "Buscar")
+                        }
+                    }
+                )
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
@@ -123,11 +164,26 @@ private fun MainShell(viewModel: RecetasViewModel) {
             }
         }
     ) { padding ->
-        when (tab) {
-            MainTab.RECIPES  -> RecipeList(recipes, Modifier.padding(padding), viewModel, viewModel::refresh)
-            MainTab.STOCK    -> StockList(stockItems, Modifier.padding(padding), viewModel)
-            MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
-            MainTab.NOTES    -> NotesScreen(notes, Modifier.padding(padding), viewModel)
+        if (searchActive && searchQuery.trim().length >= 2) {
+            GlobalSearchScreen(
+                query = searchQuery.trim(),
+                recipes = recipes,
+                stockItems = stockItems,
+                notes = notes,
+                modifier = Modifier.padding(padding),
+                onNavigate = { selectedTab ->
+                    searchActive = false
+                    searchQuery = ""
+                    tab = selectedTab
+                }
+            )
+        } else {
+            when (tab) {
+                MainTab.RECIPES  -> RecipeList(recipes, Modifier.padding(padding), viewModel, viewModel::refresh)
+                MainTab.STOCK    -> StockList(stockItems, Modifier.padding(padding), viewModel)
+                MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
+                MainTab.NOTES    -> NotesScreen(notes, Modifier.padding(padding), viewModel)
+            }
         }
     }
 }
