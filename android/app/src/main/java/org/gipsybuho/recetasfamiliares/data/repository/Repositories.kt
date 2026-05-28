@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.data.repository
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.FavoriteRecipeEntity
@@ -17,6 +18,7 @@ import org.gipsybuho.recetasfamiliares.data.local.StockDao
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.MenuItemDto
@@ -26,6 +28,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipePhotoDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 
@@ -117,6 +120,53 @@ class SyncRepository(
         database.recipePhotoDao().upsertAll(response.recipePhotos.orEmpty().map { it.toEntity() })
 
         sessionStore.lastSyncTime = response.serverTime
+    }
+}
+
+class ShoppingListRepository(
+    private val api: RecetasApi,
+    private val database: RecetasDatabase,
+    private val sessionStore: SessionStore
+) {
+    val shoppingLists: Flow<List<ShoppingListEntity>> = database.shoppingListDao().observeShoppingLists()
+
+    fun itemsFor(listId: String): Flow<List<ShoppingListItemEntity>> =
+        database.shoppingListItemDao().observeItems(listId)
+
+    suspend fun checkItem(item: ShoppingListItemEntity, checked: Boolean) {
+        val familyId = sessionStore.familyId ?: return
+        val req = UpdateShoppingListItemRequestDto(
+            position = item.position,
+            name = item.name,
+            quantity = item.quantity,
+            unit = item.unit,
+            checked = checked,
+            note = item.note
+        )
+        val updated = api.updateShoppingListItem(familyId, item.shoppingListId, item.id, req)
+        database.shoppingListItemDao().upsertAll(listOf(updated.toEntity()))
+    }
+}
+
+class FavoriteRepository(
+    private val api: RecetasApi,
+    private val database: RecetasDatabase,
+    private val sessionStore: SessionStore
+) {
+    fun isFavorite(recipeId: String): Flow<Boolean> =
+        database.favoriteRecipeDao().observeFavorites()
+            .map { list -> list.any { it.recipeId == recipeId } }
+
+    suspend fun toggle(recipeId: String) {
+        val familyId = sessionStore.familyId ?: return
+        val existing = database.favoriteRecipeDao().findByRecipeId(recipeId)
+        if (existing != null) {
+            api.removeFavorite(familyId, existing.id)
+            database.favoriteRecipeDao().upsertAll(listOf(existing.copy(deleted = true)))
+        } else {
+            val dto = api.addFavorite(familyId, AddFavoriteRequestDto(recipeId))
+            database.favoriteRecipeDao().upsertAll(listOf(dto.toEntity()))
+        }
     }
 }
 

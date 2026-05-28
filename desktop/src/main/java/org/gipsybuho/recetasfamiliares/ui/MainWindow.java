@@ -20,6 +20,7 @@ public class MainWindow {
     private RecipeListView recipeListView;
     private StockView stockView;
     private WeeklyMenuView weeklyMenuView;
+    private ShoppingListView shoppingListView;
 
     public MainWindow(Stage stage, AppContext context) {
         this.stage = stage;
@@ -60,6 +61,7 @@ public class MainWindow {
         recipeListView = new RecipeListView(context);
         stockView = new StockView(context);
         weeklyMenuView = new WeeklyMenuView(context);
+        shoppingListView = new ShoppingListView(context);
 
         VBox sidebar = buildSidebar();
         root.setLeft(sidebar);
@@ -82,6 +84,7 @@ public class MainWindow {
         Button btnRecipes = sidebarButton("Recetas", "recipes");
         Button btnStock = sidebarButton("Stock", "stock");
         Button btnMenu = sidebarButton("Menú semanal", "menu");
+        Button btnShopping = sidebarButton("Lista de la compra", "shopping");
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -99,7 +102,7 @@ public class MainWindow {
         VBox bottom = new VBox(8, syncBtn, logoutBtn);
         bottom.setPadding(new Insets(8, 16, 24, 16));
 
-        sidebar.getChildren().addAll(header, btnDashboard, btnRecipes, btnStock, btnMenu, spacer, bottom);
+        sidebar.getChildren().addAll(header, btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, spacer, bottom);
         return sidebar;
     }
 
@@ -130,6 +133,10 @@ public class MainWindow {
                 root.setCenter(weeklyMenuView);
                 weeklyMenuView.refresh();
             }
+            case "shopping" -> {
+                root.setCenter(shoppingListView);
+                shoppingListView.refresh();
+            }
         }
     }
 
@@ -154,6 +161,7 @@ public class MainWindow {
                     else if (root.getCenter() instanceof RecipeListView) recipeListView.refresh();
                     else if (root.getCenter() instanceof StockView) stockView.refresh();
                     else if (root.getCenter() instanceof WeeklyMenuView) weeklyMenuView.refresh();
+                    else if (root.getCenter() instanceof ShoppingListView) shoppingListView.refresh();
                 });
             } catch (Exception ex) {
                 Platform.runLater(() ->

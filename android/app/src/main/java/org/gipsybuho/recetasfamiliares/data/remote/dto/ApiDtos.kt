@@ -201,6 +201,19 @@ data class SyncPullDto(
     val recipePhotos: List<RecipePhotoDto>?
 )
 
+// ── Mutation request DTOs ─────────────────────────────────────────────────────
+
+data class AddFavoriteRequestDto(val recipeId: String)
+
+data class UpdateShoppingListItemRequestDto(
+    val position: Int,
+    val name: String,
+    val quantity: Double?,
+    val unit: String?,
+    val checked: Boolean,
+    val note: String?
+)
+
 // ── Sync push request DTOs ────────────────────────────────────────────────────
 
 data class SyncPushRequestDto(

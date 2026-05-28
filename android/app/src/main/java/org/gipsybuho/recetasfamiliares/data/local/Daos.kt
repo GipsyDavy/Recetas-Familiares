@@ -79,6 +79,9 @@ interface FavoriteRecipeDao {
     @Query("SELECT * FROM favorite_recipes WHERE deleted = 0 ORDER BY updatedAt DESC")
     fun observeFavorites(): Flow<List<FavoriteRecipeEntity>>
 
+    @Query("SELECT * FROM favorite_recipes WHERE recipeId = :recipeId AND deleted = 0 LIMIT 1")
+    suspend fun findByRecipeId(recipeId: String): FavoriteRecipeEntity?
+
     @Upsert
     suspend fun upsertAll(favorites: List<FavoriteRecipeEntity>)
 }

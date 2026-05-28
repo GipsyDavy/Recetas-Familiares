@@ -22,6 +22,7 @@ public class RecipeDetailView extends VBox {
     private final VBox stepsList = new VBox(10);
     private final Label statusLabel = new Label();
     private final HBox actionBar = new HBox(10);
+    private final Button favBtn = new Button("♡  Favorito");
 
     private RecipeDtos.RecipeDto currentRecipe;
 
@@ -41,7 +42,10 @@ public class RecipeDetailView extends VBox {
         descText.getStyleClass().add("recipe-desc");
         descText.setWrappingWidth(480);
 
-        // Action bar (edit + delete) — hidden until a recipe is selected
+        // Action bar (favorite + edit + delete) — hidden until a recipe is selected
+        favBtn.getStyleClass().add("action-button-secondary");
+        favBtn.setOnAction(e -> toggleFavorite());
+
         Button editBtn = new Button("Editar");
         editBtn.getStyleClass().add("action-button-secondary");
         editBtn.setOnAction(e -> openEditForm());
@@ -52,7 +56,7 @@ public class RecipeDetailView extends VBox {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        actionBar.getChildren().addAll(spacer, editBtn, deleteBtn);
+        actionBar.getChildren().addAll(spacer, favBtn, editBtn, deleteBtn);
         actionBar.setPadding(new Insets(12, 16, 8, 16));
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -98,6 +102,7 @@ public class RecipeDetailView extends VBox {
         statusLabel.setVisible(true);
         actionBar.setVisible(true);
         actionBar.setManaged(true);
+        updateFavButton(recipe.id());
 
         Thread.ofVirtual().start(() -> {
             try {
@@ -162,6 +167,40 @@ public class RecipeDetailView extends VBox {
         }
         if (steps.isEmpty())
             stepsList.getChildren().add(noDataLabel("Sin pasos."));
+    }
+
+    // ── Favorite ──────────────────────────────────────────────────────────────
+
+    private void updateFavButton(String recipeId) {
+        boolean isFav = context.getFavoriteRepository().findByRecipeId(recipeId).isPresent();
+        favBtn.setText(isFav ? "♥  Favorito" : "♡  Favorito");
+        favBtn.setStyle(isFav ? "-fx-text-fill: -color-error;" : "");
+    }
+
+    private void toggleFavorite() {
+        if (currentRecipe == null) return;
+        String recipeId = currentRecipe.id();
+        favBtn.setDisable(true);
+        Thread.ofVirtual().start(() -> {
+            try {
+                var existing = context.getFavoriteRepository().findByRecipeId(recipeId);
+                if (existing.isPresent()) {
+                    context.getFavoriteRepository().remove(existing.get().id());
+                } else {
+                    context.getFavoriteRepository().add(recipeId);
+                }
+                Platform.runLater(() -> {
+                    updateFavButton(recipeId);
+                    favBtn.setDisable(false);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    statusLabel.setText("Error al cambiar favorito: " + ex.getMessage());
+                    statusLabel.setVisible(true);
+                    favBtn.setDisable(false);
+                });
+            }
+        });
     }
 
     // ── Edit ──────────────────────────────────────────────────────────────────

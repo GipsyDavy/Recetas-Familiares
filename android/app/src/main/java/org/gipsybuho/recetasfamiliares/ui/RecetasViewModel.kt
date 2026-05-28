@@ -19,6 +19,8 @@ import org.gipsybuho.recetasfamiliares.core.AppContainer
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
+import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
+import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import org.gipsybuho.recetasfamiliares.sync.SyncWorker
 import java.util.concurrent.TimeUnit
@@ -67,11 +69,33 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         workManager.enqueueUniquePeriodicWork("family-sync", ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
+    val shoppingLists: StateFlow<List<ShoppingListEntity>> =
+        container.shoppingListRepository.shoppingLists
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun ingredientsFor(recipeId: String): Flow<List<RecipeIngredientEntity>> =
         container.database.recipeIngredientDao().observeIngredients(recipeId)
 
     fun stepsFor(recipeId: String): Flow<List<RecipeStepEntity>> =
         container.database.recipeStepDao().observeSteps(recipeId)
+
+    fun itemsFor(listId: String): Flow<List<ShoppingListItemEntity>> =
+        container.shoppingListRepository.itemsFor(listId)
+
+    fun isFavorite(recipeId: String): Flow<Boolean> =
+        container.favoriteRepository.isFavorite(recipeId)
+
+    fun toggleFavorite(recipeId: String) {
+        viewModelScope.launch {
+            runCatching { container.favoriteRepository.toggle(recipeId) }
+        }
+    }
+
+    fun checkItem(item: ShoppingListItemEntity, checked: Boolean) {
+        viewModelScope.launch {
+            runCatching { container.shoppingListRepository.checkItem(item, checked) }
+        }
+    }
 }
 
 class RecetasViewModelFactory(private val container: AppContainer) : ViewModelProvider.Factory {

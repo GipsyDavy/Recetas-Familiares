@@ -2,8 +2,10 @@ package org.gipsybuho.recetasfamiliares.core;
 
 import org.gipsybuho.recetasfamiliares.api.ApiClient;
 import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository;
+import org.gipsybuho.recetasfamiliares.data.repository.FavoriteRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.MenuRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository;
+import org.gipsybuho.recetasfamiliares.data.repository.ShoppingListRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.SyncRepository;
 
@@ -19,6 +21,8 @@ public final class AppContext {
     private final StockRepository stockRepository;
     private final MenuRepository menuRepository;
     private final SyncRepository syncRepository;
+    private final ShoppingListRepository shoppingListRepository;
+    private final FavoriteRepository favoriteRepository;
 
     private AppContext() {
         session = new AppSession();
@@ -28,6 +32,8 @@ public final class AppContext {
         stockRepository = new StockRepository(apiClient, session);
         menuRepository = new MenuRepository(apiClient, session);
         syncRepository = new SyncRepository(apiClient, session, recipeRepository, stockRepository);
+        shoppingListRepository = new ShoppingListRepository(apiClient, session);
+        favoriteRepository = new FavoriteRepository(apiClient, session);
     }
 
     public static synchronized AppContext getInstance() {
@@ -42,6 +48,8 @@ public final class AppContext {
     public StockRepository getStockRepository() { return stockRepository; }
     public MenuRepository getMenuRepository() { return menuRepository; }
     public SyncRepository getSyncRepository() { return syncRepository; }
+    public ShoppingListRepository getShoppingListRepository() { return shoppingListRepository; }
+    public FavoriteRepository getFavoriteRepository() { return favoriteRepository; }
 
     public void shutdown() {
         apiClient.shutdown();

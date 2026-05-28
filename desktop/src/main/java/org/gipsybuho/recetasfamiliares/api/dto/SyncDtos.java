@@ -93,13 +93,50 @@ public final class SyncDtos {
 
     public static final class ShoppingDtos {
         private ShoppingDtos() {}
-        public record ShoppingListDto(String id) {}
-        public record ShoppingListItemDto(String id) {}
+
+        public record ShoppingListDto(
+                String id, String familyId, String name,
+                String plannedFrom, String plannedTo, String note,
+                boolean completed, String createdAt, String updatedAt,
+                long syncVersion, boolean deleted
+        ) {}
+
+        public record ShoppingListItemDto(
+                String id, String shoppingListId, int position, String name,
+                Double quantity, String unit, boolean checked, String note,
+                String createdAt, String updatedAt, long syncVersion, boolean deleted
+        ) {}
+
+        public record ShoppingPageResponse(
+                java.util.List<ShoppingListDto> content,
+                int totalElements, int totalPages, int number
+        ) {}
+
+        public record ShoppingItemPageResponse(
+                java.util.List<ShoppingListItemDto> content,
+                int totalElements, int totalPages, int number
+        ) {}
+
+        public record UpdateShoppingListItemRequest(
+                int position, String name, Double quantity,
+                String unit, boolean checked, String note
+        ) {}
     }
 
     public static final class FavoriteDtos {
         private FavoriteDtos() {}
-        public record FavoriteRecipeDto(String id, String recipeId) {}
+
+        public record FavoriteRecipeDto(
+                String id, String familyId, String recipeId, String recipeTitle,
+                String createdAt, String updatedAt, long syncVersion, boolean deleted
+        ) {}
+
+        public record AddFavoriteRequest(String recipeId) {}
+
+        public record FavoritePageResponse(
+                java.util.List<FavoriteRecipeDto> content,
+                int totalElements, int totalPages, int number
+        ) {}
     }
 
     public static final class NoteDtos {

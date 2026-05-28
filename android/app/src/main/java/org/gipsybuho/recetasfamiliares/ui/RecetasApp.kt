@@ -16,13 +16,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -47,11 +52,13 @@ import androidx.work.WorkManager
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
+import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
+import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-private enum class MainTab { RECIPES, STOCK }
+private enum class MainTab { RECIPES, STOCK, SHOPPING }
 
 @Composable
 fun RecetasApp(viewModel: RecetasViewModel) {
@@ -122,6 +129,7 @@ private fun MainShell(viewModel: RecetasViewModel) {
     var tab by remember { mutableStateOf(MainTab.RECIPES) }
     val recipes by viewModel.recipes.collectAsState()
     val stockItems by viewModel.stockItems.collectAsState()
+    val shoppingLists by viewModel.shoppingLists.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -138,12 +146,19 @@ private fun MainShell(viewModel: RecetasViewModel) {
                     icon = { Icon(Icons.Outlined.Inventory2, contentDescription = null) },
                     label = { Text("Stock") }
                 )
+                NavigationBarItem(
+                    selected = tab == MainTab.SHOPPING,
+                    onClick = { tab = MainTab.SHOPPING },
+                    icon = { Icon(Icons.Outlined.ShoppingCart, contentDescription = null) },
+                    label = { Text("Lista") }
+                )
             }
         }
     ) { padding ->
         when (tab) {
             MainTab.RECIPES -> RecipeList(recipes, Modifier.padding(padding), viewModel, viewModel::refresh)
             MainTab.STOCK -> StockList(stockItems, Modifier.padding(padding), viewModel::refresh)
+            MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
         }
     }
 }
@@ -191,6 +206,7 @@ private fun RecipeDetail(
 ) {
     val ingredients by viewModel.ingredientsFor(recipe.id).collectAsState(initial = emptyList())
     val steps by viewModel.stepsFor(recipe.id).collectAsState(initial = emptyList())
+    val isFavorite by viewModel.isFavorite(recipe.id).collectAsState(initial = false)
 
     LazyColumn(
         contentPadding = PaddingValues(bottom = 24.dp),
@@ -207,6 +223,13 @@ private fun RecipeDetail(
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = { viewModel.toggleFavorite(recipe.id) }) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Quitar favorito" else "Añadir favorito",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
         item {
@@ -374,6 +397,118 @@ private fun StockList(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ShoppingListScreen(
+    lists: List<ShoppingListEntity>,
+    modifier: Modifier,
+    viewModel: RecetasViewModel
+) {
+    var selectedList by remember { mutableStateOf<ShoppingListEntity?>(null) }
+    Column(modifier.padding(16.dp)) {
+        if (selectedList != null) {
+            ShoppingListDetail(selectedList!!, viewModel, onBack = { selectedList = null })
+        } else {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Lista de la compra", style = MaterialTheme.typography.headlineSmall)
+                Button(onClick = { viewModel.refresh() }) { Text("Actualizar") }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (lists.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Sin listas de la compra", color = MaterialTheme.colorScheme.outline)
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(lists, key = { it.id }) { list ->
+                        Card(onClick = { selectedList = list }) {
+                            ListItem(
+                                headlineContent = { Text(list.name) },
+                                supportingContent = {
+                                    if (list.completed) Text("Completada", color = MaterialTheme.colorScheme.primary)
+                                    else list.note?.takeIf { it.isNotBlank() }?.let { Text(it) }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShoppingListDetail(
+    list: ShoppingListEntity,
+    viewModel: RecetasViewModel,
+    onBack: () -> Unit
+) {
+    val items by viewModel.itemsFor(list.id).collectAsState(initial = emptyList())
+    val pending = items.count { !it.checked }
+
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = onBack) { Text("← Volver") }
+            Text(
+                list.name,
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (pending > 0) {
+            Text(
+                "$pending pendiente${if (pending != 1) "s" else ""}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        if (items.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Sin artículos — actualiza para sincronizar", color = MaterialTheme.colorScheme.outline)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(items, key = { it.id }) { item ->
+                    ShoppingItemRow(item, onCheckedChange = { viewModel.checkItem(item, it) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShoppingItemRow(
+    item: ShoppingListItemEntity,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Checkbox(checked = item.checked, onCheckedChange = onCheckedChange)
+        Text(
+            text = buildString {
+                append(item.name)
+                item.quantity?.let { append("  ${it.toBigDecimal().stripTrailingZeros().toPlainString()}") }
+                item.unit?.takeIf { it.isNotBlank() }?.let { append(" $it") }
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (item.checked) MaterialTheme.colorScheme.outline
+                    else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
