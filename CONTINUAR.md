@@ -355,30 +355,59 @@ Build SUCCESSFUL.
    ```
    Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
 
-6. Decir al agente que tarea del Sprint 8 quieres abordar.
+6. Continuar con Sprint 8 pendiente (ver seccion Sprint 8 mas abajo).
 
 ---
 
-## Sprint 8 — PENDIENTE (siguiente sesion)
+## Sprint 8 — EN CURSO (2026-05-28)
 
-Ideas para Sprint 8 (sin prioridad definida aun):
+### Sprint 8.1 — Feedback Snackbar + Pull-to-refresh Android ✅ COMPLETADO (2026-05-28)
 
-### Candidatos de alto impacto visual
-- **Modo Cocina Android** — pantalla pantalla completa paso a paso con temporizador, letra grande, modo hands-free.
-- **Modo Cocina Desktop** — similar, con temporizador sincronizado.
+Archivos modificados (commit 8a0cc18):
+- `RecetasViewModel.kt`: `_isRefreshing` StateFlow, `_userMessage` SharedFlow(extraBufferCapacity=1).
+  `refresh()` ahora trackea estado refreshing. Todos los CRUD emiten mensaje de exito.
+- `RecetasApp.kt`: SnackbarHostState en MainShell con LaunchedEffect collector. SnackbarHost en Scaffold.
+  PullToRefreshBox en RecipeList, StockList, ShoppingListScreen y NotesScreen.
+
+Build: `gradle assembleDebug` — BUILD SUCCESSFUL.
+
+### Sprint 8.2 — Busqueda global ✅ COMPLETADO (2026-05-28)
+
+**Android** (commit 8a0cc18):
+- `RecetasApp.kt`: Buscador OutlinedTextField en RecipeList (titulo+descripcion), StockList (nombre) y
+  NotesScreen (titulo+cuerpo). Filtro local en memoria. Empty state contextual con query.
+
+**Desktop** (commit 8a0cc18):
+- `RecipeListView.java`: updateRecipeCount() reactivo via ListChangeListener. Label "Mostrando X de Y"
+  al filtrar. StatusLabel reposicionado encima del boton Nuevo (mejor UX).
+
+mvn compile — EXITOSO.
+
+### Sprint 8.3 — Modo Cocina Android ✅ COMPLETADO (2026-05-28)
+
+Archivos modificados (commit 8a0cc18):
+- `RecetasApp.kt`: CookingScreen composable — pantalla completa con:
+  - Paso a paso con LinearProgressIndicator.
+  - Instruccion en MaterialTheme.typography.headlineMedium (letra grande).
+  - Temporizador countdown MM:SS con play/pause; color cambia al terminar.
+  - Keep screen on con FLAG_KEEP_SCREEN_ON (DisposableEffect).
+  - Navegacion Anterior/Siguiente; estado final "Buen provecho!".
+  - Acceso desde menu contextual de RecipeDetail (opcion "Modo Cocina").
+  - cookingMode state en RecipeList con branch en when{}.
+
+Build: `gradle assembleDebug` — BUILD SUCCESSFUL. 0 warnings.
+
+---
+
+## Sprint 8 — PENDIENTE
+
+### Candidatos restantes (orden recomendado)
+- **Modo Cocina Desktop** — CookingView JavaFX: similar a Android, con temporizador.
 - **Fotos de receta** — subida y visualizacion de fotos (Android + Desktop).
-- **Busqueda global** — filtrar recetas por nombre/ingrediente/categoria en ambas plataformas.
-
-### Mejoras de UX pendientes
-- **Paginacion de recetas** — RecipeList Android carga todas las recetas (sin paginar).
-- **Pull-to-refresh** — Android: gesto pull-to-refresh en listas.
-- **Empty states** — pantallas vacias con ilustraciones y CTA (crear primera receta, anadir primer item de stock...).
-- **Feedback de acciones** — Snackbar/Toast en Android al crear/editar/eliminar.
-
-### Infraestructura
-- **Crear/editar receta Desktop** — RecipeFormDialog ya existe; anadir soporte para editar ingredientes/pasos inline.
-- **CRUD Update/Delete offline Android** — actualmente solo Create es offline-resilient.
-- **Push git al remoto** — la rama main tiene 6 commits sin pushear.
+- **Empty states ilustrados** — ilustraciones con CTA en pantallas vacias.
+- **CRUD Update/Delete offline Android** — solo Create es offline-resilient actualmente.
+- **Paginacion de recetas** — RecipeList Android carga todas las recetas sin paginar.
+- **Push git al remoto** — rama main tiene 7 commits sin pushear.
 
 ---
 
