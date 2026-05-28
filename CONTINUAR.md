@@ -399,15 +399,27 @@ Build: `gradle assembleDebug` — BUILD SUCCESSFUL. 0 warnings.
 
 ---
 
+### Sprint 8.4 — Modo Cocina Desktop ✅ COMPLETADO (2026-05-28)
+
+Archivos creados/modificados (commit a5174cb):
+- `CookingView.java` (nuevo): Stage maximizado con paso a paso, ProgressBar, instruccion en 34px,
+  temporizador countdown MM:SS con Timeline JavaFX, play/pause/reiniciar, color rojo al finalizar,
+  pantalla final "Buen provecho!".
+- `RecipeDetailView.java`: campo `currentSteps`, boton "Modo Cocina" en action bar,
+  metodo `openCookingMode()`.
+
+mvn compile: BUILD SUCCESS.
+
+---
+
 ## Sprint 8 — PENDIENTE
 
 ### Candidatos restantes (orden recomendado)
-- **Modo Cocina Desktop** — CookingView JavaFX: similar a Android, con temporizador.
 - **Fotos de receta** — subida y visualizacion de fotos (Android + Desktop).
 - **Empty states ilustrados** — ilustraciones con CTA en pantallas vacias.
 - **CRUD Update/Delete offline Android** — solo Create es offline-resilient actualmente.
 - **Paginacion de recetas** — RecipeList Android carga todas las recetas sin paginar.
-- **Push git al remoto** — rama main tiene 7 commits sin pushear.
+- **Push git al remoto** — rama main tiene 9 commits sin pushear.
 
 ---
 
