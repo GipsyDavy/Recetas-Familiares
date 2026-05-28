@@ -59,10 +59,29 @@ public final class SyncDtos {
             boolean deleted
     ) {}
 
-    // Stub inner DTOs for collections not yet fully implemented on Desktop
     public static final class MenuDtos {
         private MenuDtos() {}
-        public record MenuItemDto(String id) {}
+
+        public record MenuItemDto(
+                String id,
+                String familyId,
+                String recipeId,
+                String recipeTitle,
+                String plannedDate,
+                String mealType,
+                String note,
+                String createdAt,
+                String updatedAt,
+                long syncVersion,
+                boolean deleted
+        ) {}
+
+        public record MenuPageResponse(
+                java.util.List<MenuItemDto> content,
+                int totalElements,
+                int totalPages,
+                int number
+        ) {}
     }
 
     public static final class ShoppingDtos {

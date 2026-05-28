@@ -77,32 +77,105 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 - 57 tests, 0 fallos.
 - Hardening HTTP: CSP, HSTS, CORS deny-by-default.
 - OpenAPI/Swagger desactivado en produccion.
-- Seed de desarrollo opcional.
+- Seed de desarrollo: demo@recetas.local / Demo1234!Familia
 
-### Android Kotlin + Compose (EN PROGRESO - Sprint 2 completado)
+**Arranque dev:**
+```
+java -jar backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar \
+  --spring.profiles.active=dev \
+  --spring.datasource.password=Recetas2024! \
+  --app.dev.seed-data.enabled=true \
+  --app.dev.seed-data.email=demo@recetas.local \
+  --app.dev.seed-data.password=Demo1234!Familia \
+  --app.dev.seed-data.display-name=Demo \
+  --app.dev.seed-data.family-name=FamiliaDemo
+```
+O desde bash (evita problemas con ! en PowerShell):
+```bash
+java -jar "backend/target/..." --spring.profiles.active=dev \
+  "--spring.datasource.password=Recetas2024!" \
+  "--app.dev.seed-data.password=Demo1234!Familia" ...
+```
 
-Corregidos en Sprint 2:
-- `isLoggedIn` como `StateFlow<Boolean>` — navegacion reactiva.
-- `SyncPullDto` con las 11 colecciones del backend.
-- `SyncPushRequestDto` tipado — contrato push correcto.
-- `TokenRefreshAuthenticator` — renovacion automatica de tokens ante 401.
-- `SessionStore` con `EncryptedSharedPreferences` — tokens cifrados.
-- Singleton `AppContainer` en `RecetasApplication`.
-- `SyncWorker` usa el singleton (no instancia nuevo `AppContainer`).
-- Logging `NONE` en release.
-- Room version 2: 10 entidades + 10 DAOs completos.
-- Sync incremental con `lastSyncTime` y `serverTime`.
-- `allowBackup=false`.
+### Android Kotlin + Compose (SPRINT 2 COMPLETO — VERIFICADO EN EMULADOR)
 
-Bloqueante pendiente: instalar Android SDK y verificar compilacion.
+Stack completo verificado end-to-end el 2026-05-27:
+- Login exitoso contra backend real
+- Pantalla Recetas con lista cargada desde API
+- Bottom Navigation con tabs Recetas y Stock
 
-### Desktop JavaFX (Sprint 2 completado)
+Fixes aplicados en esta sesion:
+- AGP 9 DSL migration completa (kotlin compilerOptions, sin kotlinOptions deprecated)
+- KSP 2.3.0 → 2.3.7 (alineado con Kotlin 2.3.20)
+- org.gradle.jvmargs=-Xmx4g (D8 OutOfMemoryError)
+- SSL PKIX fix: Windows-ROOT truststore en gradle.properties
+- `network_security_config.xml` → cleartext HTTP permitido a 10.0.2.2 (emulador)
+- AndroidManifest.xml con android:networkSecurityConfig
 
-JavaFX 21 + OkHttp + Gson. Compila y genera fat JAR. Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
+Arquitectura Android:
+- MVVM + Repository Pattern
+- Retrofit + OkHttp (TokenRefreshAuthenticator para JWT refresh automatico)
+- Room v2: 10 entidades + 10 DAOs
+- WorkManager (SyncWorker incremental con lastSyncTime)
+- EncryptedSharedPreferences (SessionStore)
+- AppContainer singleton en RecetasApplication
+
+Compilar y desplegar:
+```
+# Desde android/
+gradle assembleDebug          # usa C:\tmp\tools\gradle-9.5.1
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+SDK: C:\Users\GipsyDavy\AndroidSDK
+AVD: Pixel_9_Pro (API 36, Compose)
+API base URL en emulador: http://10.0.2.2:8080/
+
+Deuda tecnica pendiente:
+- Reemplazar fallbackToDestructiveMigration con migraciones Room explicitas (antes de beta)
+- Pantalla detalle de receta (tap en item → ver ingredientes + pasos)
+- Pantalla Stock funcional
+- WorkManager sync automatico en background
+
+### Desktop JavaFX (SPRINT 2 COMPLETO)
+
+JavaFX 21 + OkHttp + Gson. Compila y genera fat JAR (13.3 MB).
 
 Sprint 1: Login, RecipeList (SplitPane + filtro), StockView (TableView), MainWindow (sidebar), CSS paleta calida.
-Sprint 2: Dashboard GridPane 2 col (recetas recientes + stock expirando), formulario creacion receta (modal), edicion receta pre-rellenada, borrado con confirmacion. Desktop completamente usable CRUD de recetas.
+Sprint 2: Dashboard GridPane 2 columnas (recetas recientes col0=60% + stock expirando+acciones col1=40%), RecipeFormDialog con forCreate()/forEdit(), RecipeDetailView con Editar+Eliminar, sidebar "Inicio/Recetas/Stock".
+
+Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
+
+SSL fix: desktop/.mvn/jvm.config con -Djavax.net.ssl.trustStoreType=Windows-ROOT
+
+Deuda tecnica pendiente:
+- Vista Menus semanales (no implementada)
+- Persistencia de tokens en OS keystore (actualmente en memoria)
 
 ### Base de Datos MySQL
 
-9 migraciones Flyway. 14 tablas principales con soft delete, syncVersion y UUID como PK.
+- MySQL80 service en localhost:3306
+- Usuario: recetas_app / Recetas2024!
+- Base de datos: recetas_familiares
+- 9 migraciones Flyway. 14 tablas principales con soft delete, syncVersion y UUID como PK.
+
+---
+
+## Sprint 3 Completado (2026-05-28)
+
+### Android
+- `RecipeDetail`: tap en receta → ingredientes + pasos reactivos desde Room via ViewModel flows
+- `StockScreen`: mejorada con badges "Bajo stock", colores de caducidad (rojo ≤3d, naranja ≤7d), empty state
+- ViewModel: `ingredientsFor()` y `stepsFor()` métodos expuestos
+
+### Desktop
+- `WeeklyMenuView`: calendario semanal GridPane 8×5 (Lun-Dom × 4 comidas), navegación de semanas, highlight hoy
+- `MenuRepository`: integración con endpoint `/api/v1/families/{id}/menu-items`
+- Sidebar: botón "Menú semanal" añadido
+
+## Proximos Pasos Recomendados (Sprint 4)
+
+1. **Desktop — Asignar recetas al menú**: CRUD desde WeeklyMenuView (POST/DELETE menu-items)
+2. **Android — WorkManager automático**: activar sync background real con constraints de red
+3. **Android — Migraciones Room explícitas**: reemplazar fallbackToDestructiveMigration antes de beta
+4. **Desktop — Persistencia de tokens**: guardar tokens en OS keystore entre reinicios

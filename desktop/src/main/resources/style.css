@@ -362,6 +362,76 @@
     -fx-font-style: italic;
 }
 
+/* ── Weekly Menu ─────────────────────────────────────────────────────────────── */
+.menu-view {
+    -fx-background-color: #FAF7F2;
+}
+
+.menu-week-label {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3D2B1F;
+}
+
+.menu-grid {
+    -fx-background-color: transparent;
+}
+
+.menu-day-header {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3D2B1F;
+    -fx-background-color: #F0E6D8;
+    -fx-background-radius: 8;
+    -fx-padding: 6 8;
+    -fx-alignment: CENTER;
+}
+
+.menu-day-header-today {
+    -fx-background-color: #C17D52;
+    -fx-text-fill: white;
+}
+
+.menu-meal-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #8B6F5E;
+    -fx-alignment: CENTER;
+    -fx-background-color: #FAF7F2;
+}
+
+.menu-cell {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 8;
+    -fx-border-color: #EDE0D0;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.04), 3, 0, 0, 1);
+}
+
+.menu-cell-filled {
+    -fx-background-color: #FFF8F2;
+    -fx-border-color: #D4BBA8;
+}
+
+.menu-cell-empty {
+    -fx-font-size: 16px;
+    -fx-text-fill: #E0D0C0;
+    -fx-alignment: CENTER;
+}
+
+.menu-cell-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3D2B1F;
+}
+
+.menu-cell-note {
+    -fx-font-size: 11px;
+    -fx-text-fill: #8B6F5E;
+    -fx-font-style: italic;
+}
+
 /* ── Form dialog ─────────────────────────────────────────────────────────────── */
 .form-content {
     -fx-background-color: #FAF7F2;

@@ -12,3 +12,6 @@ app/build/
 
 # Kotlin generated
 .kotlin/
+
+# JVM heap dumps
+*.hprof

@@ -6,6 +6,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="Recetas Familiares"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.RecetasFamiliares">
         <activity
             android:name=".MainActivity"

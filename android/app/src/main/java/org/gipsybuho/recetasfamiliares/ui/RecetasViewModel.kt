@@ -8,6 +8,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
+import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
+import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import org.gipsybuho.recetasfamiliares.sync.SyncWorker
 import java.util.concurrent.TimeUnit
@@ -63,6 +66,12 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             .build()
         workManager.enqueueUniquePeriodicWork("family-sync", ExistingPeriodicWorkPolicy.UPDATE, request)
     }
+
+    fun ingredientsFor(recipeId: String): Flow<List<RecipeIngredientEntity>> =
+        container.database.recipeIngredientDao().observeIngredients(recipeId)
+
+    fun stepsFor(recipeId: String): Flow<List<RecipeStepEntity>> =
+        container.database.recipeStepDao().observeSteps(recipeId)
 }
 
 class RecetasViewModelFactory(private val container: AppContainer) : ViewModelProvider.Factory {

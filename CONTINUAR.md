@@ -43,8 +43,8 @@ Plataformas objetivo:
 Antes de continuar, leer y cumplir:
 
 - `CLAUDE.md`
-- `MACRO-PROMPT-RECETAS-FAMILIA.md`
 - `Resumen.md`
+- `MACRO-PROMPT-RECETAS-FAMILIA.md`
 - este `CONTINUAR.md`
 
 Reglas tecnicas clave:
@@ -62,257 +62,259 @@ Reglas tecnicas clave:
 - Soft delete obligatorio.
 - Preparar Android/Desktop para sincronizacion offline.
 
-## Herramientas
+---
 
-Se dejo Maven y Gradle disponibles en PATH de usuario:
+## Entorno de desarrollo
 
-```text
-C:\Program Files\Apache NetBeans\java\maven\bin
-C:\tmp\tools\gradle-9.5.1\bin
+### Java
+- Ejecutable: `C:\Program Files\Common Files\Oracle\Java\javapath\java.exe`
+- Version activa: Java 26
+
+### Gradle (Android)
+- Instalacion global: `C:\tmp\tools\gradle-9.5.1\bin\gradle.bat`
+- **No hay gradlew en el proyecto** — usar gradle global
+- Compilar APK: ejecutar `gradle assembleDebug` desde `android/`
+
+### Maven (Desktop + Backend)
+- Disponible en PATH: `C:\Program Files\Apache NetBeans\java\maven\bin`
+- Si no responde, recargar PATH:
+  ```powershell
+  $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')
+  ```
+
+### Android SDK
+- SDK dir: `C:\Users\GipsyDavy\AndroidSDK`
+- ADB: `C:\Users\GipsyDavy\AndroidSDK\platform-tools\adb.exe`
+- AVD: `Pixel_9_Pro` (API 36) — arranca desde snapshot en ~5 segundos
+- `android/local.properties` (no en git):
+  ```properties
+  sdk.dir=C\:\\Users\\GipsyDavy\\AndroidSDK
+  ```
+
+### MySQL
+- Servicio Windows: `MySQL80` (corriendo)
+- Host: localhost:3306
+- Usuario app: `recetas_app` / `Recetas2024!`
+- Base de datos: `recetas_familiares`
+- Root: password desconocido (no es "root")
+
+---
+
+## Arranque del entorno dev
+
+### 1. Arrancar backend (USAR BASH, no PowerShell — evita problemas con ! en passwords)
+
+```bash
+java -jar "C:\Users\GipsyDavy\MAVEN\Recetas Familiares\backend\target\recetas-familiares-backend-0.1.0-SNAPSHOT.jar" \
+  --spring.profiles.active=dev \
+  "--spring.datasource.password=Recetas2024!" \
+  "--app.dev.seed-data.enabled=true" \
+  "--app.dev.seed-data.email=demo@recetas.local" \
+  "--app.dev.seed-data.password=Demo1234!Familia" \
+  "--app.dev.seed-data.display-name=Demo" \
+  "--app.dev.seed-data.family-name=FamiliaDemo" \
+  > /tmp/backend.log 2>&1 &
+
+# Esperar arranque:
+until grep -q "Started BackendApplication" /tmp/backend.log; do sleep 3; done
 ```
 
-En esta sesion puede hacer falta recargar PATH:
+Credenciales seed: `demo@recetas.local` / `Demo1234!Familia`
+Nota: el seed NO actualiza password si el usuario ya existe. La primera ejecucion lo fija.
+
+### 2. Arrancar emulador Android
 
 ```powershell
-$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')
+$emulator = "C:\Users\GipsyDavy\AndroidSDK\emulator\emulator.exe"
+& $emulator -avd Pixel_9_Pro -no-snapshot-save
 ```
 
-El build actual usa Java instalado en la maquina. Maven compila con release 21, aunque la JVM detectada en tests fue Java 25.
+### 3. Compilar e instalar APK
 
-Advertencia conocida:
-
-- Mockito/Byte Buddy muestra warning con Java 25.
-- No rompe build ni tests.
-- Futuro recomendado: usar JDK 21 LTS o configurar Mockito como javaagent.
-
-## Backend implementado
-
-Se creo backend Maven Spring Boot en:
-
-```text
-backend/
+```powershell
+# Desde android/
+gradle assembleDebug
+$adb = "C:\Users\GipsyDavy\AndroidSDK\platform-tools\adb.exe"
+& $adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
-Stack actual:
-
-- Spring Boot 3.5.14.
-- Java configurado como 21.
-- Maven.
-- Spring Web.
-- Spring Security.
-- Spring Data JPA.
-- Bean Validation.
-- Flyway.
-- MySQL.
-- H2 para tests.
-- OpenAPI/Swagger.
-- JJWT.
-
-Estado: **COMPLETO Y ESTABLE**. 57 tests, 0 fallos.
-
-## Configuracion backend
-
-Archivos:
-
-- `backend/pom.xml`
-- `backend/src/main/resources/application.yml`
-- `backend/src/main/resources/application-dev.yml`
-- `backend/src/main/resources/application-prod.yml`
-- `backend/src/test/resources/application-test.yml`
-
-## Seguridad backend implementada
-
-- seguridad stateless;
-- JWT Bearer access token (TTL 15 min por defecto);
-- refresh tokens opacos almacenados como hash SHA-256;
-- rotacion de refresh token;
-- logout con revocacion;
-- BCrypt(12) para passwords;
-- errores JSON para 401 y 403;
-- filtros JWT;
-- endpoints publicos limitados a auth, health y Swagger/OpenAPI;
-- permisos familiares por rol: `OWNER` y `ADMIN` escriben/borran/sync push; `MEMBER` lee;
-- rate limiting configurable en auth endpoints;
-- respuestas `429` con codigo `rate_limited` y cabecera `Retry-After`;
-- cabeceras defensivas HTTP: CSP, nosniff, frame deny, referrer policy y permissions policy;
-- HSTS configurado para HTTPS;
-- CORS deny-by-default salvo origenes configurados en `CORS_ALLOWED_ORIGINS`.
-
-## Modulos backend implementados
-
-- auth (register, login, refresh, logout);
-- familias;
-- recetas (CRUD + paginacion + soft delete);
-- ingredientes y pasos (PUT replace-all + tombstones);
-- stock familiar;
-- menus semanales;
-- listas de compra (con generate-from-menu);
-- favoritos;
-- notas familiares;
-- fotos de receta (solo metadata/URLs, nunca binarios);
-- sincronizacion pull/push completa con tombstones y deteccion de conflictos.
-
-## Migraciones Flyway
-
-```text
-V1__create_identity_schema.sql
-V2__create_recipes_schema.sql
-V3__create_recipe_contents_schema.sql
-V4__create_stock_schema.sql
-V5__create_menu_schema.sql
-V6__create_shopping_schema.sql
-V7__create_favorites_schema.sql
-V8__create_notes_schema.sql
-V9__create_recipe_photos_schema.sql
-```
-
-## Tests backend
-
-- 57 tests, 0 fallos, 0 errores.
-- Cubren: contexto, health, auth, familias, recetas, contenidos, stock, menus, compra, favoritos, notas, fotos, sync pull/push, permisos, rate limiting, hardening HTTP/CORS, tombstones.
-
-## Estado Git actual
-
-- Rama main por delante de origin/main en 3 commits.
-- No se ha hecho push todavia.
-- Commits locales pendientes de push:
-  - `ff73840 Scaffold Android client`
-  - `a58ebca Update continuation notes after backend stabilization`
-  - `2aad060 Stabilize backend OpenAPI and dev seed data`
-
-## Android - Estado actual (Sprint 2 completado)
-
-Ruta:
-
-```text
-android/
-```
-
-Stack:
-
-- Android Gradle Plugin 9.2.0.
-- Kotlin 2.3.20.
-- Compose + Material 3.
-- Retrofit 3.
-- OkHttp logging.
-- Room 2.8.4 (version DB: 2).
-- KSP para Room.
-- WorkManager.
-- security-crypto 1.1.0-alpha06.
-- MVVM ligero sin DI framework externo.
-
-### Corregido en Sprint 2
-
-1. **`isLoggedIn` reactivo** — Ahora es `StateFlow<Boolean>`. La navegacion login → main funciona correctamente.
-2. **`SyncPullDto` completo** — Las 11 colecciones del backend: recipes, ingredients, steps, stockItems, menuItems, shoppingLists, shoppingListItems, favoriteRecipes, familyNotes, recipePhotos.
-3. **`SyncPushRequestDto` tipado** — Contrato push alineado con `SyncPushRequest` del servidor. Las colecciones requeridas (recipes, ingredients, steps) se envian siempre como lista vacia si no hay cambios.
-4. **`TokenRefreshAuthenticator`** — OkHttp Authenticator que detecta 401, llama a `/api/v1/auth/refresh`, actualiza tokens y reintenta. Limpia sesion si el refresh falla.
-5. **`SessionStore` con `EncryptedSharedPreferences`** — Tokens cifrados con AES256-GCM. Incluye campo `lastSyncTime` para sync incremental.
-6. **`AppContainer` singleton** — `sessionStore` y `database` publicos. `SyncWorker` usa el `AppContainer` del `RecetasApplication` (singleton).
-7. **Logging condicional** — `HttpLoggingInterceptor.Level.BASIC` en debug, `NONE` en release.
-8. **Room version 2** — Todas las entidades: recetas, ingredientes, pasos, stock, menus, listas de compra, items de lista, favoritos, notas, fotos. `fallbackToDestructiveMigration` para desarrollo.
-9. **DAOs completos** — 10 DAOs con queries tipadas y `@Upsert`.
-10. **Mappers completos** — Todos los DTOs a entidades Room.
-11. **Sync incremental** — `SyncRepository.pullOnce()` pasa `lastSyncTime` como `since` y guarda el nuevo `serverTime`.
-12. **`allowBackup=false`** — Seguridad: no se hace backup de tokens cifrados.
-
-### Bloqueo Android actual
-
-- No existe `ANDROID_HOME` / `ANDROID_SDK_ROOT`.
-- Falta crear `android/local.properties` con `sdk.dir=...`.
-- Sin SDK no compila.
-
-### Proximo paso Android
-
-1. Instalar/configurar Android SDK.
-2. Crear `android/local.properties`:
-   ```properties
-   sdk.dir=C\:\\Users\\GipsyDavy\\AppData\\Local\\Android\\Sdk
-   ```
-3. Ejecutar:
-   ```powershell
-   cd android
-   gradle :app:compileDebugKotlin
-   gradle :app:assembleDebug
-   ```
-4. Corregir errores de compilacion si aparecen (KSP version, AGP flags).
-5. Probar en emulador con backend en dev.
-
-### Advertencia tecnica Android
-
-- AGP 9.2 + KSP: `android.builtInKotlin=false` / `android.newDsl=false` son workarounds temporales.
-- KSP version `2.3.0` puede estar desalineada con Kotlin `2.3.20`. Verificar y alinear cuando compile.
-- `fallbackToDestructiveMigration` activo: la DB Room se reinicia ante cambios de schema. Aceptable en desarrollo.
-
-## Desktop JavaFX (Sprint 1 completado)
-
-Scaffold completo creado. Ruta:
-
-```text
-desktop/
-```
-
-Stack:
-
-- Java 21 + JavaFX 21.0.2.
-- OkHttp 4.12.0 (cliente HTTP con TokenRefresh Authenticator).
-- Gson 2.10.1.
-- Maven con javafx-maven-plugin.
-
-### Implementado en Sprint 1
-
-1. **`pom.xml`** — JavaFX 21, OkHttp, Gson, maven-shade-plugin para fat jar.
-2. **`DesktopApp`** — `Application` JavaFX. Punto de entrada.
-3. **`AppSession`** — tokens en memoria, `familyId` y `lastSyncTime` en `java.util.prefs`.
-4. **`AppContext`** — singleton container sin DI framework.
-5. **`ApiClient`** — OkHttp con `Authenticator` para refresh JWT automático en 401. Cliente de refresh separado para evitar bucles.
-6. **DTOs** — `AuthDtos`, `RecipeDtos`, `StockDtos`, `SyncDtos` con Java records.
-7. **`SimpleCache<T>`** — `ObservableList` para binding directo en JavaFX.
-8. **Repositorios** — `AuthRepository`, `RecipeRepository`, `StockRepository`, `SyncRepository`.
-9. **`LoginView`** — formulario login con feedback de error y llamada en hilo virtual.
-10. **`RecipeListView`** — `SplitPane` lista filtrable + `RecipeDetailView` con ingredientes y pasos.
-11. **`StockView`** — `TableView` con ingrediente, cantidad y fecha de caducidad.
-12. **`MainWindow`** — `BorderPane` con sidebar oscuro, navegacion Recetas/Stock, boton Sincronizar, logout.
-13. **`style.css`** — paleta calida: tonos tierra (`#3D2B1F`, `#C17D52`, `#FAF7F2`).
-14. **`module-info.java`** — modulo Java 9+.
-
-### Ejecutar Desktop
+### 4. Arrancar Desktop
 
 ```powershell
 cd "C:\Users\GipsyDavy\MAVEN\Recetas Familiares\desktop"
 mvn javafx:run -Dapi.base.url=http://localhost:8080/
 ```
 
-### Deuda tecnica Desktop
+---
 
-- Tokens no se persisten entre reinicios (solo en memoria). Pendiente: keystore OS o cifrado similar a EncryptedSharedPreferences.
-- Push sync envia listas vacias — sin cola de cambios offline todavia.
-- Sin paginacion en scroll infinito — aceptable para MVP.
-- Modo Cocina (letra grande, temporizadores) no implementado todavia.
+## Backend (COMPLETO Y ESTABLE)
+
+Stack: Spring Boot 3.5.14 + Java 21 + MySQL + Flyway + JWT.
+
+Estado: **57 tests, 0 fallos.**
+
+Modulos implementados:
+- auth (register, login, refresh, logout)
+- familias
+- recetas (CRUD + paginacion + soft delete)
+- ingredientes y pasos (PUT replace-all + tombstones)
+- stock familiar
+- menus semanales
+- listas de compra (con generate-from-menu)
+- favoritos
+- notas familiares
+- fotos de receta (solo metadata/URLs)
+- sincronizacion pull/push completa con tombstones y deteccion de conflictos
+
+Seguridad:
+- JWT Bearer (TTL 15min) + refresh tokens opacos (hash SHA-256)
+- BCrypt(12) para passwords
+- Rate limiting en auth
+- CSP, HSTS, CORS deny-by-default
+- OpenAPI desactivado en produccion
+
+Migraciones Flyway V1-V9 (tablas: users, families, family_members, recipes, ingredients, steps, stock_items, menus, shopping_lists, shopping_list_items, favorite_recipes, family_notes, recipe_photos, refresh_tokens).
+
+---
+
+## Android Kotlin + Compose (VERIFICADO EN EMULADOR — 2026-05-27)
+
+Stack:
+- AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
+- Compose + Material 3 (BOM 2026.05.00)
+- Retrofit 3 + OkHttp 5
+- Room 2.8.4 (version DB: 2)
+- WorkManager 2.11.2
+- security-crypto 1.1.0-alpha06
+- MVVM sin DI framework (AppContainer manual)
+
+### Verificado funcionando (2026-05-27)
+- Login contra backend real: OK
+- Lista de recetas cargada desde API: OK
+- Bottom Navigation (Recetas / Stock): OK
+- Cleartext HTTP a emulador (10.0.2.2): OK via network_security_config.xml
+
+### Fixes aplicados (no revertir)
+- AGP 9 DSL completa: `kotlin { compilerOptions { jvmTarget = JVM_11 } }`, sin `kotlinOptions`, sin plugin `org.jetbrains.kotlin.android`
+- KSP: `2.3.7` (alineado con Kotlin 2.3.20)
+- `org.gradle.jvmargs=-Xmx4g` (D8 OutOfMemoryError)
+- SSL PKIX: `org.gradle.jvmargs` incluye `-Djavax.net.ssl.trustStoreType=Windows-ROOT -Djavax.net.ssl.trustStore=NUL`
+- `res/xml/network_security_config.xml`: permite cleartext a `10.0.2.2`
+- `AndroidManifest.xml`: `android:networkSecurityConfig="@xml/network_security_config"`
+
+### Arquitectura Android implementada
+- `RecetasApplication` → `AppContainer` singleton (sessionStore, database)
+- `SessionStore` → `EncryptedSharedPreferences` (tokens + lastSyncTime)
+- `ApiClient` → OkHttp con `TokenRefreshAuthenticator` (cliente refresh separado)
+- Room v2: 10 entidades, 10 DAOs con `@Upsert`
+- `SyncWorker` → WorkManager, sync incremental con `lastSyncTime`
+- `isLoggedIn`: `StateFlow<Boolean>` reactivo
+- `SyncPullDto` con las 11 colecciones del backend
+- Logging: `BASIC` en debug, `NONE` en release
+
+### Pantallas implementadas
+- `LoginScreen` — campos email/password, boton Entrar, error reactivo
+- `RecipeListScreen` — lista de recetas desde Room/API, boton Actualizar
+- Bottom Navigation: tabs Recetas y Stock
+
+### Completado Android (Sprint 3 — 2026-05-28)
+1. `RecipeDetail` — tap en receta → pantalla con ingredientes + pasos desde Room (flows reactivos via ViewModel) ✓
+2. `StockScreen` — pantalla Stock mejorada: badges "Bajo stock", color expiry (rojo ≤3d, naranja ≤7d), empty state ✓
+3. ViewModel: `ingredientsFor(recipeId)` y `stepsFor(recipeId)` exponen flows de Room ✓
+
+### Pendiente Android (Sprint 4)
+1. WorkManager sync automatico (ya programado cada 30 min, falta activar constraints en background real)
+2. Reemplazar `fallbackToDestructiveMigration` con migraciones Room explicitas (antes de beta)
+
+---
+
+## Desktop JavaFX (SPRINT 2 COMPLETO — 2026-05-27)
+
+Stack: Java 21 + JavaFX 21.0.2 + OkHttp 4.12.0 + Gson 2.10.1 + Maven.
+
+Fat JAR: 13.3 MB (`desktop/target/recetas-familiares-desktop-*.jar`).
+
+SSL fix: `desktop/.mvn/jvm.config` con Windows-ROOT truststore.
+
+### Pantallas implementadas (Sprint 1 + 2)
+- `LoginView` — formulario login con feedback de error
+- `DashboardView` — GridPane 2 columnas: recetas recientes (60%) + stock expirando + acciones (40%)
+- `RecipeListView` — SplitPane lista filtrable + detalle
+- `RecipeDetailView` — ingredientes, pasos, botones Editar + Eliminar con confirmacion
+- `RecipeFormDialog` — modal unico con `forCreate()` / `forEdit()` (pre-rellena campos en edicion)
+- `StockView` — TableView con ingrediente, cantidad, fecha caducidad
+- `MainWindow` — sidebar "Inicio / Recetas / Stock", boton Sincronizar, logout
+
+### Completado Desktop (Sprint 3 — 2026-05-28)
+1. `WeeklyMenuView` — calendario GridPane 8×5 (Lun-Dom × Desayuno/Comida/Cena/Merienda), nav semana anterior/hoy/siguiente, highlight del día actual, celdas rellenas con recipeTitle + note ✓
+2. `MenuRepository` — llama a `/api/v1/families/{id}/menu-items?weekStart=...` ✓
+3. Sidebar: botón "Menú semanal" agregado ✓
+4. `SyncDtos.MenuDtos.MenuItemDto` expandido con todos los campos reales ✓
+
+### Pendiente Desktop (Sprint 4)
+1. Persistencia de tokens entre reinicios (OS keystore)
+2. Asignación de recetas desde WeeklyMenuView (CRUD sobre menu-items)
+
+---
+
+## Estado Git
+
+Rama: `main`
+
+Commits locales pendientes de push (no se ha hecho push):
+```
+ff73840 Scaffold Android client
+a58ebca Update continuation notes after backend stabilization
+2aad060 Stabilize backend OpenAPI and dev seed data
+40cb14d v1
+ea353f0 Harden backend and add creator logo
+```
+
+Los cambios de las sesiones de Sprint 2 Desktop y verificacion Android **no estan commiteados todavia**.
+
+Archivos modificados sin commit:
+- `android/app/build.gradle.kts` (AGP 9 migration)
+- `android/build.gradle.kts` (KSP 2.3.7)
+- `android/gradle.properties` (Xmx4g + SSL fix)
+- `android/app/src/main/AndroidManifest.xml` (networkSecurityConfig)
+- `android/app/src/main/res/xml/network_security_config.xml` (nuevo)
+- `desktop/` — todo el modulo Desktop (Sprint 1 + 2)
+
+---
 
 ## Procedimiento al retomar
 
-1. Abrir la raiz: `C:\Users\GipsyDavy\MAVEN\Recetas Familiares`
+1. Abrir raiz: `C:\Users\GipsyDavy\MAVEN\Recetas Familiares`
 
-2. Leer: `CLAUDE.md`, `MACRO-PROMPT-RECETAS-FAMILIA.md`, `Resumen.md`, `CONTINUAR.md`, `backend/README.md`
+2. Leer: `CLAUDE.md`, `Resumen.md`, este `CONTINUAR.md`
 
-3. Comprobar estado:
+3. Comprobar estado git:
    ```powershell
    git status --short --branch
    ```
 
-4. Validar backend:
+4. Arrancar MySQL (si no esta corriendo):
    ```powershell
-   $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine'); mvn verify
+   Start-Service MySQL80
    ```
 
-5. Continuar con SDK Android o compilar Desktop con `mvn javafx:run`.
+5. Arrancar backend desde Bash tool (ver seccion "Arranque del entorno dev").
+
+6. Verificar backend:
+   ```bash
+   curl -s http://localhost:8080/actuator/health
+   ```
+   Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
+
+7. Continuar con el Sprint 3 segun prioridad (ver pendientes Android/Desktop arriba).
+
+---
 
 ## Deuda tecnica conocida y aceptada
 
-- Push sync envia listas vacias (no hay cola de cambios offline todavia). Correcto para MVP.
 - `fallbackToDestructiveMigration` en Room: cambiar por migraciones explicitas antes de beta.
-- KSP version desalineada con Kotlin: verificar cuando compile.
-- SyncService.push() sin batch: O(n) queries individuales. Documentado, no urgente para MVP.
+- Push sync Android envia listas vacias (sin cola de cambios offline). Correcto para MVP.
 - Sync pull sin paginacion: aceptable para familias pequenas.
+- Tokens Desktop solo en memoria: se pierden al reiniciar. Pendiente keystore OS.
 - Login devuelve primera familia (no determinista si hay varias): limitacion documentada para MVP.
+- Advertencia Mockito/Byte Buddy con Java 26: no rompe build ni tests.

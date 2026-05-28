@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.core;
 
 import org.gipsybuho.recetasfamiliares.api.ApiClient;
 import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository;
+import org.gipsybuho.recetasfamiliares.data.repository.MenuRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.SyncRepository;
@@ -16,6 +17,7 @@ public final class AppContext {
     private final AuthRepository authRepository;
     private final RecipeRepository recipeRepository;
     private final StockRepository stockRepository;
+    private final MenuRepository menuRepository;
     private final SyncRepository syncRepository;
 
     private AppContext() {
@@ -24,6 +26,7 @@ public final class AppContext {
         authRepository = new AuthRepository(apiClient, session);
         recipeRepository = new RecipeRepository(apiClient, session);
         stockRepository = new StockRepository(apiClient, session);
+        menuRepository = new MenuRepository(apiClient, session);
         syncRepository = new SyncRepository(apiClient, session, recipeRepository, stockRepository);
     }
 
@@ -37,6 +40,7 @@ public final class AppContext {
     public AuthRepository getAuthRepository() { return authRepository; }
     public RecipeRepository getRecipeRepository() { return recipeRepository; }
     public StockRepository getStockRepository() { return stockRepository; }
+    public MenuRepository getMenuRepository() { return menuRepository; }
     public SyncRepository getSyncRepository() { return syncRepository; }
 
     public void shutdown() {
