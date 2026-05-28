@@ -682,12 +682,36 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
 
 ---
 
-## Sprint 14 — PENDIENTE
+## Sprint 14 — EN CURSO (2026-05-28)
 
-Candidatos:
+### Sprint 14.1 — Historial de menús Android ✅ COMPLETADO (Claude Code)
 
-1. **Historial de menús Android** — navegación ← → semanas pasadas en la pantalla de menú (Desktop ya lo tiene desde Sprint 1).
-2. **Paginación stock Desktop** — el endpoint actual devuelve array plano; añadir `loadNextPage()` si el stock crece mucho.
-3. **Exportar receta Desktop a archivo** — guardar como .txt desde RecipeDetailView (FileChooser).
-4. **Compartir lista de la compra Android** — Intent.ACTION_SEND con los ítems pendientes.
-5. **Notificaciones caducidad stock Android mejoradas** — agrupar por urgencia (hoy / esta semana).
+- `MenuScreen.kt` (nuevo): LazyColumn con nav ← → semanas, cards por día, MealRow, empty state.
+  Filtra `menuItems` (Room) por semana. Muestra "Esta semana / Semana pasada / Hace N semanas / Próxima semana".
+- `RecetasViewModel.kt`: `menuItems` StateFlow via `database.menuItemDao().observeMenuItems()`.
+- `RecetasApp.kt`: 5º tab MENU (CalendarMonth icon). `isRefreshing` colectado en MainShell.
+- Build: `gradle assembleDebug` — BUILD SUCCESSFUL.
+
+### Sprint 14.4 — Compartir lista de la compra Android ✅ COMPLETADO (Claude Code)
+
+- `RecetasApp.kt`: botón "Compartir" (OutlinedButton) en `ShoppingListDetail` header.
+  `shareShoppingList()`: construye texto con ✅/☐ + cantidad + unidad. Lanza `Intent.ACTION_SEND`.
+- Build: incluido en el mismo BUILD SUCCESSFUL de 14.1.
+
+### Sprint 14.5 — Notificaciones caducidad Android mejoradas ✅ COMPLETADO (Claude Code)
+
+- `ExpiryNotificationWorker.kt`: `EXPIRY_DAYS_AHEAD` extendido a 7.
+  Dos grupos: `todayItems` (daysLeft==0) con PRIORITY_HIGH y NOTIFICATION_ID_TODAY=1001;
+  `weekItems` (1-7 días) con PRIORITY_DEFAULT y NOTIFICATION_ID_WEEK=1002.
+  Cada grupo dispara su propia notificación solo si no está vacío.
+- Build: incluido en el mismo BUILD SUCCESSFUL.
+
+### Sprint 14.2 — Paginación stock Desktop ⏳ PENDIENTE Codex
+
+- `StockView.java`: paginación client-side PAGE_SIZE=50. displayItems + refreshDisplay() + botón "Cargar más".
+- Bloque Codex generado — pendiente de ejecución por el usuario.
+
+### Sprint 14.3 — Exportar receta Desktop a archivo ⏳ PENDIENTE Codex
+
+- `RecipeDetailView.java`: botón "💾 Exportar", método `exportToFile()`. FileChooser .txt, Files.writeString.
+- Bloque Codex generado — pendiente de ejecución por el usuario.

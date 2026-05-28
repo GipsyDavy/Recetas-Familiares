@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Restaurant
@@ -53,7 +55,7 @@ import androidx.work.WorkManager
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 
-internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES }
+internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES, MENU }
 
 @Composable
 fun RecetasApp(viewModel: RecetasViewModel) {
@@ -109,6 +111,8 @@ private fun MainShell(viewModel: RecetasViewModel) {
     val stockItems by viewModel.stockItems.collectAsState()
     val shoppingLists by viewModel.shoppingLists.collectAsState()
     val notes by viewModel.notes.collectAsState()
+    val menuItems by viewModel.menuItems.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -161,6 +165,8 @@ private fun MainShell(viewModel: RecetasViewModel) {
                     icon = { Icon(Icons.Outlined.ShoppingCart, contentDescription = null) }, label = { Text("Lista") })
                 NavigationBarItem(selected = tab == MainTab.NOTES, onClick = { tab = MainTab.NOTES },
                     icon = { Icon(Icons.Outlined.Description, contentDescription = null) }, label = { Text("Notas") })
+                NavigationBarItem(selected = tab == MainTab.MENU, onClick = { tab = MainTab.MENU },
+                    icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) }, label = { Text("Menú") })
             }
         }
     ) { padding ->
@@ -183,6 +189,7 @@ private fun MainShell(viewModel: RecetasViewModel) {
                 MainTab.STOCK    -> StockList(stockItems, Modifier.padding(padding), viewModel)
                 MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
                 MainTab.NOTES    -> NotesScreen(notes, Modifier.padding(padding), viewModel)
+                MainTab.MENU     -> MenuScreen(menuItems, Modifier.padding(padding), isRefreshing, viewModel::refresh)
             }
         }
     }
@@ -233,11 +240,13 @@ private fun ShoppingListScreen(lists: List<ShoppingListEntity>, modifier: Modifi
 private fun ShoppingListDetail(list: ShoppingListEntity, viewModel: RecetasViewModel, onBack: () -> Unit) {
     val items by viewModel.itemsFor(list.id).collectAsState(initial = emptyList())
     val pending = items.count { !it.checked }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Column {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Button(onClick = onBack) { Text("← Volver") }
             Text(list.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { shareShoppingList(context, list.name, items) }) { Text("Compartir") }
         }
         if (pending > 0) {
             Text("$pending pendiente${if (pending != 1) "s" else ""}",
@@ -258,6 +267,29 @@ private fun ShoppingListDetail(list: ShoppingListEntity, viewModel: RecetasViewM
             }
         }
     }
+}
+
+private fun shareShoppingList(
+    context: android.content.Context,
+    listName: String,
+    items: List<ShoppingListItemEntity>
+) {
+    val sb = StringBuilder()
+    sb.append("🛒 $listName\n\n")
+    items.forEach { item ->
+        val check = if (item.checked) "✅" else "☐"
+        sb.append("$check ${item.name}")
+        item.quantity?.let { q ->
+            sb.append("  ${q.toBigDecimal().stripTrailingZeros().toPlainString()}")
+            item.unit?.takeIf { it.isNotBlank() }?.let { u -> sb.append(" $u") }
+        }
+        sb.append("\n")
+    }
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, sb.toString().trim())
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartir lista de la compra"))
 }
 
 @Composable

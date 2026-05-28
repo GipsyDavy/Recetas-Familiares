@@ -25,8 +25,9 @@ class ExpiryNotificationWorker(
 
     companion object {
         const val CHANNEL_ID = "expiry_alerts"
-        const val NOTIFICATION_ID = 1001
-        private const val EXPIRY_DAYS_AHEAD = 3L
+        const val NOTIFICATION_ID_TODAY = 1001
+        const val NOTIFICATION_ID_WEEK = 1002
+        private const val EXPIRY_DAYS_AHEAD = 7L
     }
 
     override suspend fun doWork(): Result {
@@ -38,55 +39,63 @@ class ExpiryNotificationWorker(
 
         val expiring = database.stockDao().findExpiringItems()
 
-        val items = expiring.filter { item ->
+        fun daysLeft(item: org.gipsybuho.recetasfamiliares.data.local.StockItemEntity): Long =
             item.expiresAt?.let { dateStr ->
-                runCatching {
-                    val expiryDate = LocalDate.parse(dateStr.substring(0, 10))
-                    val daysLeft = ChronoUnit.DAYS.between(today, expiryDate)
-                    daysLeft in 0..EXPIRY_DAYS_AHEAD
-                }.getOrDefault(false)
-            } ?: false
-        }
-
-        if (items.isEmpty()) return Result.success()
-
-        val title = when (items.size) {
-            1 -> "1 artículo próximo a caducar"
-            else -> "${items.size} artículos próximos a caducar"
-        }
-
-        val body = items.joinToString("\n") { item ->
-            val daysLeft = item.expiresAt?.let { dateStr ->
                 runCatching {
                     ChronoUnit.DAYS.between(today, LocalDate.parse(dateStr.substring(0, 10)))
                 }.getOrDefault(-1L)
             } ?: -1L
-            "• ${item.name}: " + when (daysLeft) {
-                0L -> "caduca hoy"
-                1L -> "caduca mañana"
-                else -> "caduca en $daysLeft días"
-            }
-        }
 
-        val intent = Intent(applicationContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
+        val todayItems = expiring.filter { daysLeft(it) == 0L }
+        val weekItems  = expiring.filter { daysLeft(it) in 1L..EXPIRY_DAYS_AHEAD }
+
+        if (todayItems.isEmpty() && weekItems.isEmpty()) return Result.success()
+
         val pendingIntent = PendingIntent.getActivity(
-            applicationContext, 0, intent,
+            applicationContext, 0,
+            Intent(applicationContext, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle(title)
-            .setContentText(body.lines().firstOrNull() ?: body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .build()
+        val nm = NotificationManagerCompat.from(applicationContext)
 
-        NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, notification)
+        if (todayItems.isNotEmpty()) {
+            val body = todayItems.joinToString("\n") { "‼️ ${it.name}: caduca HOY" }
+            nm.notify(
+                NOTIFICATION_ID_TODAY,
+                NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                    .setContentTitle("${todayItems.size} artículo${if (todayItems.size > 1) "s" else ""} caducan HOY")
+                    .setContentText(todayItems.joinToString(", ") { it.name })
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .build()
+            )
+        }
+
+        if (weekItems.isNotEmpty()) {
+            val body = weekItems.joinToString("\n") { item ->
+                val d = daysLeft(item)
+                "• ${item.name}: caduca " + if (d == 1L) "mañana" else "en $d días"
+            }
+            nm.notify(
+                NOTIFICATION_ID_WEEK,
+                NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                    .setContentTitle("${weekItems.size} artículo${if (weekItems.size > 1) "s" else ""} caducan esta semana")
+                    .setContentText(weekItems.joinToString(", ") { it.name })
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .build()
+            )
+        }
+
         return Result.success()
     }
 

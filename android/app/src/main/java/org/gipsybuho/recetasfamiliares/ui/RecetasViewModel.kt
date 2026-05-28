@@ -25,6 +25,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
+import org.gipsybuho.recetasfamiliares.data.local.MenuItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
@@ -120,6 +121,10 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             .build()
         workManager.enqueueUniquePeriodicWork("expiry-check", ExistingPeriodicWorkPolicy.KEEP, expiryRequest)
     }
+
+    val menuItems: StateFlow<List<MenuItemEntity>> =
+        container.database.menuItemDao().observeMenuItems()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val shoppingLists: StateFlow<List<ShoppingListEntity>> =
         container.shoppingListRepository.shoppingLists
