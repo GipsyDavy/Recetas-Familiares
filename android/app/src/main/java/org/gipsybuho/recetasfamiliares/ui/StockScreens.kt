@@ -12,9 +12,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.outlined.Inventory2
@@ -103,7 +109,9 @@ internal fun StockList(
                                     Icon(Icons.Filled.Sort, contentDescription = "Ordenar por caducidad",
                                         tint = if (sortByExpiry) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                                 }
-                                Button(onClick = { viewModel.refresh() }) { Text("Actualizar") }
+                                IconButton(onClick = { viewModel.refresh() }) {
+                                    Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
+                                }
                             }
                         }
                         error?.let {
@@ -205,8 +213,10 @@ internal fun StockItemCard(item: StockItemEntity, onClick: () -> Unit = {}) {
 internal fun StockDetail(item: StockItemEntity, onBack: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val isLowStock = item.lowStockThreshold != null && item.quantity != null && item.quantity <= item.lowStockThreshold
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Button(onClick = onBack) { Text("← Volver") }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            }
             Text(item.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {

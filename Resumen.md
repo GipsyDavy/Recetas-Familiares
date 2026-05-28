@@ -99,7 +99,7 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT 14 COMPLETO — 2026-05-29)
+### Android Kotlin + Compose (SPRINT 15 COMPLETO — 2026-05-29)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -135,7 +135,7 @@ SDK: C:\Users\GipsyDavy\AndroidSDK
 AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-### Desktop JavaFX (SPRINT 14 COMPLETO — 2026-05-29)
+### Desktop JavaFX (SPRINT 15 COMPLETO — 2026-05-29)
 
 JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
@@ -214,7 +214,12 @@ Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 | 14.3 | 2026-05-29 | Exportar receta Desktop a .txt: botón "💾 Exportar" + FileChooser + Files.writeString |
 | 14.4 | 2026-05-29 | Compartir lista de la compra Android: botón "Compartir" + Intent.ACTION_SEND |
 | 14.5 | 2026-05-29 | Notificaciones caducidad Android mejoradas: HOY (PRIORITY_HIGH) + esta semana (7 días) |
+| 15.1 | 2026-05-29 | CRUD menú semanal Android: botón "+" + AssignMenuDialog (receta + tipo comida) |
+| 15.2 | 2026-05-29 | Navegar a receta desde MenuScreen: tap "Ver receta" → tab Recetas + RecipeDetail |
+| 15.3 | 2026-05-29 | Filtros dificultad recetas Android: FilterChip Fácil/Media/Difícil |
+| 15.4 | 2026-05-29 | Exportar lista de la compra Desktop: botón "💾 Exportar" → FileChooser .txt |
+| 15.5 | 2026-05-29 | Ordenar stock por caducidad Android: icono Sort toggle, color primary cuando activo |
 
-## Proximos Pasos — Sprint 15
+## Proximos Pasos — Sprint 16
 
 Ver CONTINUAR.md para contexto técnico completo.

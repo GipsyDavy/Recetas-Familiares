@@ -748,10 +748,13 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
   Toggle: tap activa, tap de nuevo desactiva. Se combina con búsqueda por texto.
   `difficultyFilter` state + combinación con `query` en el `filtered` val.
 
-### Sprint 15.4 — Exportar lista de la compra Desktop ⏳ PENDIENTE Codex
+### Sprint 15.4 — Exportar lista de la compra Desktop ✅ COMPLETADO (Codex, commit 2edfc88)
 
-- `ShoppingListView.java`: botón "💾 Exportar" + exportToFile(). FileChooser .txt, Files.writeString.
-- Bloque Codex generado — pendiente de ejecución por el usuario.
+- `ShoppingListView.java`: botón "💾 Exportar" junto a "Actualizar".
+  `exportToFile()`: carga ítems reales con `loadItems(selected.id())` en hilo virtual.
+  `saveListToFile()`: FileChooser .txt + `Files.writeString` UTF-8.
+  Formato: 🛒 nombre, ☐ pendientes, ✅ completados con cantidad y unidad.
+  mvn compile — BUILD SUCCESS.
 
 ### Sprint 15.5 — Ordenar stock por caducidad Android ✅ COMPLETADO (commit e67d734)
 
