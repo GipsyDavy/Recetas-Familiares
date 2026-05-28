@@ -16,6 +16,12 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE deleted = 0 ORDER BY updatedAt DESC")
     suspend fun findAll(): List<RecipeEntity>
 
+    @Query("SELECT * FROM recipes WHERE syncVersion = 0 AND deleted = 0")
+    suspend fun findPendingCreate(): List<RecipeEntity>
+
+    @Query("SELECT * FROM recipes WHERE syncVersion = 0 AND deleted = 1")
+    suspend fun findPendingDelete(): List<RecipeEntity>
+
     @Upsert
     suspend fun upsertAll(recipes: List<RecipeEntity>)
 }
@@ -25,6 +31,9 @@ interface RecipeIngredientDao {
     @Query("SELECT * FROM recipe_ingredients WHERE recipeId = :recipeId AND deleted = 0 ORDER BY position ASC")
     fun observeIngredients(recipeId: String): Flow<List<RecipeIngredientEntity>>
 
+    @Query("SELECT * FROM recipe_ingredients WHERE recipeId IN (:recipeIds) AND deleted = 0 ORDER BY position ASC")
+    suspend fun findByRecipeIds(recipeIds: List<String>): List<RecipeIngredientEntity>
+
     @Upsert
     suspend fun upsertAll(ingredients: List<RecipeIngredientEntity>)
 }
@@ -33,6 +42,9 @@ interface RecipeIngredientDao {
 interface RecipeStepDao {
     @Query("SELECT * FROM recipe_steps WHERE recipeId = :recipeId AND deleted = 0 ORDER BY position ASC")
     fun observeSteps(recipeId: String): Flow<List<RecipeStepEntity>>
+
+    @Query("SELECT * FROM recipe_steps WHERE recipeId IN (:recipeIds) AND deleted = 0 ORDER BY position ASC")
+    suspend fun findByRecipeIds(recipeIds: List<String>): List<RecipeStepEntity>
 
     @Upsert
     suspend fun upsertAll(steps: List<RecipeStepEntity>)

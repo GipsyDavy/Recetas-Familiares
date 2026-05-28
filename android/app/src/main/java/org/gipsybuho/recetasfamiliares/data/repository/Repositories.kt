@@ -49,7 +49,10 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFamilyNotePushItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncIngredientPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncRecipePushItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStepPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStockItemPushItemDto
 
 class AuthRepository(
@@ -104,15 +107,38 @@ class RecipeRepository(
         ingredients: List<RecipeIngredientItemDto>, steps: List<RecipeStepItemDto>
     ) {
         val familyId = sessionStore.familyId ?: return
-        val dto = api.createRecipe(familyId, CreateRecipeRequestDto(title, description, servings, prepMinutes, cookMinutes, difficulty))
-        database.recipeDao().upsertAll(listOf(dto.toEntity()))
-        if (ingredients.isNotEmpty()) {
-            val ingDtos = api.replaceIngredients(familyId, dto.id, ReplaceIngredientsRequestDto(ingredients))
-            database.recipeIngredientDao().upsertAll(ingDtos.map { it.toEntity() })
-        }
-        if (steps.isNotEmpty()) {
-            val stepDtos = api.replaceSteps(familyId, dto.id, ReplaceStepsRequestDto(steps))
-            database.recipeStepDao().upsertAll(stepDtos.map { it.toEntity() })
+        try {
+            val dto = api.createRecipe(familyId, CreateRecipeRequestDto(title, description, servings, prepMinutes, cookMinutes, difficulty))
+            database.recipeDao().upsertAll(listOf(dto.toEntity()))
+            if (ingredients.isNotEmpty()) {
+                val ingDtos = api.replaceIngredients(familyId, dto.id, ReplaceIngredientsRequestDto(ingredients))
+                database.recipeIngredientDao().upsertAll(ingDtos.map { it.toEntity() })
+            }
+            if (steps.isNotEmpty()) {
+                val stepDtos = api.replaceSteps(familyId, dto.id, ReplaceStepsRequestDto(steps))
+                database.recipeStepDao().upsertAll(stepDtos.map { it.toEntity() })
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // Offline: save full recipe locally with syncVersion=0 for SyncWorker to push later
+            val now = Instant.now().toString()
+            val recipeId = UUID.randomUUID().toString()
+            database.recipeDao().upsertAll(listOf(
+                RecipeEntity(recipeId, familyId, title, description, servings,
+                    prepMinutes, cookMinutes, difficulty, now, now, 0L, false)
+            ))
+            if (ingredients.isNotEmpty()) {
+                database.recipeIngredientDao().upsertAll(ingredients.mapIndexed { idx, ing ->
+                    RecipeIngredientEntity(UUID.randomUUID().toString(), recipeId, idx + 1,
+                        ing.name, ing.quantity, ing.unit, ing.note, now, now, 0L, false)
+                })
+            }
+            if (steps.isNotEmpty()) {
+                database.recipeStepDao().upsertAll(steps.mapIndexed { idx, step ->
+                    RecipeStepEntity(UUID.randomUUID().toString(), recipeId, idx + 1,
+                        step.instruction, step.timerMinutes, now, now, 0L, false)
+                })
+            }
         }
     }
 
@@ -122,18 +148,35 @@ class RecipeRepository(
         ingredients: List<RecipeIngredientItemDto>, steps: List<RecipeStepItemDto>
     ) {
         val familyId = sessionStore.familyId ?: return
-        val dto = api.updateRecipe(familyId, recipe.id, UpdateRecipeRequestDto(title, description, servings, prepMinutes, cookMinutes, difficulty))
-        database.recipeDao().upsertAll(listOf(dto.toEntity()))
-        val ingDtos = api.replaceIngredients(familyId, recipe.id, ReplaceIngredientsRequestDto(ingredients))
-        database.recipeIngredientDao().upsertAll(ingDtos.map { it.toEntity() })
-        val stepDtos = api.replaceSteps(familyId, recipe.id, ReplaceStepsRequestDto(steps))
-        database.recipeStepDao().upsertAll(stepDtos.map { it.toEntity() })
+        try {
+            val dto = api.updateRecipe(familyId, recipe.id, UpdateRecipeRequestDto(title, description, servings, prepMinutes, cookMinutes, difficulty))
+            database.recipeDao().upsertAll(listOf(dto.toEntity()))
+            val ingDtos = api.replaceIngredients(familyId, recipe.id, ReplaceIngredientsRequestDto(ingredients))
+            database.recipeIngredientDao().upsertAll(ingDtos.map { it.toEntity() })
+            val stepDtos = api.replaceSteps(familyId, recipe.id, ReplaceStepsRequestDto(steps))
+            database.recipeStepDao().upsertAll(stepDtos.map { it.toEntity() })
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // Offline: save recipe metadata locally; ingredients/steps unchanged until next sync
+            val now = Instant.now().toString()
+            database.recipeDao().upsertAll(listOf(
+                recipe.copy(title = title, description = description, servings = servings,
+                    prepMinutes = prepMinutes, cookMinutes = cookMinutes, difficulty = difficulty,
+                    updatedAt = now, syncVersion = 0L)
+            ))
+        }
     }
 
     suspend fun delete(recipe: RecipeEntity) {
         val familyId = sessionStore.familyId ?: return
-        api.deleteRecipe(familyId, recipe.id)
-        database.recipeDao().upsertAll(listOf(recipe.copy(deleted = true)))
+        try {
+            api.deleteRecipe(familyId, recipe.id)
+            database.recipeDao().upsertAll(listOf(recipe.copy(deleted = true)))
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // Offline: mark deleted locally, SyncWorker will push on next sync
+            database.recipeDao().upsertAll(listOf(recipe.copy(deleted = true, syncVersion = 0L)))
+        }
     }
 }
 
@@ -232,29 +275,61 @@ class SyncRepository(
     suspend fun pushThenPull() {
         val familyId = sessionStore.familyId ?: return
 
+        val pendingRecipes     = database.recipeDao().findPendingCreate()
+        val pendingRecipeDel   = database.recipeDao().findPendingDelete()
         val pendingStock       = database.stockDao().findPendingCreate()
         val pendingStockDelete = database.stockDao().findPendingDelete()
         val pendingNotes       = database.familyNoteDao().findPendingCreate()
         val pendingNoteDelete  = database.familyNoteDao().findPendingDelete()
 
-        val stockPushItems = (pendingStock.map {
+        val recipeIds = pendingRecipes.map { it.id }
+        val pendingIngredients = if (recipeIds.isNotEmpty())
+            database.recipeIngredientDao().findByRecipeIds(recipeIds) else emptyList()
+        val pendingSteps = if (recipeIds.isNotEmpty())
+            database.recipeStepDao().findByRecipeIds(recipeIds) else emptyList()
+
+        val recipePushItems = pendingRecipes.map {
+            SyncRecipePushItemDto(id = it.id, baseSyncVersion = null,
+                title = it.title, description = it.description, servings = it.servings,
+                prepMinutes = it.prepMinutes, cookMinutes = it.cookMinutes,
+                difficulty = it.difficulty, deleted = false)
+        } + pendingRecipeDel.map {
+            SyncRecipePushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
+        }
+
+        val ingredientPushItems = pendingIngredients.map {
+            SyncIngredientPushItemDto(id = it.id, baseSyncVersion = null, recipeId = it.recipeId,
+                position = it.position, name = it.name, quantity = it.quantity,
+                unit = it.unit, note = it.note, deleted = false)
+        }
+
+        val stepPushItems = pendingSteps.map {
+            SyncStepPushItemDto(id = it.id, baseSyncVersion = null, recipeId = it.recipeId,
+                position = it.position, instruction = it.instruction,
+                timerMinutes = it.timerMinutes, deleted = false)
+        }
+
+        val stockPushItems = pendingStock.map {
             SyncStockItemPushItemDto(id = it.id, baseSyncVersion = null,
                 name = it.name, quantity = it.quantity, unit = it.unit,
                 lowStockThreshold = it.lowStockThreshold, expiresAt = it.expiresAt,
                 note = it.note, deleted = false)
         } + pendingStockDelete.map {
             SyncStockItemPushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
-        })
+        }
 
-        val notePushItems = (pendingNotes.map {
+        val notePushItems = pendingNotes.map {
             SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null,
                 recipeId = it.recipeId, title = it.title, body = it.body,
                 pinned = it.pinned, deleted = false)
         } + pendingNoteDelete.map {
             SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
-        })
+        }
 
         val pushRequest = SyncPushRequestDto(
+            recipes = recipePushItems,
+            ingredients = ingredientPushItems,
+            steps = stepPushItems,
             stockItems = stockPushItems.ifEmpty { null },
             familyNotes = notePushItems.ifEmpty { null }
         )
