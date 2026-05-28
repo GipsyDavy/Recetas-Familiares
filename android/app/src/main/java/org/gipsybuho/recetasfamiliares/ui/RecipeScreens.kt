@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.ui
 
+import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -230,6 +231,7 @@ internal fun RecipeDetail(
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(text = { Text("Modo Cocina") }, onClick = { showMenu = false; onCookingMode() })
                         DropdownMenuItem(text = { Text("Añadir foto") }, onClick = { showMenu = false; photoPicker.launch("image/*") })
+                        DropdownMenuItem(text = { Text("Compartir") }, onClick = { showMenu = false; shareRecipe(context, recipe, ingredients, steps) })
                         DropdownMenuItem(text = { Text("Editar") }, onClick = { showMenu = false; onEdit(ingredients, steps) })
                         DropdownMenuItem(text = { Text("Eliminar") }, onClick = { showMenu = false; onDelete() })
                     }
@@ -407,6 +409,49 @@ internal fun RatingsSection(
             Text("Sé el primero en valorar esta receta", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
         }
     }
+}
+
+private fun shareRecipe(
+    context: android.content.Context,
+    recipe: org.gipsybuho.recetasfamiliares.data.local.RecipeEntity,
+    ingredients: List<org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity>,
+    steps: List<org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity>
+) {
+    val text = buildString {
+        appendLine("🍳 ${recipe.title}")
+        val meta = buildList {
+            recipe.servings?.let { add("$it porciones") }
+            val mins = (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
+            if (mins > 0) add("$mins min")
+            recipe.difficulty?.let { add(it) }
+        }
+        if (meta.isNotEmpty()) appendLine(meta.joinToString(" · "))
+        recipe.description?.let { appendLine(); appendLine(it) }
+        if (ingredients.isNotEmpty()) {
+            appendLine(); appendLine("🥗 Ingredientes:")
+            ingredients.sortedBy { it.position }.forEach { ing ->
+                val qty = buildString {
+                    ing.quantity?.let { append(it.toBigDecimal().stripTrailingZeros().toPlainString()) }
+                    ing.unit?.takeIf { it.isNotBlank() }?.let { append(" $it") }
+                }
+                appendLine("• ${ing.name}${if (qty.isNotBlank()) "  $qty" else ""}")
+            }
+        }
+        if (steps.isNotEmpty()) {
+            appendLine(); appendLine("👨‍🍳 Preparación:")
+            steps.sortedBy { it.position }.forEach { step ->
+                val timer = step.timerMinutes?.let { " ⏱ $it min" } ?: ""
+                appendLine("${step.position}. ${step.instruction}$timer")
+            }
+        }
+        appendLine(); append("📱 Recetas Familiares")
+    }
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+        putExtra(Intent.EXTRA_SUBJECT, recipe.title)
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartir receta"))
 }
 
 @Composable
