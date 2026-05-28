@@ -57,6 +57,7 @@ public final class AppContext {
     public NoteRepository getNoteRepository() { return noteRepository; }
 
     public void shutdown() {
+        recipeRepository.shutdown();
         apiClient.shutdown();
     }
 }

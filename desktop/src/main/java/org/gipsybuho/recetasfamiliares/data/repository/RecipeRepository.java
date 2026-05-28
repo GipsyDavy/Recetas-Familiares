@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class RecipeRepository {
 
@@ -27,7 +28,12 @@ public class RecipeRepository {
     private final ApiClient api;
     private final AppSession session;
     private final Gson gson = new Gson();
-    private final OkHttpClient photoClient = new OkHttpClient();
+    private final OkHttpClient photoClient = new OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(120, TimeUnit.SECONDS)  // upload up to 8 MB
+            .callTimeout(180, TimeUnit.SECONDS)
+            .build();
     private final SimpleCache<RecipeDtos.RecipeDto> cache = new SimpleCache<>();
     private final SimpleCache<RecipeDtos.RecipeIngredientDto> ingredientCache = new SimpleCache<>();
     private final SimpleCache<RecipeDtos.RecipeStepDto> stepCache = new SimpleCache<>();
@@ -169,5 +175,10 @@ public class RecipeRepository {
         if (recipes != null) cache.replaceAll(recipes.stream().filter(r -> !r.deleted()).toList());
         if (ingredients != null) ingredientCache.replaceAll(ingredients.stream().filter(i -> !i.deleted()).toList());
         if (steps != null) stepCache.replaceAll(steps.stream().filter(s -> !s.deleted()).toList());
+    }
+
+    public void shutdown() {
+        photoClient.dispatcher().executorService().shutdown();
+        photoClient.connectionPool().evictAll();
     }
 }

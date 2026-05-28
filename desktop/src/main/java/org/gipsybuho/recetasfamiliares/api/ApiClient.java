@@ -89,6 +89,8 @@ public class ApiClient {
     public void shutdown() {
         client.dispatcher().executorService().shutdown();
         client.connectionPool().evictAll();
+        refreshClient.dispatcher().executorService().shutdown();
+        refreshClient.connectionPool().evictAll();
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
