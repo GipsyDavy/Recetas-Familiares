@@ -7,8 +7,11 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
+import java.util.ArrayList;
 
 public class RecipeListView extends SplitPane {
+
+    private static final int PAGE_SIZE = 30;
 
     private final AppContext context;
     private final Runnable onSync;
@@ -16,7 +19,10 @@ public class RecipeListView extends SplitPane {
     private final RecipeDetailView detailView;
     private final TextField searchField = new TextField();
     private final Label statusLabel = new Label();
+    private final Button loadMoreBtn = new Button("Cargar más recetas");
     private boolean loadingRecipes;
+    private int currentPage = 0;
+    private boolean hasMore = false;
 
     public RecipeListView(AppContext context, Runnable onSync) {
         this.context = context;
@@ -54,10 +60,16 @@ public class RecipeListView extends SplitPane {
         context.getRecipeRepository().getCache().getItems()
                 .addListener((ListChangeListener<RecipeDtos.RecipeDto>) change -> updateRecipeCount());
 
+        loadMoreBtn.getStyleClass().add("action-button-secondary");
+        loadMoreBtn.setMaxWidth(Double.MAX_VALUE);
+        loadMoreBtn.setVisible(false);
+        loadMoreBtn.setManaged(false);
+        loadMoreBtn.setOnAction(e -> loadNextPage());
+
         statusLabel.getStyleClass().add("status-label");
         updateRecipeCount();
 
-        VBox leftPanel = new VBox(10, searchField, statusLabel, refreshBtn, newRecipeBtn, listView);
+        VBox leftPanel = new VBox(10, searchField, statusLabel, refreshBtn, newRecipeBtn, listView, loadMoreBtn);
         leftPanel.setPadding(new Insets(16));
         VBox.setVgrow(listView, Priority.ALWAYS);
         leftPanel.setMinWidth(280);
@@ -75,15 +87,20 @@ public class RecipeListView extends SplitPane {
 
     public void refresh() {
         loadingRecipes = true;
+        currentPage = 0;
+        hasMore = false;
+        updateLoadMoreBtn();
         statusLabel.setText("Cargando...");
         Thread.ofVirtual().start(() -> {
             try {
-                var page = context.getRecipeRepository().loadPage(0, 100);
+                var page = context.getRecipeRepository().loadPage(0, PAGE_SIZE);
                 Platform.runLater(() -> {
                     context.getRecipeRepository().getCache().replaceAll(
                             page.items().stream().filter(r -> !r.deleted()).toList());
+                    hasMore = page.totalPages() > 1;
                     loadingRecipes = false;
                     updateRecipeCount();
+                    updateLoadMoreBtn();
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
@@ -92,6 +109,38 @@ public class RecipeListView extends SplitPane {
                 });
             }
         });
+    }
+
+    private void loadNextPage() {
+        loadMoreBtn.setDisable(true);
+        int nextPage = currentPage + 1;
+        Thread.ofVirtual().start(() -> {
+            try {
+                var page = context.getRecipeRepository().loadPage(nextPage, PAGE_SIZE);
+                Platform.runLater(() -> {
+                    var appended = new ArrayList<>(context.getRecipeRepository().getCache().getItems());
+                    page.items().stream().filter(r -> !r.deleted()).forEach(appended::add);
+                    context.getRecipeRepository().getCache().replaceAll(appended);
+                    currentPage = nextPage;
+                    hasMore = nextPage < page.totalPages() - 1;
+                    loadMoreBtn.setDisable(false);
+                    updateRecipeCount();
+                    updateLoadMoreBtn();
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    loadMoreBtn.setDisable(false);
+                    statusLabel.setText("Error al cargar más recetas.");
+                });
+            }
+        });
+    }
+
+    private void updateLoadMoreBtn() {
+        boolean show = hasMore && (searchField.getText() == null || searchField.getText().isBlank());
+        loadMoreBtn.setVisible(show);
+        loadMoreBtn.setManaged(show);
+        if (show) loadMoreBtn.setText("Cargar más  (página " + (currentPage + 2) + " de " + "...)");
     }
 
     private void openNewRecipeForm() {
@@ -110,6 +159,7 @@ public class RecipeListView extends SplitPane {
         if (query == null || query.isBlank()) {
             listView.setItems(context.getRecipeRepository().getCache().getItems());
             updateRecipeCount();
+            updateLoadMoreBtn();
             return;
         }
         String lower = query.toLowerCase();
@@ -117,6 +167,9 @@ public class RecipeListView extends SplitPane {
                 .filtered(r -> r.title() != null && r.title().toLowerCase().contains(lower));
         listView.setItems(filtered);
         updateRecipeCount();
+        // Hide "load more" while filtering
+        loadMoreBtn.setVisible(false);
+        loadMoreBtn.setManaged(false);
     }
 
     private void updateRecipeCount() {
