@@ -176,6 +176,8 @@ Fixes criticos en commit 5404a7b (no revertir):
 | fix | 2026-05-28 | 8 bugs contratos DTO Desktop + URLs endpoints (commit 5404a7b) |
 | 7.1 | 2026-05-28 | CRUD Stock Items Desktop: StockFormDialog + StockRepository create/update/delete + toolbar StockView |
 | 7.2 | 2026-05-28 | CRUD Stock Items Android: FAB + StockForm (DatePickerDialog) + StockDetail + navegación inline |
+| 7.3 | 2026-05-28 | Crear/Editar Receta Android: RecipeForm con SegmentedButton, filas dinámicas, RecipeDetail menú ⋮ |
+| 7.4 | 2026-05-28 | SyncWorker push: offline-resilient creates (syncVersion=0) + pushThenPull real |
 
 ## Proximos Pasos — Sprint 7 (EN CURSO)
 

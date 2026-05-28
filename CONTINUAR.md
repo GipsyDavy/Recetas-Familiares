@@ -280,20 +280,21 @@ mvn compile — EXITOSO
 
 ## Estado Git (2026-05-28)
 
-Rama: `main` — limpio, sin cambios pendientes.
+Rama: `main` — limpio, sin cambios pendientes. 6 commits adelantados al remoto (no pusheado).
 
 Commits recientes:
 ```
-5404a7b fix: corregir contratos DTO Desktop y URLs de endpoints   ← HEAD
-6ecf16b feat: Sprint 6 — notas familiares en Android y Desktop
-dc0d655 feat: Sprint 5 — lista de la compra y favoritos en Android y Desktop
-18430cc feat: Sprint 4 — persistencia tokens, CRUD menú semanal y migraciones Room
-cd680c9 feat: Sprint 3 — detalle de receta Android, Stock mejorado y menú semanal Desktop
+4b56070 docs: Sprint 7 completo — actualizar CONTINUAR y Resumen  ← HEAD
+15079bc feat: Sprint 7.4 — SyncWorker push de cambios pendientes
+7253983 feat: Sprint 7.3 — crear y editar recetas desde Android
+9b4533a feat: Sprint 7.2 — CRUD stock items en Android
+287395a feat: Sprint 7.1 — CRUD stock items en Desktop
+5404a7b fix: corregir contratos DTO Desktop y URLs de endpoints
 ```
 
 ---
 
-## Sprint 7 — EN CURSO (2026-05-28)
+## Sprint 7 — COMPLETADO (2026-05-28)
 
 ### Tarea 1 — CRUD Stock Items en Desktop ✅ COMPLETADA (2026-05-28)
 
@@ -354,15 +355,37 @@ Build SUCCESSFUL.
    ```
    Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
 
-6. Decir al agente que tarea del Sprint 7 quieres abordar.
+6. Decir al agente que tarea del Sprint 8 quieres abordar.
+
+---
+
+## Sprint 8 — PENDIENTE (siguiente sesion)
+
+Ideas para Sprint 8 (sin prioridad definida aun):
+
+### Candidatos de alto impacto visual
+- **Modo Cocina Android** — pantalla pantalla completa paso a paso con temporizador, letra grande, modo hands-free.
+- **Modo Cocina Desktop** — similar, con temporizador sincronizado.
+- **Fotos de receta** — subida y visualizacion de fotos (Android + Desktop).
+- **Busqueda global** — filtrar recetas por nombre/ingrediente/categoria en ambas plataformas.
+
+### Mejoras de UX pendientes
+- **Paginacion de recetas** — RecipeList Android carga todas las recetas (sin paginar).
+- **Pull-to-refresh** — Android: gesto pull-to-refresh en listas.
+- **Empty states** — pantallas vacias con ilustraciones y CTA (crear primera receta, anadir primer item de stock...).
+- **Feedback de acciones** — Snackbar/Toast en Android al crear/editar/eliminar.
+
+### Infraestructura
+- **Crear/editar receta Desktop** — RecipeFormDialog ya existe; anadir soporte para editar ingredientes/pasos inline.
+- **CRUD Update/Delete offline Android** — actualmente solo Create es offline-resilient.
+- **Push git al remoto** — la rama main tiene 6 commits sin pushear.
 
 ---
 
 ## Deuda tecnica conocida y aceptada
 
-- Push sync Android envia listas vacias (sin cola de cambios offline). Correcto para MVP.
+- CRUD Update y Delete no son offline-resilient en Android (solo Create lo es desde Sprint 7.4).
 - Sync pull sin paginacion: aceptable para familias pequenas.
 - Login devuelve primera familia (no determinista si hay varias): limitacion documentada para MVP.
 - Advertencia Mockito/Byte Buddy con Java 26: no rompe build ni tests.
-- StockView Desktop es solo lectura (tarea Sprint 7).
-- Crear/editar receta desde Android no implementado (tarea Sprint 7).
+- RecipeForm Android: icono de eliminar fila reutiliza Icons.Filled.Add (cosmético, no funcional).
