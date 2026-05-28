@@ -45,6 +45,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.gipsybuho.recetasfamiliares.data.remote.dto.AssignMenuItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRatingRequestDto
@@ -488,6 +489,24 @@ class FamilyNoteRepository(
             // Offline: mark deleted locally, SyncWorker will push on next sync
             database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true, syncVersion = 0L)))
         }
+    }
+}
+
+class MenuItemRepository(
+    private val api: RecetasApi,
+    private val database: RecetasDatabase,
+    private val sessionStore: SessionStore
+) {
+    suspend fun assign(recipeId: String, plannedDate: String, mealType: String) {
+        val familyId = sessionStore.familyId ?: return
+        val dto = api.assignMenuItem(familyId, AssignMenuItemRequestDto(recipeId, plannedDate, mealType))
+        database.menuItemDao().upsertAll(listOf(dto.toEntity()))
+    }
+
+    suspend fun remove(item: MenuItemEntity) {
+        val familyId = sessionStore.familyId ?: return
+        api.removeMenuItem(familyId, item.id)
+        database.menuItemDao().upsertAll(listOf(item.copy(deleted = true)))
     }
 }
 

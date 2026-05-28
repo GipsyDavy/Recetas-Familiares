@@ -113,6 +113,7 @@ private fun MainShell(viewModel: RecetasViewModel) {
     val notes by viewModel.notes.collectAsState()
     val menuItems by viewModel.menuItems.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    var navigateToRecipeId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -185,11 +186,26 @@ private fun MainShell(viewModel: RecetasViewModel) {
             )
         } else {
             when (tab) {
-                MainTab.RECIPES  -> RecipeList(recipes, Modifier.padding(padding), viewModel, viewModel::refresh)
+                MainTab.RECIPES  -> RecipeList(
+                    recipes = recipes, modifier = Modifier.padding(padding),
+                    viewModel = viewModel, onRefresh = viewModel::refresh,
+                    openRecipeId = navigateToRecipeId,
+                    onRecipeOpened = { navigateToRecipeId = null }
+                )
                 MainTab.STOCK    -> StockList(stockItems, Modifier.padding(padding), viewModel)
                 MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
                 MainTab.NOTES    -> NotesScreen(notes, Modifier.padding(padding), viewModel)
-                MainTab.MENU     -> MenuScreen(menuItems, Modifier.padding(padding), isRefreshing, viewModel::refresh)
+                MainTab.MENU     -> MenuScreen(
+                    menuItems = menuItems, recipes = recipes,
+                    modifier = Modifier.padding(padding),
+                    isRefreshing = isRefreshing, onRefresh = viewModel::refresh,
+                    onAssignToMenu = { date, recipeId, mealType -> viewModel.assignToMenu(recipeId, date, mealType) },
+                    onRemoveFromMenu = { item -> viewModel.removeFromMenu(item) },
+                    onNavigateToRecipe = { recipeId ->
+                        navigateToRecipeId = recipeId
+                        tab = MainTab.RECIPES
+                    }
+                )
             }
         }
     }

@@ -308,6 +308,21 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    fun assignToMenu(recipeId: String, plannedDate: String, mealType: String) {
+        viewModelScope.launch {
+            runCatching { container.menuItemRepository.assign(recipeId, plannedDate, mealType) }
+                .onSuccess { _userMessage.emit("Comida añadida al menú") }
+                .onFailure { _userMessage.emit("Error al añadir al menú") }
+        }
+    }
+
+    fun removeFromMenu(item: org.gipsybuho.recetasfamiliares.data.local.MenuItemEntity) {
+        viewModelScope.launch {
+            runCatching { container.menuItemRepository.remove(item) }
+                .onSuccess { _userMessage.emit("Comida eliminada del menú") }
+        }
+    }
+
     fun deletePhoto(photo: RecipePhotoEntity) {
         viewModelScope.launch {
             runCatching { container.recipePhotoRepository.delete(photo) }

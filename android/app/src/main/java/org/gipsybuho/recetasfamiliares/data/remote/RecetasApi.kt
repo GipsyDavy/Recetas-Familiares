@@ -1,6 +1,8 @@
 package org.gipsybuho.recetasfamiliares.data.remote
 
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.AssignMenuItemRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.MenuItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AuthResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRecipeRequestDto
@@ -220,5 +222,17 @@ interface RecetasApi {
         @Path("familyId") familyId: String,
         @Path("recipeId") recipeId: String,
         @Path("ratingId") ratingId: String
+    )
+
+    @POST("api/v1/families/{familyId}/menu-items")
+    suspend fun assignMenuItem(
+        @Path("familyId") familyId: String,
+        @Body request: AssignMenuItemRequestDto
+    ): MenuItemDto
+
+    @DELETE("api/v1/families/{familyId}/menu-items/{menuItemId}")
+    suspend fun removeMenuItem(
+        @Path("familyId") familyId: String,
+        @Path("menuItemId") menuItemId: String
     )
 }

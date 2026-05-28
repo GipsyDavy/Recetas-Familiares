@@ -3,6 +3,8 @@ package org.gipsybuho.recetasfamiliares.ui
 import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,7 +76,9 @@ internal fun RecipeList(
     recipes: List<RecipeEntity>,
     modifier: Modifier,
     viewModel: RecetasViewModel,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    openRecipeId: String? = null,
+    onRecipeOpened: () -> Unit = {}
 ) {
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val recipeHasMore by viewModel.recipeHasMore.collectAsState()
@@ -85,11 +90,24 @@ internal fun RecipeList(
     var cookingMode by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
-    val filtered = if (query.isBlank()) recipes
-        else recipes.filter {
+    var difficultyFilter by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(openRecipeId, recipes) {
+        if (openRecipeId != null && recipes.isNotEmpty()) {
+            val found = recipes.find { it.id == openRecipeId }
+            if (found != null) { selectedRecipe = found; onRecipeOpened() }
+        }
+    }
+
+    val filtered = recipes.let { list ->
+        var r = list
+        if (query.isNotBlank()) r = r.filter {
             it.title.contains(query, ignoreCase = true) ||
             it.description?.contains(query, ignoreCase = true) == true
         }
+        if (difficultyFilter != null) r = r.filter { it.difficulty == difficultyFilter }
+        r
+    }
 
     PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, modifier = modifier) {
         Box(Modifier.fillMaxSize()) {
@@ -140,9 +158,22 @@ internal fun RecipeList(
                             } else null,
                             singleLine = true, modifier = Modifier.fillMaxWidth()
                         )
+                        Spacer(Modifier.height(Spacing.xs))
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        ) {
+                            listOf("EASY" to "Fácil", "MEDIUM" to "Media", "HARD" to "Difícil").forEach { (value, label) ->
+                                FilterChip(
+                                    selected = difficultyFilter == value,
+                                    onClick = { difficultyFilter = if (difficultyFilter == value) null else value },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
                         Spacer(Modifier.height(Spacing.md))
                         if (filtered.isEmpty()) {
-                            if (query.isBlank()) {
+                            if (query.isBlank() && difficultyFilter == null) {
                                 EmptyStateView(icon = Icons.Outlined.Restaurant,
                                     title = "Sin recetas aún",
                                     subtitle = "Empieza a guardar las recetas de tu familia y construid vuestro recetario",

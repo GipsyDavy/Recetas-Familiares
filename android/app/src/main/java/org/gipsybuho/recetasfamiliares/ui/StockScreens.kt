@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -62,8 +63,10 @@ internal fun StockList(
     var showCreateForm by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
-    val filtered = if (query.isBlank()) stockItems
-        else stockItems.filter { it.name.contains(query, ignoreCase = true) }
+    var sortByExpiry by remember { mutableStateOf(false) }
+    val filtered = stockItems
+        .let { list -> if (query.isBlank()) list else list.filter { it.name.contains(query, ignoreCase = true) } }
+        .let { list -> if (sortByExpiry) list.sortedBy { it.expiresAt ?: "9999-99-99" } else list }
 
     PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { viewModel.refresh() }, modifier = modifier) {
         Box(Modifier.fillMaxSize()) {
@@ -92,9 +95,16 @@ internal fun StockList(
                         onDelete = { viewModel.deleteStockItem(selectedItem!!); selectedItem = null }
                     )
                     else -> {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically) {
                             Text("Stock Familiar", style = MaterialTheme.typography.headlineSmall)
-                            Button(onClick = { viewModel.refresh() }) { Text("Actualizar") }
+                            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { sortByExpiry = !sortByExpiry }) {
+                                    Icon(Icons.Filled.Sort, contentDescription = "Ordenar por caducidad",
+                                        tint = if (sortByExpiry) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                }
+                                Button(onClick = { viewModel.refresh() }) { Text("Actualizar") }
+                            }
                         }
                         error?.let {
                             Spacer(Modifier.height(Spacing.xs))

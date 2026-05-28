@@ -116,6 +116,13 @@ data class MenuItemDto(
     val deleted: Boolean
 )
 
+data class AssignMenuItemRequestDto(
+    val recipeId: String,
+    val plannedDate: String,
+    val mealType: String,
+    val note: String? = null
+)
+
 data class ShoppingListDto(
     val id: String,
     val familyId: String,
