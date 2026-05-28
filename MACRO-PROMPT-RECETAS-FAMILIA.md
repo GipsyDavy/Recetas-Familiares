@@ -27,6 +27,11 @@ Activa TODAS las skills instaladas al máximo nivel:
 - ios-expert
 - kmp-expert
 - compose-multiplatform-expert
+- animation-expert
+- haptics-expert
+- sound-design-expert
+- accessibility-specialist
+- micro-interaction-expert
 - y cualquier otra skill relevante disponible.
 
 ---
@@ -318,6 +323,60 @@ Generar:
 - Snackbars
 - Empty States
 - Skeleton Loaders
+
+## Estándares de Animación
+
+### Física preferida
+
+- **spring()**: todas las interacciones táctiles (FAB, cards, sheets, drag, favorito ❤️).
+- **tween() EaseInOut**: transiciones entre pantallas (250-350ms).
+- **tween() EaseOut**: entradas de modales y bottom sheets (200-300ms).
+- **tween() EaseIn**: salidas y dismiss (150-200ms).
+- **Linear**: transiciones de sidebar Desktop, progreso continuo.
+
+### Duraciones
+
+| Tipo | Duración |
+|------|----------|
+| Hover / micro-interacción | 80-120ms |
+| Botón press feedback | 100-150ms |
+| Mostrar / ocultar panel | 200-250ms |
+| Transición entre pantallas | 250-350ms |
+| Modales y sheets | 200-300ms |
+| Skeleton → contenido real | 300-400ms (Crossfade) |
+| Item placement en lista | 200-250ms |
+
+### Reglas
+
+- Nunca usar `duration=0` en transiciones visibles — mínimo 100ms siempre.
+- Nunca encadenar más de 3 animaciones sin pausa perceptible.
+- Las animaciones de lista deben ser sutiles: máximo 250ms.
+- `SharedElementTransition` entre lista y detalle de receta es el efecto premium máximo (Android).
+
+## Filosofía de Sonido y Háptico
+
+### Jerarquía de feedback
+
+1. **Visual** — siempre presente, no desactivable.
+2. **Háptico** — activado por defecto, desactivable en preferencias.
+3. **Sonido** — desactivado por defecto, activable en preferencias.
+
+### Sonidos del producto (identidad sonora)
+
+- Guardar receta/nota/stock: "pop" suave y cálido (~200ms).
+- Eliminar: tono neutro discreto (~150ms).
+- Timer completado en CookingScreen: acorde corto de 2 notas + vibración larga.
+- Paso en CookingScreen: tick suave (~80ms).
+- Notificación caducidad: tono amable, no alarmante.
+
+### Hápticos del producto
+
+- Acción confirmada (guardar): impacto medio.
+- Acción destructiva (eliminar): 2 pulsos o impacto fuerte.
+- Navegar pasos CookingScreen: impacto ligero por paso.
+- Timer finalizado: vibración larga (800ms) + pausa + vibración corta (200ms).
+- Marcar ítem lista de compra: selección suave.
+- Marcar favorito: impacto suave al activar, ninguno al desactivar.
 
 ---
 

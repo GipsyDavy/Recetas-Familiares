@@ -568,3 +568,71 @@ Antes de cerrar una tarea:
 ```bash
 ./gradlew test
 ./gradlew build
+```
+
+---
+
+# 16. ANIMACIONES Y FEEDBACK UX
+
+## Regla Principal
+
+La transición entre estados NUNCA debe ser abrupta. Toda aparición, desaparición o cambio de estado visible debe estar animado de forma sutil y natural.
+
+## Compose (Android e iOS)
+
+- Usar `AnimatedVisibility` en lugar de `if (visible) { ... }` para mostrar/ocultar paneles y secciones.
+- Usar `animateContentSize()` en contenedores que cambian de tamaño al expandirse.
+- Usar `Crossfade` al cambiar entre estado loading y contenido real.
+- Usar `animateItemPlacement()` en `LazyColumn` al insertar o eliminar items.
+- Usar `animateColorAsState` en cambios de color de badges, chips y estados.
+- Usar `AnimatedContent` para cambios de número (timers, contadores).
+- Física preferida: `spring()` para interacciones táctiles, `tween()` para transiciones de pantalla.
+- Duraciones: entradas 200-300ms, salidas 150-200ms, transiciones de pantalla 250-350ms.
+
+## JavaFX Desktop
+
+- Usar `FadeTransition` al cambiar vistas en sidebar (250ms, Linear).
+- Usar `ScaleTransition` al abrir modales (200ms desde 0.95 a 1.0, EaseOut).
+- Usar `ScaleTransition` en hover de cards (100ms, 1.0 → 1.02).
+- Usar `SequentialTransition` al eliminar items (FadeOut 150ms → colapso 150ms).
+- Toda animación JavaFX corre en el JavaFX Application Thread. Nunca en hilos de fondo.
+- Tooltip obligatorio en todos los botones sin label visible (delay 400ms). Formato: `"Acción (Ctrl+X)"`.
+
+## Hápticos
+
+- Obligatorio en acciones destructivas (eliminar, borrar).
+- Obligatorio al cambiar paso en CookingScreen.
+- Obligatorio al guardar con éxito o error (feedback distinto).
+- Implementar vía `LocalHapticFeedback.current` en Compose Android.
+- En iOS: usar `UIImpactFeedbackGenerator`, `UISelectionFeedbackGenerator`, `UINotificationFeedbackGenerator` vía `expect/actual`.
+- Siempre desactivables en preferencias de usuario (activados por defecto).
+
+## Sonidos
+
+- Opcionales y SIEMPRE desactivables en preferencias (desactivados por defecto).
+- Nunca autoplay sin acción del usuario.
+- En Android: `SoundPool` para efectos cortos.
+- En Desktop: `AudioClip` JavaFX para efectos.
+- En iOS: seguir política Apple — no usar sonidos del sistema sin permiso explícito.
+
+## Tooltips y Accesibilidad
+
+- `TooltipBox + PlainTooltip` en Android en todos los botones de TopAppBar sin label visible.
+- `contentDescription` completo y descriptivo en TODOS los elementos interactivos.
+- `semantics { heading() }` en títulos de sección para TalkBack (Android).
+- `.accessibilityLabel()` y `.accessibilityHint()` en iOS para VoiceOver.
+- `.help()` modifier en botones iOS para tooltip VoiceOver y hover iPadOS.
+- Focus order explícito en todos los formularios.
+
+## Skeleton Loading
+
+- Usar skeleton (shimmer animado) en lugar de spinners en listados con carga de red.
+- Mostrar mínimo 3-5 items skeleton del tamaño real del contenido esperado.
+- Desaparece con `Crossfade` o `AnimatedVisibility` al llegar los datos reales.
+
+## Reglas de Calidad
+
+- Ninguna animación bloquea el hilo UI.
+- Evitar más de 2 animaciones simultáneas en la misma región visual.
+- Todo efecto háptico o sonoro debe tener un toggle en preferencias.
+- Si el sistema tiene animaciones reducidas activadas, simplificar o eliminar las propias.

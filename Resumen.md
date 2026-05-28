@@ -261,6 +261,16 @@ Pendiente Sprint 17:
 | 16.5 | 2026-05-29 | iOS RecipeListScreen básica: RecipeRepository (paginado) + LazyColumn M3 |
 | UI-Android | 2026-05-29 | Rediseño visual Android: LoginScreen brand, RecipeCards gradiente+chips, IconButton nav, FAB Cocinar, tachado shopping, iconos Editar/Eliminar |
 
-## Proximos Pasos — Sprint 17
+## Proximos Pasos — Sprint 17 (UX Premium)
 
-Ver CONTINUAR.md para contexto técnico completo.
+Objetivo: llevar la app de "funcional" a "emocional y memorable" — animaciones, hápticos, sonidos, tooltips, skeleton loading, keyboard shortcuts Desktop y accesibilidad completa. Sin cambios de contratos API ni arquitectura de fondo.
+
+Prioridad alta: Tooltips Desktop, AnimatedVisibility Android, SwipeToDismiss notas+stock, keyboard shortcuts Desktop.
+Prioridad media: skeleton loading, ModalBottomSheet menú ⋮, hápticos Android completo, animaciones iOS.
+Prioridad baja: Lottie empty states, SharedElementTransition, micro-animación favorito ❤️.
+
+Ver CONTINUAR.md para plan completo, tabla de prioridad y APIs exactas por plataforma.
+
+### Sprint 18 (en cola)
+
+iOS expansion: TabView 5 tabs, StockScreen, NotesScreen, SQLDelight offline-first, Keychain tokens.

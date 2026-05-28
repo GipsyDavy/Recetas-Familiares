@@ -854,13 +854,110 @@ Verificado en emulador Pixel_9_Pro API 36: LoginScreen, RecipeList, RecipeDetail
 
 ---
 
-## Proximos Pasos — Sprint 17 (iOS ampliacion)
+## Sprint 17 — UX Premium: Animaciones, Sonidos y Pulido Visual
 
-Candidatos:
+Objetivo: llevar la app de "funcional" a "emocional y memorable". Sin cambios de contratos API ni arquitectura.
+
+### Prioridad Alta
+
+#### Android (Compose)
+
+- **Tooltips** — `TooltipBox + PlainTooltip` en todos los botones de `TopAppBar` (Buscar, Sort, Refresh, etc.).
+- **AnimatedVisibility** en todas las transiciones show/hide de paneles (forms, details, filtros expandibles).
+- **animateItemPlacement()** en `LazyColumn` al añadir/eliminar items (deslizamiento suave, no salto brusco).
+- **Crossfade** entre estado loading → contenido en `RecipeList`, `StockList`, `NotesScreen`.
+- **SwipeToDismiss** en listas de notas y stock items (swipe izquierda → eliminar con confirmación).
+- **Haptic feedback** en acciones clave:
+  - `HapticFeedbackType.LongPress` al mantener pulsado un item.
+  - Vibración suave (1 pulso) en `CookingScreen` al cambiar de paso (via `LocalHapticFeedback`).
+  - Vibración doble cuando el timer llega a cero.
+  - `HapticFeedbackType.Confirm` al guardar receta/stock/nota con éxito.
+- **contentDescription** exhaustivo en todos los iconos que aún no lo tienen.
+- **semantics { heading() }** en todos los títulos de sección para TalkBack.
+- **Focus order explícito** en formularios (`RecipeForm`, `StockForm`, `NoteForm`).
+
+#### Desktop (JavaFX)
+
+- **Tooltip en TODOS los botones** — cualquier botón sin label visible necesita tooltip con delay 400ms. Formato: `"Guardar (Ctrl+S)"`, `"Eliminar (Supr)"`, `"Buscar (Ctrl+F)"`.
+- **Keyboard shortcuts**:
+  - `Ctrl+N` → nueva receta / nuevo stock item (según vista activa)
+  - `Ctrl+F` → foco en campo de búsqueda
+  - `Ctrl+S` → guardar formulario abierto
+  - `Escape` → cerrar modal / volver a lista
+  - `Supr` → eliminar item seleccionado (con confirmación)
+  - `←/→` en `CookingView` → paso anterior/siguiente
+- **FadeTransition** al cambiar de vista en el sidebar (250ms).
+- **ScaleTransition** al abrir modales (`RecipeFormDialog` crece desde 0.95x → 1.0x, 200ms EaseOut).
+- **Hover ScaleTransition** en recipe cards del Dashboard (1.0 → 1.02x, 100ms).
+- **SequentialTransition** al eliminar item de tabla (FadeOut 150ms → colapso 150ms).
+- **Status bar** inferior contextual: `"3 recetas filtradas"`, `"Stock cargado"`, `"Cambios guardados"`.
+- **ContextMenu** click derecho en tabla de stock y lista de recetas.
+
+### Prioridad Media
+
+#### Android
+
+- **animateContentSize()** en cards de receta al expandirse.
+- **spring()** physics en el FAB al aparecer/desaparecer al hacer scroll.
+- **AnimatedContent** en el temporizador de `CookingScreen` (cambios de número animados).
+- **ModalBottomSheet** para el menú ⋮ de `RecipeDetail` (más táctil que `DropdownMenu`).
+- **Skeleton loading (shimmer)** en `RecipeListScreen` mientras carga (3-5 cards placeholder).
+- **animateColorAsState** en chips de dificultad y badges de caducidad del stock.
+- **RichTooltip** en el botón Sort del stock (explica estado activo/inactivo).
+- **Swipe left/right** en `CookingScreen` para navegar pasos (alternativa táctil a botones).
+- **SoundPool** para tick del temporizador en `CookingScreen` (opcional, toggle en preferencias).
+- **Onboarding de primera vez**: 3 pantallas explicando tabs principales (se muestra una sola vez con `SharedPreferences`).
+
+#### Desktop
+
+- **Skeleton placeholders** en `RecipeListView` mientras carga (rectángulos animados con CSS animatedfill).
+- **TranslateTransition** en notificaciones `ExpiryNotificationService` (entra deslizando desde abajo-derecha).
+- **AudioClip sonidos desactivables** en preferencias:
+  - Confirmar guardado: "pop" suave.
+  - Eliminar: tono neutro discreto.
+  - `CookingView` timer completado: acorde corto.
+  - Notificación caducidad: tono amable, no alarmante.
+
+#### iOS
+
+- **spring()** y **AnimatedVisibility** en todas las transiciones (ya disponibles en Compose Multiplatform).
+- **SwipeToReveal** en items de lista (acciones inline al deslizar).
+- **Hápticos vía expect/actual**:
+  - `UIImpactFeedbackGenerator` al confirmar acciones (guardar, marcar compra).
+  - `UISelectionFeedbackGenerator` al navegar entre pasos de `CookingScreen`.
+  - `UINotificationFeedbackGenerator` al guardar con éxito o error.
+- **.help() modifier** en botones (tooltip VoiceOver + hover iPadOS).
+- **.accessibilityLabel() y .accessibilityHint()** completos en todos los elementos interactivos.
+- **Long press context menu** en cards de receta (menú flotante nativo iOS).
+
+### Prioridad Baja
+
+- **Lottie en empty states Android** (cocinero animado, lista vacía — vía `com.airbnb.android:lottie-compose:6.x`).
+- **SharedElementTransition** entre `RecipeListScreen` y `RecipeDetailScreen` Android (Compose 1.5+, API experimental).
+- **Micro-animación ❤️** al marcar favorito: escala + partículas (Android + iOS).
+- **Hero transitions** lista → detalle en iOS.
+- **Drag to reorder** en ingredientes y pasos del `RecipeForm` (Android).
+
+---
+
+### Reglas técnicas para Sprint 17
+
+- Toda animación Compose corre en `Dispatchers.Main`. Toda animación JavaFX en el JavaFX Application Thread. Nunca en hilos de fondo.
+- Sonidos y hápticos: siempre con toggle en pantalla de preferencias. Hápticos ON por defecto, sonidos OFF por defecto.
+- `contentDescription` completo en todos los elementos interactivos antes de cerrar cada tarea.
+- No introducir nuevas dependencias sin necesidad. Animaciones Compose son parte del BOM ya incluido.
+- Tooltips Desktop son JavaFX estándar — sin librerías externas.
+- Para Lottie Android (prioridad baja): añadir `com.airbnb.android:lottie-compose:6.x` al `build.gradle.kts`.
+- Para hápticos iOS: implementar `expect class HapticFeedback` con `actual` en `iosMain`.
+
+---
+
+## Sprint 18 — iOS Expansion
+
+Candidatos (antes llamado Sprint 17 iOS):
 
 1. **Navegacion por tabs iOS** — TabView con 4-5 tabs (Recetas, Stock, Lista, Notas, Menu). Actualmente solo hay login + lista de recetas.
 2. **StockScreen iOS** — pantalla de stock con `StockRepository` Ktor.
 3. **NotesScreen iOS** — CRUD de notas familiares.
 4. **SQLDelight persistencia local iOS** — cache offline para recetas y stock. Actualmente la app es 100% online.
 5. **Keychain para tokens** — reemplazar NSUserDefaults por SecItem API en `SessionStore.ios.kt`.
-6. **UI-Android commit** — commitar y pushear los cambios del rediseño visual si no se hizo al cerrar sesión.
