@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.ui
 
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,11 +53,17 @@ internal fun CookingScreen(
     onExit: () -> Unit
 ) {
     val steps by viewModel.stepsFor(recipe.id).collectAsState(initial = emptyList())
-    var currentIndex by remember { mutableStateOf(0) }
+    val currentIndexState = remember { mutableStateOf(0) }
+    var currentIndex by currentIndexState
     var timerSecondsLeft by remember(currentIndex, steps) {
         mutableStateOf(steps.getOrNull(currentIndex)?.timerMinutes?.let { it * 60 })
     }
     var timerRunning by remember(currentIndex) { mutableStateOf(false) }
+
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        try { focusRequester.requestFocus() } catch (_: Exception) {}
+    }
 
     LaunchedEffect(timerRunning) {
         if (timerRunning) {
@@ -73,7 +85,31 @@ internal fun CookingScreen(
     val currentStep = steps.getOrNull(currentIndex)
     val finished = steps.isNotEmpty() && currentIndex >= steps.size
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .focusRequester(focusRequester)
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                val stepsSize = steps.size
+                when (event.nativeKeyEvent.keyCode) {
+                    android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
+                        val idx = currentIndexState.value
+                        if (idx < stepsSize - 1) currentIndexState.value = idx + 1
+                        else if (idx == stepsSize - 1 && stepsSize > 0) currentIndexState.value = stepsSize
+                        true
+                    }
+                    android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                        val idx = currentIndexState.value
+                        if (idx > 0) currentIndexState.value = idx - 1
+                        true
+                    }
+                    else -> false
+                }
+            },
+        color = MaterialTheme.colorScheme.background
+    ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(Spacing.xxl),
             verticalArrangement = Arrangement.SpaceBetween
