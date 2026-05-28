@@ -68,7 +68,7 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 
 ## Estado del Proyecto por Modulo
 
-### Backend Spring Boot (COMPLETO)
+### Backend Spring Boot (COMPLETO — SIN TOCAR)
 
 - Spring Boot 3.5.14 + Java 21 + MySQL + Flyway.
 - Auth JWT + refresh tokens + rate limiting.
@@ -79,78 +79,80 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 - OpenAPI/Swagger desactivado en produccion.
 - Seed de desarrollo: demo@recetas.local / Demo1234!Familia
 
-**Arranque dev:**
-```
-java -jar backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar \
-  --spring.profiles.active=dev \
-  --spring.datasource.password=Recetas2024! \
-  --app.dev.seed-data.enabled=true \
-  --app.dev.seed-data.email=demo@recetas.local \
-  --app.dev.seed-data.password=Demo1234!Familia \
-  --app.dev.seed-data.display-name=Demo \
-  --app.dev.seed-data.family-name=FamiliaDemo
-```
-O desde bash (evita problemas con ! en PowerShell):
+Arranque dev:
 ```bash
-java -jar "backend/target/..." --spring.profiles.active=dev \
+java -jar "backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar" \
+  --spring.profiles.active=dev \
   "--spring.datasource.password=Recetas2024!" \
-  "--app.dev.seed-data.password=Demo1234!Familia" ...
+  "--app.dev.seed-data.enabled=true" \
+  "--app.dev.seed-data.email=demo@recetas.local" \
+  "--app.dev.seed-data.password=Demo1234!Familia" \
+  "--app.dev.seed-data.display-name=Demo" \
+  "--app.dev.seed-data.family-name=FamiliaDemo"
 ```
 
-### Android Kotlin + Compose (SPRINT 2 COMPLETO — VERIFICADO EN EMULADOR)
+Contratos API criticos (no cambiar sin revisar Android y Desktop):
+- PageResponse<T>: campos `items`, `page`, `size`, `totalItems`, `totalPages`
+- Notas: /api/v1/families/{id}/notes (NO /family-notes)
+- Stock: /api/v1/families/{id}/stock-items (NO /stock)
+- StockItemResponse: campo `name` (NO `ingredientName`)
+- RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
+- RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-Stack completo verificado end-to-end el 2026-05-27:
-- Login exitoso contra backend real
-- Pantalla Recetas con lista cargada desde API
-- Bottom Navigation con tabs Recetas y Stock
+### Android Kotlin + Compose (SPRINT 6 COMPLETO — 2026-05-28)
 
-Fixes aplicados en esta sesion:
-- AGP 9 DSL migration completa (kotlin compilerOptions, sin kotlinOptions deprecated)
-- KSP 2.3.0 → 2.3.7 (alineado con Kotlin 2.3.20)
-- org.gradle.jvmargs=-Xmx4g (D8 OutOfMemoryError)
-- SSL PKIX fix: Windows-ROOT truststore en gradle.properties
-- `network_security_config.xml` → cleartext HTTP permitido a 10.0.2.2 (emulador)
-- AndroidManifest.xml con android:networkSecurityConfig
+Stack completo verificado:
+- AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
+- Compose + Material 3 (BOM 2026.05.00)
+- Retrofit 3 + OkHttp 5 + Room 2.8.4 (v2) + WorkManager 2.11.2
+- MVVM + AppContainer (DI manual) + EncryptedSharedPreferences
 
-Arquitectura Android:
-- MVVM + Repository Pattern
-- Retrofit + OkHttp (TokenRefreshAuthenticator para JWT refresh automatico)
-- Room v2: 10 entidades + 10 DAOs
-- WorkManager (SyncWorker incremental con lastSyncTime)
-- EncryptedSharedPreferences (SessionStore)
-- AppContainer singleton en RecetasApplication
+Pantallas implementadas (Sprint 1-6):
+- LoginScreen
+- RecipeListScreen + RecipeDetailScreen (ingredientes + pasos desde Room)
+- StockScreen (badges bajo stock, colores caducidad)
+- ShoppingListScreen
+- NotesScreen (CRUD completo: crear, editar, eliminar notas familiares)
+- Bottom Navigation: 4 tabs (RECIPES, STOCK, SHOPPING, NOTES)
 
 Compilar y desplegar:
 ```
 # Desde android/
-gradle assembleDebug          # usa C:\tmp\tools\gradle-9.5.1
+gradle assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 SDK: C:\Users\GipsyDavy\AndroidSDK
-AVD: Pixel_9_Pro (API 36, Compose)
+AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-Deuda tecnica pendiente:
-- Reemplazar fallbackToDestructiveMigration con migraciones Room explicitas (antes de beta)
-- Pantalla detalle de receta (tap en item → ver ingredientes + pasos)
-- Pantalla Stock funcional
-- WorkManager sync automatico en background
-
-### Desktop JavaFX (SPRINT 2 COMPLETO)
+### Desktop JavaFX (SPRINT 6 + FIXES COMPLETO — 2026-05-28)
 
 JavaFX 21 + OkHttp + Gson. Compila y genera fat JAR (13.3 MB).
+mvn compile — EXITOSO.
 
-Sprint 1: Login, RecipeList (SplitPane + filtro), StockView (TableView), MainWindow (sidebar), CSS paleta calida.
-Sprint 2: Dashboard GridPane 2 columnas (recetas recientes col0=60% + stock expirando+acciones col1=40%), RecipeFormDialog con forCreate()/forEdit(), RecipeDetailView con Editar+Eliminar, sidebar "Inicio/Recetas/Stock".
+Pantallas implementadas (Sprint 1-6):
+- LoginView
+- DashboardView (GridPane 2 columnas: recetas recientes + stock expirando)
+- RecipeListView (SplitPane filtrable + detalle + edicion)
+- RecipeDetailView (ingredientes, pasos, Editar, Eliminar)
+- RecipeFormDialog (modal crear/editar)
+- StockView (TableView — solo lectura, CRUD pendiente Sprint 7)
+- WeeklyMenuView (calendario semanal, CRUD assign/remove)
+- ShoppingListView
+- NotesView (SplitPane lista + editor inline, CRUD completo)
+
+Sidebar: Inicio | Recetas | Stock | Menu semanal | Lista de la compra | Notas familiares
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-SSL fix: desktop/.mvn/jvm.config con -Djavax.net.ssl.trustStoreType=Windows-ROOT
-
-Deuda tecnica pendiente:
-- Vista Menus semanales (no implementada)
-- Persistencia de tokens en OS keystore (actualmente en memoria)
+Fixes criticos en commit 5404a7b (no revertir):
+- StockDtos: name (NO ingredientName)
+- RecipeDtos: campos alineados con backend (quantity Double, position, instruction, timerMinutes, items/totalItems)
+- StockRepository: /stock-items (NO /stock)
+- NoteRepository: /notes (NO /family-notes)
+- SyncRepository: actualiza cache menu+shopping+favorites
+- AppContext: SyncRepository recibe 6 repos
 
 ### Base de Datos MySQL
 
@@ -161,21 +163,26 @@ Deuda tecnica pendiente:
 
 ---
 
-## Sprint 3 Completado (2026-05-28)
+## Sprints Completados
 
-### Android
-- `RecipeDetail`: tap en receta → ingredientes + pasos reactivos desde Room via ViewModel flows
-- `StockScreen`: mejorada con badges "Bajo stock", colores de caducidad (rojo ≤3d, naranja ≤7d), empty state
-- ViewModel: `ingredientsFor()` y `stepsFor()` métodos expuestos
+| Sprint | Fecha | Contenido |
+|--------|-------|-----------|
+| 1 | 2026-05 | Login + RecipeList + StockView Desktop; Login + RecipeList Android |
+| 2 | 2026-05-27 | Dashboard Desktop, RecipeFormDialog, RecipeDetailView |
+| 3 | 2026-05-28 | RecipeDetail Android, StockScreen mejorada, WeeklyMenuView Desktop |
+| 4 | 2026-05-28 | Persistencia tokens Desktop, CRUD menu semanal, MIGRATION_1_2 Android |
+| 5 | 2026-05-28 | ShoppingListView Desktop+Android, FavoriteRepository Desktop+Android |
+| 6 | 2026-05-28 | NotesView Desktop + NotesScreen Android (CRUD completo) |
+| fix | 2026-05-28 | 8 bugs contratos DTO Desktop + URLs endpoints (commit 5404a7b) |
+| 7.1 | 2026-05-28 | CRUD Stock Items Desktop: StockFormDialog + StockRepository create/update/delete + toolbar StockView |
 
-### Desktop
-- `WeeklyMenuView`: calendario semanal GridPane 8×5 (Lun-Dom × 4 comidas), navegación de semanas, highlight hoy
-- `MenuRepository`: integración con endpoint `/api/v1/families/{id}/menu-items`
-- Sidebar: botón "Menú semanal" añadido
+## Proximos Pasos — Sprint 7 (EN CURSO)
 
-## Proximos Pasos Recomendados (Sprint 4)
+Orden recomendado por prioridad:
 
-1. **Desktop — Asignar recetas al menú**: CRUD desde WeeklyMenuView (POST/DELETE menu-items)
-2. **Android — WorkManager automático**: activar sync background real con constraints de red
-3. **Android — Migraciones Room explícitas**: reemplazar fallbackToDestructiveMigration antes de beta
-4. **Desktop — Persistencia de tokens**: guardar tokens en OS keystore entre reinicios
+1. **CRUD Stock Items Desktop** ✅ — StockFormDialog, create/update/delete en StockRepository, toolbar + columna "Min. stock" en StockView.
+2. **CRUD Stock Items Android** — StockScreen solo es lectura. Anadir FAB + StockForm composable, metodos en RecetasApi + StockRepository + ViewModel.
+3. **Crear/Editar Receta Android** — RecipeListScreen tiene FAB sin accion. Implementar RecipeFormScreen composable.
+4. **SyncWorker Android push** — Actualmente solo hace PULL. Implementar pushPendingChanges() para subir cambios offline.
+
+Ver CONTINUAR.md para detalle exacto de archivos a tocar en cada tarea.

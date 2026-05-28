@@ -30,7 +30,7 @@ public class StockView extends VBox {
 
         TableColumn<StockDtos.StockItemDto, String> nameCol = new TableColumn<>("Ingrediente");
         nameCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().name()));
-        nameCol.setPrefWidth(240);
+        nameCol.setPrefWidth(220);
 
         TableColumn<StockDtos.StockItemDto, String> qtyCol = new TableColumn<>("Cantidad");
         qtyCol.setCellValueFactory(c -> {
@@ -39,16 +39,28 @@ public class StockView extends VBox {
             if (item.unit() != null) val += " " + item.unit();
             return new SimpleStringProperty(val);
         });
-        qtyCol.setPrefWidth(140);
+        qtyCol.setPrefWidth(120);
 
         TableColumn<StockDtos.StockItemDto, String> expiresCol = new TableColumn<>("Caduca");
         expiresCol.setCellValueFactory(c -> {
             String exp = c.getValue().expiresAt();
             return new SimpleStringProperty(exp != null ? exp.substring(0, Math.min(10, exp.length())) : "—");
         });
-        expiresCol.setPrefWidth(120);
+        expiresCol.setPrefWidth(110);
 
-        table.getColumns().addAll(nameCol, qtyCol, expiresCol);
+        TableColumn<StockDtos.StockItemDto, String> lowStockCol = new TableColumn<>("Mín. stock");
+        lowStockCol.setCellValueFactory(c -> {
+            var item = c.getValue();
+            if (item.lowStockThreshold() == null) return new SimpleStringProperty("—");
+            String val = item.lowStockThreshold().toString();
+            if (item.unit() != null) val += " " + item.unit();
+            // Visual warning if current quantity is below threshold
+            boolean belowMin = item.quantity() != null && item.quantity() < item.lowStockThreshold();
+            return new SimpleStringProperty(belowMin ? "⚠ " + val : val);
+        });
+        lowStockCol.setPrefWidth(110);
+
+        table.getColumns().addAll(nameCol, qtyCol, expiresCol, lowStockCol);
         table.setItems(context.getStockRepository().getCache().getItems());
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.getStyleClass().add("stock-table");
@@ -56,7 +68,83 @@ public class StockView extends VBox {
 
         statusLabel.getStyleClass().add("status-label");
 
-        getChildren().addAll(header, table, statusLabel);
+        getChildren().addAll(header, buildToolbar(), table, statusLabel);
+    }
+
+    private HBox buildToolbar() {
+        Button newBtn = new Button("+ Nuevo");
+        newBtn.getStyleClass().add("action-button-primary");
+        newBtn.setOnAction(e -> openCreateDialog());
+
+        Button editBtn = new Button("Editar");
+        editBtn.getStyleClass().add("action-button-secondary");
+        editBtn.setDisable(true);
+        editBtn.setOnAction(e -> openEditDialog());
+
+        Button deleteBtn = new Button("Eliminar");
+        deleteBtn.getStyleClass().add("action-button-secondary");
+        deleteBtn.setDisable(true);
+        deleteBtn.setOnAction(e -> confirmDelete());
+
+        table.getSelectionModel().selectedItemProperty().addListener((obs, old, sel) -> {
+            boolean hasSelection = sel != null;
+            editBtn.setDisable(!hasSelection);
+            deleteBtn.setDisable(!hasSelection);
+        });
+
+        HBox toolbar = new HBox(8, newBtn, editBtn, deleteBtn);
+        toolbar.setPadding(new Insets(0, 0, 4, 0));
+        return toolbar;
+    }
+
+    private void openCreateDialog() {
+        StockFormDialog.forCreate(getScene().getWindow(), context, saved -> {
+            context.getStockRepository().getCache().getItems().add(saved);
+            statusLabel.setText("Item creado.");
+        }).show();
+    }
+
+    private void openEditDialog() {
+        StockDtos.StockItemDto selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+        StockFormDialog.forEdit(getScene().getWindow(), context, selected, saved -> {
+            var items = context.getStockRepository().getCache().getItems();
+            int idx = -1;
+            for (int i = 0; i < items.size(); i++) {
+                if (items.get(i).id().equals(saved.id())) { idx = i; break; }
+            }
+            if (idx >= 0) items.set(idx, saved);
+            else items.add(saved);
+            statusLabel.setText("Item actualizado.");
+        }).show();
+    }
+
+    private void confirmDelete() {
+        StockDtos.StockItemDto selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Eliminar item");
+        confirm.setHeaderText("¿Eliminar \"" + selected.name() + "\"?");
+        confirm.setContentText("Esta acción no se puede deshacer.");
+        confirm.initOwner(getScene().getWindow());
+
+        confirm.showAndWait().ifPresent(btn -> {
+            if (btn == ButtonType.OK) {
+                statusLabel.setText("Eliminando...");
+                Thread.ofVirtual().start(() -> {
+                    try {
+                        context.getStockRepository().delete(selected.id());
+                        Platform.runLater(() -> {
+                            context.getStockRepository().getCache().getItems().remove(selected);
+                            statusLabel.setText("Item eliminado.");
+                        });
+                    } catch (Exception ex) {
+                        Platform.runLater(() -> statusLabel.setText("Error al eliminar: " + ex.getMessage()));
+                    }
+                });
+            }
+        });
     }
 
     public void refresh() {

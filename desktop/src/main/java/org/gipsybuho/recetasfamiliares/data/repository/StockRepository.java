@@ -28,6 +28,21 @@ public class StockRepository {
         return List.of(result);
     }
 
+    public StockDtos.StockItemDto create(StockDtos.CreateStockItemRequest req) throws ApiException {
+        String familyId = session.getFamilyId();
+        return api.post("api/v1/families/" + familyId + "/stock-items", req, StockDtos.StockItemDto.class);
+    }
+
+    public StockDtos.StockItemDto update(String itemId, StockDtos.UpdateStockItemRequest req) throws ApiException {
+        String familyId = session.getFamilyId();
+        return api.put("api/v1/families/" + familyId + "/stock-items/" + itemId, req, StockDtos.StockItemDto.class);
+    }
+
+    public void delete(String itemId) throws ApiException {
+        String familyId = session.getFamilyId();
+        api.delete("api/v1/families/" + familyId + "/stock-items/" + itemId);
+    }
+
     public void updateFromSync(List<StockDtos.StockItemDto> items) {
         if (items != null) cache.replaceAll(items.stream().filter(i -> !i.deleted()).toList());
     }
