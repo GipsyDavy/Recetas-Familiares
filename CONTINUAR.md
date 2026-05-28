@@ -720,3 +720,41 @@ ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
   `exportToFile()`: FileChooser .txt + `Files.writeString` UTF-8. Feedback en `statusLabel`.
   Imports: `java.nio.charset.StandardCharsets`, `java.nio.file.Files`.
 - mvn compile — BUILD SUCCESS.
+
+---
+
+## Sprint 15 — EN CURSO (2026-05-29)
+
+### Sprint 15.1 — CRUD menú semanal Android ✅ COMPLETADO (commit e67d734)
+
+- `AssignMenuItemRequestDto` en ApiDtos.kt.
+- `assignMenuItem()` / `removeMenuItem()` en RecetasApi.kt (endpoint `/menu-items`).
+- `MenuItemRepository` en Repositories.kt: assign() guarda en Room; remove() soft-delete.
+- `AppContainer`: menuItemRepository añadido.
+- `RecetasViewModel`: assignToMenu() + removeFromMenu() con userMessage feedback.
+- `MenuScreen.kt` (reescrito): botón "+" por día → AssignMenuDialog (filtro recetas + tipo comida).
+  Tap en comida → AlertDialog "Ver receta" / "Eliminar del menú".
+  Parámetros nuevos: recipes, onAssignToMenu, onRemoveFromMenu, onNavigateToRecipe.
+
+### Sprint 15.2 — Navegar a receta desde MenuScreen ✅ COMPLETADO (commit e67d734)
+
+- `RecipeScreens.kt`: `RecipeList` acepta `openRecipeId: String?` + `onRecipeOpened: () -> Unit`.
+  `LaunchedEffect(openRecipeId, recipes)` abre RecipeDetail automáticamente al recibir un ID.
+- `RecetasApp.kt`: `navigateToRecipeId` state. "Ver receta" en menú → tab RECIPES + ID pasado.
+
+### Sprint 15.3 — Filtros de dificultad en RecipeList Android ✅ COMPLETADO (commit e67d734)
+
+- `RecipeScreens.kt`: `FilterChip` row (Fácil/Media/Difícil) encima de la lista de recetas.
+  Toggle: tap activa, tap de nuevo desactiva. Se combina con búsqueda por texto.
+  `difficultyFilter` state + combinación con `query` en el `filtered` val.
+
+### Sprint 15.4 — Exportar lista de la compra Desktop ⏳ PENDIENTE Codex
+
+- `ShoppingListView.java`: botón "💾 Exportar" + exportToFile(). FileChooser .txt, Files.writeString.
+- Bloque Codex generado — pendiente de ejecución por el usuario.
+
+### Sprint 15.5 — Ordenar stock por caducidad Android ✅ COMPLETADO (commit e67d734)
+
+- `StockScreens.kt`: icono Sort en header de StockList. Toggle `sortByExpiry: Boolean`.
+  Ordena por `expiresAt` ASC cuando activo (null al final como "9999-99-99").
+  Icono coloreado (primary) cuando activo para indicar estado visual.
