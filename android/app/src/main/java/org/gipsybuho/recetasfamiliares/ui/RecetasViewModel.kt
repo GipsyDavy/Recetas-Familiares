@@ -57,6 +57,10 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _recipeNextPage = MutableStateFlow(1)
+    private val _recipeHasMore = MutableStateFlow(false)
+    val recipeHasMore: StateFlow<Boolean> = _recipeHasMore.asStateFlow()
+
     private val _userMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val userMessage: SharedFlow<String> = _userMessage.asSharedFlow()
 
@@ -81,7 +85,21 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             container.recipeRepository.refresh()
             container.stockRepository.refresh()
             runCatching { container.syncRepository.pullOnce() }
+            _recipeNextPage.value = 1
+            _recipeHasMore.value = container.recipeRepository.totalPages > 1
             _isRefreshing.value = false
+        }
+    }
+
+    fun loadNextRecipePage() {
+        val next = _recipeNextPage.value
+        if (!_recipeHasMore.value) return
+        viewModelScope.launch {
+            runCatching { container.recipeRepository.loadPage(next) }
+                .onSuccess {
+                    _recipeNextPage.value = next + 1
+                    _recipeHasMore.value = next + 1 < container.recipeRepository.totalPages
+                }
         }
     }
 

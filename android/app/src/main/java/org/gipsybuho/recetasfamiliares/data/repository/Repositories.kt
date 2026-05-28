@@ -80,9 +80,20 @@ class RecipeRepository(
 
     fun recipe(id: String): Flow<RecipeEntity?> = database.recipeDao().observeRecipe(id)
 
+    private var _totalPages = 1
+    val totalPages: Int get() = _totalPages
+
     suspend fun refresh() {
         val familyId = sessionStore.familyId ?: return
-        val page = api.recipes(familyId)
+        val page = api.recipes(familyId, page = 0, size = 30)
+        _totalPages = page.totalPages.coerceAtLeast(1)
+        database.recipeDao().upsertAll(page.items.map { it.toEntity() })
+    }
+
+    suspend fun loadPage(pageNum: Int) {
+        val familyId = sessionStore.familyId ?: return
+        val page = api.recipes(familyId, page = pageNum, size = 30)
+        _totalPages = page.totalPages.coerceAtLeast(1)
         database.recipeDao().upsertAll(page.items.map { it.toEntity() })
     }
 

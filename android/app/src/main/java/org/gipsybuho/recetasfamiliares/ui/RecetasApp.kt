@@ -234,6 +234,7 @@ private fun RecipeList(
     onRefresh: () -> Unit
 ) {
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val recipeHasMore by viewModel.recipeHasMore.collectAsState()
     var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     var editingRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     var editingIngredients by remember { mutableStateOf<List<RecipeIngredientEntity>>(emptyList()) }
@@ -339,6 +340,14 @@ private fun RecipeList(
                                         headlineContent = { Text(recipe.title) },
                                         supportingContent = { Text(recipe.description ?: "Sin descripción") }
                                     )
+                                }
+                            }
+                            if (recipeHasMore && query.isBlank()) {
+                                item {
+                                    OutlinedButton(
+                                        onClick = { viewModel.loadNextRecipePage() },
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                                    ) { Text("Cargar más recetas") }
                                 }
                             }
                         }
