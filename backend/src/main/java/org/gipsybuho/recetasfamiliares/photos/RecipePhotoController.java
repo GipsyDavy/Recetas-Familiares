@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/families/{familyId}/recipes/{recipeId}/photos")
@@ -46,6 +48,20 @@ public class RecipePhotoController {
             Authentication authentication
     ) {
         return photoService.createPhoto(familyId, recipeId, authentication.getName(), request);
+    }
+
+    /** Multipart upload: stores the file and registers the photo metadata in one step. */
+    @PostMapping(value = "/upload", consumes = "multipart/form-data")
+    @ResponseStatus(HttpStatus.CREATED)
+    public RecipePhotoResponse uploadPhoto(
+            @PathVariable String familyId,
+            @PathVariable String recipeId,
+            @RequestPart("file") MultipartFile file,
+            @RequestPart(value = "caption", required = false) String caption,
+            Authentication authentication
+    ) {
+        return photoService.uploadAndCreatePhoto(
+                familyId, recipeId, authentication.getName(), file, caption);
     }
 
     @GetMapping("/{photoId}")

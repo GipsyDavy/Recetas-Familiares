@@ -18,6 +18,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipePhotoDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPullDto
@@ -25,11 +26,15 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -162,5 +167,27 @@ interface RecetasApi {
     suspend fun deleteNote(
         @Path("familyId") familyId: String,
         @Path("noteId") noteId: String
+    )
+
+    @GET("api/v1/families/{familyId}/recipes/{recipeId}/photos")
+    suspend fun photos(
+        @Path("familyId") familyId: String,
+        @Path("recipeId") recipeId: String
+    ): List<RecipePhotoDto>
+
+    @Multipart
+    @POST("api/v1/families/{familyId}/recipes/{recipeId}/photos/upload")
+    suspend fun uploadPhoto(
+        @Path("familyId") familyId: String,
+        @Path("recipeId") recipeId: String,
+        @Part file: MultipartBody.Part,
+        @Part("caption") caption: RequestBody? = null
+    ): RecipePhotoDto
+
+    @DELETE("api/v1/families/{familyId}/recipes/{recipeId}/photos/{photoId}")
+    suspend fun deletePhoto(
+        @Path("familyId") familyId: String,
+        @Path("recipeId") recipeId: String,
+        @Path("photoId") photoId: String
     )
 }

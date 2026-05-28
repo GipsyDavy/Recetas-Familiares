@@ -12,9 +12,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import coil3.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -82,6 +90,7 @@ import kotlinx.coroutines.delay
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
+import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
@@ -349,6 +358,7 @@ private fun RecipeList(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RecipeDetail(
     recipe: RecipeEntity,
@@ -358,10 +368,18 @@ private fun RecipeDetail(
     onDelete: () -> Unit,
     onCookingMode: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val ingredients by viewModel.ingredientsFor(recipe.id).collectAsState(initial = emptyList())
     val steps by viewModel.stepsFor(recipe.id).collectAsState(initial = emptyList())
     val isFavorite by viewModel.isFavorite(recipe.id).collectAsState(initial = false)
+    val photos by viewModel.photosFor(recipe.id).collectAsState(initial = emptyList())
     var showMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(recipe.id) { viewModel.loadPhotos(recipe.id) }
+
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { viewModel.launchUploadPhoto(context, recipe.id, it) }
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(bottom = 24.dp),
@@ -395,6 +413,10 @@ private fun RecipeDetail(
                             onClick = { showMenu = false; onCookingMode() }
                         )
                         DropdownMenuItem(
+                            text = { Text("Añadir foto") },
+                            onClick = { showMenu = false; photoPicker.launch("image/*") }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Editar") },
                             onClick = { showMenu = false; onEdit(ingredients, steps) }
                         )
@@ -402,6 +424,19 @@ private fun RecipeDetail(
                             text = { Text("Eliminar") },
                             onClick = { showMenu = false; onDelete() }
                         )
+                    }
+                }
+            }
+        }
+
+        if (photos.isNotEmpty()) {
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(photos, key = { it.id }) { photo ->
+                        PhotoThumbnail(photo, onDelete = { viewModel.deletePhoto(photo) })
                     }
                 }
             }
@@ -706,6 +741,29 @@ private fun CookingScreen(
                     ) { Text("¡Finalizar!") }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PhotoThumbnail(photo: RecipePhotoEntity, onDelete: () -> Unit) {
+    var showMenu by remember { mutableStateOf(false) }
+    Box {
+        AsyncImage(
+            model = photo.thumbnailUrl ?: photo.url,
+            contentDescription = photo.caption,
+            modifier = Modifier
+                .size(120.dp, 88.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .combinedClickable(onClick = {}, onLongClick = { showMenu = true }),
+            contentScale = ContentScale.Crop
+        )
+        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+            DropdownMenuItem(
+                text = { Text("Eliminar foto") },
+                onClick = { showMenu = false; onDelete() }
+            )
         }
     }
 }

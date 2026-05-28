@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.photos;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
@@ -9,6 +10,7 @@ import org.gipsybuho.recetasfamiliares.recipes.RecipeRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -17,15 +19,18 @@ public class RecipePhotoService {
     private final RecipePhotoRepository photoRepository;
     private final RecipeRepository recipeRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final FileStorageService fileStorageService;
 
     public RecipePhotoService(
             RecipePhotoRepository photoRepository,
             RecipeRepository recipeRepository,
-            FamilyMemberRepository familyMemberRepository
+            FamilyMemberRepository familyMemberRepository,
+            FileStorageService fileStorageService
     ) {
         this.photoRepository = photoRepository;
         this.recipeRepository = recipeRepository;
         this.familyMemberRepository = familyMemberRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     @Transactional(readOnly = true)
@@ -89,6 +94,39 @@ public class RecipePhotoService {
                 trimToNull(request.caption()),
                 trimToNull(request.contentType()),
                 request.sizeBytes()
+        );
+        recipe.markContentChanged();
+        recipeRepository.save(recipe);
+        return toResponse(photoRepository.save(photo));
+    }
+
+    @Transactional
+    public RecipePhotoResponse uploadAndCreatePhoto(
+            String familyId,
+            String recipeId,
+            String userId,
+            MultipartFile file,
+            String caption
+    ) {
+        RecipeEntity recipe = requireActiveRecipeForEditor(familyId, recipeId, userId);
+
+        FileStorageService.StoredFile stored;
+        try {
+            stored = fileStorageService.store(file);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to store uploaded file");
+        }
+
+        int nextPosition = photoRepository
+                .findByRecipe_IdAndDeletedFalseOrderByPositionAsc(recipeId)
+                .stream().mapToInt(RecipePhotoEntity::getPosition).max().orElse(0) + 1;
+
+        String trimmedCaption = (caption != null && !caption.isBlank()) ? caption.trim() : null;
+        RecipePhotoEntity photo = new RecipePhotoEntity(
+                recipe, nextPosition,
+                stored.url(), stored.url(),  // same URL for thumbnail (no resize in MVP)
+                trimmedCaption, stored.contentType(), stored.sizeBytes()
         );
         recipe.markContentChanged();
         recipeRepository.save(recipe);

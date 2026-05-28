@@ -41,6 +41,9 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFamilyNotePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStockItemPushItemDto
@@ -346,6 +349,36 @@ class FamilyNoteRepository(
             // Offline: mark deleted locally, SyncWorker will push on next sync
             database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true, syncVersion = 0L)))
         }
+    }
+}
+
+class RecipePhotoRepository(
+    private val api: RecetasApi,
+    private val database: RecetasDatabase,
+    private val sessionStore: SessionStore
+) {
+    fun photosFor(recipeId: String): Flow<List<RecipePhotoEntity>> =
+        database.recipePhotoDao().observePhotos(recipeId)
+
+    suspend fun loadPhotos(recipeId: String) {
+        val familyId = sessionStore.familyId ?: return
+        val dtos = api.photos(familyId, recipeId)
+        database.recipePhotoDao().upsertAll(dtos.filter { !it.deleted }.map { it.toEntity() })
+    }
+
+    suspend fun upload(recipeId: String, bytes: ByteArray, contentType: String, caption: String?) {
+        val familyId = sessionStore.familyId ?: return
+        val requestFile = bytes.toRequestBody(contentType.toMediaType())
+        val filePart = MultipartBody.Part.createFormData("file", "photo.jpg", requestFile)
+        val captionPart = caption?.toRequestBody("text/plain".toMediaType())
+        val dto = api.uploadPhoto(familyId, recipeId, filePart, captionPart)
+        database.recipePhotoDao().upsertAll(listOf(dto.toEntity()))
+    }
+
+    suspend fun delete(photo: RecipePhotoEntity) {
+        val familyId = sessionStore.familyId ?: return
+        api.deletePhoto(familyId, photo.recipeId, photo.id)
+        database.recipePhotoDao().upsertAll(listOf(photo.copy(deleted = true)))
     }
 }
 

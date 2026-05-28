@@ -12,6 +12,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.TokenRefreshAuthenticator
 import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository
 import org.gipsybuho.recetasfamiliares.data.repository.FamilyNoteRepository
 import org.gipsybuho.recetasfamiliares.data.repository.FavoriteRepository
+import org.gipsybuho.recetasfamiliares.data.repository.RecipePhotoRepository
 import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository
 import org.gipsybuho.recetasfamiliares.data.repository.ShoppingListRepository
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository
@@ -63,6 +64,7 @@ class AppContainer(context: Context) {
     val shoppingListRepository = ShoppingListRepository(api, database, sessionStore)
     val favoriteRepository = FavoriteRepository(api, database, sessionStore)
     val familyNoteRepository = FamilyNoteRepository(api, database, sessionStore)
+    val recipePhotoRepository = RecipePhotoRepository(api, database, sessionStore)
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {

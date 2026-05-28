@@ -19,12 +19,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
+import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
+import kotlinx.coroutines.Dispatchers
+import java.io.ByteArrayOutputStream
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
@@ -204,6 +212,52 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             runCatching { container.familyNoteRepository.delete(note) }
                 .onSuccess { _userMessage.emit("Nota eliminada") }
         }
+    }
+
+    fun photosFor(recipeId: String): Flow<List<RecipePhotoEntity>> =
+        container.recipePhotoRepository.photosFor(recipeId)
+
+    fun loadPhotos(recipeId: String) {
+        viewModelScope.launch {
+            runCatching { container.recipePhotoRepository.loadPhotos(recipeId) }
+        }
+    }
+
+    fun launchUploadPhoto(context: Context, recipeId: String, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val (bytes, contentType) = compressImage(context, uri)
+                container.recipePhotoRepository.upload(recipeId, bytes, contentType, null)
+            }.onSuccess { _userMessage.emit("Foto añadida") }
+             .onFailure { _userMessage.emit("Error al subir la foto") }
+        }
+    }
+
+    fun deletePhoto(photo: RecipePhotoEntity) {
+        viewModelScope.launch {
+            runCatching { container.recipePhotoRepository.delete(photo) }
+                .onSuccess { _userMessage.emit("Foto eliminada") }
+        }
+    }
+
+    private fun compressImage(context: Context, uri: Uri): Pair<ByteArray, String> {
+        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
+        } else {
+            @Suppress("DEPRECATION")
+            android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        }
+        val maxDim = 1080
+        val scaled = if (bitmap.width > maxDim || bitmap.height > maxDim) {
+            val ratio = minOf(maxDim.toFloat() / bitmap.width, maxDim.toFloat() / bitmap.height)
+            Bitmap.createScaledBitmap(
+                bitmap, (bitmap.width * ratio).toInt(), (bitmap.height * ratio).toInt(), true
+            )
+        } else bitmap
+        val baos = ByteArrayOutputStream()
+        scaled.compress(Bitmap.CompressFormat.JPEG, 85, baos)
+        if (scaled !== bitmap) scaled.recycle()
+        return Pair(baos.toByteArray(), "image/jpeg")
     }
 }
 
