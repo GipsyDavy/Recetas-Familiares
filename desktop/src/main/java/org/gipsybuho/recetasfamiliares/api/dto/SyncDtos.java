@@ -82,6 +82,13 @@ public final class SyncDtos {
                 int totalPages,
                 int number
         ) {}
+
+        public record AssignMenuItemRequest(
+                String recipeId,
+                String plannedDate,
+                String mealType,
+                String note
+        ) {}
     }
 
     public static final class ShoppingDtos {

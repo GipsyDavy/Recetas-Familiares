@@ -30,6 +30,17 @@ public class MenuRepository {
         return page.content().stream().filter(i -> !i.deleted()).toList();
     }
 
+    public SyncDtos.MenuDtos.MenuItemDto assign(String recipeId, LocalDate plannedDate, String mealType) throws ApiException {
+        String familyId = session.getFamilyId();
+        var req = new SyncDtos.MenuDtos.AssignMenuItemRequest(recipeId, plannedDate.toString(), mealType, null);
+        return api.post("api/v1/families/" + familyId + "/menu-items", req, SyncDtos.MenuDtos.MenuItemDto.class);
+    }
+
+    public void remove(String menuItemId) throws ApiException {
+        String familyId = session.getFamilyId();
+        api.delete("api/v1/families/" + familyId + "/menu-items/" + menuItemId);
+    }
+
     public void updateFromSync(List<SyncDtos.MenuDtos.MenuItemDto> items) {
         if (items != null) cache.replaceAll(items.stream().filter(i -> !i.deleted()).toList());
     }

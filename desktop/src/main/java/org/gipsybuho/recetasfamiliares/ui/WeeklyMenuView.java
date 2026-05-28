@@ -3,10 +3,10 @@ package org.gipsybuho.recetasfamiliares.ui;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
+import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.TextAlignment;
+import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
@@ -112,9 +112,7 @@ public class WeeklyMenuView extends VBox {
                     statusLabel.setText(items.size() + " entradas esta semana");
                 });
             } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    statusLabel.setText("No se pudo cargar el menú.");
-                });
+                Platform.runLater(() -> statusLabel.setText("No se pudo cargar el menú."));
             }
         });
     }
@@ -125,8 +123,7 @@ public class WeeklyMenuView extends VBox {
         grid.getChildren().clear();
 
         // Corner cell
-        Label corner = new Label("");
-        grid.add(corner, 0, 0);
+        grid.add(new Label(""), 0, 0);
 
         // Day headers (row 0, cols 1-7)
         DateTimeFormatter dayFmt = DateTimeFormatter.ofPattern("d/MM");
@@ -156,7 +153,9 @@ public class WeeklyMenuView extends VBox {
         // Empty cells for all 7×4 slots
         for (int m = 0; m < 4; m++) {
             for (int d = 0; d < 7; d++) {
-                grid.add(emptyCell(), d + 1, m + 1);
+                LocalDate day = weekStart.plusDays(d);
+                String mealType = MEAL_TYPES[m];
+                grid.add(emptyCell(day, mealType), d + 1, m + 1);
             }
         }
     }
@@ -191,7 +190,7 @@ public class WeeklyMenuView extends VBox {
 
     // ── Cell builders ──────────────────────────────────────────────────────────
 
-    private VBox emptyCell() {
+    private VBox emptyCell(LocalDate date, String mealType) {
         VBox cell = new VBox();
         cell.getStyleClass().add("menu-cell");
         cell.setAlignment(Pos.CENTER);
@@ -200,6 +199,7 @@ public class WeeklyMenuView extends VBox {
         Label dash = new Label("—");
         dash.getStyleClass().add("menu-cell-empty");
         cell.getChildren().add(dash);
+        cell.setOnMouseClicked(e -> showRecipePicker(date, mealType));
         return cell;
     }
 
@@ -224,7 +224,66 @@ public class WeeklyMenuView extends VBox {
             noteLabel.setMaxWidth(Double.MAX_VALUE);
             cell.getChildren().add(noteLabel);
         }
+
+        cell.setOnMouseClicked(e -> confirmRemove(item));
         return cell;
+    }
+
+    // ── CRUD actions ───────────────────────────────────────────────────────────
+
+    private void showRecipePicker(LocalDate date, String mealType) {
+        List<RecipeDtos.RecipeDto> recipes = List.copyOf(context.getRecipeRepository().getCache().getItems());
+        if (recipes.isEmpty()) {
+            new Alert(Alert.AlertType.INFORMATION,
+                    "No hay recetas en caché. Sincroniza primero.", ButtonType.OK)
+                    .showAndWait();
+            return;
+        }
+
+        List<String> titles = recipes.stream().map(RecipeDtos.RecipeDto::title).toList();
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(titles.get(0), titles);
+        dialog.setTitle("Asignar receta");
+        dialog.setHeaderText(mealLabel(mealType) + " — " +
+                date.format(DateTimeFormatter.ofPattern("EEEE d/MM", Locale.forLanguageTag("es"))));
+        dialog.setContentText("Receta:");
+
+        dialog.showAndWait().ifPresent(selectedTitle -> {
+            RecipeDtos.RecipeDto selected = recipes.stream()
+                    .filter(r -> selectedTitle.equals(r.title()))
+                    .findFirst().orElse(null);
+            if (selected == null) return;
+            statusLabel.setText("Asignando...");
+            Thread.ofVirtual().start(() -> {
+                try {
+                    context.getMenuRepository().assign(selected.id(), date, mealType);
+                    Platform.runLater(this::refresh);
+                } catch (Exception ex) {
+                    Platform.runLater(() -> statusLabel.setText("Error al asignar: " + ex.getMessage()));
+                }
+            });
+        });
+    }
+
+    private void confirmRemove(SyncDtos.MenuDtos.MenuItemDto item) {
+        String title = item.recipeTitle() != null ? item.recipeTitle() : "esta entrada";
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                "¿Eliminar \"" + title + "\" del menú?",
+                ButtonType.YES, ButtonType.NO);
+        alert.setTitle("Confirmar eliminación");
+        alert.setHeaderText(null);
+        alert.showAndWait()
+                .filter(b -> b == ButtonType.YES)
+                .ifPresent(b -> {
+                    statusLabel.setText("Eliminando...");
+                    Thread.ofVirtual().start(() -> {
+                        try {
+                            context.getMenuRepository().remove(item.id());
+                            Platform.runLater(this::refresh);
+                        } catch (Exception ex) {
+                            Platform.runLater(() -> statusLabel.setText("Error al eliminar: " + ex.getMessage()));
+                        }
+                    });
+                });
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -234,6 +293,13 @@ public class WeeklyMenuView extends VBox {
             if (MEAL_TYPES[i].equals(mealType)) return i + 1;
         }
         return -1;
+    }
+
+    private String mealLabel(String mealType) {
+        for (int i = 0; i < MEAL_TYPES.length; i++) {
+            if (MEAL_TYPES[i].equals(mealType)) return MEAL_LABELS[i];
+        }
+        return mealType;
     }
 
     private void updateWeekLabel() {

@@ -222,9 +222,11 @@ Stack:
 2. `StockScreen` — pantalla Stock mejorada: badges "Bajo stock", color expiry (rojo ≤3d, naranja ≤7d), empty state ✓
 3. ViewModel: `ingredientsFor(recipeId)` y `stepsFor(recipeId)` exponen flows de Room ✓
 
+### Completado Android (Sprint 4 — 2026-05-28)
+- Migraciones Room explícitas: `MIGRATION_1_2` (no-op) en `AppContainer`, eliminado `fallbackToDestructiveMigration` ✓
+
 ### Pendiente Android (Sprint 4)
-1. WorkManager sync automatico (ya programado cada 30 min, falta activar constraints en background real)
-2. Reemplazar `fallbackToDestructiveMigration` con migraciones Room explicitas (antes de beta)
+1. WorkManager sync automático (ya programado cada 30 min, falta activar constraints en background real)
 
 ---
 
@@ -251,9 +253,14 @@ SSL fix: `desktop/.mvn/jvm.config` con Windows-ROOT truststore.
 3. Sidebar: botón "Menú semanal" agregado ✓
 4. `SyncDtos.MenuDtos.MenuItemDto` expandido con todos los campos reales ✓
 
-### Pendiente Desktop (Sprint 4)
-1. Persistencia de tokens entre reinicios (OS keystore)
-2. Asignación de recetas desde WeeklyMenuView (CRUD sobre menu-items)
+### Completado Desktop (Sprint 4 — 2026-05-28)
+- Persistencia de tokens en `java.util.prefs.Preferences` (`AppSession`): carga al inicio, guarda en `setTokens()`, borra en `clear()` ✓
+- CRUD menú semanal en `WeeklyMenuView`: celdas vacías clickables (ChoiceDialog con recetas del cache) y celdas rellenas clickables (confirmación + DELETE) ✓
+- `MenuRepository`: métodos `assign()` y `remove()` ✓
+- `SyncDtos.MenuDtos.AssignMenuItemRequest` ✓
+
+### Pendiente Desktop
+- Ninguno pendiente urgente. OS keystore descartado (Preferences persiste tokens suficientemente para MVP).
 
 ---
 

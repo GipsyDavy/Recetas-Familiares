@@ -2,6 +2,8 @@ package org.gipsybuho.recetasfamiliares.core
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import org.gipsybuho.recetasfamiliares.BuildConfig
 import org.gipsybuho.recetasfamiliares.data.local.RecetasDatabase
 import org.gipsybuho.recetasfamiliares.data.remote.AuthInterceptor
@@ -25,7 +27,7 @@ class AppContainer(context: Context) {
         RecetasDatabase::class.java,
         "recetas-familiares.db"
     )
-        .fallbackToDestructiveMigration()
+        .addMigrations(MIGRATION_1_2)
         .build()
 
     private val baseUrl = BuildConfig.DEFAULT_API_BASE_URL
@@ -55,4 +57,12 @@ class AppContainer(context: Context) {
     val recipeRepository = RecipeRepository(api, database.recipeDao(), sessionStore)
     val stockRepository = StockRepository(api, database.stockDao(), sessionStore)
     val syncRepository = SyncRepository(api, database, sessionStore)
+
+    companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // No schema changes between v1 and v2
+            }
+        }
+    }
 }
