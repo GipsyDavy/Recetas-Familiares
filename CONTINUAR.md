@@ -434,12 +434,37 @@ Archivos modificados (commit 20d5ac0):
 
 ---
 
+### Sprint 8.7 — Fotos de receta ✅ COMPLETADO (2026-05-28) [Android+Backend; Desktop via Codex]
+
+**Backend** (commit 9a31cb8):
+- FileStorageService: guarda multipart en ./uploads/, UUID filename, max 8MB.
+- WebMvcConfig: sirve /uploads/** como recursos estaticos (sin auth).
+- POST /api/v1/families/{familyId}/recipes/{recipeId}/photos/upload (multipart).
+- SecurityConfig: /uploads/** permitAll.
+- application.yml: multipart 10MB, app.upload.dir y base-url.
+- 57 tests, 0 fallos.
+
+**Android** (commit 9a31cb8):
+- build.gradle.kts: coil3:coil-compose:3.0.4 + coil-network-okhttp:3.0.4.
+- RecetasApi.kt: GET photos, POST upload multipart, DELETE photo.
+- Repositories.kt: RecipePhotoRepository (loadPhotos, upload, delete).
+- RecetasViewModel.kt: launchUploadPhoto() comprime JPEG 85% max 1080px en Dispatchers.IO.
+- RecetasApp.kt: LazyRow carrusel en RecipeDetail, PhotoThumbnail long-press delete,
+  menu "Añadir foto" lanza gallery picker.
+- Build SUCCESSFUL.
+
+**Desktop** (Codex pendiente de confirmar):
+- RecipeDtos: RecipePhotoResponse record.
+- RecipeRepository: loadPhotos, uploadPhoto (multipart OkHttp), deletePhoto.
+- RecipeDetailView: HBox scrollable fotos, FileChooser, boton "Añadir foto".
+
+---
+
 ## Sprint 8 — PENDIENTE
 
 ### Candidatos restantes
-- **Fotos de receta** — subida y visualizacion de fotos (Android + Desktop). Complejo: requiere almacenamiento de ficheros en backend.
 - **Paginacion de recetas** — RecipeList Android carga todas las recetas sin paginar.
-- **Push git al remoto** — rama main tiene 11 commits sin pushear.
+- **Push git al remoto** — rama main tiene varios commits sin pushear.
 
 ---
 
