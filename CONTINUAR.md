@@ -453,10 +453,12 @@ Archivos modificados (commit 20d5ac0):
   menu "Añadir foto" lanza gallery picker.
 - Build SUCCESSFUL.
 
-**Desktop** (Codex pendiente de confirmar):
-- RecipeDtos: RecipePhotoResponse record.
-- RecipeRepository: loadPhotos, uploadPhoto (multipart OkHttp), deletePhoto.
-- RecipeDetailView: HBox scrollable fotos, FileChooser, boton "Añadir foto".
+**Desktop** (commit ee7066a — Codex):
+- RecipeDtos.java: RecipePhotoResponse record.
+- RecipeRepository.java: loadPhotos(), uploadPhoto() multipart OkHttp, deletePhoto().
+- RecipeDetailView.java: ScrollPane horizontal, ImageView 110x80px async,
+  boton Añadir foto con FileChooser, menu contextual eliminar.
+- mvn compile: BUILD SUCCESS.
 
 ---
 
@@ -464,7 +466,8 @@ Archivos modificados (commit 20d5ac0):
 
 ### Candidatos restantes
 - **Paginacion de recetas** — RecipeList Android carga todas las recetas sin paginar.
-- **Push git al remoto** — rama main tiene varios commits sin pushear.
+- **Paginacion de recetas** — RecipeList Android carga todas las recetas sin paginar (MVP aceptable para familias pequeñas).
+- **Sprint 9** — valorar nuevas funcionalidades: valoraciones/comentarios, widgets Android, notificaciones, mejoras IA.
 
 ---
 
