@@ -189,7 +189,7 @@ Migraciones Flyway V1-V9 (tablas: users, families, family_members, recipes, ingr
 
 ---
 
-## Android Kotlin + Compose — SPRINT 11 COMPLETO (2026-05-28)
+## Android Kotlin + Compose — SPRINT 12 COMPLETO (2026-05-28)
 
 Stack:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -228,7 +228,7 @@ Stack:
 - `NotesScreen` (CRUD completo, búsqueda, empty states)
 - Bottom Navigation: 4 tabs — RECIPES, STOCK, SHOPPING, NOTES
 - Snackbar feedback global
-- SyncWorker pushThenPull: Recetas + Ingredientes + Pasos + Stock + Notas + Shopping items
+- **SyncWorker pushThenPull: 7 tipos** — Recetas + Ingredientes + Pasos + Stock + Shopping items + Favoritos + Notas
 - Widgets: `RecipeWidget` (receta del día, 4×2) + `StockWidget` (ítems críticos, 2×2)
 
 ### RecetasApi.kt — endpoints implementados
@@ -246,7 +246,7 @@ Build: `gradle assembleDebug` desde `android/` — EXITOSO
 
 ---
 
-## Desktop JavaFX — SPRINT 11 COMPLETO (2026-05-28)
+## Desktop JavaFX — SPRINT 12 COMPLETO (2026-05-28)
 
 Stack: Java 21 + JavaFX 21.0.2 + OkHttp 4.12.0 + Gson 2.10.1 + Maven.
 
@@ -256,14 +256,15 @@ Fat JAR: 13.3 MB. SSL fix: `desktop/.mvn/jvm.config` con Windows-ROOT truststore
 - `LoginView`
 - `DashboardView` — GridPane 2 columnas: recetas recientes + stock expirando + acciones
 - `RecipeListView` — SplitPane filtrable, búsqueda, paginación 30/pág + "Cargar más", botón "Actualizar"
-- `RecipeDetailView` — ingredientes, pasos, fotos async, Editar + Eliminar + Modo Cocina
+- `RecipeDetailView` — ingredientes, pasos, fotos async, Editar + Eliminar + Modo Cocina + **"📋 Copiar"**
 - `RecipeFormDialog` — modal `forCreate()` / `forEdit()`
 - `CookingView` — Stage maximizado, paso a paso, temporizador JavaFX Timeline
 - `StockView` — TableView CRUD, búsqueda, columna "Mín. stock", botón "Actualizar"
 - `WeeklyMenuView` — calendario 8x5, nav semanas, CRUD assign/remove, botón "Actualizar"
 - `ShoppingListView` — dialog de items con check, botón "Actualizar" → sync completo
-- `NotesView` — SplitPane lista + editor inline, búsqueda FilteredList, botón "Actualizar"
-- `GlobalSearchView` — resultados agrupados Recetas/Stock/Notas desde sidebar (Sprint 10.2)
+- `NotesView` — SplitPane lista + editor inline, búsqueda, paginación 30/pág, botón "Actualizar"
+- `GlobalSearchView` — resultados agrupados Recetas/Stock/Notas desde sidebar
+- `ExpiryNotificationService` — toast bottom-right tras sync si stock ≤3 días caducidad
 
 ### Sidebar completa
 Inicio | Recetas | Stock | Menú semanal | Lista de la compra | Notas familiares | [Sincronizar] [Cerrar sesión]
@@ -576,12 +577,12 @@ RecipeListScreen con carga incremental. PageResponse<T> ya soportado en el backe
 
 Rama: `main` — limpio, pusheado a origin.
 
-Commits Sprint 11:
+Commits Sprint 12:
 ```
-624f900 feat: Sprint 11.4 — Paginación recetas Desktop (RecipeListView)  ← HEAD
-663f973 feat: Sprint 11.3 — Offline-resilient lista de la compra Android
-0bc5b46 feat: Sprint 11.2 — Pull-to-refresh Desktop en todas las vistas
-3850bd9 feat: Sprint 11.1 — Búsqueda global Android
+139d6df feat: Sprint 12.4 — Exportar/copiar receta al portapapeles (Desktop)  ← HEAD
+1b23583 feat: Sprint 12.3 — Paginación notas Desktop (NotesView)
+ea78874 feat: Sprint 12.2 — Notificaciones caducidad Desktop (toast JavaFX)
+6aaf406 feat: Sprint 12.1 — Offline-resilient favoritos Android
 ```
 
 ---
@@ -622,13 +623,48 @@ Commits Sprint 11:
 
 ---
 
-## Sprint 12 — PENDIENTE
+## Sprint 12 — COMPLETADO (2026-05-28)
+
+### Sprint 12.1 — Offline-resilient favoritos Android ✅ COMPLETADO (commit 6aaf406)
+
+- `FavoriteRepository.toggle()`: try/catch en rama add y rama remove.
+  - Add offline: `FavoriteRecipeEntity` con UUID local, `syncVersion=0L`, `recipeTitle=null`.
+  - Remove offline: `existing.copy(deleted=true, syncVersion=0L)`.
+- `SyncRepository.pushThenPull()`: incluye favoritos pendientes vía `SyncFavoriteRecipePushItemDto`.
+  SyncWorker ahora empuja **7 tipos**: recetas, ingredientes, pasos, stock, shopping, favoritos, notas.
+- `Daos.kt`: `FavoriteRecipeDao.findPendingCreate/Delete()`.
+
+### Sprint 12.2 — Notificaciones caducidad Desktop ✅ COMPLETADO (commit ea78874)
+
+- `ExpiryNotificationService` (nuevo): filtra stock ≤3 días y muestra toast `Stage` transparente
+  en la esquina bottom-right. Auto-dismiss 5s. Clic cierra inmediatamente.
+  Hasta 4 ítems con etiqueta "hoy/mañana/N días"; "… y N más" si hay más.
+  Paleta del proyecto (#F6E7D8/#D4A574). No requiere `java.desktop`.
+- `MainWindow`: `showIfNeeded()` llamado tras `triggerInitialSync()` y cada `triggerSync()`.
+
+### Sprint 12.3 — Paginación notas Desktop ✅ COMPLETADO (commit 1b23583)
+
+- `NoteRepository.loadPage(page, size)` añadido. `loadAll()` se mantiene para sync/cache.
+- `NotesView`: `PAGE_SIZE=30`, campos `currentPage`/`hasMore`.
+  `refresh()` carga página 0. `loadNextPage()` appenda a `allNotes` (FilteredList se actualiza).
+  Botón "Cargar más notas" oculto al filtrar o sin más páginas.
+
+### Sprint 12.4 — Exportar/copiar receta Desktop ✅ COMPLETADO (commit 139d6df)
+
+- `RecipeDetailView`: botón "📋  Copiar" en el action bar.
+- `copyToClipboard()`: construye texto con secciones (🍳 título, meta, 🥗 ingredientes, 👨‍🍳 pasos).
+  Usa `Clipboard.getSystemClipboard()` vía `ClipboardContent`. Confirmación en `statusLabel`.
+- `currentIngredients` almacenado en `renderContent()` para tener los datos en el momento de copiar.
+
+---
+
+## Sprint 13 — PENDIENTE
 
 Candidatos:
 
-1. **Notificaciones caducidad Desktop** — equivalente al WorkManager Android; alerta de stock próximo a caducar.
-2. **Offline-resilient favoritos** — `toggleFavorite()` con fallback local (patrón stock/notas).
-3. **Paginación notas/stock Desktop** — las vistas cargan todo de una vez; añadir carga incremental.
-4. **Modo manos libres CookingScreen Android** — control por gestos/volumen para avanzar pasos.
-5. **Exportar/compartir receta** — generar texto o PDF de una receta para compartir fuera de la app.
+1. **Exportar receta Android** — Intent de compartir texto/HTML con la receta.
+2. **Modo manos libres CookingScreen** — botones de volumen para avanzar pasos (Android).
+3. **Historial de menús** — ver semanas pasadas en WeeklyMenuView Desktop + Android.
+4. **Acceso rápido Dashboard** — tarjetas de acción rápida (nueva receta, añadir stock, nueva nota).
+5. **Paginación stock Desktop** — el endpoint actual devuelve array plano; valorar si el backend lo necesita.
 6. **Pull-to-refresh Desktop** — sincronización manual desde la UI.
