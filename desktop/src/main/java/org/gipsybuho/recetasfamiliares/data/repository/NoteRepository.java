@@ -35,6 +35,12 @@ public class NoteRepository {
         return page.content().stream().filter(n -> !n.deleted()).toList();
     }
 
+    public SyncDtos.NoteDtos.NotePageResponse loadPage(int page, int size) throws ApiException {
+        String familyId = session.getFamilyId();
+        String path = "api/v1/families/" + familyId + "/notes?page=" + page + "&size=" + size;
+        return api.get(path, SyncDtos.NoteDtos.NotePageResponse.class);
+    }
+
     public SyncDtos.NoteDtos.FamilyNoteDto create(String title, String body, boolean pinned) throws ApiException {
         String familyId = session.getFamilyId();
         var req = new SyncDtos.NoteDtos.CreateNoteRequest(title, body, pinned);

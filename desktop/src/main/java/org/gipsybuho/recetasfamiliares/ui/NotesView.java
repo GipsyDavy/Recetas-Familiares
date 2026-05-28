@@ -13,6 +13,7 @@ import javafx.scene.layout.*;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class NotesView extends VBox {
@@ -24,6 +25,10 @@ public class NotesView extends VBox {
     private final FilteredList<SyncDtos.NoteDtos.FamilyNoteDto> filteredNotes = new FilteredList<>(allNotes);
     private final ListView<SyncDtos.NoteDtos.FamilyNoteDto> listView = new ListView<>();
     private final TextField filterField = new TextField();
+    private final Button loadMoreBtn = new Button("Cargar más notas");
+    private int currentPage = 0;
+    private boolean hasMore = false;
+    private static final int PAGE_SIZE = 30;
 
     // Right-panel controls
     private final TextField titleField = new TextField();
@@ -67,10 +72,18 @@ public class NotesView extends VBox {
 
         filterField.setPromptText("Buscar notas...");
         filterField.getStyleClass().add("search-field");
-        filterField.textProperty().addListener((obs, old, val) ->
+        filterField.textProperty().addListener((obs, old, val) -> {
             filteredNotes.setPredicate(val == null || val.isBlank() ? null :
                 n -> (n.title() != null && n.title().toLowerCase().contains(val.toLowerCase()))
-                  || (n.body()  != null && n.body() .toLowerCase().contains(val.toLowerCase()))));
+                  || (n.body()  != null && n.body() .toLowerCase().contains(val.toLowerCase())));
+            updateLoadMoreBtn();
+        });
+
+        loadMoreBtn.getStyleClass().add("action-button-secondary");
+        loadMoreBtn.setMaxWidth(Double.MAX_VALUE);
+        loadMoreBtn.setVisible(false);
+        loadMoreBtn.setManaged(false);
+        loadMoreBtn.setOnAction(e -> loadNextPage());
 
         listView.setItems(filteredNotes);
         listView.getStyleClass().add("notes-list");
@@ -117,7 +130,7 @@ public class NotesView extends VBox {
         VBox.setVgrow(detailPane, Priority.ALWAYS);
         setDetailEnabled(false);
 
-        VBox listPane = new VBox(8, filterField, listView);
+        VBox listPane = new VBox(8, filterField, listView, loadMoreBtn);
         VBox.setVgrow(listView, Priority.ALWAYS);
         SplitPane split = new SplitPane(listPane, detailPane);
         split.setOrientation(Orientation.HORIZONTAL);
@@ -133,19 +146,62 @@ public class NotesView extends VBox {
     // ── Public API ─────────────────────────────────────────────────────────────
 
     public void refresh() {
+        currentPage = 0;
+        hasMore = false;
+        updateLoadMoreBtn();
         statusLabel.setText("Cargando...");
         Thread.ofVirtual().start(() -> {
             try {
-                List<SyncDtos.NoteDtos.FamilyNoteDto> notes = context.getNoteRepository().loadAll();
+                var page = context.getNoteRepository().loadPage(0, PAGE_SIZE);
+                List<SyncDtos.NoteDtos.FamilyNoteDto> notes =
+                        page.content() == null ? List.of()
+                        : page.content().stream().filter(n -> !n.deleted()).toList();
                 Platform.runLater(() -> {
                     allNotes.setAll(notes);
                     context.getNoteRepository().updateCache(notes);
+                    hasMore = page.totalPages() > 1;
                     statusLabel.setText(notes.size() + " notas");
+                    updateLoadMoreBtn();
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> statusLabel.setText("Error al cargar: " + ex.getMessage()));
             }
         });
+    }
+
+    private void loadNextPage() {
+        loadMoreBtn.setDisable(true);
+        int nextPage = currentPage + 1;
+        Thread.ofVirtual().start(() -> {
+            try {
+                var page = context.getNoteRepository().loadPage(nextPage, PAGE_SIZE);
+                List<SyncDtos.NoteDtos.FamilyNoteDto> newNotes =
+                        page.content() == null ? List.of()
+                        : page.content().stream().filter(n -> !n.deleted()).toList();
+                Platform.runLater(() -> {
+                    var appended = new ArrayList<>(allNotes);
+                    appended.addAll(newNotes);
+                    allNotes.setAll(appended);
+                    context.getNoteRepository().updateCache(allNotes);
+                    currentPage = nextPage;
+                    hasMore = nextPage < page.totalPages() - 1;
+                    loadMoreBtn.setDisable(false);
+                    statusLabel.setText(allNotes.size() + " notas");
+                    updateLoadMoreBtn();
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    loadMoreBtn.setDisable(false);
+                    statusLabel.setText("Error al cargar más notas.");
+                });
+            }
+        });
+    }
+
+    private void updateLoadMoreBtn() {
+        boolean show = hasMore && (filterField.getText() == null || filterField.getText().isBlank());
+        loadMoreBtn.setVisible(show);
+        loadMoreBtn.setManaged(show);
     }
 
     public void filterBy(String query) {
