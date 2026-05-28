@@ -473,8 +473,27 @@ Archivos modificados (commit 20d5ac0):
 
 ## Deuda tecnica conocida y aceptada
 
-- CRUD Update y Delete no son offline-resilient en Android (solo Create lo es desde Sprint 7.4).
 - Sync pull sin paginacion: aceptable para familias pequenas.
 - Login devuelve primera familia (no determinista si hay varias): limitacion documentada para MVP.
 - Advertencia Mockito/Byte Buddy con Java 26: no rompe build ni tests.
-- RecipeForm Android: icono de eliminar fila reutiliza Icons.Filled.Add (cosmético, no funcional).
+- RecetasApp.kt: composables > 80 lineas (RecipeList, RecipeDetail, CookingScreen, etc.) — refactor
+  en sprint dedicado, no bloquea funcionalidad.
+- RecetasApp.kt: magic numbers de spacing (8.dp x35, 4.dp x18, etc.) — sistema de design tokens
+  pendiente para Sprint 10.
+- Repositories.kt: solo Stock y FamilyNote tienen fallback offline (por diseño MVP). Recetas, fotos,
+  ratings y shopping son online-only intencionalmente.
+- Desktop AppSession: tokens en java.util.prefs (Windows Registry, sin cifrar). Documentado. Para
+  produccion real: migrar a Windows Credential Manager / macOS Keychain.
+- RecetasViewModel.compressImage: logica de imagen en ViewModel (MVP aceptable, Dispatchers.IO).
+  Para produccion: mover a use case o repositorio.
+
+## Auditoria completada (2026-05-28)
+
+- Fase 0: Baseline limpio. 57→62 tests backend, 0 fallos.
+- Fase 1: RecipeRatingControllerTest — 5 tests (CRUD, conflicto, validacion, acceso cruzado).
+- Fase 2: Fix SSRF validateHttpsUrl (bloquea localhost/IPs privadas). Doc Desktop tokens.
+- Fase 3: Codex Android — fixes aplicados: _isRefreshing try/finally, CancellationException
+  rethrow en 6 catch offline de Repositories.kt. Codex Desktop: pendiente.
+- Fase 4: Icons.Filled.Close en RecipeForm (bug cosmético). 0 TODOs/printlns en codigo.
+- Fase 5: Contratos API coherentes en las 3 plataformas (items/totalItems, name, /notes).
+- Fase 6: Gemini dependencias + arquitectura: pendiente.

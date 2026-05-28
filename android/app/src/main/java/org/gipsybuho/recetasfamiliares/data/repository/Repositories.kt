@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.data.repository
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.gipsybuho.recetasfamiliares.core.SessionStore
@@ -160,6 +161,7 @@ class StockRepository(
             )
             stockDao.upsertAll(listOf(dto.toEntity()))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             // Offline: save locally with syncVersion=0 for SyncWorker to push later
             val now = Instant.now().toString()
             stockDao.upsertAll(listOf(
@@ -180,6 +182,7 @@ class StockRepository(
             )
             stockDao.upsertAll(listOf(dto.toEntity()))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             // Offline: apply update locally, SyncWorker will push on next sync
             val now = Instant.now().toString()
             stockDao.upsertAll(listOf(
@@ -196,6 +199,7 @@ class StockRepository(
             api.deleteStockItem(familyId, item.id)
             stockDao.upsertAll(listOf(item.copy(deleted = true)))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             // Offline: mark deleted locally, SyncWorker will push on next sync
             stockDao.upsertAll(listOf(item.copy(deleted = true, syncVersion = 0L)))
         }
@@ -332,6 +336,7 @@ class FamilyNoteRepository(
             val dto = api.createNote(familyId, CreateNoteRequestDto(title, body, pinned))
             database.familyNoteDao().upsertAll(listOf(dto.toEntity()))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             // Offline: save locally with syncVersion=0 for SyncWorker to push later
             val now = Instant.now().toString()
             database.familyNoteDao().upsertAll(listOf(
@@ -347,6 +352,7 @@ class FamilyNoteRepository(
             val dto = api.updateNote(familyId, note.id, UpdateNoteRequestDto(title, body, pinned))
             database.familyNoteDao().upsertAll(listOf(dto.toEntity()))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             // Offline: apply update locally, SyncWorker will push on next sync
             val now = Instant.now().toString()
             database.familyNoteDao().upsertAll(listOf(
@@ -361,6 +367,7 @@ class FamilyNoteRepository(
             api.deleteNote(familyId, note.id)
             database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true)))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             // Offline: mark deleted locally, SyncWorker will push on next sync
             database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true, syncVersion = 0L)))
         }

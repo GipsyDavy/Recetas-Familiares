@@ -82,12 +82,15 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            container.recipeRepository.refresh()
-            container.stockRepository.refresh()
-            runCatching { container.syncRepository.pullOnce() }
-            _recipeNextPage.value = 1
-            _recipeHasMore.value = container.recipeRepository.totalPages > 1
-            _isRefreshing.value = false
+            try {
+                container.recipeRepository.refresh()
+                container.stockRepository.refresh()
+                runCatching { container.syncRepository.pullOnce() }
+                _recipeNextPage.value = 1
+                _recipeHasMore.value = container.recipeRepository.totalPages > 1
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 
