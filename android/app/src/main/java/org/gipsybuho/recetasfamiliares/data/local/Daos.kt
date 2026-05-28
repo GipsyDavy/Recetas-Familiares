@@ -13,6 +13,9 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE id = :id LIMIT 1")
     fun observeRecipe(id: String): Flow<RecipeEntity?>
 
+    @Query("SELECT * FROM recipes WHERE deleted = 0 ORDER BY updatedAt DESC")
+    suspend fun findAll(): List<RecipeEntity>
+
     @Upsert
     suspend fun upsertAll(recipes: List<RecipeEntity>)
 }
@@ -48,6 +51,14 @@ interface StockDao {
 
     @Query("SELECT * FROM stock_items WHERE deleted = 0 AND expiresAt IS NOT NULL")
     suspend fun findExpiringItems(): List<StockItemEntity>
+
+    @Query("""
+        SELECT * FROM stock_items WHERE deleted = 0 AND (
+            (expiresAt IS NOT NULL AND expiresAt <= :threshold)
+            OR (lowStockThreshold IS NOT NULL AND quantity IS NOT NULL AND quantity <= lowStockThreshold)
+        )
+    """)
+    suspend fun findCriticalItems(threshold: String): List<StockItemEntity>
 
     @Upsert
     suspend fun upsertAll(items: List<StockItemEntity>)

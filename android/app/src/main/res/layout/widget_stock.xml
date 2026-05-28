@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_stock_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F6E7D8"
+    android:padding="16dp"
+    android:gravity="center">
+
+    <TextView
+        android:id="@+id/widget_stock_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textColor="#C94B2D"
+        android:textSize="40sp"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <TextView
+        android:id="@+id/widget_stock_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="críticos"
+        android:textColor="#8B6F5E"
+        android:textSize="13sp"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="STOCK"
+        android:textColor="#3D2B1F"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:layout_marginTop="10dp"
+        android:gravity="center" />
+
+</LinearLayout>
