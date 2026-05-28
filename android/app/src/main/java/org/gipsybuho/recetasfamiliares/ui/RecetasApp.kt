@@ -17,8 +17,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Inventory2
@@ -42,10 +47,14 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.TextButton
@@ -64,9 +73,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.work.WorkManager
+import kotlinx.coroutines.delay
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
@@ -152,8 +164,16 @@ private fun MainShell(viewModel: RecetasViewModel) {
     val stockItems by viewModel.stockItems.collectAsState()
     val shoppingLists by viewModel.shoppingLists.collectAsState()
     val notes by viewModel.notes.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.userMessage.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
@@ -203,14 +223,23 @@ private fun RecipeList(
     viewModel: RecetasViewModel,
     onRefresh: () -> Unit
 ) {
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     var editingRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     var editingIngredients by remember { mutableStateOf<List<RecipeIngredientEntity>>(emptyList()) }
     var editingSteps by remember { mutableStateOf<List<RecipeStepEntity>>(emptyList()) }
     var showCreateForm by remember { mutableStateOf(false) }
+    var cookingMode by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    val filtered = if (query.isBlank()) recipes
+        else recipes.filter {
+            it.title.contains(query, ignoreCase = true) ||
+            it.description?.contains(query, ignoreCase = true) == true
+        }
 
-    Box(modifier) {
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, modifier = modifier) {
+        Box(Modifier.fillMaxSize()) {
         Column(Modifier.padding(16.dp)) {
             when {
                 showCreateForm -> RecipeForm(
@@ -229,6 +258,11 @@ private fun RecipeList(
                     onSaved = { editingRecipe = null; selectedRecipe = null },
                     onCancel = { editingRecipe = null }
                 )
+                cookingMode && selectedRecipe != null -> CookingScreen(
+                    recipe = selectedRecipe!!,
+                    viewModel = viewModel,
+                    onExit = { cookingMode = false }
+                )
                 selectedRecipe != null -> RecipeDetail(
                     recipe = selectedRecipe!!,
                     viewModel = viewModel,
@@ -241,7 +275,8 @@ private fun RecipeList(
                     onDelete = {
                         viewModel.deleteRecipe(selectedRecipe!!)
                         selectedRecipe = null
-                    }
+                    },
+                    onCookingMode = { cookingMode = true }
                 )
                 else -> {
                     Row(
@@ -255,14 +290,36 @@ private fun RecipeList(
                         Spacer(Modifier.height(4.dp))
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
-                    Spacer(Modifier.height(12.dp))
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(recipes, key = { it.id }) { recipe ->
-                            Card(onClick = { selectedRecipe = recipe; error = null }) {
-                                ListItem(
-                                    headlineContent = { Text(recipe.title) },
-                                    supportingContent = { Text(recipe.description ?: "Sin descripción") }
-                                )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text("Buscar recetas...") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        trailingIcon = if (query.isNotEmpty()) {
+                            { IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Borrar") } }
+                        } else null,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (filtered.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                if (query.isBlank()) "Sin recetas — crea tu primera receta"
+                                else "Sin resultados para \"$query\"",
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(filtered, key = { it.id }) { recipe ->
+                                Card(onClick = { selectedRecipe = recipe; error = null }) {
+                                    ListItem(
+                                        headlineContent = { Text(recipe.title) },
+                                        supportingContent = { Text(recipe.description ?: "Sin descripción") }
+                                    )
+                                }
                             }
                         }
                     }
@@ -278,6 +335,7 @@ private fun RecipeList(
                 Icon(Icons.Filled.Add, contentDescription = "Nueva receta")
             }
         }
+        }
     }
 }
 
@@ -287,7 +345,8 @@ private fun RecipeDetail(
     viewModel: RecetasViewModel,
     onBack: () -> Unit,
     onEdit: (List<RecipeIngredientEntity>, List<RecipeStepEntity>) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onCookingMode: () -> Unit = {}
 ) {
     val ingredients by viewModel.ingredientsFor(recipe.id).collectAsState(initial = emptyList())
     val steps by viewModel.stepsFor(recipe.id).collectAsState(initial = emptyList())
@@ -321,6 +380,10 @@ private fun RecipeDetail(
                         Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones")
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Modo Cocina") },
+                            onClick = { showMenu = false; onCookingMode() }
+                        )
                         DropdownMenuItem(
                             text = { Text("Editar") },
                             onClick = { showMenu = false; onEdit(ingredients, steps) }
@@ -457,6 +520,186 @@ private fun StepRow(step: RecipeStepEntity) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CookingScreen(
+    recipe: RecipeEntity,
+    viewModel: RecetasViewModel,
+    onExit: () -> Unit
+) {
+    val steps by viewModel.stepsFor(recipe.id).collectAsState(initial = emptyList())
+    var currentIndex by remember { mutableStateOf(0) }
+    var timerSecondsLeft by remember(currentIndex, steps) {
+        mutableStateOf(steps.getOrNull(currentIndex)?.timerMinutes?.let { it * 60 })
+    }
+    var timerRunning by remember(currentIndex) { mutableStateOf(false) }
+
+    LaunchedEffect(timerRunning) {
+        if (timerRunning) {
+            while ((timerSecondsLeft ?: 0) > 0) {
+                delay(1_000L)
+                timerSecondsLeft = (timerSecondsLeft ?: 0) - 1
+            }
+            timerRunning = false
+        }
+    }
+
+    val view = LocalView.current
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val window = (view.context as android.app.Activity).window
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    val currentStep = steps.getOrNull(currentIndex)
+    val finished = steps.isNotEmpty() && currentIndex >= steps.size
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextButton(onClick = onExit) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Salir")
+                }
+                Text(
+                    recipe.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false).padding(start = 8.dp)
+                )
+            }
+
+            if (steps.isNotEmpty()) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (finished) "¡Receta completada!"
+                        else "Paso ${currentIndex + 1} de ${steps.size}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        progress = { minOf(1f, (currentIndex + 1).toFloat() / steps.size) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    steps.isEmpty() -> Text(
+                        "Esta receta no tiene pasos registrados",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        textAlign = TextAlign.Center
+                    )
+                    finished -> Text(
+                        "¡Buen provecho!",
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center
+                    )
+                    else -> Text(
+                        currentStep!!.instruction,
+                        style = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center,
+                        lineHeight = MaterialTheme.typography.headlineMedium.lineHeight
+                    )
+                }
+            }
+
+            if (currentStep?.timerMinutes != null && !finished) {
+                val secs = timerSecondsLeft ?: (currentStep.timerMinutes * 60)
+                val mm = secs / 60
+                val ss = secs % 60
+                val timerDone = secs == 0
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                ) {
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = when {
+                            timerDone -> MaterialTheme.colorScheme.errorContainer
+                            timerRunning -> MaterialTheme.colorScheme.primaryContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (timerDone) "⏱ ¡Listo!" else "⏱ %02d:%02d".format(mm, ss),
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = if (timerDone) MaterialTheme.colorScheme.onErrorContainer
+                                        else MaterialTheme.colorScheme.onSurface
+                            )
+                            IconButton(onClick = {
+                                if (timerDone) {
+                                    timerSecondsLeft = currentStep.timerMinutes * 60
+                                    timerRunning = false
+                                } else {
+                                    timerRunning = !timerRunning
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = if (timerRunning) "Pausar" else "Iniciar temporizador"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedButton(
+                    onClick = { if (currentIndex > 0) { currentIndex--; timerRunning = false } },
+                    enabled = currentIndex > 0,
+                    modifier = Modifier.weight(1f)
+                ) { Text("← Anterior") }
+
+                if (finished) {
+                    Button(onClick = onExit, modifier = Modifier.weight(1f)) {
+                        Text("Cerrar")
+                    }
+                } else if (currentIndex < steps.size - 1) {
+                    Button(
+                        onClick = { currentIndex++; timerRunning = false },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Siguiente →") }
+                } else {
+                    Button(
+                        onClick = { currentIndex = steps.size },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("¡Finalizar!") }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun MetaChip(label: String) {
     Surface(
@@ -472,18 +715,24 @@ private fun MetaChip(label: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StockList(
     stockItems: List<StockItemEntity>,
     modifier: Modifier,
     viewModel: RecetasViewModel
 ) {
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var selectedItem by remember { mutableStateOf<StockItemEntity?>(null) }
     var editingItem by remember { mutableStateOf<StockItemEntity?>(null) }
     var showCreateForm by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    val filtered = if (query.isBlank()) stockItems
+        else stockItems.filter { it.name.contains(query, ignoreCase = true) }
 
-    Box(modifier) {
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { viewModel.refresh() }, modifier = modifier) {
+        Box(Modifier.fillMaxSize()) {
         Column(Modifier.padding(16.dp)) {
             when {
                 showCreateForm -> StockForm(
@@ -524,14 +773,30 @@ private fun StockList(
                         Spacer(Modifier.height(4.dp))
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
-                    Spacer(Modifier.height(12.dp))
-                    if (stockItems.isEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text("Buscar en stock...") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        trailingIcon = if (query.isNotEmpty()) {
+                            { IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Borrar") } }
+                        } else null,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (filtered.isEmpty()) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Sin artículos en stock", color = MaterialTheme.colorScheme.outline)
+                            Text(
+                                if (query.isBlank()) "Sin artículos en stock"
+                                else "Sin resultados para \"$query\"",
+                                color = MaterialTheme.colorScheme.outline
+                            )
                         }
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(stockItems, key = { it.id }) { item ->
+                            items(filtered, key = { it.id }) { item ->
                                 StockItemCard(item, onClick = { selectedItem = item; error = null })
                             }
                         }
@@ -548,6 +813,7 @@ private fun StockList(
                 Icon(Icons.Filled.Add, contentDescription = "Nuevo item de stock")
             }
         }
+        }
     }
 }
 
@@ -558,8 +824,10 @@ private fun ShoppingListScreen(
     modifier: Modifier,
     viewModel: RecetasViewModel
 ) {
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var selectedList by remember { mutableStateOf<ShoppingListEntity?>(null) }
-    Column(modifier.padding(16.dp)) {
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { viewModel.refresh() }, modifier = modifier) {
+    Column(Modifier.padding(16.dp)) {
         if (selectedList != null) {
             ShoppingListDetail(selectedList!!, viewModel, onBack = { selectedList = null })
         } else {
@@ -591,6 +859,7 @@ private fun ShoppingListScreen(
                 }
             }
         }
+    }
     }
 }
 
@@ -665,18 +934,27 @@ private fun ShoppingItemRow(
 
 // ── Notes ──────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NotesScreen(
     notes: List<FamilyNoteEntity>,
     modifier: Modifier,
     viewModel: RecetasViewModel
 ) {
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var selectedNote by remember { mutableStateOf<FamilyNoteEntity?>(null) }
     var editingNote by remember { mutableStateOf<FamilyNoteEntity?>(null) }
     var showCreateForm by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    val filtered = if (query.isBlank()) notes
+        else notes.filter {
+            it.title.contains(query, ignoreCase = true) ||
+            it.body.contains(query, ignoreCase = true)
+        }
 
-    Column(modifier.padding(16.dp)) {
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { viewModel.refresh() }, modifier = modifier) {
+    Column(Modifier.padding(16.dp)) {
         when {
             showCreateForm -> NoteForm(
                 initialTitle = "",
@@ -720,23 +998,37 @@ private fun NotesScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
-                Spacer(Modifier.height(12.dp))
-                if (notes.isEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("Buscar notas...") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = if (query.isNotEmpty()) {
+                        { IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Borrar") } }
+                    } else null,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                if (filtered.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            "Sin notas — crea tu primera nota familiar",
+                            if (query.isBlank()) "Sin notas — crea tu primera nota familiar"
+                            else "Sin resultados para \"$query\"",
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(notes, key = { it.id }) { note ->
+                        items(filtered, key = { it.id }) { note ->
                             NoteCard(note, onClick = { selectedNote = note; error = null })
                         }
                     }
                 }
             }
         }
+    }
     }
 }
 

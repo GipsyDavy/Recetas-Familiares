@@ -9,9 +9,12 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -39,6 +42,12 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private val _isLoggedIn = MutableStateFlow(container.authRepository.isLoggedIn)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _userMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val userMessage: SharedFlow<String> = _userMessage.asSharedFlow()
+
     fun login(email: String, password: String, onError: (String) -> Unit) {
         viewModelScope.launch {
             runCatching {
@@ -56,9 +65,11 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
+            _isRefreshing.value = true
             container.recipeRepository.refresh()
             container.stockRepository.refresh()
             runCatching { container.syncRepository.pullOnce() }
+            _isRefreshing.value = false
         }
     }
 
@@ -113,7 +124,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 container.recipeRepository.create(title, description, servings, prepMinutes, cookMinutes, difficulty, ingredients, steps)
-            }.onFailure { onError(it.message ?: "Error al crear receta") }
+            }.onSuccess { _userMessage.emit("Receta creada") }
+             .onFailure { onError(it.message ?: "Error al crear receta") }
         }
     }
 
@@ -126,13 +138,15 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 container.recipeRepository.update(recipe, title, description, servings, prepMinutes, cookMinutes, difficulty, ingredients, steps)
-            }.onFailure { onError(it.message ?: "Error al actualizar receta") }
+            }.onSuccess { _userMessage.emit("Receta actualizada") }
+             .onFailure { onError(it.message ?: "Error al actualizar receta") }
         }
     }
 
     fun deleteRecipe(recipe: RecipeEntity) {
         viewModelScope.launch {
             runCatching { container.recipeRepository.delete(recipe) }
+                .onSuccess { _userMessage.emit("Receta eliminada") }
         }
     }
 
@@ -144,7 +158,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 container.stockRepository.create(name, quantity, unit, lowStockThreshold, expiresAt, note)
-            }.onFailure { onError(it.message ?: "Error al crear item de stock") }
+            }.onSuccess { _userMessage.emit("Artículo añadido al stock") }
+             .onFailure { onError(it.message ?: "Error al crear item de stock") }
         }
     }
 
@@ -156,19 +171,22 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 container.stockRepository.update(item, name, quantity, unit, lowStockThreshold, expiresAt, note)
-            }.onFailure { onError(it.message ?: "Error al actualizar item de stock") }
+            }.onSuccess { _userMessage.emit("Artículo de stock actualizado") }
+             .onFailure { onError(it.message ?: "Error al actualizar item de stock") }
         }
     }
 
     fun deleteStockItem(item: StockItemEntity) {
         viewModelScope.launch {
             runCatching { container.stockRepository.delete(item) }
+                .onSuccess { _userMessage.emit("Artículo de stock eliminado") }
         }
     }
 
     fun createNote(title: String, body: String, pinned: Boolean, onError: (String) -> Unit) {
         viewModelScope.launch {
             runCatching { container.familyNoteRepository.create(title, body, pinned) }
+                .onSuccess { _userMessage.emit("Nota creada") }
                 .onFailure { onError(it.message ?: "Error al crear nota") }
         }
     }
@@ -176,6 +194,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     fun updateNote(note: FamilyNoteEntity, title: String, body: String, pinned: Boolean, onError: (String) -> Unit) {
         viewModelScope.launch {
             runCatching { container.familyNoteRepository.update(note, title, body, pinned) }
+                .onSuccess { _userMessage.emit("Nota actualizada") }
                 .onFailure { onError(it.message ?: "Error al actualizar nota") }
         }
     }
@@ -183,6 +202,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     fun deleteNote(note: FamilyNoteEntity) {
         viewModelScope.launch {
             runCatching { container.familyNoteRepository.delete(note) }
+                .onSuccess { _userMessage.emit("Nota eliminada") }
         }
     }
 }

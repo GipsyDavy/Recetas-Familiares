@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
 import javafx.application.Platform;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -14,6 +15,7 @@ public class RecipeListView extends SplitPane {
     private final RecipeDetailView detailView;
     private final TextField searchField = new TextField();
     private final Label statusLabel = new Label();
+    private boolean loadingRecipes;
 
     public RecipeListView(AppContext context) {
         this.context = context;
@@ -43,10 +45,13 @@ public class RecipeListView extends SplitPane {
 
         // Bind to cache — updates automatically after sync
         listView.setItems(context.getRecipeRepository().getCache().getItems());
+        context.getRecipeRepository().getCache().getItems()
+                .addListener((ListChangeListener<RecipeDtos.RecipeDto>) change -> updateRecipeCount());
 
         statusLabel.getStyleClass().add("status-label");
+        updateRecipeCount();
 
-        VBox leftPanel = new VBox(10, searchField, newRecipeBtn, listView, statusLabel);
+        VBox leftPanel = new VBox(10, searchField, statusLabel, newRecipeBtn, listView);
         leftPanel.setPadding(new Insets(16));
         VBox.setVgrow(listView, Priority.ALWAYS);
         leftPanel.setMinWidth(280);
@@ -59,6 +64,7 @@ public class RecipeListView extends SplitPane {
     }
 
     public void refresh() {
+        loadingRecipes = true;
         statusLabel.setText("Cargando...");
         Thread.ofVirtual().start(() -> {
             try {
@@ -66,10 +72,14 @@ public class RecipeListView extends SplitPane {
                 Platform.runLater(() -> {
                     context.getRecipeRepository().getCache().replaceAll(
                             page.items().stream().filter(r -> !r.deleted()).toList());
-                    statusLabel.setText(page.totalItems() + " recetas");
+                    loadingRecipes = false;
+                    updateRecipeCount();
                 });
             } catch (Exception ex) {
-                Platform.runLater(() -> statusLabel.setText("Error al cargar recetas."));
+                Platform.runLater(() -> {
+                    loadingRecipes = false;
+                    statusLabel.setText("Error al cargar recetas.");
+                });
             }
         });
     }
@@ -89,13 +99,27 @@ public class RecipeListView extends SplitPane {
     private void filterList(String query) {
         if (query == null || query.isBlank()) {
             listView.setItems(context.getRecipeRepository().getCache().getItems());
+            updateRecipeCount();
             return;
         }
         String lower = query.toLowerCase();
         var filtered = context.getRecipeRepository().getCache().getItems()
-                .filtered(r -> r.title().toLowerCase().contains(lower)
-                        || (r.description() != null && r.description().toLowerCase().contains(lower)));
+                .filtered(r -> r.title() != null && r.title().toLowerCase().contains(lower));
         listView.setItems(filtered);
+        updateRecipeCount();
+    }
+
+    private void updateRecipeCount() {
+        if (loadingRecipes) return;
+
+        int total = context.getRecipeRepository().getCache().getItems().size();
+        String query = searchField.getText();
+        if (query == null || query.isBlank()) {
+            statusLabel.setText(total + " recetas");
+            return;
+        }
+
+        statusLabel.setText("Mostrando " + listView.getItems().size() + " de " + total);
     }
 
     private static class RecipeCell extends ListCell<RecipeDtos.RecipeDto> {
