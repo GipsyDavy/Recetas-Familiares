@@ -18,6 +18,7 @@ import java.util.List;
 public class NotesView extends VBox {
 
     private final AppContext context;
+    private final Runnable onSync;
     private final Label statusLabel = new Label();
     private final ObservableList<SyncDtos.NoteDtos.FamilyNoteDto> allNotes = FXCollections.observableArrayList();
     private final FilteredList<SyncDtos.NoteDtos.FamilyNoteDto> filteredNotes = new FilteredList<>(allNotes);
@@ -34,8 +35,9 @@ public class NotesView extends VBox {
 
     private SyncDtos.NoteDtos.FamilyNoteDto editing = null; // null = new note
 
-    public NotesView(AppContext context) {
+    public NotesView(AppContext context, Runnable onSync) {
         this.context = context;
+        this.onSync = onSync;
         build();
     }
 
@@ -51,7 +53,7 @@ public class NotesView extends VBox {
 
         Button refreshBtn = new Button("Actualizar");
         refreshBtn.getStyleClass().add("action-button-secondary");
-        refreshBtn.setOnAction(e -> refresh());
+        refreshBtn.setOnAction(e -> onSync.run());
 
         Button newBtn = new Button("Nueva nota");
         newBtn.getStyleClass().add("action-button-primary");

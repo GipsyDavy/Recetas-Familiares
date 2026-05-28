@@ -15,11 +15,13 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ShoppingListView extends VBox {
 
     private final AppContext context;
+    private final Runnable onSync;
     private final Label statusLabel = new Label();
     private final ListView<SyncDtos.ShoppingDtos.ShoppingListDto> listView = new ListView<>();
 
-    public ShoppingListView(AppContext context) {
+    public ShoppingListView(AppContext context, Runnable onSync) {
         this.context = context;
+        this.onSync = onSync;
         build();
     }
 
@@ -35,7 +37,7 @@ public class ShoppingListView extends VBox {
 
         Button refreshBtn = new Button("Actualizar");
         refreshBtn.getStyleClass().add("action-button-secondary");
-        refreshBtn.setOnAction(e -> refresh());
+        refreshBtn.setOnAction(e -> onSync.run());
 
         HBox toolbar = new HBox(12, refreshBtn);
         toolbar.setAlignment(Pos.CENTER_LEFT);

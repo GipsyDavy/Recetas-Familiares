@@ -63,11 +63,11 @@ public class MainWindow {
 
     private void showMain() {
         dashboardView = new DashboardView(context, this::triggerSync, () -> navigateTo("recipes"));
-        recipeListView = new RecipeListView(context);
-        stockView = new StockView(context);
-        weeklyMenuView = new WeeklyMenuView(context);
-        shoppingListView = new ShoppingListView(context);
-        notesView = new NotesView(context);
+        recipeListView = new RecipeListView(context, this::triggerSync);
+        stockView = new StockView(context, this::triggerSync);
+        weeklyMenuView = new WeeklyMenuView(context, this::triggerSync);
+        shoppingListView = new ShoppingListView(context, this::triggerSync);
+        notesView = new NotesView(context, this::triggerSync);
 
         VBox sidebar = buildSidebar();
         root.setLeft(sidebar);

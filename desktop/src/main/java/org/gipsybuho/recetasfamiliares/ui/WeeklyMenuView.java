@@ -24,13 +24,15 @@ public class WeeklyMenuView extends VBox {
     private static final String[] DAY_NAMES    = {"Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"};
 
     private final AppContext context;
+    private final Runnable onSync;
     private final GridPane grid      = new GridPane();
     private final Label weekLabel    = new Label();
     private final Label statusLabel  = new Label();
     private LocalDate weekStart      = currentMonday();
 
-    public WeeklyMenuView(AppContext context) {
+    public WeeklyMenuView(AppContext context, Runnable onSync) {
         this.context = context;
+        this.onSync = onSync;
         build();
     }
 
@@ -60,7 +62,11 @@ public class WeeklyMenuView extends VBox {
         Region navSpacer = new Region();
         HBox.setHgrow(navSpacer, Priority.ALWAYS);
 
-        HBox navBar = new HBox(10, prevBtn, todayBtn, nextBtn, navSpacer, weekLabel);
+        Button syncBtn = new Button("Actualizar");
+        syncBtn.getStyleClass().add("action-button-secondary");
+        syncBtn.setOnAction(e -> onSync.run());
+
+        HBox navBar = new HBox(10, prevBtn, todayBtn, nextBtn, syncBtn, navSpacer, weekLabel);
         navBar.setAlignment(Pos.CENTER_LEFT);
         navBar.setPadding(new Insets(12, 0, 16, 0));
 

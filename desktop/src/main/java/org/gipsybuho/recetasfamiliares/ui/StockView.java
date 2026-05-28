@@ -14,13 +14,15 @@ import org.gipsybuho.recetasfamiliares.core.AppContext;
 public class StockView extends VBox {
 
     private final AppContext context;
+    private final Runnable onSync;
     private final TableView<StockDtos.StockItemDto> table = new TableView<>();
     private final Label statusLabel = new Label();
     private final TextField filterField = new TextField();
     private FilteredList<StockDtos.StockItemDto> filteredItems;
 
-    public StockView(AppContext context) {
+    public StockView(AppContext context, Runnable onSync) {
         this.context = context;
+        this.onSync = onSync;
         build();
     }
 
@@ -109,7 +111,11 @@ public class StockView extends VBox {
             deleteBtn.setDisable(!hasSelection);
         });
 
-        HBox toolbar = new HBox(8, newBtn, editBtn, deleteBtn);
+        Button refreshBtn = new Button("Actualizar");
+        refreshBtn.getStyleClass().add("action-button-secondary");
+        refreshBtn.setOnAction(e -> onSync.run());
+
+        HBox toolbar = new HBox(8, newBtn, editBtn, deleteBtn, refreshBtn);
         toolbar.setPadding(new Insets(0, 0, 4, 0));
         return toolbar;
     }

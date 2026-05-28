@@ -11,14 +11,16 @@ import org.gipsybuho.recetasfamiliares.core.AppContext;
 public class RecipeListView extends SplitPane {
 
     private final AppContext context;
+    private final Runnable onSync;
     private final ListView<RecipeDtos.RecipeDto> listView = new ListView<>();
     private final RecipeDetailView detailView;
     private final TextField searchField = new TextField();
     private final Label statusLabel = new Label();
     private boolean loadingRecipes;
 
-    public RecipeListView(AppContext context) {
+    public RecipeListView(AppContext context, Runnable onSync) {
         this.context = context;
+        this.onSync = onSync;
         this.detailView = new RecipeDetailView(context, this::refresh);
         build();
     }
@@ -30,6 +32,10 @@ public class RecipeListView extends SplitPane {
         searchField.setPromptText("Buscar recetas...");
         searchField.getStyleClass().add("search-field");
         searchField.textProperty().addListener((obs, oldVal, newVal) -> filterList(newVal));
+
+        Button refreshBtn = new Button("Actualizar");
+        refreshBtn.getStyleClass().add("action-button-secondary");
+        refreshBtn.setOnAction(e -> onSync.run());
 
         Button newRecipeBtn = new Button("+ Nueva receta");
         newRecipeBtn.getStyleClass().add("action-button-primary");
@@ -51,7 +57,7 @@ public class RecipeListView extends SplitPane {
         statusLabel.getStyleClass().add("status-label");
         updateRecipeCount();
 
-        VBox leftPanel = new VBox(10, searchField, statusLabel, newRecipeBtn, listView);
+        VBox leftPanel = new VBox(10, searchField, statusLabel, refreshBtn, newRecipeBtn, listView);
         leftPanel.setPadding(new Insets(16));
         VBox.setVgrow(listView, Priority.ALWAYS);
         leftPanel.setMinWidth(280);
