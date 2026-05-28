@@ -15,6 +15,8 @@ import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -71,6 +73,10 @@ public class RecipeDetailView extends VBox {
         copyBtn.getStyleClass().add("action-button-secondary");
         copyBtn.setOnAction(e -> copyToClipboard());
 
+        Button exportBtn = new Button("💾  Exportar");
+        exportBtn.getStyleClass().add("action-button-secondary");
+        exportBtn.setOnAction(e -> exportToFile());
+
         Button editBtn = new Button("Editar");
         editBtn.getStyleClass().add("action-button-secondary");
         editBtn.setOnAction(e -> openEditForm());
@@ -81,7 +87,7 @@ public class RecipeDetailView extends VBox {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, copyBtn, editBtn, deleteBtn);
+        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, copyBtn, exportBtn, editBtn, deleteBtn);
         actionBar.setPadding(new Insets(12, 16, 8, 16));
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -485,6 +491,66 @@ public class RecipeDetailView extends VBox {
         Clipboard.getSystemClipboard().setContent(content);
         statusLabel.setText("Receta copiada al portapapeles ✓");
         statusLabel.setVisible(true);
+    }
+
+    private void exportToFile() {
+        if (currentRecipe == null) return;
+
+        var sb = new StringBuilder();
+        sb.append("🍳  ").append(currentRecipe.title()).append("\n");
+
+        var meta = new java.util.ArrayList<String>();
+        if (currentRecipe.servings() != null) meta.add(currentRecipe.servings() + " porciones");
+        int totalMin = (currentRecipe.prepMinutes() != null ? currentRecipe.prepMinutes() : 0)
+                     + (currentRecipe.cookMinutes() != null ? currentRecipe.cookMinutes() : 0);
+        if (totalMin > 0) meta.add(totalMin + " min");
+        if (currentRecipe.difficulty() != null) meta.add(currentRecipe.difficulty());
+        if (!meta.isEmpty()) sb.append(String.join("  ·  ", meta)).append("\n");
+
+        if (currentRecipe.description() != null && !currentRecipe.description().isBlank()) {
+            sb.append("\n").append(currentRecipe.description()).append("\n");
+        }
+
+        if (!currentIngredients.isEmpty()) {
+            sb.append("\n🥗  Ingredientes\n");
+            for (var ing : currentIngredients) {
+                sb.append("• ").append(ing.name());
+                if (ing.quantity() != null) {
+                    sb.append("  —  ").append(java.math.BigDecimal.valueOf(ing.quantity()).stripTrailingZeros().toPlainString());
+                    if (ing.unit() != null && !ing.unit().isBlank()) sb.append(" ").append(ing.unit());
+                }
+                sb.append("\n");
+            }
+        }
+
+        if (!currentSteps.isEmpty()) {
+            sb.append("\n👨‍🍳  Preparación\n");
+            int num = 1;
+            for (var step : currentSteps) {
+                sb.append(num++).append(". ").append(step.instruction());
+                if (step.timerMinutes() != null) sb.append("  [").append(step.timerMinutes()).append(" min]");
+                sb.append("\n");
+            }
+        }
+
+        String text = sb.toString().trim();
+        String safeTitle = currentRecipe.title().replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Exportar receta");
+        chooser.setInitialFileName(safeTitle + ".txt");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Texto plano", "*.txt"));
+        File file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) return;
+
+        try {
+            Files.writeString(file.toPath(), text, StandardCharsets.UTF_8);
+            statusLabel.setText("Receta exportada: " + file.getName() + " ✓");
+            statusLabel.setVisible(true);
+        } catch (Exception ex) {
+            statusLabel.setText("Error al exportar: " + ex.getMessage());
+            statusLabel.setVisible(true);
+        }
     }
 
     private Label noDataLabel(String text) {

@@ -13,12 +13,18 @@ import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 public class StockView extends VBox {
 
+    private static final int PAGE_SIZE = 50;
+
     private final AppContext context;
     private final Runnable onSync;
     private final TableView<StockDtos.StockItemDto> table = new TableView<>();
     private final Label statusLabel = new Label();
     private final TextField filterField = new TextField();
+    private final javafx.collections.ObservableList<StockDtos.StockItemDto> displayItems =
+            javafx.collections.FXCollections.observableArrayList();
     private FilteredList<StockDtos.StockItemDto> filteredItems;
+    private int currentLimit = PAGE_SIZE;
+    private Button loadMoreBtn;
 
     public StockView(AppContext context, Runnable onSync) {
         this.context = context;
@@ -69,7 +75,11 @@ public class StockView extends VBox {
 
         table.getColumns().addAll(nameCol, qtyCol, expiresCol, lowStockCol);
         filteredItems = new FilteredList<>(context.getStockRepository().getCache().getItems());
-        table.setItems(filteredItems);
+        filteredItems.addListener((javafx.collections.ListChangeListener<StockDtos.StockItemDto>) c -> {
+            currentLimit = PAGE_SIZE;
+            refreshDisplay();
+        });
+        table.setItems(displayItems);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.getStyleClass().add("stock-table");
         table.setPlaceholder(buildEmptyState(
@@ -115,7 +125,15 @@ public class StockView extends VBox {
         refreshBtn.getStyleClass().add("action-button-secondary");
         refreshBtn.setOnAction(e -> onSync.run());
 
-        HBox toolbar = new HBox(8, newBtn, editBtn, deleteBtn, refreshBtn);
+        loadMoreBtn = new Button("Cargar más");
+        loadMoreBtn.getStyleClass().add("action-button-secondary");
+        loadMoreBtn.setVisible(false);
+        loadMoreBtn.setOnAction(e -> {
+            currentLimit += PAGE_SIZE;
+            refreshDisplay();
+        });
+
+        HBox toolbar = new HBox(8, newBtn, editBtn, deleteBtn, refreshBtn, loadMoreBtn);
         toolbar.setPadding(new Insets(0, 0, 4, 0));
         return toolbar;
     }
@@ -123,6 +141,7 @@ public class StockView extends VBox {
     private void openCreateDialog() {
         StockFormDialog.forCreate(getScene().getWindow(), context, saved -> {
             context.getStockRepository().getCache().getItems().add(saved);
+            refreshDisplay();
             statusLabel.setText("Item creado.");
         }).show();
     }
@@ -138,6 +157,7 @@ public class StockView extends VBox {
             }
             if (idx >= 0) items.set(idx, saved);
             else items.add(saved);
+            refreshDisplay();
             statusLabel.setText("Item actualizado.");
         }).show();
     }
@@ -160,6 +180,7 @@ public class StockView extends VBox {
                         context.getStockRepository().delete(selected.id());
                         Platform.runLater(() -> {
                             context.getStockRepository().getCache().getItems().remove(selected);
+                            refreshDisplay();
                             statusLabel.setText("Item eliminado.");
                         });
                     } catch (Exception ex) {
@@ -168,6 +189,15 @@ public class StockView extends VBox {
                 });
             }
         });
+    }
+
+    private void refreshDisplay() {
+        int total = filteredItems.size();
+        int showing = Math.min(currentLimit, total);
+        displayItems.setAll(filteredItems.subList(0, showing));
+        boolean hasMore = showing < total && (filterField.getText() == null || filterField.getText().isBlank());
+        if (loadMoreBtn != null) loadMoreBtn.setVisible(hasMore);
+        if (loadMoreBtn != null) loadMoreBtn.setText("Cargar más (" + showing + " de " + total + ")");
     }
 
     private Node buildEmptyState(String emoji, String title, String subtitle) {
@@ -201,6 +231,7 @@ public class StockView extends VBox {
                 Platform.runLater(() -> {
                     context.getStockRepository().getCache().replaceAll(
                             items.stream().filter(i -> !i.deleted()).toList());
+                    refreshDisplay();
                     statusLabel.setText(items.size() + " artículos");
                 });
             } catch (Exception ex) {
