@@ -194,6 +194,9 @@ public class MainWindow {
         Thread.ofVirtual().start(() -> {
             try {
                 context.getSyncRepository().pull();
+                Platform.runLater(() ->
+                    ExpiryNotificationService.showIfNeeded(
+                        context.getStockRepository().getCache().getItems(), stage));
             } catch (Exception ignored) {
                 // Silent fail on initial sync — UI still works offline
             }
@@ -211,6 +214,8 @@ public class MainWindow {
                     else if (root.getCenter() instanceof WeeklyMenuView) weeklyMenuView.refresh();
                     else if (root.getCenter() instanceof ShoppingListView) shoppingListView.refresh();
                     else if (root.getCenter() instanceof NotesView) notesView.refresh();
+                    ExpiryNotificationService.showIfNeeded(
+                        context.getStockRepository().getCache().getItems(), stage);
                 });
             } catch (Exception ex) {
                 Platform.runLater(() ->
