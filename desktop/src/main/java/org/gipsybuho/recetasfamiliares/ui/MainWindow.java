@@ -62,7 +62,10 @@ public class MainWindow {
     // ── Main shell ───────────────────────────────────────────────────────────
 
     private void showMain() {
-        dashboardView = new DashboardView(context, this::triggerSync, () -> navigateTo("recipes"));
+        dashboardView = new DashboardView(context, this::triggerSync,
+                () -> navigateTo("recipes"),
+                () -> navigateTo("stock"),
+                () -> navigateTo("notes"));
         recipeListView = new RecipeListView(context, this::triggerSync);
         stockView = new StockView(context, this::triggerSync);
         weeklyMenuView = new WeeklyMenuView(context, this::triggerSync);

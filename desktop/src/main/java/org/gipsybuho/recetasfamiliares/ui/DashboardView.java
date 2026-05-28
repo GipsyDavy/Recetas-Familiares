@@ -26,11 +26,16 @@ public class DashboardView extends ScrollPane {
     private final VBox stockSection = new VBox(6);
     private final Runnable onSyncRequested;
     private final Runnable onNavigateRecipes;
+    private final Runnable onNavigateStock;
+    private final Runnable onNavigateNotes;
 
-    public DashboardView(AppContext context, Runnable onSyncRequested, Runnable onNavigateRecipes) {
+    public DashboardView(AppContext context, Runnable onSyncRequested, Runnable onNavigateRecipes,
+                         Runnable onNavigateStock, Runnable onNavigateNotes) {
         this.context = context;
         this.onSyncRequested = onSyncRequested;
         this.onNavigateRecipes = onNavigateRecipes;
+        this.onNavigateStock = onNavigateStock;
+        this.onNavigateNotes = onNavigateNotes;
         build();
     }
 
@@ -61,7 +66,17 @@ public class DashboardView extends ScrollPane {
         recipesBtn.setMaxWidth(Double.MAX_VALUE);
         recipesBtn.setOnAction(e -> onNavigateRecipes.run());
 
-        VBox rightCol = new VBox(16, stockCard, syncBtn, recipesBtn);
+        Button stockNavBtn = new Button("Stock familiar");
+        stockNavBtn.getStyleClass().add("action-button-secondary");
+        stockNavBtn.setMaxWidth(Double.MAX_VALUE);
+        stockNavBtn.setOnAction(e -> onNavigateStock.run());
+
+        Button notesNavBtn = new Button("Notas familiares");
+        notesNavBtn.getStyleClass().add("action-button-secondary");
+        notesNavBtn.setMaxWidth(Double.MAX_VALUE);
+        notesNavBtn.setOnAction(e -> onNavigateNotes.run());
+
+        VBox rightCol = new VBox(12, stockCard, syncBtn, recipesBtn, stockNavBtn, notesNavBtn);
         GridPane.setVgrow(rightCol, Priority.ALWAYS);
 
         // ── Grid assembly ─────────────────────────────────────────────────────
