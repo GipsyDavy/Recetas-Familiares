@@ -55,6 +55,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -375,7 +376,13 @@ private fun RecipeDetail(
     val photos by viewModel.photosFor(recipe.id).collectAsState(initial = emptyList())
     var showMenu by remember { mutableStateOf(false) }
 
-    LaunchedEffect(recipe.id) { viewModel.loadPhotos(recipe.id) }
+    val ratings by viewModel.recipeRatings.collectAsState()
+    val myUserId = viewModel.myUserId
+
+    LaunchedEffect(recipe.id) {
+        viewModel.loadPhotos(recipe.id)
+        viewModel.loadRatings(recipe.id)
+    }
 
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { viewModel.launchUploadPhoto(context, recipe.id, it) }
@@ -502,6 +509,27 @@ private fun RecipeDetail(
             items(steps, key = { it.id }) { step ->
                 StepRow(step)
             }
+        }
+
+        item {
+            Spacer(Modifier.height(4.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (ratings.isNotEmpty()) "Valoraciones (${ratings.size})" else "Valoraciones",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        item {
+            RatingsSection(
+                ratings = ratings,
+                myUserId = myUserId,
+                onSubmit = { stars, comment, existingId, onError ->
+                    viewModel.submitRating(recipe.id, stars, comment, existingId, onError)
+                },
+                onDelete = { ratingId -> viewModel.deleteRating(recipe.id, ratingId) }
+            )
         }
     }
 }
@@ -740,6 +768,136 @@ private fun CookingScreen(
                         modifier = Modifier.weight(1f)
                     ) { Text("¡Finalizar!") }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingsSection(
+    ratings: List<RecipeRatingDto>,
+    myUserId: String?,
+    onSubmit: (stars: Int, comment: String?, existingId: String?, onError: (String) -> Unit) -> Unit,
+    onDelete: (ratingId: String) -> Unit
+) {
+    val myRating = ratings.firstOrNull { it.userId == myUserId }
+    var selectedStars by remember(myRating) { mutableStateOf(myRating?.stars ?: 0) }
+    var commentText by remember(myRating) { mutableStateOf(myRating?.comment ?: "") }
+    var showForm by remember { mutableStateOf(false) }
+    var formError by remember { mutableStateOf<String?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // My rating or invite to rate
+        if (myRating == null) {
+            if (!showForm) {
+                OutlinedButton(
+                    onClick = { showForm = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Añadir valoración") }
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Tu valoración:", style = MaterialTheme.typography.labelLarge)
+                Row {
+                    TextButton(onClick = { showForm = true; selectedStars = myRating.stars; commentText = myRating.comment ?: "" }) { Text("Editar") }
+                    TextButton(onClick = { onDelete(myRating.id) }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+                }
+            }
+            StarRow(stars = myRating.stars, interactive = false)
+            myRating.comment?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        if (showForm) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    if (myRating == null) "Nueva valoración" else "Editar valoración",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                StarRow(stars = selectedStars, interactive = true, onSelect = { selectedStars = it })
+                OutlinedTextField(
+                    value = commentText,
+                    onValueChange = { commentText = it },
+                    label = { Text("Comentario (opcional)") },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            if (selectedStars == 0) { formError = "Selecciona entre 1 y 5 estrellas"; return@Button }
+                            onSubmit(selectedStars, commentText.trim().ifBlank { null }, myRating?.id) { err ->
+                                formError = err
+                            }
+                            showForm = false
+                        },
+                        enabled = selectedStars > 0
+                    ) { Text("Guardar") }
+                    OutlinedButton(onClick = { showForm = false; formError = null }) { Text("Cancelar") }
+                }
+            }
+        }
+
+        // Other family members' ratings
+        val othersRatings = ratings.filter { it.userId != myUserId }
+        if (othersRatings.isNotEmpty()) {
+            HorizontalDivider()
+            othersRatings.forEach { rating ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(rating.userDisplayName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        StarRow(stars = rating.stars, interactive = false)
+                    }
+                    rating.comment?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        if (ratings.isEmpty() && !showForm) {
+            Text(
+                "Sé el primero en valorar esta receta",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+}
+
+@Composable
+private fun StarRow(stars: Int, interactive: Boolean, onSelect: ((Int) -> Unit)? = null) {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        for (i in 1..5) {
+            val filled = i <= stars
+            if (interactive && onSelect != null) {
+                IconButton(
+                    onClick = { onSelect(i) },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = if (filled) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = "$i estrellas",
+                        tint = if (filled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = if (filled) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = null,
+                    tint = if (filled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }

@@ -46,6 +46,9 @@ interface StockDao {
     @Query("SELECT * FROM stock_items WHERE syncVersion = 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<StockItemEntity>
 
+    @Query("SELECT * FROM stock_items WHERE deleted = 0 AND expiresAt IS NOT NULL")
+    suspend fun findExpiringItems(): List<StockItemEntity>
+
     @Upsert
     suspend fun upsertAll(items: List<StockItemEntity>)
 }

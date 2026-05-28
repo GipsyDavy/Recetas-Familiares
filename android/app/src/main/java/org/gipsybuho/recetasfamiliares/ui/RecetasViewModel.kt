@@ -27,6 +27,7 @@ import android.os.Build
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
@@ -36,6 +37,7 @@ import java.io.ByteArrayOutputStream
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
+import org.gipsybuho.recetasfamiliares.sync.ExpiryNotificationWorker
 import org.gipsybuho.recetasfamiliares.sync.SyncWorker
 import java.util.concurrent.TimeUnit
 
@@ -49,6 +51,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _isLoggedIn = MutableStateFlow(container.authRepository.isLoggedIn)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    val myUserId: String? get() = container.sessionStore.userId
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -82,14 +86,18 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun scheduleSync(workManager: WorkManager) {
-        val request = PeriodicWorkRequestBuilder<SyncWorker>(30, TimeUnit.MINUTES)
+        val syncRequest = PeriodicWorkRequestBuilder<SyncWorker>(30, TimeUnit.MINUTES)
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build()
             )
             .build()
-        workManager.enqueueUniquePeriodicWork("family-sync", ExistingPeriodicWorkPolicy.UPDATE, request)
+        workManager.enqueueUniquePeriodicWork("family-sync", ExistingPeriodicWorkPolicy.UPDATE, syncRequest)
+
+        val expiryRequest = PeriodicWorkRequestBuilder<ExpiryNotificationWorker>(24, TimeUnit.HOURS)
+            .build()
+        workManager.enqueueUniquePeriodicWork("expiry-check", ExistingPeriodicWorkPolicy.KEEP, expiryRequest)
     }
 
     val shoppingLists: StateFlow<List<ShoppingListEntity>> =
@@ -230,6 +238,47 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 container.recipePhotoRepository.upload(recipeId, bytes, contentType, null)
             }.onSuccess { _userMessage.emit("Foto añadida") }
              .onFailure { _userMessage.emit("Error al subir la foto") }
+        }
+    }
+
+    // ── Ratings ────────────────────────────────────────────────────────────────
+
+    private val _recipeRatings = MutableStateFlow<List<RecipeRatingDto>>(emptyList())
+    val recipeRatings: StateFlow<List<RecipeRatingDto>> = _recipeRatings.asStateFlow()
+
+    fun loadRatings(recipeId: String) {
+        viewModelScope.launch {
+            runCatching { container.recipeRatingRepository.loadRatings(recipeId) }
+                .onSuccess { _recipeRatings.value = it }
+        }
+    }
+
+    fun submitRating(recipeId: String, stars: Int, comment: String?, existingRatingId: String?,
+                     onError: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                if (existingRatingId == null) {
+                    container.recipeRatingRepository.create(recipeId, stars, comment)
+                } else {
+                    container.recipeRatingRepository.update(recipeId, existingRatingId, stars, comment)
+                }
+            }.onSuccess { updated ->
+                val current = _recipeRatings.value.toMutableList()
+                val idx = current.indexOfFirst { it.id == updated.id }
+                if (idx >= 0) current[idx] = updated else current.add(0, updated)
+                _recipeRatings.value = current
+                _userMessage.emit("Valoración guardada")
+            }.onFailure { onError(it.message ?: "Error al guardar valoración") }
+        }
+    }
+
+    fun deleteRating(recipeId: String, ratingId: String) {
+        viewModelScope.launch {
+            runCatching { container.recipeRatingRepository.delete(recipeId, ratingId) }
+                .onSuccess {
+                    _recipeRatings.value = _recipeRatings.value.filter { it.id != ratingId }
+                    _userMessage.emit("Valoración eliminada")
+                }
         }
     }
 

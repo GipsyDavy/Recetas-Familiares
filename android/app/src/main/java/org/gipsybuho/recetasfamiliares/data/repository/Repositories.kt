@@ -44,6 +44,9 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRatingRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFamilyNotePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStockItemPushItemDto
@@ -60,6 +63,7 @@ class AuthRepository(
         sessionStore.accessToken = response.accessToken
         sessionStore.refreshToken = response.refreshToken
         sessionStore.familyId = response.family.id
+        sessionStore.userId = response.user.id
     }
 
     fun logout() {
@@ -349,6 +353,31 @@ class FamilyNoteRepository(
             // Offline: mark deleted locally, SyncWorker will push on next sync
             database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true, syncVersion = 0L)))
         }
+    }
+}
+
+class RecipeRatingRepository(
+    private val api: RecetasApi,
+    private val sessionStore: SessionStore
+) {
+    suspend fun loadRatings(recipeId: String): List<RecipeRatingDto> {
+        val familyId = sessionStore.familyId ?: return emptyList()
+        return api.ratings(familyId, recipeId)
+    }
+
+    suspend fun create(recipeId: String, stars: Int, comment: String?): RecipeRatingDto {
+        val familyId = sessionStore.familyId ?: error("Not logged in")
+        return api.createRating(familyId, recipeId, CreateRatingRequestDto(stars, comment))
+    }
+
+    suspend fun update(recipeId: String, ratingId: String, stars: Int, comment: String?): RecipeRatingDto {
+        val familyId = sessionStore.familyId ?: error("Not logged in")
+        return api.updateRating(familyId, recipeId, ratingId, UpdateRatingRequestDto(stars, comment))
+    }
+
+    suspend fun delete(recipeId: String, ratingId: String) {
+        val familyId = sessionStore.familyId ?: return
+        api.deleteRating(familyId, recipeId, ratingId)
     }
 }
 

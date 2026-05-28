@@ -13,6 +13,7 @@ import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository
 import org.gipsybuho.recetasfamiliares.data.repository.FamilyNoteRepository
 import org.gipsybuho.recetasfamiliares.data.repository.FavoriteRepository
 import org.gipsybuho.recetasfamiliares.data.repository.RecipePhotoRepository
+import org.gipsybuho.recetasfamiliares.data.repository.RecipeRatingRepository
 import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository
 import org.gipsybuho.recetasfamiliares.data.repository.ShoppingListRepository
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository
@@ -65,6 +66,7 @@ class AppContainer(context: Context) {
     val favoriteRepository = FavoriteRepository(api, database, sessionStore)
     val familyNoteRepository = FamilyNoteRepository(api, database, sessionStore)
     val recipePhotoRepository = RecipePhotoRepository(api, database, sessionStore)
+    val recipeRatingRepository = RecipeRatingRepository(api, sessionStore)
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {

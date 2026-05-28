@@ -18,7 +18,10 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipePhotoDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPullDto
@@ -189,5 +192,33 @@ interface RecetasApi {
         @Path("familyId") familyId: String,
         @Path("recipeId") recipeId: String,
         @Path("photoId") photoId: String
+    )
+
+    @GET("api/v1/families/{familyId}/recipes/{recipeId}/ratings")
+    suspend fun ratings(
+        @Path("familyId") familyId: String,
+        @Path("recipeId") recipeId: String
+    ): List<RecipeRatingDto>
+
+    @POST("api/v1/families/{familyId}/recipes/{recipeId}/ratings")
+    suspend fun createRating(
+        @Path("familyId") familyId: String,
+        @Path("recipeId") recipeId: String,
+        @Body request: CreateRatingRequestDto
+    ): RecipeRatingDto
+
+    @PUT("api/v1/families/{familyId}/recipes/{recipeId}/ratings/{ratingId}")
+    suspend fun updateRating(
+        @Path("familyId") familyId: String,
+        @Path("recipeId") recipeId: String,
+        @Path("ratingId") ratingId: String,
+        @Body request: UpdateRatingRequestDto
+    ): RecipeRatingDto
+
+    @DELETE("api/v1/families/{familyId}/recipes/{recipeId}/ratings/{ratingId}")
+    suspend fun deleteRating(
+        @Path("familyId") familyId: String,
+        @Path("recipeId") recipeId: String,
+        @Path("ratingId") ratingId: String
     )
 }

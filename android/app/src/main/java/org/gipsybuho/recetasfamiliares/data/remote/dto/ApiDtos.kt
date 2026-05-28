@@ -170,6 +170,22 @@ data class FamilyNoteDto(
     val deleted: Boolean
 )
 
+data class RecipeRatingDto(
+    val id: String,
+    val recipeId: String,
+    val userId: String,
+    val userDisplayName: String,
+    val stars: Int,
+    val comment: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean
+)
+
+data class CreateRatingRequestDto(val stars: Int, val comment: String?)
+data class UpdateRatingRequestDto(val stars: Int, val comment: String?)
+
 data class RecipePhotoDto(
     val id: String,
     val recipeId: String,
