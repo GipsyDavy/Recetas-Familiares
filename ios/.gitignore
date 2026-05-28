@@ -1,0 +1,18 @@
+# Gradle
+.gradle/
+build/
+composeApp/build/
+
+# Xcode
+iosApp/*.xcworkspace
+iosApp/Pods/
+iosApp/.build/
+*.xcuserdata
+DerivedData/
+
+# KMP
+kotlin-native-build/
+.kotlin/
+
+# JVM heap dumps
+*.hprof
