@@ -8,6 +8,7 @@ import javafx.scene.text.Text;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class RecipeDetailView extends VBox {
@@ -25,6 +26,7 @@ public class RecipeDetailView extends VBox {
     private final Button favBtn = new Button("♡  Favorito");
 
     private RecipeDtos.RecipeDto currentRecipe;
+    private List<RecipeDtos.RecipeStepDto> currentSteps = new ArrayList<>();
 
     public RecipeDetailView(AppContext context, Runnable onRecipeChanged) {
         this.context = context;
@@ -46,6 +48,10 @@ public class RecipeDetailView extends VBox {
         favBtn.getStyleClass().add("action-button-secondary");
         favBtn.setOnAction(e -> toggleFavorite());
 
+        Button cookingBtn = new Button("👨‍🍳  Modo Cocina");
+        cookingBtn.getStyleClass().add("action-button-secondary");
+        cookingBtn.setOnAction(e -> openCookingMode());
+
         Button editBtn = new Button("Editar");
         editBtn.getStyleClass().add("action-button-secondary");
         editBtn.setOnAction(e -> openEditForm());
@@ -56,7 +62,7 @@ public class RecipeDetailView extends VBox {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        actionBar.getChildren().addAll(spacer, favBtn, editBtn, deleteBtn);
+        actionBar.getChildren().addAll(spacer, favBtn, cookingBtn, editBtn, deleteBtn);
         actionBar.setPadding(new Insets(12, 16, 8, 16));
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -134,6 +140,7 @@ public class RecipeDetailView extends VBox {
 
     private void renderContent(List<RecipeDtos.RecipeIngredientDto> ingredients,
                                List<RecipeDtos.RecipeStepDto> steps) {
+        this.currentSteps = steps != null ? steps : new ArrayList<>();
         statusLabel.setVisible(false);
         ingredientsList.getChildren().clear();
         for (var ing : ingredients) {
@@ -167,6 +174,13 @@ public class RecipeDetailView extends VBox {
         }
         if (steps.isEmpty())
             stepsList.getChildren().add(noDataLabel("Sin pasos."));
+    }
+
+    // ── Cooking mode ──────────────────────────────────────────────────────────
+
+    private void openCookingMode() {
+        if (currentRecipe == null) return;
+        CookingView.open(getScene().getWindow(), currentRecipe, currentSteps);
     }
 
     // ── Favorite ──────────────────────────────────────────────────────────────
