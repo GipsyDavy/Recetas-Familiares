@@ -43,6 +43,9 @@ interface StockDao {
     @Query("SELECT * FROM stock_items WHERE syncVersion = 0 AND deleted = 0")
     suspend fun findPendingCreate(): List<StockItemEntity>
 
+    @Query("SELECT * FROM stock_items WHERE syncVersion = 0 AND deleted = 1")
+    suspend fun findPendingDelete(): List<StockItemEntity>
+
     @Upsert
     suspend fun upsertAll(items: List<StockItemEntity>)
 }
@@ -96,6 +99,9 @@ interface FamilyNoteDao {
 
     @Query("SELECT * FROM family_notes WHERE syncVersion = 0 AND deleted = 0")
     suspend fun findPendingCreate(): List<FamilyNoteEntity>
+
+    @Query("SELECT * FROM family_notes WHERE syncVersion = 0 AND deleted = 1")
+    suspend fun findPendingDelete(): List<FamilyNoteEntity>
 
     @Upsert
     suspend fun upsertAll(notes: List<FamilyNoteEntity>)

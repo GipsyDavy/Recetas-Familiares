@@ -156,16 +156,31 @@ class StockRepository(
         lowStockThreshold: Double?, expiresAt: String?, note: String?
     ) {
         val familyId = sessionStore.familyId ?: return
-        val dto = api.updateStockItem(
-            familyId, item.id, UpdateStockItemRequestDto(name, quantity, unit, lowStockThreshold, expiresAt, note)
-        )
-        stockDao.upsertAll(listOf(dto.toEntity()))
+        try {
+            val dto = api.updateStockItem(
+                familyId, item.id, UpdateStockItemRequestDto(name, quantity, unit, lowStockThreshold, expiresAt, note)
+            )
+            stockDao.upsertAll(listOf(dto.toEntity()))
+        } catch (e: Exception) {
+            // Offline: apply update locally, SyncWorker will push on next sync
+            val now = Instant.now().toString()
+            stockDao.upsertAll(listOf(
+                item.copy(name = name, quantity = quantity, unit = unit,
+                    lowStockThreshold = lowStockThreshold, expiresAt = expiresAt,
+                    note = note, updatedAt = now, syncVersion = 0L)
+            ))
+        }
     }
 
     suspend fun delete(item: StockItemEntity) {
         val familyId = sessionStore.familyId ?: return
-        api.deleteStockItem(familyId, item.id)
-        stockDao.upsertAll(listOf(item.copy(deleted = true)))
+        try {
+            api.deleteStockItem(familyId, item.id)
+            stockDao.upsertAll(listOf(item.copy(deleted = true)))
+        } catch (e: Exception) {
+            // Offline: mark deleted locally, SyncWorker will push on next sync
+            stockDao.upsertAll(listOf(item.copy(deleted = true, syncVersion = 0L)))
+        }
     }
 }
 
@@ -195,21 +210,31 @@ class SyncRepository(
     suspend fun pushThenPull() {
         val familyId = sessionStore.familyId ?: return
 
-        val pendingStock = database.stockDao().findPendingCreate()
-        val pendingNotes = database.familyNoteDao().findPendingCreate()
+        val pendingStock       = database.stockDao().findPendingCreate()
+        val pendingStockDelete = database.stockDao().findPendingDelete()
+        val pendingNotes       = database.familyNoteDao().findPendingCreate()
+        val pendingNoteDelete  = database.familyNoteDao().findPendingDelete()
+
+        val stockPushItems = (pendingStock.map {
+            SyncStockItemPushItemDto(id = it.id, baseSyncVersion = null,
+                name = it.name, quantity = it.quantity, unit = it.unit,
+                lowStockThreshold = it.lowStockThreshold, expiresAt = it.expiresAt,
+                note = it.note, deleted = false)
+        } + pendingStockDelete.map {
+            SyncStockItemPushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
+        })
+
+        val notePushItems = (pendingNotes.map {
+            SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null,
+                recipeId = it.recipeId, title = it.title, body = it.body,
+                pinned = it.pinned, deleted = false)
+        } + pendingNoteDelete.map {
+            SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
+        })
 
         val pushRequest = SyncPushRequestDto(
-            stockItems = pendingStock.map {
-                SyncStockItemPushItemDto(id = it.id, baseSyncVersion = null,
-                    name = it.name, quantity = it.quantity, unit = it.unit,
-                    lowStockThreshold = it.lowStockThreshold, expiresAt = it.expiresAt,
-                    note = it.note, deleted = false)
-            },
-            familyNotes = pendingNotes.map {
-                SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null,
-                    recipeId = it.recipeId, title = it.title, body = it.body,
-                    pinned = it.pinned, deleted = false)
-            }
+            stockItems = stockPushItems.ifEmpty { null },
+            familyNotes = notePushItems.ifEmpty { null }
         )
 
         val response = api.pushSync(familyId, pushRequest)
@@ -300,14 +325,27 @@ class FamilyNoteRepository(
 
     suspend fun update(note: FamilyNoteEntity, title: String, body: String, pinned: Boolean) {
         val familyId = sessionStore.familyId ?: return
-        val dto = api.updateNote(familyId, note.id, UpdateNoteRequestDto(title, body, pinned))
-        database.familyNoteDao().upsertAll(listOf(dto.toEntity()))
+        try {
+            val dto = api.updateNote(familyId, note.id, UpdateNoteRequestDto(title, body, pinned))
+            database.familyNoteDao().upsertAll(listOf(dto.toEntity()))
+        } catch (e: Exception) {
+            // Offline: apply update locally, SyncWorker will push on next sync
+            val now = Instant.now().toString()
+            database.familyNoteDao().upsertAll(listOf(
+                note.copy(title = title, body = body, pinned = pinned, updatedAt = now, syncVersion = 0L)
+            ))
+        }
     }
 
     suspend fun delete(note: FamilyNoteEntity) {
         val familyId = sessionStore.familyId ?: return
-        api.deleteNote(familyId, note.id)
-        database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true)))
+        try {
+            api.deleteNote(familyId, note.id)
+            database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true)))
+        } catch (e: Exception) {
+            // Offline: mark deleted locally, SyncWorker will push on next sync
+            database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true, syncVersion = 0L)))
+        }
     }
 }
 

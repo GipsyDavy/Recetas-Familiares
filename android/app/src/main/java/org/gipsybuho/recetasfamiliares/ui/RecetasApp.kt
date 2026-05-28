@@ -304,12 +304,22 @@ private fun RecipeList(
                     )
                     Spacer(Modifier.height(8.dp))
                     if (filtered.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                if (query.isBlank()) "Sin recetas — crea tu primera receta"
-                                else "Sin resultados para \"$query\"",
-                                color = MaterialTheme.colorScheme.outline
+                        if (query.isBlank()) {
+                            EmptyStateView(
+                                icon = Icons.Outlined.Restaurant,
+                                title = "Sin recetas aún",
+                                subtitle = "Empieza a guardar las recetas de tu familia y construid vuestro recetario",
+                                actionLabel = "Crear primera receta",
+                                onAction = { showCreateForm = true }
                             )
+                        } else {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    "Sin resultados para \"$query\"",
+                                    color = MaterialTheme.colorScheme.outline,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -701,6 +711,46 @@ private fun CookingScreen(
 }
 
 @Composable
+private fun EmptyStateView(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(40.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(72.dp),
+                tint = MaterialTheme.colorScheme.outlineVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            if (actionLabel != null && onAction != null) {
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = onAction) { Text(actionLabel) }
+            }
+        }
+    }
+}
+
+@Composable
 private fun MetaChip(label: String) {
     Surface(
         shape = MaterialTheme.shapes.small,
@@ -787,12 +837,22 @@ private fun StockList(
                     )
                     Spacer(Modifier.height(8.dp))
                     if (filtered.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                if (query.isBlank()) "Sin artículos en stock"
-                                else "Sin resultados para \"$query\"",
-                                color = MaterialTheme.colorScheme.outline
+                        if (query.isBlank()) {
+                            EmptyStateView(
+                                icon = Icons.Outlined.Inventory2,
+                                title = "Stock vacío",
+                                subtitle = "Registra los ingredientes de casa para controlar caducidades y bajo stock",
+                                actionLabel = "Añadir primer artículo",
+                                onAction = { showCreateForm = true }
                             )
+                        } else {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    "Sin resultados para \"$query\"",
+                                    color = MaterialTheme.colorScheme.outline,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -840,9 +900,11 @@ private fun ShoppingListScreen(
             }
             Spacer(Modifier.height(12.dp))
             if (lists.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Sin listas de la compra", color = MaterialTheme.colorScheme.outline)
-                }
+                EmptyStateView(
+                    icon = Icons.Outlined.ShoppingCart,
+                    title = "Sin listas de la compra",
+                    subtitle = "Las listas se generan desde el menú semanal o se sincronizan desde otro dispositivo"
+                )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(lists, key = { it.id }) { list ->
@@ -894,9 +956,11 @@ private fun ShoppingListDetail(
         }
         Spacer(Modifier.height(8.dp))
         if (items.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Sin artículos — actualiza para sincronizar", color = MaterialTheme.colorScheme.outline)
-            }
+            EmptyStateView(
+                icon = Icons.Outlined.ShoppingCart,
+                title = "Lista vacía",
+                subtitle = "Desliza hacia abajo para sincronizar los artículos"
+            )
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(items, key = { it.id }) { item ->
@@ -1012,12 +1076,22 @@ private fun NotesScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 if (filtered.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            if (query.isBlank()) "Sin notas — crea tu primera nota familiar"
-                            else "Sin resultados para \"$query\"",
-                            color = MaterialTheme.colorScheme.outline
+                    if (query.isBlank()) {
+                        EmptyStateView(
+                            icon = Icons.Outlined.Description,
+                            title = "Sin notas familiares",
+                            subtitle = "Escribe recuerdos, anécdotas y secretos culinarios de vuestra familia",
+                            actionLabel = "Nueva nota",
+                            onAction = { showCreateForm = true }
                         )
+                    } else {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                "Sin resultados para \"$query\"",
+                                color = MaterialTheme.colorScheme.outline,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
