@@ -13,7 +13,7 @@ class SyncWorker(
     override suspend fun doWork(): Result {
         val container = (applicationContext as RecetasApplication).container
         return runCatching {
-            container.syncRepository.pullOnce()
+            container.syncRepository.pushThenPull()
         }.fold(
             onSuccess = { Result.success() },
             onFailure = { Result.retry() }

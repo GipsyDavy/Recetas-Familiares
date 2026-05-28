@@ -19,6 +19,8 @@ import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
+import java.time.Instant
+import java.util.UUID
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
@@ -39,7 +41,9 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ShoppingListItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFamilyNotePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStockItemPushItemDto
 
 class AuthRepository(
     private val api: RecetasApi,
@@ -132,10 +136,19 @@ class StockRepository(
         lowStockThreshold: Double?, expiresAt: String?, note: String?
     ) {
         val familyId = sessionStore.familyId ?: return
-        val dto = api.createStockItem(
-            familyId, CreateStockItemRequestDto(name, quantity, unit, lowStockThreshold, expiresAt, note)
-        )
-        stockDao.upsertAll(listOf(dto.toEntity()))
+        try {
+            val dto = api.createStockItem(
+                familyId, CreateStockItemRequestDto(name, quantity, unit, lowStockThreshold, expiresAt, note)
+            )
+            stockDao.upsertAll(listOf(dto.toEntity()))
+        } catch (e: Exception) {
+            // Offline: save locally with syncVersion=0 for SyncWorker to push later
+            val now = Instant.now().toString()
+            stockDao.upsertAll(listOf(
+                StockItemEntity(UUID.randomUUID().toString(), familyId, name, quantity, unit,
+                    lowStockThreshold, expiresAt, note, now, now, 0L, false)
+            ))
+        }
     }
 
     suspend fun update(
@@ -181,7 +194,25 @@ class SyncRepository(
 
     suspend fun pushThenPull() {
         val familyId = sessionStore.familyId ?: return
-        val response = api.pushSync(familyId, SyncPushRequestDto())
+
+        val pendingStock = database.stockDao().findPendingCreate()
+        val pendingNotes = database.familyNoteDao().findPendingCreate()
+
+        val pushRequest = SyncPushRequestDto(
+            stockItems = pendingStock.map {
+                SyncStockItemPushItemDto(id = it.id, baseSyncVersion = null,
+                    name = it.name, quantity = it.quantity, unit = it.unit,
+                    lowStockThreshold = it.lowStockThreshold, expiresAt = it.expiresAt,
+                    note = it.note, deleted = false)
+            },
+            familyNotes = pendingNotes.map {
+                SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null,
+                    recipeId = it.recipeId, title = it.title, body = it.body,
+                    pinned = it.pinned, deleted = false)
+            }
+        )
+
+        val response = api.pushSync(familyId, pushRequest)
 
         database.recipeDao().upsertAll(response.recipes.orEmpty().map { it.toEntity() })
         database.recipeIngredientDao().upsertAll(response.ingredients.orEmpty().map { it.toEntity() })
@@ -254,8 +285,17 @@ class FamilyNoteRepository(
 
     suspend fun create(title: String, body: String, pinned: Boolean) {
         val familyId = sessionStore.familyId ?: return
-        val dto = api.createNote(familyId, CreateNoteRequestDto(title, body, pinned))
-        database.familyNoteDao().upsertAll(listOf(dto.toEntity()))
+        try {
+            val dto = api.createNote(familyId, CreateNoteRequestDto(title, body, pinned))
+            database.familyNoteDao().upsertAll(listOf(dto.toEntity()))
+        } catch (e: Exception) {
+            // Offline: save locally with syncVersion=0 for SyncWorker to push later
+            val now = Instant.now().toString()
+            database.familyNoteDao().upsertAll(listOf(
+                FamilyNoteEntity(UUID.randomUUID().toString(), familyId, null, null,
+                    title, body, pinned, now, now, 0L, false)
+            ))
+        }
     }
 
     suspend fun update(note: FamilyNoteEntity, title: String, body: String, pinned: Boolean) {

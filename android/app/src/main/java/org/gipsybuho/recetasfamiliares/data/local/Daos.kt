@@ -40,6 +40,9 @@ interface StockDao {
     @Query("SELECT * FROM stock_items WHERE deleted = 0 ORDER BY name COLLATE NOCASE")
     fun observeStock(): Flow<List<StockItemEntity>>
 
+    @Query("SELECT * FROM stock_items WHERE syncVersion = 0 AND deleted = 0")
+    suspend fun findPendingCreate(): List<StockItemEntity>
+
     @Upsert
     suspend fun upsertAll(items: List<StockItemEntity>)
 }
@@ -90,6 +93,9 @@ interface FavoriteRecipeDao {
 interface FamilyNoteDao {
     @Query("SELECT * FROM family_notes WHERE deleted = 0 ORDER BY pinned DESC, updatedAt DESC")
     fun observeNotes(): Flow<List<FamilyNoteEntity>>
+
+    @Query("SELECT * FROM family_notes WHERE syncVersion = 0 AND deleted = 0")
+    suspend fun findPendingCreate(): List<FamilyNoteEntity>
 
     @Upsert
     suspend fun upsertAll(notes: List<FamilyNoteEntity>)
