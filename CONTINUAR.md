@@ -496,12 +496,8 @@ RecipeListScreen con carga incremental. PageResponse<T> ya soportado en el backe
 - Sync pull sin paginacion: aceptable para familias pequenas.
 - Login devuelve primera familia (no determinista si hay varias): limitacion documentada para MVP.
 - Advertencia Mockito/Byte Buddy con Java 26: no rompe build ni tests.
-- RecetasApp.kt: composables > 80 lineas (RecipeList, RecipeDetail, CookingScreen, etc.) — refactor
-  en sprint dedicado, no bloquea funcionalidad.
-- RecetasApp.kt: magic numbers de spacing (8.dp x35, 4.dp x18, etc.) — sistema de design tokens
-  pendiente para Sprint 10.
-- Repositories.kt: solo Stock y FamilyNote tienen fallback offline (por diseño MVP). Recetas, fotos,
-  ratings y shopping son online-only intencionalmente.
+- Repositories.kt: fotos, ratings y shopping son online-only intencionalmente (MVP aceptable).
+  Recetas, Stock y FamilyNote tienen fallback offline completo (create/update/delete, syncVersion=0).
 - Desktop AppSession: tokens en java.util.prefs (Windows Registry, sin cifrar). Documentado. Para
   produccion real: migrar a Windows Credential Manager / macOS Keychain.
 - RecetasViewModel.compressImage: logica de imagen en ViewModel (MVP aceptable, Dispatchers.IO).
@@ -528,13 +524,71 @@ RecipeListScreen con carga incremental. PageResponse<T> ya soportado en el backe
 
 ---
 
-## Sprint 10 — PENDIENTE
+## Sprint 10 — COMPLETADO (2026-05-28)
 
-Candidatos ordenados por valor de usuario:
+### Sprint 10.1 — Widgets Android ✅ COMPLETADO (commit 4eab106)
 
-1. **Widgets Android** — widget receta del día o stock crítico en pantalla de inicio.
-2. **Búsqueda global Desktop** — búsqueda unificada por receta, nota e ingrediente.
-3. **CRUD update/delete offline-resilient recetas** — alinear recetas con el patrón de stock/notas.
-4. **Design tokens Android** — eliminar magic numbers de RecetasApp.kt (espaciado, tipografía).
-5. **Refactor RecetasApp.kt** — extraer composables > 80 líneas a ficheros propios.
+- `RecipeWidget`: receta del día rotando por índice diario desde Room. Layout 4×2.
+- `StockWidget`: contador de ítems críticos (caducan ≤3 días o bajo umbral). Layout 2×2.
+- Ambos usan `goAsync()` + Room directo. Se actualizan cada 24h.
+- Nuevas queries: `RecipeDao.findAll()`, `StockDao.findCriticalItems(threshold)`.
+- Registrados en `AndroidManifest.xml` como receivers con `APPWIDGET_UPDATE`.
+
+### Sprint 10.2 — Búsqueda global Desktop ✅ COMPLETADO (commit e91420a)
+
+- `GlobalSearchView` (nuevo): resultados agrupados 📖 Recetas / 🧂 Stock / 📝 Notas.
+  Sin llamada de red — filtra sobre caches en memoria. Hover warm-beige.
+- `MainWindow`: TextField de búsqueda en sidebar; ≥2 chars activa búsqueda global;
+  clic en resultado navega y pre-filtra la vista destino. Flag `navigating` evita re-entradas.
+- `NoteRepository`: `SimpleCache` + `getCache()` + `updateCache()` para búsqueda global.
+- `NotesView`: `FilteredList` + `filterField` encima de lista; CRUD migrado a `allNotes`.
+- `RecipeListView`: `filterBy(String)` público. `StockView`: `FilteredList` + `filterField` + `filterBy()`.
+
+### Sprint 10.3 — CRUD offline-resilient recetas Android ✅ COMPLETADO (commit 1b9292b)
+
+- `RecipeRepository.create()`: fallo API → guarda receta + ingredientes + pasos con UUID local y syncVersion=0.
+- `RecipeRepository.update()`: fallo API → guarda metadatos con syncVersion=0 (ing/pasos sin cambio hasta sync).
+- `RecipeRepository.delete()`: fallo API → deleted=true + syncVersion=0 en Room.
+- `SyncRepository.pushThenPull()`: incluye recetas/ingredientes/pasos pendientes en el push.
+- Nuevas queries: `RecipeDao.findPendingCreate/Delete()`, `RecipeIngredientDao/RecipeStepDao.findByRecipeIds()`.
+
+### Sprint 10.4 — Design tokens + refactor RecetasApp.kt ✅ COMPLETADO (commit b97c0cd)
+
+**Design tokens** (`AppTokens.kt`):
+- `Spacing.xxs/xs/sm/md/lg/xl/xxl` = 2/4/6/8/12/16/24 dp.
+- 101 magic numbers reemplazados por tokens semánticos.
+
+**Extracción composables** (1887 → 250 líneas en `RecetasApp.kt`):
+- `SharedComposables.kt`: `EmptyStateView`, `MetaChip`.
+- `RecipeScreens.kt`: `RecipeList`, `RecipeDetail`, `IngredientRow`, `StepRow`, `PhotoThumbnail`, `RatingsSection`, `StarRow`.
+- `CookingScreen.kt`: `CookingScreen`.
+- `RecipeFormScreen.kt`: `RecipeForm` + `IngredientDraft` + `StepDraft`.
+- `StockScreens.kt`: `StockList`, `StockItemCard`, `StockDetail`, `StockForm`.
+- `NotesScreens.kt`: `NotesScreen`, `NoteCard`, `NoteDetail`, `NoteForm`.
+
+---
+
+## Estado Git (2026-05-28)
+
+Rama: `main` — limpio, pusheado a origin.
+
+Commits Sprint 10:
+```
+b97c0cd refactor: Sprint 10.4 — Design tokens + extracción composables RecetasApp.kt  ← HEAD
+1b9292b feat: Sprint 10.3 — CRUD offline-resilient recetas Android
+e91420a feat: Sprint 10.2 — Búsqueda global Desktop (recetas, stock, notas)
+4eab106 feat: Sprint 10.1 — Widgets Android (Receta del día + Stock crítico)
+```
+
+---
+
+## Sprint 11 — PENDIENTE
+
+Candidatos para el próximo sprint:
+
+1. **Búsqueda global Android** — barra de búsqueda unificada entre tabs (recetas + stock + notas).
+2. **Pull-to-refresh Desktop** — botón/gesto de sincronización manual en todas las vistas.
+3. **Modo offline-resilient shopping** — alinear lista de la compra con patrón de offline de recetas/stock.
+4. **Paginación Desktop recetas** — RecipeListView carga todas las recetas de una vez; aplicar paginación.
+5. **Notificaciones caducidad Desktop** — equivalent al WorkManager Android para alertas de stock.
 6. **Pull-to-refresh Desktop** — sincronización manual desde la UI.
