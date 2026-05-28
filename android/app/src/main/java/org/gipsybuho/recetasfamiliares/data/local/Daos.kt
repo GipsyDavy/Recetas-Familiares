@@ -102,6 +102,9 @@ interface ShoppingListItemDao {
     @Query("SELECT * FROM shopping_list_items WHERE shoppingListId = :shoppingListId AND deleted = 0 ORDER BY position ASC")
     fun observeItems(shoppingListId: String): Flow<List<ShoppingListItemEntity>>
 
+    @Query("SELECT * FROM shopping_list_items WHERE syncVersion = 0 AND deleted = 0")
+    suspend fun findPendingCheck(): List<ShoppingListItemEntity>
+
     @Upsert
     suspend fun upsertAll(items: List<ShoppingListItemEntity>)
 }

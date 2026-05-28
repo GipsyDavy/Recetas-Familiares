@@ -52,6 +52,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFamilyNotePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncIngredientPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncRecipePushItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncShoppingListItemPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStepPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStockItemPushItemDto
 
@@ -275,12 +276,13 @@ class SyncRepository(
     suspend fun pushThenPull() {
         val familyId = sessionStore.familyId ?: return
 
-        val pendingRecipes     = database.recipeDao().findPendingCreate()
-        val pendingRecipeDel   = database.recipeDao().findPendingDelete()
-        val pendingStock       = database.stockDao().findPendingCreate()
-        val pendingStockDelete = database.stockDao().findPendingDelete()
-        val pendingNotes       = database.familyNoteDao().findPendingCreate()
-        val pendingNoteDelete  = database.familyNoteDao().findPendingDelete()
+        val pendingRecipes      = database.recipeDao().findPendingCreate()
+        val pendingRecipeDel    = database.recipeDao().findPendingDelete()
+        val pendingStock        = database.stockDao().findPendingCreate()
+        val pendingStockDelete  = database.stockDao().findPendingDelete()
+        val pendingNotes        = database.familyNoteDao().findPendingCreate()
+        val pendingNoteDelete   = database.familyNoteDao().findPendingDelete()
+        val pendingShoppingItems = database.shoppingListItemDao().findPendingCheck()
 
         val recipeIds = pendingRecipes.map { it.id }
         val pendingIngredients = if (recipeIds.isNotEmpty())
@@ -326,11 +328,20 @@ class SyncRepository(
             SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
         }
 
+        val shoppingItemPushItems = pendingShoppingItems.map {
+            SyncShoppingListItemPushItemDto(
+                id = it.id, baseSyncVersion = null, shoppingListId = it.shoppingListId,
+                position = it.position, name = it.name, quantity = it.quantity,
+                unit = it.unit, checked = it.checked, note = it.note, deleted = false
+            )
+        }
+
         val pushRequest = SyncPushRequestDto(
             recipes = recipePushItems,
             ingredients = ingredientPushItems,
             steps = stepPushItems,
             stockItems = stockPushItems.ifEmpty { null },
+            shoppingListItems = shoppingItemPushItems.ifEmpty { null },
             familyNotes = notePushItems.ifEmpty { null }
         )
 
@@ -363,16 +374,22 @@ class ShoppingListRepository(
 
     suspend fun checkItem(item: ShoppingListItemEntity, checked: Boolean) {
         val familyId = sessionStore.familyId ?: return
-        val req = UpdateShoppingListItemRequestDto(
-            position = item.position,
-            name = item.name,
-            quantity = item.quantity,
-            unit = item.unit,
-            checked = checked,
-            note = item.note
-        )
-        val updated = api.updateShoppingListItem(familyId, item.shoppingListId, item.id, req)
-        database.shoppingListItemDao().upsertAll(listOf(updated.toEntity()))
+        try {
+            val req = UpdateShoppingListItemRequestDto(
+                position = item.position,
+                name = item.name,
+                quantity = item.quantity,
+                unit = item.unit,
+                checked = checked,
+                note = item.note
+            )
+            val updated = api.updateShoppingListItem(familyId, item.shoppingListId, item.id, req)
+            database.shoppingListItemDao().upsertAll(listOf(updated.toEntity()))
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // Offline: save checked state locally, SyncWorker will push later
+            database.shoppingListItemDao().upsertAll(listOf(item.copy(checked = checked, syncVersion = 0L)))
+        }
     }
 }
 
