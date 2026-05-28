@@ -20,6 +20,7 @@ import org.gipsybuho.recetasfamiliares.data.repository.StockRepository
 import org.gipsybuho.recetasfamiliares.data.repository.SyncRepository
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.util.concurrent.TimeUnit
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -38,6 +39,8 @@ class AppContainer(context: Context) {
     private val baseUrl = BuildConfig.DEFAULT_API_BASE_URL
 
     private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(AuthInterceptor(sessionStore))
         .authenticator(TokenRefreshAuthenticator(sessionStore, baseUrl))
         .addInterceptor(

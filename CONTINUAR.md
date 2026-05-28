@@ -496,4 +496,12 @@ Archivos modificados (commit 20d5ac0):
   rethrow en 6 catch offline de Repositories.kt. Codex Desktop: pendiente.
 - Fase 4: Icons.Filled.Close en RecipeForm (bug cosmético). 0 TODOs/printlns en codigo.
 - Fase 5: Contratos API coherentes en las 3 plataformas (items/totalItems, name, /notes).
-- Fase 6: Gemini dependencias + arquitectura: pendiente.
+- Fase 6: Dependencias + arquitectura — COMPLETADA (Claude Code, 2026-05-28):
+  * Backend: Spring Boot 3.5.14, jjwt 0.12.7, springdoc 2.8.17 — todos estables y actuales. Sin CVEs.
+  * Desktop: JavaFX 21.0.2 (LTS aceptable), okhttp 4.12.0, gson 2.10.1, junit 5.10.2 — aceptables para MVP.
+  * Android: security-crypto 1.1.0-alpha06 es la más reciente disponible (no existe stable 1.1.0). Aceptado.
+  * Bug crítico corregido — ApiClient.java Desktop: post() carecía de Authorization header;
+    cada POST autenticado generaba un round-trip 401 innecesario + llamada extra a /refresh.
+  * Bug corregido — Timeouts OkHttp ausentes en Desktop (ambos clientes) y Android.
+    commit 58bcf2a solo añadió shutdown(), no los timeouts.
+    Ahora: connectTimeout 10s, readTimeout 30s (client principal), readTimeout 15s (refreshClient).

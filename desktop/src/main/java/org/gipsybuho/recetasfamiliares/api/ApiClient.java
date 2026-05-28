@@ -7,6 +7,7 @@ import org.gipsybuho.recetasfamiliares.api.dto.AuthDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 public class ApiClient {
 
@@ -22,8 +23,13 @@ public class ApiClient {
     public ApiClient(AppSession session) {
         this.session = session;
         this.gson = new GsonBuilder().create();
-        this.refreshClient = new OkHttpClient();
+        this.refreshClient = new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .build();
         this.client = new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
                 .authenticator(this::authenticate)
                 .build();
     }
@@ -43,6 +49,7 @@ public class ApiClient {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
                 .url(BASE_URL + path)
+                .header("Authorization", "Bearer " + session.getAccessToken())
                 .post(rb)
                 .build();
         return execute(request, responseType);
