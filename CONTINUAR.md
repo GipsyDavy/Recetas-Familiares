@@ -872,11 +872,41 @@ Verificado en emulador Pixel_9_Pro API 36: LoginScreen, RecipeList, RecipeDetail
 - `CookingView.java`: ←/→ teclado navega pasos; `prevStep()`/`nextStep()` extraídos.
 - `DashboardView.java`: hover `ScaleTransition` recipe cards (1.0→1.02, 100ms).
 
-### Pendiente Sprint 17 (Prioridad Media — Sprint 19)
+### Pendiente Sprint 17 (Prioridad Media — COMPLETADO en Sprint 19)
 
-Android: `animateContentSize()`, `ModalBottomSheet` menú ⋮, `AnimatedContent` timer, skeleton shimmer, `animateColorAsState`.
-Desktop: skeleton placeholders, `TranslateTransition` notificaciones, `AudioClip` sonidos.
-iOS: hápticos `expect/actual`, `SwipeToReveal`.
+---
+
+## Sprint 19 — UX Polish + SQLDelight iOS + Sonidos Desktop ✅ COMPLETADO (2026-05-29) — commit 8853bd0
+
+### Sprint 19 Android (Claude Code) ✅
+
+- `RecipeScreens.kt`: `ModalBottomSheet` reemplaza `DropdownMenu` en menú ⋮ RecipeDetail.
+- `RecipeScreens.kt`: `AnimatedContent` timer CookingScreen (slide+fade por segundo).
+- `RecipeScreens.kt`: `SkeletonRecipeCard` shimmer en primera carga (4 cards pulsantes con `rememberInfiniteTransition`).
+- `RecipeScreens.kt`: `animateColorAsState` en FilterChips dificultad via `FilterChipDefaults.filterChipColors`.
+- `RecipeScreens.kt`: `animateContentSize()` en `RatingsSection` al abrir/cerrar formulario de valoración.
+- `StockScreens.kt`: `animateColorAsState` en color badge caducidad (`expiryColor`).
+- `CookingScreen.kt`: `AnimatedContent` en texto del timer (slide vertical por segundo).
+
+### Sprint 19 Desktop (Codex) ✅
+
+- `ExpiryNotificationService.java`: `TranslateTransition` entrada toast desde abajo (Y+60→0, 220ms EaseOut).
+- `RecipeListView.java`: skeleton loading con `StackPane` + 5 placeholders + shimmer `Timeline`.
+- `SoundPlayer.java` (nuevo): `playConfirm/Delete/TimerComplete` via `javax.sound.sampled` onda sinusoidal.
+  Sonidos desactivados por defecto (`Preferences`), playback en hilos virtuales.
+- Sonidos integrados en `CookingView.java`, `RecipeFormDialog.java`, `StockFormDialog.java`, `StockView.java`.
+
+### Sprint 19 iOS (Claude Code + diseño Gemini) ✅
+
+- `libs.versions.toml` + `build.gradle.kts`: SQLDelight 2.0.2 plugin + deps (runtime, coroutines, native-driver).
+- `AppDatabase.sq` (nuevo): tablas `recipes` + `stock_items` con queries insertOrReplace + selectAll.
+- `DatabaseDriverFactory.kt` (expect) + `DatabaseDriverFactory.ios.kt` (actual, NativeSqliteDriver).
+- `RecipeRepository.kt`: cache offline — API→BD→devuelve; fallo API→devuelve desde BD.
+- `StockRepository.kt`: mismo patrón cache offline.
+- `App.kt` + `MainTabScreen.kt`: `DatabaseDriverFactory` instanciado en App y pasado a repos.
+- `HapticFeedback.kt` (expect) + `HapticFeedback.ios.kt` (actual): UIImpactFeedbackGenerator / UISelectionFeedbackGenerator / UINotificationFeedbackGenerator.
+- `RecipeListScreen.kt`, `NotesScreen.kt`: `rememberHapticFeedback()` + `haptic.selection()` al tocar card.
+- `StockScreen.kt`: `SwipeToReveal` per item via `pointerInput + Animatable` (commonMain, sin APIs Android).
 
 ---
 
@@ -905,9 +935,11 @@ iOS: hápticos `expect/actual`, `SwipeToReveal`.
 ### iOS pendiente Sprint 19
 
 - Shopping y Menú screens iOS (StockScreen pattern).
-- SQLDelight offline cache (recipes + stock).
-- Hápticos `expect/actual` (UIImpactFeedbackGenerator).
-- SwipeToReveal items lista.
+- ~~SQLDelight offline cache (recipes + stock).~~ ✅ Sprint 19
+- ~~Hápticos `expect/actual` (UIImpactFeedbackGenerator).~~ ✅ Sprint 19
+- ~~SwipeToReveal items lista.~~ ✅ Sprint 19
+- ShoppingListScreen + MenuScreen iOS (placeholder → implementación real).
+- Sync incremental SQLDelight (pull y push desde iOS).
 
 ---
 
