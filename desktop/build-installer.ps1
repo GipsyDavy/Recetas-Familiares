@@ -1,0 +1,310 @@
+# ==============================================================================
+# build-installer.ps1 — Recetas Familiares v1.0.0 — Instalador Windows
+# ==============================================================================
+# Requisitos:
+#   - JDK 21+ (probado con JDK 26) en C:\Program Files\Java\jdk-26
+#   - Maven accesible (NetBeans, IntelliJ o PATH)
+#   - Inno Setup 6 para generar el .exe final (opcional — sin él se crea el app-image)
+#
+# Uso:
+#   .\build-installer.ps1
+#   .\build-installer.ps1 -ApiUrl "http://192.168.1.100:8080/"
+# ==============================================================================
+
+param(
+    [string]$ApiUrl = "http://localhost:8080/"
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+# ── Configuración ──────────────────────────────────────────────────────────────
+$AppName        = "RecetasFamiliares"
+$AppDisplayName = "Recetas Familiares"
+$AppVersion     = "1.0.0"
+$MainJar        = "RecetasFamiliares.jar"
+$MainClass      = "org.gipsybuho.recetasfamiliares.Launcher"
+$JavaFxModules  = "javafx.controls,javafx.fxml,javafx.base,javafx.graphics"
+$ProjectDir     = $PSScriptRoot
+$TargetDir      = "$ProjectDir\target"
+$InputDir       = "$TargetDir\jpackage-input"
+$ModsDir        = "$InputDir\mods"
+$OutputDir      = "$ProjectDir\output"
+$IcoPath        = "$ProjectDir\installer\recetas.ico"
+$PngPath        = "$ProjectDir\src\main\resources\brand\gipsy-buho-logo.png"
+$ShadedJar      = "$TargetDir\recetas-familiares-desktop-1.0-SNAPSHOT.jar"
+
+# ── Rutas de herramientas ─────────────────────────────────────────────────────
+$JDK       = "C:\Program Files\Java\jdk-26"
+$InnoSetup = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+$MvnCandidates = @(
+    "C:\Program Files\Apache NetBeans\java\maven\bin\mvn.cmd",
+    "C:\Program Files\JetBrains\IntelliJ IDEA 2026.1\plugins\maven\lib\maven3\bin\mvn.cmd",
+    "C:\Program Files\JetBrains\IntelliJ IDEA 2025.1\plugins\maven\lib\maven3\bin\mvn.cmd",
+    "mvn.cmd",
+    "mvn"
+)
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+function Write-Step { param($msg) Write-Host "`n  $msg" -ForegroundColor Cyan }
+function Write-OK   { param($msg) Write-Host "    [OK]  $msg" -ForegroundColor Green }
+function Write-Warn { param($msg) Write-Host "    [!]   $msg" -ForegroundColor Yellow }
+function Write-Fail { param($msg) Write-Host "    [ERR] $msg" -ForegroundColor Red }
+
+function Find-Maven {
+    foreach ($candidate in $MvnCandidates) {
+        if (Test-Path $candidate)                                    { return $candidate }
+        if (Get-Command $candidate -ErrorAction SilentlyContinue)   { return $candidate }
+    }
+    return $null
+}
+
+# Crea un fichero .ico a partir de un .png usando System.Drawing (siempre disponible en Windows).
+# El ICO contendrá la imagen en 256x256 formato PNG (soportado desde Windows Vista).
+function New-IcoFromPng {
+    param([string]$Png, [string]$Ico)
+
+    # 1) Intentar Python PIL (mejor calidad, multi-resolución)
+    $python = Get-Command python -ErrorAction SilentlyContinue
+    if ($python) {
+        $script = "from PIL import Image; img=Image.open(r'$Png').convert('RGBA'); img.save(r'$Ico',format='ICO',sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)]); print('OK')"
+        $result = python -c $script 2>$null
+        if ($LASTEXITCODE -eq 0 -and $result -eq 'OK') { return $true }
+    }
+
+    # 2) Intentar ImageMagick
+    $magick = Get-Command magick -ErrorAction SilentlyContinue
+    if ($magick) {
+        magick convert "$Png" -define icon:auto-resize=256,128,64,48,32,16 "$Ico" 2>$null
+        if ($LASTEXITCODE -eq 0) { return $true }
+    }
+
+    # 3) Fallback: System.Drawing — ICO con una sola entrada 256×256 en formato PNG
+    try {
+        Add-Type -AssemblyName System.Drawing
+        $src = [System.Drawing.Image]::FromFile($Png)
+        $bmp = New-Object System.Drawing.Bitmap 256, 256
+        $g   = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $g.DrawImage($src, 0, 0, 256, 256)
+        $g.Dispose()
+
+        $pngMs = New-Object System.IO.MemoryStream
+        $bmp.Save($pngMs, [System.Drawing.Imaging.ImageFormat]::Png)
+        $pngBytes = $pngMs.ToArray()
+        $pngMs.Dispose(); $bmp.Dispose(); $src.Dispose()
+
+        $fs = [System.IO.File]::Create($Ico)
+        $bw = New-Object System.IO.BinaryWriter $fs
+        $bw.Write([uint16]0)                       # reserved
+        $bw.Write([uint16]1)                       # type: ICO
+        $bw.Write([uint16]1)                       # num images: 1
+        $bw.Write([byte]0)                         # width  (0 = 256)
+        $bw.Write([byte]0)                         # height (0 = 256)
+        $bw.Write([byte]0)                         # color count
+        $bw.Write([byte]0)                         # reserved
+        $bw.Write([uint16]1)                       # planes
+        $bw.Write([uint16]32)                      # bpp
+        $bw.Write([uint32]$pngBytes.Length)        # data size
+        $bw.Write([uint32]22)                      # data offset (6 header + 16 entry)
+        $bw.Write($pngBytes)
+        $bw.Flush(); $bw.Dispose(); $fs.Dispose()
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+# ── INICIO ─────────────────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "  +--------------------------------------------------+" -ForegroundColor Magenta
+Write-Host "  |   Recetas Familiares $AppVersion — Build Windows     |" -ForegroundColor Magenta
+Write-Host "  +--------------------------------------------------+" -ForegroundColor Magenta
+
+# ── PASO 1: Validar herramientas ───────────────────────────────────────────────
+Write-Step "1/7  Verificando herramientas..."
+
+if (-not (Test-Path "$JDK\bin\java.exe")) {
+    Write-Fail "JDK no encontrado: $JDK"
+    Write-Host "     Instala JDK 21+ desde https://adoptium.net/" -ForegroundColor Yellow
+    exit 1
+}
+if (-not (Test-Path "$JDK\bin\jpackage.exe")) {
+    Write-Fail "jpackage no encontrado en $JDK\bin\ (requiere JDK 14+)"
+    exit 1
+}
+$javaVersion = & "$JDK\bin\java.exe" -version 2>&1 | Select-Object -First 1
+Write-OK "JDK: $javaVersion"
+
+$MVN = Find-Maven
+if (-not $MVN) {
+    Write-Fail "Maven no encontrado. Verifica el PATH o las rutas en este script."
+    exit 1
+}
+Write-OK "Maven: $MVN"
+
+$hasInno = Test-Path $InnoSetup
+if ($hasInno) {
+    Write-OK "Inno Setup 6: $InnoSetup"
+} else {
+    Write-Warn "Inno Setup 6 no encontrado en $InnoSetup"
+    Write-Warn "Se creara solo el app-image (sin .exe instalador)"
+    Write-Warn "Descarga desde: https://jrsoftware.org/isdl.php"
+}
+
+# ── PASO 2: Preparar directorios (solo los que Maven no borrará) ───────────────
+Write-Step "2/7  Preparando directorios..."
+
+@("$ProjectDir\installer", $OutputDir) | ForEach-Object {
+    if (-not (Test-Path $_)) {
+        New-Item -ItemType Directory -Path $_ -Force | Out-Null
+    }
+}
+Write-OK "Directorios listos"
+
+# ── PASO 3: Crear icono .ico ───────────────────────────────────────────────────
+Write-Step "3/7  Preparando icono de aplicacion..."
+
+if (Test-Path $IcoPath) {
+    Write-OK "ICO ya existe: $IcoPath"
+} elseif (Test-Path $PngPath) {
+    $ok = New-IcoFromPng -Png $PngPath -Ico $IcoPath
+    if ($ok) {
+        Write-OK "ICO generado: $IcoPath"
+    } else {
+        Write-Warn "No se pudo crear el ICO. El instalador usara icono por defecto."
+        $IcoPath = $null
+    }
+} else {
+    Write-Warn "Logo PNG no encontrado en $PngPath — icono por defecto."
+    $IcoPath = $null
+}
+
+# ── PASO 4: Maven package ──────────────────────────────────────────────────────
+Write-Step "4/7  Compilando con Maven (mvn package -Ppackage-windows)..."
+
+Push-Location $ProjectDir
+try {
+    & $MVN clean package -Ppackage-windows -DskipTests --no-transfer-progress
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Maven fallo con codigo $LASTEXITCODE"
+        exit 1
+    }
+} finally {
+    Pop-Location
+}
+
+if (-not (Test-Path $ShadedJar)) {
+    Write-Fail "JAR no encontrado tras compilacion: $ShadedJar"
+    exit 1
+}
+$jarMB = '{0:N1}' -f ((Get-Item $ShadedJar).Length / 1MB)
+Write-OK "Maven BUILD SUCCESS — JAR: $jarMB MB"
+
+# ── PASO 5: Organizar input para jpackage ──────────────────────────────────────
+Write-Step "5/7  Organizando archivos para jpackage..."
+
+# Crear directorios DESPUÉS de mvn clean (que borra target/ completo)
+@($InputDir, $ModsDir) | ForEach-Object {
+    if (-not (Test-Path $_)) { New-Item -ItemType Directory -Path $_ -Force | Out-Null }
+}
+
+# JAR principal (fat JAR con todas las dependencias)
+Copy-Item $ShadedJar "$InputDir\$MainJar"
+Write-OK "Main JAR copiado: $MainJar"
+
+# JavaFX -win JARs (modulos nativos con DLLs de Windows) → mods/
+$winJars = Get-ChildItem "$TargetDir\lib\*-win.jar" -ErrorAction SilentlyContinue
+if (-not $winJars -or $winJars.Count -eq 0) {
+    Write-Fail "No se encontraron JavaFX *-win.jar en target/lib/"
+    Write-Fail "Asegurate de ejecutar con el perfil -Ppackage-windows"
+    exit 1
+}
+foreach ($jar in $winJars) {
+    Copy-Item $jar.FullName "$ModsDir\"
+}
+Write-OK "Modulos JavaFX nativos: $($winJars.Count) JARs copiados a mods/"
+
+# ── PASO 6: jpackage — app-image ──────────────────────────────────────────────
+Write-Step "6/7  Ejecutando jpackage..."
+
+$AppImageDir = "$OutputDir\$AppName"
+if (Test-Path $AppImageDir) {
+    Remove-Item $AppImageDir -Recurse -Force
+}
+
+$jpackageArgs = [System.Collections.Generic.List[string]]@(
+    "--type",        "app-image",
+    "--name",        $AppName,
+    "--app-version", $AppVersion,
+    "--vendor",      "Gipsybuho",
+    "--description", "Recetas Familiares - Gestion familiar de recetas y menus",
+    "--input",       $InputDir,
+    "--main-jar",    $MainJar,
+    "--main-class",  $MainClass,
+    "--dest",        $OutputDir,
+    "--java-options", "-Djavax.net.ssl.trustStoreType=Windows-ROOT",
+    "--java-options", "-Djavax.net.ssl.trustStore=NUL",
+    "--java-options", "-Dapi.base.url=$ApiUrl",
+    "--java-options", '--module-path $APPDIR/mods',
+    "--java-options", "--add-modules $JavaFxModules",
+    "--java-options", "--add-opens java.base/java.lang=ALL-UNNAMED",
+    "--java-options", "--add-opens java.base/java.net=ALL-UNNAMED",
+    "--java-options", "-Xmx512m"
+)
+
+if ($IcoPath -and (Test-Path $IcoPath)) {
+    $jpackageArgs.Add("--icon")
+    $jpackageArgs.Add($IcoPath)
+}
+
+& "$JDK\bin\jpackage.exe" @jpackageArgs
+if ($LASTEXITCODE -ne 0) {
+    Write-Fail "jpackage fallo con codigo $LASTEXITCODE"
+    exit 1
+}
+
+if (-not (Test-Path "$AppImageDir\$AppName.exe")) {
+    Write-Fail "App-image no encontrado en $AppImageDir tras jpackage"
+    exit 1
+}
+$imageMB = '{0:N0}' -f ((Get-ChildItem $AppImageDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB)
+Write-OK "App-image creado: $AppImageDir ($imageMB MB)"
+
+# ── PASO 7: Inno Setup ────────────────────────────────────────────────────────
+Write-Step "7/7  Creando instalador .exe..."
+
+if ($hasInno) {
+    & $InnoSetup "$ProjectDir\installer.iss"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Inno Setup fallo con codigo $LASTEXITCODE"
+        exit 1
+    }
+
+    $exePath = "$OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe"
+    if (Test-Path $exePath) {
+        $exeMB = '{0:N1}' -f ((Get-Item $exePath).Length / 1MB)
+        Write-OK "Instalador .exe: $exePath ($exeMB MB)"
+    }
+} else {
+    Write-Warn "Inno Setup no disponible. Instalador .exe omitido."
+    Write-Warn "Puedes distribuir directamente la carpeta: $AppImageDir"
+}
+
+# ── RESULTADO ─────────────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "  +--------------------------------------------------+" -ForegroundColor Green
+Write-Host "  |   BUILD COMPLETADO - $AppDisplayName v$AppVersion        |" -ForegroundColor Green
+Write-Host "  +--------------------------------------------------+" -ForegroundColor Green
+Write-Host ""
+
+if ($hasInno -and (Test-Path "$OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe")) {
+    Write-Host "  Instalador:  $OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe" -ForegroundColor White
+}
+Write-Host "  App-image:   $AppImageDir\$AppName.exe" -ForegroundColor White
+Write-Host "  API URL:     $ApiUrl (configurable con -ApiUrl)" -ForegroundColor Gray
+Write-Host ""
+Write-Host "  Para cambiar la URL del backend al empaquetar:" -ForegroundColor Gray
+Write-Host "    .\build-installer.ps1 -ApiUrl 'http://192.168.1.100:8080/'" -ForegroundColor Gray
+Write-Host ""

@@ -992,3 +992,165 @@ Sprint 31 UI/UX (baja prioridad / polish):
 
 *Auditoría actualizada: 2026-05-29 — Sprint 28 completado*
 *Código revisado: `RecetasApp.kt`, `ProfileScreen.kt`, `RecipeScreens.kt`, `CookingScreen.kt` (Android), `RecipeListScreen.kt`, `CookingScreen.kt`, `SettingsScreen.kt` (iOS), `MainWindow.java` (Desktop)*
+
+---
+
+## PARTE 9 — SISTEMA AUTH/ROLES/PERMISOS DESKTOP (Sprints 32-33)
+
+**Fecha de análisis: 2026-05-30**
+**Referencia de inspiración: `C:\Users\GipsyDavy\MAVEN\Graficas Mulberry`** (sistema local BCrypt + SQLite)
+**Adaptación a: Recetas Familiares Desktop (JWT + Spring Boot API)**
+
+---
+
+### 9.1 — Contexto del análisis
+
+Graficas Mulberry tiene un sistema de auth local completo con 4 roles, 16 permisos, CRUD de usuarios,
+preguntas de seguridad y sidebar permission-gated. No es portable directamente porque Recetas Familiares
+usa JWT + backend remoto en lugar de SQLite local. Sin embargo, los **patrones UX y de arquitectura UI**
+son completamente adaptables.
+
+**Lo que Recetas Desktop tiene actualmente:**
+- `LoginView.java` — email + password básico, sin toggle ni animación.
+- `AppSession.java` — JWT en Windows Registry (sin roles).
+- `AuthRepository.java` — login/logout/refresh.
+- `MainWindow.java` — sidebar completa visible para cualquier usuario autenticado.
+- `UserRepository.java` — solo `updateDisplayName()`.
+- **Sin ningún concepto de rol, permiso ni gestión de usuarios.**
+
+---
+
+### 9.2 — Sprint 32 (Grupo A) — Solo Desktop, sin cambios de backend
+
+#### 9.2.1 — LoginView UX Premium
+
+| Elemento | Estado actual | Objetivo Sprint 32 |
+|---|---|---|
+| Password toggle | No existe | `Button` con `Icons.Filled.Visibility/VisibilityOff` inline, alterna `passwordField` ↔ `textField` |
+| Animación de entrada | Ninguna | `FadeTransition(400ms)` + `ScaleTransition(0.97→1.0, 300ms, EaseOut)` sobre el card de login |
+| Email field | `TextField` plano | `promptText = "tu@email.com"` + icono Person inline |
+| Layout | Vertical básico | Card centrado 420px con padding generoso, logo/initials encima |
+| Error UX | Label texto plano | Label con icono ⚠ + color `recetas-error` (del CSS) |
+
+**Archivos afectados:** `LoginView.java`, `style.css` (clases CSS nuevas para login card).
+
+#### 9.2.2 — Sistema FamilyRole
+
+```
+FamilyRole.java (nuevo enum)
+  ├── ADMIN     — creador de la familia / propietario
+  └── MIEMBRO   — resto de usuarios de la familia
+
+AppSession.java (modificado)
+  ├── + String familyRole       (persistido en java.util.prefs, clave "family_role")
+  ├── + setFamilyRole(String)
+  ├── + getFamilyRole(): FamilyRole
+  └── + isAdmin(): boolean      → getFamilyRole() == ADMIN
+```
+
+**Estrategia de detección sin cambio de backend:**
+Al hacer login, llamar `GET /api/v1/families/{familyId}` (ya implementado). Si el `createdBy`
+del response coincide con el email del usuario → `ADMIN`; sino → `MIEMBRO`.
+
+Si el endpoint de familia no devuelve `createdBy`, alternativa: comparar si el primer miembro
+registrado coincide con el usuario actual (heurística aceptable para MVP).
+
+#### 9.2.3 — Sidebar permission-gated
+
+Patrón adaptado de `MainWindow.java` de Graficas Mulberry (`addIfPermiso()`):
+
+```java
+// Solo visible para ADMIN
+private void addAdminOnlyButton(VBox sidebar, String label, String view) {
+    if (context.getSession().isAdmin()) {
+        sidebar.getChildren().add(buildNavButton(label, view));
+    }
+}
+```
+
+**Ítems solo ADMIN:**
+- Botón ⚙ Ajustes (configuración avanzada, cambio de tema).
+- Botón Miembros familia (FamilyMembersView — Sprint 32.D).
+
+**Visible para todos (ADMIN + MIEMBRO):**
+- Dashboard, Recetas, Stock, Menú semanal, Lista de la compra, Notas familiares.
+
+#### 9.2.4 — FamilyMembersView (read-only)
+
+```
+FamilyMembersView.java (nuevo)
+  ├── TableView con columnas: Nombre / Email / Rol / Miembro desde
+  ├── Datos de GET /api/v1/families/{id} (campos members si existen) o
+  │   GET /api/v1/families/{id}/members (a definir en Sprint 33)
+  ├── Solo accesible desde sidebar si isAdmin()
+  ├── Sin botones de acción (read-only hasta Grupo B)
+  └── Botón "Actualizar" para recargar
+```
+
+---
+
+### 9.3 — Sprint 33 (Grupo B) — Backend + Desktop CRUD completo
+
+#### 9.3.1 — Backend cambios mínimos
+
+| Archivo | Cambio |
+|---|---|
+| `V12__add_role_to_users.sql` | `ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'MIEMBRO'` |
+| `UserEntity.java` | Campo `role` + getter/setter |
+| `UserResponse.java` | Record + `String role` |
+| `UserService.java` | Lógica asignar ADMIN al creador de familia |
+| Nuevos endpoints | `GET/PUT/DELETE /api/v1/families/{id}/members/**` |
+
+VibeSec obligatorio en todos los endpoints de gestión familiar (ownership, anti-self-delete).
+
+#### 9.3.2 — Desktop FamilyMemberView CRUD
+
+Evolución de la vista read-only de Sprint 32.D:
+
+```
+FamilyMemberView.java (ampliado)
+  ├── Botón "Invitar miembro" → InviteMemberDialog (email + ComboBox rol)
+  ├── Botón "Cambiar rol" → ComboBox inline en la fila seleccionada
+  ├── Botón "Eliminar" → AlertDialog confirmación (pattern confirmarSalida)
+  ├── Auto-deshabilita si selectedMember == currentUser (sin self-delete)
+  └── FamilyMemberRepository.java — llamadas a los nuevos endpoints
+
+FamilyMemberRepository.java (nuevo)
+  ├── loadMembers(familyId): List<FamilyMemberDto>
+  ├── updateMemberRole(familyId, userId, role): void
+  └── removeMember(familyId, userId): void
+```
+
+---
+
+### 9.4 — Criterios de calidad
+
+| Criterio | Sprint 32 | Sprint 33 |
+|---|---|---|
+| `mvn compile` BUILD SUCCESS | ✅ requerido | ✅ requerido |
+| `mvn test` sin regresiones backend | N/A | ✅ requerido |
+| Toggle password funciona | ✅ | — |
+| ADMIN ve todo el sidebar | ✅ | ✅ |
+| MIEMBRO no ve Ajustes ni Miembros | ✅ | ✅ |
+| FamilyMembersView carga sin error | ✅ read-only | ✅ CRUD |
+| VibeSec invocado | ✅ al cerrar Sprint 32 | ✅ al cerrar Sprint 33 |
+| Ningún cambio en Android/iOS | ✅ | solo SessionStore si aplica |
+
+---
+
+### 9.5 — Archivos afectados (Sprint 32)
+
+```
+desktop/src/main/java/.../
+  ├── ui/LoginView.java                  ← UX premium (toggle, animación, card)
+  ├── core/AppSession.java               ← + familyRole field + isAdmin()
+  ├── core/FamilyRole.java               ← NUEVO: enum ADMIN / MIEMBRO
+  ├── ui/MainWindow.java                 ← sidebar permission-gated
+  ├── ui/FamilyMembersView.java          ← NUEVO: panel miembros (read-only)
+  └── data/repository/FamilyRepository.java ← llamada a GET /families/{id} para detectar rol
+
+desktop/src/main/resources/
+  └── style.css                          ← clases CSS login card + login-error
+```
+
+*Análisis realizado: 2026-05-30. Implementación autorizada pendiente.*

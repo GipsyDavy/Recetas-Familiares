@@ -392,7 +392,7 @@ Build SUCCESSFUL.
    ```
    Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
 
-6. Continuar con Sprint 29 (ver candidatos al final de este documento).
+6. Continuar con Sprint 32 (ver candidatos al final de este documento).
 
 ---
 
@@ -1412,6 +1412,46 @@ Build: Android **BUILD SUCCESSFUL** · Backend `mvn compile` limpio
 
 ## Sprint 32 — Candidatos
 
+### Prioridad Máxima — Auth/Roles Desktop (Grupo A, solo Desktop, sin backend)
+
+Sistema de autenticación, roles y permisos para la aplicación Desktop, inspirado en el sistema de
+Graficas Mulberry pero adaptado a la arquitectura JWT/API de Recetas Familiares.
+
+**Análisis completo en sesión 2026-05-30. Autorizado por el usuario.**
+
+Tareas concretas:
+
+1. **32.A — LoginView UX premium** (`LoginView.java`):
+   - Toggle mostrar/ocultar password (como Mulberry).
+   - Animación de entrada (FadeTransition + ligero ScaleTransition desde 0.97).
+   - Mensaje de bienvenida contextual.
+   - Campo email con `promptText` y icono inline.
+   - Sin cambios de lógica — solo UX.
+
+2. **32.B — Sistema FamilyRole** (`AppSession.java` + nuevo `FamilyRole.java`):
+   - Enum `FamilyRole { ADMIN, MIEMBRO }`.
+   - Campo `familyRole` en `AppSession` (persistido en Java Preferences).
+   - Derivado de la respuesta del backend: si el usuario es creador de la familia → ADMIN; resto → MIEMBRO.
+   - Llamada a `GET /api/v1/users/me` o a `GET /api/v1/families/{id}` al hacer login para determinar el rol.
+   - `AppSession.isAdmin()` helper para uso en UI.
+
+3. **32.C — Sidebar permission-gated** (`MainWindow.java`):
+   - Adaptar patrón `addIfPermiso()` de Graficas Mulberry.
+   - Ocultar al MIEMBRO: botón de ajustes avanzados, gestión de familia, otras acciones admin.
+   - ADMIN ve todo. MIEMBRO solo ve módulos de uso diario (recetas, stock, menú, lista, notas).
+   - Sin cambios en lógica de API — solo visibilidad de botones.
+
+4. **32.D — FamilyMembersView** (`FamilyMembersView.java`, nuevo, solo lectura):
+   - Panel accesible solo para ADMIN.
+   - TableView con miembros de la familia (nombre, email, rol) — datos de `GET /api/v1/families/{id}/members` (endpoint ya existente o derivado de la API actual).
+   - Vista read-only por ahora. CRUD completo en Grupo B (Sprint 33+).
+
+**Restricciones Grupo A:**
+- Cero cambios en backend.
+- Cero cambios en Android ni iOS.
+- Solo Desktop JavaFX.
+- VibeSec al cerrar Sprint 32.
+
 ### Prioridad Alta
 1. **Android**: Widget de receta del día mejorado (foto si existe, acción "Cocinar desde widget").
 2. **iOS**: Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
@@ -1424,3 +1464,39 @@ Build: Android **BUILD SUCCESSFUL** · Backend `mvn compile` limpio
 
 ### Prioridad Baja
 1. **Desktop**: Avatar upload desde Desktop (paridad completa con Android/iOS).
+
+---
+
+## Sprint 33 — Candidatos (Grupo B Auth Desktop — sprint posterior a Sprint 32)
+
+Sistema completo de gestión de usuarios familiares: roles en backend + CRUD Desktop.
+**Prerrequisito: Sprint 32 Grupo A completado.**
+
+### Tareas Grupo B
+
+1. **33.A — Backend: campo `role` en usuarios** (Backend, quirúrgico):
+   - Flyway `V12__add_role_to_users.sql`: columna `role VARCHAR(20) DEFAULT 'MIEMBRO'` en tabla `users`.
+   - `UserEntity.java`: campo `role` + getter + setter.
+   - `UserResponse.java`: record ampliado con `String role`.
+   - `UserService.java`: lógica para asignar ADMIN al creador de la familia.
+   - Sin romper contratos existentes (campo nuevo, opcional hacia atrás).
+   - VibeSec obligatorio al tocar contratos de auth.
+
+2. **33.B — Backend: endpoints gestión miembros familia**:
+   - `GET /api/v1/families/{id}/members` — lista miembros con rol.
+   - `PUT /api/v1/families/{id}/members/{userId}/role` — cambiar rol (solo ADMIN).
+   - `DELETE /api/v1/families/{id}/members/{userId}` — expulsar miembro (solo ADMIN, no self-delete).
+   - Validación ownership: solo ADMIN de esa familia puede invocarlos.
+
+3. **33.C — Desktop: FamilyMemberView CRUD completo**:
+   - Evolución de la vista read-only de Sprint 32.D.
+   - Botones Invitar / Cambiar rol / Eliminar miembro (solo visibles para ADMIN).
+   - `InviteMemberDialog` — input email + ComboBox rol.
+   - Confirmación en eliminación (patrón `confirmarSalida()`).
+   - `FamilyMemberRepository.java` — llamadas a los nuevos endpoints.
+
+4. **33.D — Desktop + Android + iOS: consumir campo `role` del backend**:
+   - `AppSession` Desktop: leer `role` del `UserResponse` al hacer login.
+   - Android `SessionStore`: guardar rol si se añade al `AuthResponse`.
+   - iOS `SessionStore`: ídem via Keychain.
+   - Unificar lógica de rol en las tres plataformas.
