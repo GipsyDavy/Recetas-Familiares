@@ -187,10 +187,43 @@ public class MainWindow {
             emailLabel.getStyleClass().add("sidebar-user-email");
 
             VBox textBox = new VBox(2, nameLabel, emailLabel);
-            userCard.getChildren().addAll(avatar, textBox);
+
+            Button editBtn = new Button("✏");
+            editBtn.getStyleClass().add("sidebar-nav-button");
+            editBtn.setPadding(new Insets(2, 6, 2, 6));
+            Tooltip.install(editBtn, new Tooltip("Editar nombre"));
+            editBtn.setOnAction(e -> showEditNameDialog());
+
+            userCard.getChildren().addAll(avatar, textBox, editBtn);
         }
 
         return userCard;
+    }
+
+    private void showEditNameDialog() {
+        String current = context.getSession().getDisplayName();
+        TextInputDialog dialog = new TextInputDialog(current != null ? current : "");
+        dialog.setTitle("Editar nombre");
+        dialog.setHeaderText(null);
+        dialog.setContentText("Nombre:");
+        dialog.showAndWait().ifPresent(newName -> {
+            if (newName.isBlank()) return;
+            Thread.ofVirtual().start(() -> {
+                try {
+                    context.getUserRepository().updateDisplayName(newName.trim());
+                    Platform.runLater(() -> {
+                        VBox sidebar = (VBox) root.getLeft();
+                        if (sidebar != null) {
+                            HBox newCard = buildUserCard();
+                            sidebar.getChildren().set(2, newCard);
+                        }
+                        setStatus("Nombre actualizado");
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> setStatus("Error al actualizar nombre: " + ex.getMessage()));
+                }
+            });
+        });
     }
 
     private String initials(String displayName) {

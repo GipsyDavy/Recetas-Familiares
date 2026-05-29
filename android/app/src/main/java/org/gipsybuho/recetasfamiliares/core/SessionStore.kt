@@ -43,6 +43,10 @@ class SessionStore(context: Context) {
         get() = preferences.getString("email", null)
         set(value) = preferences.edit { putString("email", value) }
 
+    var avatarUrl: String?
+        get() = preferences.getString("avatar_url", null)
+        set(value) = preferences.edit { putString("avatar_url", value) }
+
     var lastSyncTime: String?
         get() = preferences.getString("last_sync_time", null)
         set(value) = preferences.edit { putString("last_sync_time", value) }

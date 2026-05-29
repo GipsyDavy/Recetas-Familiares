@@ -29,6 +29,7 @@ import org.gipsybuho.recetasfamiliares.stock.StockScreen
 import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.theme.ThemeMode
+import org.gipsybuho.recetasfamiliares.users.UserRepository
 
 private enum class Tab { RECIPES, STOCK, SHOPPING, NOTES, MENU, SETTINGS }
 
@@ -51,6 +52,7 @@ fun MainTabScreen(
     val noteRepo     = remember { NoteRepository(apiClient, session) }
     val shoppingRepo = remember { ShoppingListRepository(apiClient, session) }
     val menuRepo     = remember { MenuRepository(apiClient, session) }
+    val userRepo     = remember { UserRepository(apiClient, session) }
 
     var selectedTab by remember { mutableStateOf(Tab.RECIPES) }
 
@@ -98,7 +100,7 @@ fun MainTabScreen(
     ) { paddingValues ->
         Box(Modifier.fillMaxSize().padding(paddingValues)) {
             when (selectedTab) {
-                Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo, syncRepo = syncRepo)
+                Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo, syncRepo = syncRepo, stockRepo = stockRepo)
                 Tab.STOCK    -> StockScreen(repository = stockRepo, syncRepo = syncRepo)
                 Tab.NOTES    -> NotesScreen(repository = noteRepo)
                 Tab.SHOPPING -> ShoppingListScreen(repository = shoppingRepo)
@@ -111,7 +113,8 @@ fun MainTabScreen(
                     onModeChange    = onModeChange,
                     onHapticsChange = onHapticsChange,
                     onLogout        = onLogout,
-                    session         = session
+                    session         = session,
+                    userRepository  = userRepo
                 )
             }
         }

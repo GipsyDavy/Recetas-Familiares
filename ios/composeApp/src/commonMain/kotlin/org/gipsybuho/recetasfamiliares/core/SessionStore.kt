@@ -7,6 +7,7 @@ expect class SessionStore() {
     var userId: String?
     var displayName: String?
     var email: String?
+    var avatarUrl: String?
     val isLoggedIn: Boolean
     fun clear()
 }

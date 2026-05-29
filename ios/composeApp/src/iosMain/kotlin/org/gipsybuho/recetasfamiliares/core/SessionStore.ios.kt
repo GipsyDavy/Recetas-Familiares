@@ -55,11 +55,15 @@ actual class SessionStore {
         get()  = kcRead(KEY_EMAIL)
         set(v) = if (v != null) kcWrite(KEY_EMAIL, v) else kcDelete(KEY_EMAIL)
 
+    actual var avatarUrl: String?
+        get()  = kcRead(KEY_AVATAR_URL)
+        set(v) = if (v != null) kcWrite(KEY_AVATAR_URL, v) else kcDelete(KEY_AVATAR_URL)
+
     actual val isLoggedIn: Boolean
         get() = !accessToken.isNullOrBlank() && !familyId.isNullOrBlank()
 
     actual fun clear() {
-        listOf(KEY_ACCESS, KEY_REFRESH, KEY_FAMILY, KEY_USER, KEY_DISPLAY_NAME, KEY_EMAIL).forEach { kcDelete(it) }
+        listOf(KEY_ACCESS, KEY_REFRESH, KEY_FAMILY, KEY_USER, KEY_DISPLAY_NAME, KEY_EMAIL, KEY_AVATAR_URL).forEach { kcDelete(it) }
     }
 
     // ── Keychain helpers ──────────────────────────────────────────────────────
@@ -106,5 +110,6 @@ actual class SessionStore {
         private const val KEY_USER         = "rf_user_id"
         private const val KEY_DISPLAY_NAME = "rf_display_name"
         private const val KEY_EMAIL        = "rf_email"
+        private const val KEY_AVATAR_URL   = "rf_avatar_url"
     }
 }

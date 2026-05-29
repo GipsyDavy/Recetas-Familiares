@@ -1,5 +1,7 @@
 package org.gipsybuho.recetasfamiliares.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,10 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,14 +35,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 
 @Composable
 internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Modifier) {
     val displayName by viewModel.displayName.collectAsState()
     val email       by viewModel.email.collectAsState()
+    val avatarUrl   by viewModel.avatarUrl.collectAsState()
     var editing     by remember { mutableStateOf(false) }
     var editName    by remember { mutableStateOf("") }
+    val context     = LocalContext.current
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.uploadAvatar(context, it) }
+    }
 
     Column(
         modifier = modifier
@@ -50,28 +67,61 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
         Spacer(Modifier.height(Spacing.lg))
 
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(80.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    if (!displayName.isNullOrBlank()) {
-                        Text(
-                            text = displayName!!.split(" ").filter { it.isNotBlank() }.take(2).map { it.first().uppercaseChar() }.joinToString(""),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    } else {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(80.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (!avatarUrl.isNullOrBlank()) {
+                            var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty) }
+                            AsyncImage(
+                                model           = avatarUrl,
+                                contentDescription = "Foto de perfil",
+                                contentScale    = ContentScale.Crop,
+                                onState         = { imageState = it },
+                                modifier        = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                            if (imageState is AsyncImagePainter.State.Loading) {
+                                CircularProgressIndicator(
+                                    modifier  = Modifier.size(24.dp),
+                                    color     = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        } else if (!displayName.isNullOrBlank()) {
+                            Text(
+                                text  = displayName!!.split(" ").filter { it.isNotBlank() }.take(2)
+                                    .map { it.first().uppercaseChar() }.joinToString(""),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        } else {
+                            Icon(
+                                Icons.Outlined.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint     = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+                IconButton(
+                    onClick  = { galleryLauncher.launch("image/*") },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
                         Icon(
-                            Icons.Outlined.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            Icons.Filled.CameraAlt,
+                            contentDescription = "Cambiar foto de perfil",
+                            modifier = Modifier.size(16.dp).padding(4.dp),
+                            tint     = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
             }
+
             Spacer(Modifier.height(Spacing.md))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

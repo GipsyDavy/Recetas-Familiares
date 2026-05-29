@@ -524,7 +524,7 @@ RecipeListScreen con carga incremental. PageResponse<T> ya soportado en el backe
 
 ## Deuda tecnica conocida y aceptada
 
-- Sync pull sin paginacion: aceptable para familias pequenas.
+- Sync pull sin paginacion: aceptable para familias pequeñas.
 - Login devuelve primera familia (no determinista si hay varias): limitacion documentada para MVP.
 - Advertencia Mockito/Byte Buddy con Java 26: no rompe build ni tests.
 - Repositories.kt: fotos, ratings y shopping son online-only intencionalmente (MVP aceptable).
@@ -1358,21 +1358,69 @@ Build: Android BUILD SUCCESSFUL (11s) · Desktop BUILD SUCCESS
 
 ---
 
-## Sprint 31 — Candidatos
+## Sprint 31 — COMPLETADO (2026-05-29)
 
-### Prioridad Alta — Funcional
+### Sprint 31.A — Backend: Avatar upload ✅
+- **`V11__add_avatar_url_to_users.sql`**: columna `avatar_url VARCHAR(2048) NULL` en tabla `users`.
+- **`UserEntity.java`**: campo `avatarUrl` + getter + setter.
+- **`UserResponse.java`**: record ampliado con `String avatarUrl`.
+- **`FileStorageService.java`**: overload `store(file, subdir)` — guarda en `uploads/avatars/`; subdir validado con regex `[a-zA-Z0-9_-]+` (VibeSec fix path traversal).
+- **`UserService.java`**: inyecta `FileStorageService`; nuevo `uploadAvatar(email, file)` → `store(file, "avatars")`.
+- **`UserController.java`**: `POST /api/v1/users/me/avatar` multipart/form-data.
 
-1. **Backend + Android + iOS**: Foto de avatar de usuario — `POST /api/v1/users/me/avatar` (multipart, almacena URL), mostrar imagen circular en `ProfileScreen` / `SettingsScreen` (Coil en Android).
-2. **iOS**: Filtro "Con mi stock" en `RecipeListScreen` (paridad con Android Sprint 28.C). Ver UI-13.
-3. **Android + iOS**: Haptics toggle visibilidad — confirmar que el `Switch` del toggle se muestra y persiste correctamente en sesión real.
+### Sprint 31.B — Android: Avatar picker + Coil ✅
+- **`ApiDtos.kt`**: `UserResponseDto` añade `avatarUrl: String? = null`.
+- **`RecetasApi.kt`**: `@Multipart @POST("api/v1/users/me/avatar") uploadAvatar()`.
+- **`SessionStore.kt`**: nuevo campo `avatarUrl` en EncryptedSharedPreferences.
+- **`UserRepository.kt`**: `uploadAvatar(uri, context)` — comprime a JPEG 80% max 512px + `MultipartBody.Part`.
+- **`RecetasViewModel.kt`**: `avatarUrl: StateFlow<String?>` + `uploadAvatar(context, uri)` en `Dispatchers.IO`; reset en `logout()`.
+- **`ProfileScreen.kt`**: `AsyncImage` con Coil si `avatarUrl` != null; gallery picker `ActivityResultContracts.GetContent`; botón cámara overlay `CircleShape` bottom-end del avatar.
 
-### Prioridad Media — Funcional
+### Sprint 31.C — iOS: Avatar picker + Coil 3 ✅
+- **`libs.versions.toml`** + **`build.gradle.kts`**: Coil 3.0.4 (`coil-compose` + `coil-network-ktor3`) en commonMain.
+- **`SessionStore.kt`** (commonMain expect + iosMain actual): nuevo campo `avatarUrl` en Keychain; `clear()` actualizado.
+- **`ImagePickerLauncher.kt`** (commonMain expect): `expect class ImagePickerLauncher { fun launch() }` + `@Composable expect fun rememberImagePickerLauncher`.
+- **`ImagePickerLauncher.ios.kt`** (iosMain actual): `UIImagePickerController` con `ImagePickerDelegate` (NSObject que implementa `UIImagePickerControllerDelegateProtocol`); `NSData.toByteArray()` vía `memcpy`.
+- **`network/ApiDtos.kt`**: `UserResponseDto` serializable con `avatarUrl`.
+- **`users/UserRepository.kt`** (commonMain, nuevo): `uploadAvatar(bytes: ByteArray)` via Ktor `submitFormWithBinaryData`; `updateDisplayName()` via PUT.
+- **`SettingsScreen.kt`**: `AsyncImage` (Coil) si `avatarUrl != null`; overlay cámara `ImagePickerLauncher`; acepta `userRepository: UserRepository? = null`.
+- **`MainTabScreen.kt`**: instancia `userRepo` + pasa a `SettingsScreen`.
 
+### Sprint 31.D — iOS: Filtro "Con mi stock" ✅
+- **`AppDatabase.sq`**: nueva tabla `recipe_ingredients` + queries `insertOrReplaceIngredient`, `selectAllIngredients`, `selectIngredientsByRecipeId`.
+- **`network/ApiDtos.kt`**: `SyncPullResponseDto` incluye `ingredients: List<RecipeIngredientDto>`.
+- **`SyncRepository.kt`**: cachea ingredientes en SQLDelight durante `pullIncremental()`.
+- **`RecipeRepository.kt`**: nuevo `loadLocalIngredients(): List<Pair<String, String>>` (recipeId → name normalizado).
+- **`RecipeListScreen.kt`**: acepta `stockRepo: StockRepository? = null`; `stockNames: Set<String>` cargado en `loadData()`; chip "Con mi stock" (solo si `stockRepo != null`); `filtered` cruza ingredientes locales × stock.
+- **`MainTabScreen.kt`**: pasa `stockRepo = stockRepo` a `RecipeListScreen`.
+
+### Sprint 31.E — Desktop: Editar displayName ✅ (Codex)
+- **`UserDtos.java`** (nuevo): `record UpdateDisplayNameRequest(String displayName)` + `record UserResponse(String id, String email, String displayName, String avatarUrl)`.
+- **`UserRepository.java`** (nuevo Desktop): `updateDisplayName(newName)` → `api.put("api/v1/users/me", ...)` + `session.setUserInfo(...)`.
+- **`AppContext.java`**: `userRepository` añadido + `getUserRepository()` getter.
+- **`MainWindow.java`**: botón ✏ en user card → `showEditNameDialog()` → `TextInputDialog` → hilo virtual → `userRepository.updateDisplayName()` → `Platform.runLater` → `sidebar.getChildren().set(2, buildUserCard())`.
+
+Build: Android **BUILD SUCCESSFUL** · Backend `mvn compile` limpio
+
+### VibeSec Sprint 31 — Sin vulnerabilidades críticas/altas
+- Ownership `/me/avatar`: correcto via `authentication.getName()`. Sin IDOR.
+- UUID filename: nombre del cliente descartado. ✅
+- subdir sanitizado: regex `[a-zA-Z0-9_-]+` — fix path traversal latente. ✅
+- Deuda técnica documentada: magic bytes no validados (pre-existente), rate limiting avatar pendiente.
+
+---
+
+## Sprint 32 — Candidatos
+
+### Prioridad Alta
 1. **Android**: Widget de receta del día mejorado (foto si existe, acción "Cocinar desde widget").
 2. **iOS**: Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
-3. **Desktop**: Editar displayName desde Desktop (conectar con `PUT /api/v1/users/me` del Sprint 29).
+3. **Backend + clientes**: Validar magic bytes en upload de imágenes (avatar + fotos receta) — deuda VibeSec Sprint 31.
 
-### Prioridad Baja — UI/UX
+### Prioridad Media
+1. **iOS**: SharedElementTransition lista→detalle en RecipeListScreen (paridad con Android Sprint 23).
+2. **Desktop**: Vista de perfil con avatar URL (mostrar `avatarUrl` en user card si existe).
+3. **Android + iOS**: Rate limiting cliente en upload de avatar (debounce).
 
-1. **iOS**: Haptics toggle — en iOS el toggle actualiza `ThemePreference` pero la instancia de `HapticFeedback` lee la preferencia en cada llamada (correcto). Sin cambios necesarios.
-2. **Android + iOS**: SharedElementTransition entre RecipeList y RecipeDetail en iOS (ya en Android desde Sprint 23).
+### Prioridad Baja
+1. **Desktop**: Avatar upload desde Desktop (paridad completa con Android/iOS).

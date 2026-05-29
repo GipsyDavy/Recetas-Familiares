@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.FilterChip
@@ -25,16 +26,23 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.SessionStore
+import org.gipsybuho.recetasfamiliares.core.rememberImagePickerLauncher
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.theme.ThemeMode
 import org.gipsybuho.recetasfamiliares.theme.lightColors
+import org.gipsybuho.recetasfamiliares.users.UserRepository
 
 @Composable
 fun SettingsScreen(
@@ -45,8 +53,19 @@ fun SettingsScreen(
     onModeChange: (ThemeMode) -> Unit,
     onHapticsChange: (Boolean) -> Unit,
     onLogout: () -> Unit,
-    session: SessionStore? = null
+    session: SessionStore? = null,
+    userRepository: UserRepository? = null
 ) {
+    val scope = rememberCoroutineScope()
+
+    val imagePicker = rememberImagePickerLauncher { bytes ->
+        if (bytes != null && userRepository != null) {
+            scope.launch {
+                runCatching { userRepository.uploadAvatar(bytes) }
+            }
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -63,20 +82,50 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             ) {
                 Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(48.dp).clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                    contentAlignment = Alignment.BottomEnd,
+                    modifier = Modifier.size(56.dp)
                 ) {
-                    val initials = session.displayName
-                        ?.split(" ")?.filter { it.isNotBlank() }?.take(2)
-                        ?.map { it.first().uppercaseChar() }?.joinToString("")
-                    if (!initials.isNullOrBlank()) {
-                        Text(initials, style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    } else {
-                        Icon(Icons.Outlined.Person, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(24.dp))
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(48.dp).clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        val avatarUrl = session.avatarUrl
+                        if (!avatarUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = avatarUrl,
+                                contentDescription = "Foto de perfil",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        } else {
+                            val initials = session.displayName
+                                ?.split(" ")?.filter { it.isNotBlank() }?.take(2)
+                                ?.map { it.first().uppercaseChar() }?.joinToString("")
+                            if (!initials.isNullOrBlank()) {
+                                Text(initials, style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            } else {
+                                Icon(Icons.Outlined.Person, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+                    if (userRepository != null) {
+                        Box(
+                            modifier = Modifier.size(20.dp).clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .clickable { imagePicker.launch() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.CameraAlt,
+                                contentDescription = "Cambiar foto",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                     }
                 }
                 Column {

@@ -53,6 +53,10 @@ interface RecetasApi {
     @PUT("api/v1/users/me")
     suspend fun updateMe(@Body request: UpdateUserRequestDto): UserResponseDto
 
+    @Multipart
+    @POST("api/v1/users/me/avatar")
+    suspend fun uploadAvatar(@Part file: MultipartBody.Part): UserResponseDto
+
     @POST("api/v1/auth/login")
     suspend fun login(@Body request: LoginRequestDto): AuthResponseDto
 

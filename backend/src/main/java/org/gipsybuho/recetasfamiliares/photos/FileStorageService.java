@@ -35,6 +35,13 @@ public class FileStorageService {
     public record StoredFile(String url, String contentType, long sizeBytes) {}
 
     public StoredFile store(MultipartFile file) throws IOException {
+        return store(file, null);
+    }
+
+    public StoredFile store(MultipartFile file, String subdir) throws IOException {
+        if (subdir != null && !subdir.matches("[a-zA-Z0-9_-]+")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid subdir");
+        }
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty");
         }
@@ -55,8 +62,14 @@ public class FileStorageService {
             default           -> ".jpg";
         };
         String filename = UUID.randomUUID() + ext;
-        Path target = uploadDir.resolve(filename);
-        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-        return new StoredFile(baseUrl + "/uploads/" + filename, contentType, file.getSize());
+        Path targetDir = (subdir != null && !subdir.isBlank())
+                ? uploadDir.resolve(subdir)
+                : uploadDir;
+        Files.createDirectories(targetDir);
+        Files.copy(file.getInputStream(), targetDir.resolve(filename), StandardCopyOption.REPLACE_EXISTING);
+        String urlPath = (subdir != null && !subdir.isBlank())
+                ? "/uploads/" + subdir + "/" + filename
+                : "/uploads/" + filename;
+        return new StoredFile(baseUrl + urlPath, contentType, file.getSize());
     }
 }

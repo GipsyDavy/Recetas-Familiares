@@ -42,10 +42,27 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 selectAllStockItems:
 SELECT * FROM stock_items WHERE deleted = 0;
 
+CREATE TABLE recipe_ingredients (
+    id        TEXT NOT NULL PRIMARY KEY,
+    recipeId  TEXT NOT NULL,
+    name      TEXT NOT NULL,
+    deleted   INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE sync_metadata (
     key   TEXT NOT NULL PRIMARY KEY,
     value TEXT
 );
+
+insertOrReplaceIngredient:
+INSERT OR REPLACE INTO recipe_ingredients (id, recipeId, name, deleted)
+VALUES (?, ?, ?, ?);
+
+selectIngredientsByRecipeId:
+SELECT * FROM recipe_ingredients WHERE recipeId = ? AND deleted = 0;
+
+selectAllIngredients:
+SELECT * FROM recipe_ingredients WHERE deleted = 0;
 
 getMetadata:
 SELECT value FROM sync_metadata WHERE key = ?;

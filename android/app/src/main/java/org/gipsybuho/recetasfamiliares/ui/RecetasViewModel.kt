@@ -67,6 +67,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private val _email = MutableStateFlow(container.sessionStore.email)
     val email: StateFlow<String?> = _email.asStateFlow()
 
+    private val _avatarUrl = MutableStateFlow(container.sessionStore.avatarUrl)
+    val avatarUrl: StateFlow<String?> = _avatarUrl.asStateFlow()
+
     private val _filterByStock = MutableStateFlow(false)
     val filterByStock: StateFlow<Boolean> = _filterByStock.asStateFlow()
 
@@ -115,6 +118,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _isLoggedIn.value = false
         _displayName.value = null
         _email.value = null
+        _avatarUrl.value = null
     }
 
     fun markOnboardingDone() {
@@ -132,6 +136,18 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 _userMessage.emit("Nombre actualizado")
             }.onFailure {
                 _userMessage.emit("Error al actualizar el nombre")
+            }
+        }
+    }
+
+    fun uploadAvatar(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val response = container.userRepository.uploadAvatar(uri, context)
+                _avatarUrl.value = response.avatarUrl
+                _userMessage.emit("Foto de perfil actualizada")
+            }.onFailure {
+                _userMessage.emit("Error al subir la foto")
             }
         }
     }

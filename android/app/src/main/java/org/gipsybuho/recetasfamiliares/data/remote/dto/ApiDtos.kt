@@ -24,7 +24,7 @@ data class AuthUserDto(
     val displayName: String
 )
 
-data class UserResponseDto(val id: String, val email: String, val displayName: String)
+data class UserResponseDto(val id: String, val email: String, val displayName: String, val avatarUrl: String? = null)
 data class UpdateUserRequestDto(val displayName: String)
 
 data class AuthFamilyDto(

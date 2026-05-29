@@ -44,6 +44,15 @@ class SyncRepository(
             )
         }
 
+        response.ingredients.forEach { dto ->
+            db.recipeIngredientsQueries.insertOrReplaceIngredient(
+                id       = dto.id,
+                recipeId = dto.recipeId,
+                name     = dto.name,
+                deleted  = if (dto.deleted) 1L else 0L
+            )
+        }
+
         response.stockItems.forEach { dto ->
             db.stockItemsQueries.insertOrReplaceStockItem(
                 id                = dto.id,

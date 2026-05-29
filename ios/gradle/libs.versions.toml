@@ -6,6 +6,7 @@ coroutines      = "1.9.0"
 serialization   = "1.7.3"
 sqldelight      = "2.0.2"
 datetime        = "0.6.0"
+coil            = "3.0.4"
 
 [libraries]
 kotlinx-datetime                   = { module = "org.jetbrains.kotlinx:kotlinx-datetime",              version.ref = "datetime" }
@@ -18,6 +19,8 @@ kotlinx-serialization-json         = { module = "org.jetbrains.kotlinx:kotlinx-s
 sqldelight-runtime                 = { module = "app.cash.sqldelight:runtime",                     version.ref = "sqldelight" }
 sqldelight-coroutines-extensions   = { module = "app.cash.sqldelight:coroutines-extensions",       version.ref = "sqldelight" }
 sqldelight-native-driver           = { module = "app.cash.sqldelight:native-driver",               version.ref = "sqldelight" }
+coil-compose                       = { module = "io.coil-kt.coil3:coil-compose",                    version.ref = "coil" }
+coil-network-ktor                  = { module = "io.coil-kt.coil3:coil-network-ktor3",              version.ref = "coil" }
 
 [plugins]
 kotlinMultiplatform  = { id = "org.jetbrains.kotlin.multiplatform",          version.ref = "kotlin" }

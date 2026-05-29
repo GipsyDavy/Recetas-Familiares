@@ -17,6 +17,14 @@ data class AuthResponseDto(
 data class UserDto(val id: String, val displayName: String, val email: String)
 
 @Serializable
+data class UserResponseDto(
+    val id: String,
+    val email: String,
+    val displayName: String,
+    val avatarUrl: String? = null
+)
+
+@Serializable
 data class FamilyDto(val id: String, val name: String)
 
 @Serializable
@@ -159,6 +167,7 @@ data class CreateStockItemRequest(
 data class SyncPullResponseDto(
     val serverTime: String,
     val recipes: List<RecipeDto> = emptyList(),
+    val ingredients: List<RecipeIngredientDto> = emptyList(),
     val stockItems: List<StockItemDto> = emptyList(),
     val familyNotes: List<FamilyNoteDto> = emptyList()
 )

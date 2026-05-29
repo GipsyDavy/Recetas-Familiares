@@ -27,12 +27,18 @@ import org.gipsybuho.recetasfamiliares.Spacing
 import org.gipsybuho.recetasfamiliares.cooking.CookingScreen
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
+import org.gipsybuho.recetasfamiliares.stock.StockRepository
 import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
+fun RecipeListScreen(
+    repository: RecipeRepository,
+    syncRepo: SyncRepository,
+    stockRepo: StockRepository? = null
+) {
     var recipes          by remember { mutableStateOf<List<RecipeDto>>(emptyList()) }
+    var stockNames       by remember { mutableStateOf<Set<String>>(emptySet()) }
     var loading          by remember { mutableStateOf(true) }
     var isRefreshing     by remember { mutableStateOf(false) }
     var error            by remember { mutableStateOf<String?>(null) }
@@ -40,20 +46,34 @@ fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
     var cookingMode      by remember { mutableStateOf(false) }
     var query            by remember { mutableStateOf("") }
     var difficultyFilter by remember { mutableStateOf<String?>(null) }
+    var stockFilter      by remember { mutableStateOf(false) }
     val haptic           = rememberHapticFeedback()
     val scope            = rememberCoroutineScope()
 
-    val filtered = remember(recipes, query, difficultyFilter) {
-        recipes.filter { r ->
+    val filtered = remember(recipes, query, difficultyFilter, stockFilter, stockNames) {
+        val base = recipes.filter { r ->
             (query.isBlank() || r.title.contains(query, ignoreCase = true) ||
                 r.description?.contains(query, ignoreCase = true) == true) &&
             (difficultyFilter == null || r.difficulty?.uppercase() == difficultyFilter)
         }
+        if (!stockFilter || stockNames.isEmpty()) base
+        else {
+            val allIngredients = repository.loadLocalIngredients()
+            val matchingIds = allIngredients
+                .filter { (_, name) -> name in stockNames }
+                .map { it.first }
+                .toSet()
+            base.filter { it.id in matchingIds }
+        }
     }
 
     suspend fun loadData() {
-        runCatching { recipes = repository.loadRecipes() }
-            .onFailure { error = it.message }
+        runCatching {
+            recipes = repository.loadRecipes()
+            if (stockRepo != null) {
+                stockNames = stockRepo.loadStockItems().map { it.name.lowercase().trim() }.toSet()
+            }
+        }.onFailure { error = it.message }
     }
 
     LaunchedEffect(Unit) {
@@ -113,6 +133,13 @@ fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
                         selected = difficultyFilter == key,
                         onClick  = { difficultyFilter = if (difficultyFilter == key) null else key },
                         label    = { Text(label) }
+                    )
+                }
+                if (stockRepo != null) {
+                    FilterChip(
+                        selected = stockFilter,
+                        onClick  = { stockFilter = !stockFilter },
+                        label    = { Text("Con mi stock") }
                     )
                 }
             }

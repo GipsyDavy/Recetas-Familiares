@@ -89,6 +89,10 @@ class RecipeRepository(
         catch (e: Exception) { false }
     }
 
+    fun loadLocalIngredients(): List<Pair<String, String>> =
+        db.recipeIngredientsQueries.selectAllIngredients().executeAsList()
+            .map { it.recipeId to it.name.lowercase().trim() }
+
     private fun Recipes.toDto() = RecipeDto(
         id          = id,
         familyId    = familyId,

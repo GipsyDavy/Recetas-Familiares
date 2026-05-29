@@ -24,6 +24,9 @@ public class UserEntity {
     @Column(name = "display_name", nullable = false, length = 120)
     private String displayName;
 
+    @Column(name = "avatar_url", length = 2048)
+    private String avatarUrl;
+
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
@@ -87,7 +90,15 @@ public class UserEntity {
         return deleted;
     }
 
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 }
