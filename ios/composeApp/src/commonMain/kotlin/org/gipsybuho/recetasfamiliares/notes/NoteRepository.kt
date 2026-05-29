@@ -4,6 +4,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.network.ApiClient
+import org.gipsybuho.recetasfamiliares.network.CreateNoteRequest
 import org.gipsybuho.recetasfamiliares.network.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.network.PageDto
 
@@ -19,5 +20,24 @@ class NoteRepository(
                 parameter("size", size)
             }.body()
         return response.items.filter { !it.deleted }
+    }
+
+    suspend fun createNote(title: String, body: String, pinned: Boolean): FamilyNoteDto {
+        val familyId = session.familyId ?: error("Sin sesión activa")
+        return apiClient.http.post("api/v1/families/$familyId/notes") {
+            setBody(CreateNoteRequest(title, body, pinned))
+        }.body()
+    }
+
+    suspend fun updateNote(id: String, title: String, body: String, pinned: Boolean): FamilyNoteDto {
+        val familyId = session.familyId ?: error("Sin sesión activa")
+        return apiClient.http.put("api/v1/families/$familyId/notes/$id") {
+            setBody(CreateNoteRequest(title, body, pinned))
+        }.body()
+    }
+
+    suspend fun deleteNote(id: String) {
+        val familyId = session.familyId ?: error("Sin sesión activa")
+        apiClient.http.delete("api/v1/families/$familyId/notes/$id")
     }
 }

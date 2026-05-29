@@ -11,9 +11,11 @@ import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 
 /**
  * Dashboard principal — GridPane 2 columnas:
@@ -24,8 +26,9 @@ import java.util.List;
 public class DashboardView extends ScrollPane {
 
     private final AppContext context;
-    private final VBox recipesSection = new VBox(8);
-    private final VBox stockSection = new VBox(6);
+    private final VBox recipesSection  = new VBox(8);
+    private final VBox stockSection    = new VBox(6);
+    private final VBox menuTodaySection = new VBox(4);
     private final Runnable onSyncRequested;
     private final Runnable onNavigateRecipes;
     private final Runnable onNavigateStock;
@@ -121,7 +124,7 @@ public class DashboardView extends ScrollPane {
         greeting.getStyleClass().add("dashboard-greeting");
         Text subtitle = new Text("¿Qué cocinamos hoy?");
         subtitle.getStyleClass().add("dashboard-subtitle");
-        VBox box = new VBox(4, greeting, subtitle);
+        VBox box = new VBox(4, greeting, subtitle, menuTodaySection);
         box.getStyleClass().add("dashboard-greeting-box");
         box.setPadding(new Insets(0, 0, 20, 0));
         return box;
@@ -159,6 +162,7 @@ public class DashboardView extends ScrollPane {
     public void refresh() {
         loadRecentRecipes();
         loadExpiringStock();
+        loadTodayMenu();
     }
 
     private void loadRecentRecipes() {
@@ -178,6 +182,48 @@ public class DashboardView extends ScrollPane {
                 });
             }
         });
+    }
+
+    private void loadTodayMenu() {
+        menuTodaySection.getChildren().clear();
+        Thread.ofVirtual().start(() -> {
+            try {
+                LocalDate monday = LocalDate.now().with(DayOfWeek.MONDAY);
+                var allItems = context.getMenuRepository().loadForWeek(monday);
+                String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+                List<SyncDtos.MenuDtos.MenuItemDto> todayItems = allItems.stream()
+                        .filter(i -> today.equals(i.plannedDate()))
+                        .toList();
+                Platform.runLater(() -> renderTodayMenu(todayItems));
+            } catch (Exception ex) {
+                Platform.runLater(() -> menuTodaySection.getChildren().clear());
+            }
+        });
+    }
+
+    private void renderTodayMenu(List<SyncDtos.MenuDtos.MenuItemDto> items) {
+        menuTodaySection.getChildren().clear();
+        if (items.isEmpty()) return;
+        Label sectionLabel = new Label("Menú de hoy");
+        sectionLabel.getStyleClass().add("dashboard-section-title");
+        menuTodaySection.getChildren().add(sectionLabel);
+        for (var item : items) {
+            String title = item.recipeTitle() != null ? item.recipeTitle()
+                    : item.note() != null ? item.note() : "—";
+            Label row = new Label(mealTypeLabel(item.mealType()) + "  " + title);
+            row.getStyleClass().add("recipe-cell-meta");
+            menuTodaySection.getChildren().add(row);
+        }
+    }
+
+    private String mealTypeLabel(String type) {
+        return switch (type) {
+            case "BREAKFAST" -> "☀️ Desayuno:";
+            case "LUNCH"     -> "🍽 Almuerzo:";
+            case "SNACK"     -> "🫖 Merienda:";
+            case "DINNER"    -> "🌙 Cena:";
+            default          -> type + ":";
+        };
     }
 
     private void loadExpiringStock() {

@@ -1226,16 +1226,37 @@ Build: `mvn compile` — **BUILD SUCCESS**.
 
 Nota: build iOS en Windows falla por issue pre-existente SQLDelight + Gradle 9.5.1. Cambios iOS son Kotlin editable en Android Studio; compilación binaria requiere macOS + Xcode.
 
-## Sprint 26 — Candidatos
+## Sprint 26 — COMPLETADO (2026-05-29)
+
+### Sprint 26.A — Android: Drag-to-reorder RecipeForm ✅ COMPLETADO
+
+- **`build.gradle.kts`**: añadida dependencia `sh.calvin.reorderable:reorderable:2.4.3`.
+- **`RecipeFormScreen.kt`** (reescrito):
+  - `IngredientDraft` y `StepDraft` ahora tienen `id: String = UUID.randomUUID().toString()` (último campo, con default; compatibilidad posicional conservada).
+  - `rememberLazyListState()` + `rememberReorderableLazyListState` con callback de intercambio seguro por tipo (prefijos `"ing_"` / `"step_"` en keys — cross-section drag ignorado silenciosamente).
+  - `items(ingredients, key = { "ing_${it.id}" })` y `items(steps, key = { "step_${it.id}" })` con `ReorderableItem` y `Modifier.draggableHandle()` en icono `DragHandle`.
+  - Todos los `item { }` fijos llevan `key` explícita para estabilidad del LazyColumn.
+  - Los onChange de cada campo usan `indexOfFirst { it.id == X }` para lookups estables.
+  - Número de paso calculado con `steps.indexOfFirst { it.id == step.id } + 1` dentro de `ReorderableItem` (se actualiza con cada recomposición).
+
+Build: `./gradlew assembleDebug` — **BUILD SUCCESSFUL** (27s).
+
+### Sprint 26.B — iOS: NotesScreen CRUD ✅ COMPLETADO
+
+- **`ApiDtos.kt`**: añadido `CreateNoteRequest(@Serializable data class)` antes de `SyncPullResponseDto`.
+- **`NoteRepository.kt`** (ampliado): `createNote(title, body, pinned)` POST, `updateNote(id, title, body, pinned)` PUT, `deleteNote(id)` DELETE. Todos usan `session.familyId ?: error("Sin sesión activa")`.
+- **`NotesScreen.kt`** (iOS, reescrito): CRUD completo con estados `selectedNote`, `editingNote`, `showCreate`. `when` ramifica en: loading, error vacío, formulario crear, formulario editar, detalle nota, lista. FAB flotante en overlay `Box` (oculto cuando hay formulario/detalle abierto). `NoteForm` y `NoteDetail` como composables privados. `haptic.error()` al eliminar, `haptic.selection()` al seleccionar.
+
+### Sprint 26.C — Desktop: Dashboard con menú del día real ✅ COMPLETADO
+
+- **`DashboardView.java`**: campo `menuTodaySection: VBox(4)`, incluido en `buildHeader()` tras el subtítulo. `loadTodayMenu()` llama `menuRepository.loadForWeek(lunes)`, filtra por `today.equals(i.plannedDate())`, renderiza en `menuTodaySection` con `mealTypeLabel()` (emojis ☀️🍽🫖🌙). Si no hay items o hay error, la sección queda vacía (sin ruido visual). Llamado desde `refresh()`. `mealTypeLabel()` private helper para etiquetas con emoji.
+
+Build: `mvn compile` — **BUILD SUCCESS** (0 output).
+
+## Sprint 27 — Candidatos
 
 ### Prioridad Alta
 
-1. **Android:** Drag-to-reorder ingredientes y pasos en `RecipeForm` (LazyColumn + `detectDragGesturesAfterLongPress` o librería `sh.calvin.reorderable`).
-2. **iOS:** `NotesScreen` — crear/editar notas (actualmente solo lectura; añadir formulario inline similar a Android).
-3. **Desktop + Android:** DashboardView con menú del día actual real (query `/menu-items?plannedDate=HOY`).
-
-### Prioridad Media
-
-1. **iOS + Android:** Onboarding primera vez — 3 pantallas (SharedPreferences / NSUserDefaults, mostrar una sola vez).
+1. **iOS + Android:** Onboarding primera vez — 3 pantallas (`SharedPreferences` / `NSUserDefaults`, mostrar una sola vez).
 2. **iOS:** `StockScreen` CRUD — crear/editar stock items (actualmente solo lectura).
 3. **Android:** `CookingScreen` swipe visual (mostrar hint deslizamiento con `AnimatedVisibility`).

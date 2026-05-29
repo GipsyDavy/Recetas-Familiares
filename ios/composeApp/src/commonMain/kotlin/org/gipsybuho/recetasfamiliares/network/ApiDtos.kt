@@ -143,6 +143,9 @@ data class FavoriteRecipeDto(
 )
 
 @Serializable
+data class CreateNoteRequest(val title: String, val body: String, val pinned: Boolean)
+
+@Serializable
 data class SyncPullResponseDto(
     val serverTime: String,
     val recipes: List<RecipeDto> = emptyList(),

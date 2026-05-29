@@ -72,5 +72,7 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.4")
 
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
