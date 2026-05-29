@@ -291,15 +291,18 @@ Pendiente Sprint 21:
 | 23.2-Android | 2026-05-29 | SharedElementTransition RecipeList→RecipeDetail: SharedTransitionLayout+AnimatedContent(selectedRecipe); sharedBounds "recipe_bounds_{id}" en RecipeCard y RecipeDetail; fadeIn+slideInHorizontally 300ms |
 | 23.3-Android | 2026-05-29 | Lottie ShoppingList: LottieEmptyStateView(lottie_empty_list) en ShoppingListScreen y ShoppingListDetail (BUILD SUCCESSFUL 4s) |
 | 23.3-iOS | 2026-05-29 | AnimatedShoppingEmptyState: icono carrito pulsante con rememberInfiniteTransition+animateFloat escala 1.0→1.10 1400ms en ShoppingListScreen |
+| 24.1-iOS | 2026-05-29 | CookingScreen.kt (commonMain): swipe H gestures ±80f; timer countdown AnimatedContent slideInVertically; ScreenWakeLock expect/actual (UIApplication.idleTimerDisabled); FAB Cocinar en RecipeDetailScreen; cookingMode state en RecipeListScreen |
+| 24.2-iOS | 2026-05-29 | Compartir receta: ShareSheet expect/actual (UIActivityViewController keyWindow); buildShareText() título+meta+ingredientes+pasos; botón Share en RecipeDetailScreen header |
+| 24.3-Android | 2026-05-29 | CookingScreen swipe gestures: detectHorizontalDragGestures + pointerInput(steps.size); swipe izq→sig/finaliza, dcha→ant; haptic LongPress (BUILD SUCCESSFUL 3s) |
 
-## Proximos Pasos — Sprint 24
+## Proximos Pasos — Sprint 25
 
 Prioridad alta:
-- **iOS**: `CookingScreen` — paso a paso desde `RecipeDetailScreen` (swipe gestures izquierda/derecha, temporizador countdown, keep screen awake).
-- **iOS**: Compartir receta — `UIActivityViewController` vía `expect/actual`.
-- **Android**: Drag to reorder ingredientes/pasos en `RecipeForm`.
+- **Android**: Drag-to-reorder ingredientes y pasos en `RecipeForm`.
+- **iOS**: `NotesScreen` crear/editar notas (actualmente solo lectura).
+- **Desktop + Android**: DashboardView con menú del día actual real.
 
 Prioridad media:
-- **Desktop**: DashboardView con menú del día actual real.
 - **iOS + Android**: Onboarding primera vez (3 pantallas, mostrar una sola vez).
-- **Android**: Swipe left/right en `CookingScreen` como alternativa táctil.
+- **iOS**: `StockScreen` CRUD crear/editar items.
+- **Android**: Hint visual swipe en `CookingScreen`.

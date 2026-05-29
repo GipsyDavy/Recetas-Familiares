@@ -1140,16 +1140,37 @@ Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (5s, 0 errores).
 
 Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (4s, 0 errores; 1 warning pre-existente tooltip).
 
-## Sprint 24 — Candidatos
+## Sprint 24 — COMPLETADO (2026-05-29)
+
+### Sprint 24.1 — iOS CookingScreen ✅ COMPLETADO
+
+- `CookingScreen.kt` (commonMain, nuevo): paso a paso; `detectHorizontalDragGestures` (swipe izq→sig, dcha→ant, umbral 80f); temporizador countdown `MM:SS` con `AnimatedContent slideInVertically`; `LinearProgressIndicator`; loading desde `repository.loadSteps()`; pantalla final "¡Buen provecho!"; botones Anterior/Siguiente/Finalizar.
+- `ScreenWakeLock.kt` (expect) + `ScreenWakeLock.ios.kt` (actual: `UIApplication.sharedApplication.idleTimerDisabled`); `DisposableEffect` en CookingScreen activa/desactiva.
+- `RecipeListScreen.kt`: `cookingMode` state; early-return a `CookingScreen`; `onCookingMode` lambda a `RecipeDetailScreen`.
+- `RecipeDetailScreen.kt`: param `onCookingMode: (() -> Unit)? = null`; `ExtendedFloatingActionButton("Cocinar")` flotante (solo si steps no vacíos).
+
+### Sprint 24.2 — iOS compartir receta ✅ COMPLETADO
+
+- `ShareSheet.kt` (expect: `fun shareText(text: String)`) + `ShareSheet.ios.kt` (actual: `UIActivityViewController` via `keyWindow.rootViewController.presentViewController`).
+- `buildShareText()` en `RecipeDetailScreen`: texto con título, meta, 🥗 ingredientes, 👨‍🍳 pasos.
+- Botón `Icons.Filled.Share` en header de `RecipeDetailScreen`.
+
+### Sprint 24.3 — Android swipe gestures CookingScreen ✅ COMPLETADO
+
+- `CookingScreen.kt` (Android): `pointerInput(steps.size) { detectHorizontalDragGestures }`; swipe izquierda → siguiente paso (o finaliza), swipe derecha → anterior; haptic `LongPress` en cada cambio.
+
+Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (3s, 0 errores).
+
+## Sprint 25 — Candidatos
 
 ### Prioridad Alta
 
-1. **iOS:** CookingScreen — paso a paso desde `RecipeDetailScreen` (sin captura volumen, swipe gestures izquierda/derecha para cambiar paso, temporizador countdown, keep screen awake).
-2. **iOS:** Compartir receta — `UIActivityViewController` vía `expect/actual` (botón en `RecipeDetailScreen`).
-3. **Android:** Drag to reorder ingredientes y pasos en `RecipeForm` (LazyColumn + `reorderableItemModifier`).
+1. **Android:** Drag-to-reorder ingredientes y pasos en `RecipeForm` (LazyColumn + `detectDragGesturesAfterLongPress` o librería `sh.calvin.reorderable`).
+2. **iOS:** `NotesScreen` — crear/editar notas (actualmente solo lectura; añadir formulario inline similar a Android).
+3. **Desktop + Android:** DashboardView con menú del día actual real (query `/menu-items?plannedDate=HOY`).
 
 ### Prioridad Media
 
-1. **Desktop:** DashboardView con menú del día actual real (consulta `/menu-items?date=today`).
-2. **iOS + Android:** Onboarding primera vez — 3 pantallas explicando tabs principales (SharedPreferences / NSUserDefaults, mostrar una sola vez).
-3. **Android:** Swipe left/right en `CookingScreen` como alternativa táctil a botones Anterior/Siguiente.
+1. **iOS + Android:** Onboarding primera vez — 3 pantallas (SharedPreferences / NSUserDefaults, mostrar una sola vez).
+2. **iOS:** `StockScreen` CRUD — crear/editar stock items (actualmente solo lectura).
+3. **Android:** `CookingScreen` swipe visual (mostrar hint deslizamiento con `AnimatedVisibility`).
