@@ -153,7 +153,7 @@ mvn javafx:run -Dapi.base.url=http://localhost:8080/
 
 Stack: Spring Boot 3.5.14 + Java 21 + MySQL + Flyway + JWT.
 
-Estado: **57 tests, 0 fallos.**
+Estado: **62 tests, 0 fallos.**
 
 Modulos implementados:
 - auth (register, login, refresh, logout)
@@ -191,7 +191,7 @@ Migraciones Flyway V1-V9 (tablas: users, families, family_members, recipes, ingr
 
 ---
 
-## Android Kotlin + Compose — SPRINT UI COMPLETO (2026-05-29)
+## Android Kotlin + Compose — SPRINT 19 COMPLETO (2026-05-29)
 
 Stack:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -253,25 +253,26 @@ Build: `./gradlew assembleDebug` desde `android/` — BUILD SUCCESSFUL
 
 ---
 
-## Desktop JavaFX — SPRINT 15 COMPLETO (2026-05-29)
+## Desktop JavaFX — SPRINT 19 COMPLETO (2026-05-29)
 
 Stack: Java 21 + JavaFX 21.0.2 + OkHttp 4.12.0 + Gson 2.10.1 + Maven.
 
 Fat JAR: 13.3 MB. SSL fix: `desktop/.mvn/jvm.config` con Windows-ROOT truststore.
 
-### Pantallas implementadas (Sprint 1-15)
+### Pantallas implementadas (Sprint 1-19)
 - `LoginView`
-- `DashboardView` — GridPane 2 columnas: recetas recientes + stock expirando + acciones rápidas (Stock / Notas)
-- `RecipeListView` — SplitPane filtrable, búsqueda, paginación 30/pág + "Cargar más", botón "Actualizar"
+- `DashboardView` — GridPane 2 columnas: recetas recientes + stock expirando + acciones rápidas (Stock / Notas); hover ScaleTransition cards
+- `RecipeListView` — SplitPane filtrable, búsqueda, paginación 30/pág + "Cargar más", botón "Actualizar"; **skeleton loading shimmer** (Sprint 19)
 - `RecipeDetailView` — ingredientes, pasos, fotos async, Editar, Eliminar, Modo Cocina, **"📋 Copiar"**, **"💾 Exportar" → .txt**
-- `RecipeFormDialog` — modal `forCreate()` / `forEdit()`
-- `CookingView` — Stage maximizado, paso a paso, temporizador JavaFX Timeline
-- `StockView` — TableView CRUD, búsqueda, paginación client-side PAGE_SIZE=50, "Cargar más", botón "Actualizar"
+- `RecipeFormDialog` — modal `forCreate()` / `forEdit()`; ScaleTransition apertura; **playConfirm()** al guardar (Sprint 19)
+- `CookingView` — Stage maximizado, paso a paso, temporizador JavaFX Timeline; ←/→ teclado navega pasos; **playTimerComplete()** al terminar (Sprint 19)
+- `StockView` — TableView CRUD, búsqueda, paginación client-side PAGE_SIZE=50, "Cargar más", ContextMenu, tooltips, Ctrl+N/Supr/Enter; **playDelete()** al eliminar (Sprint 19)
 - `WeeklyMenuView` — calendario 8x5, nav semanas, CRUD assign/remove, botón "Actualizar"
 - `ShoppingListView` — ítems con check, **"💾 Exportar" → .txt**, botón "Actualizar"
 - `NotesView` — SplitPane lista + editor inline, búsqueda, paginación 30/pág, botón "Actualizar"
 - `GlobalSearchView` — resultados agrupados Recetas/Stock/Notas desde sidebar
-- `ExpiryNotificationService` — toast bottom-right tras sync si stock ≤3 días caducidad
+- `ExpiryNotificationService` — toast bottom-right; **TranslateTransition** entrada desde abajo (Sprint 19)
+- `SoundPlayer` (nuevo Sprint 19) — `playConfirm/Delete/TimerComplete` via `javax.sound.sampled`; desactivado por defecto (`Preferences`)
 
 ### Sidebar completa
 Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de la compra | Notas familiares
@@ -286,12 +287,12 @@ Rama: `main`. HEAD limpio en el último commit documentado.
 
 Commits recientes:
 ```
-fee80cb docs: Sprint 16 completado — cerrar sesion y preparar Sprint 17  ← HEAD
-d0bef39 feat: Sprint 16 — scaffolding KMP + Compose Multiplatform iOS
-ca12b99 docs: añadir iOS (KMP + Compose Multiplatform) como nueva plataforma objetivo
-94cee4c docs: Sprint 15 completado — actualizar Resumen.md y CONTINUAR.md
-2edfc88 feat: Sprint 15.4 — Exportar lista de la compra Desktop (.txt)
-e67d734 feat: Sprint 15.1-15.3+15.5 — CRUD menú + filtros recetas + sort stock Android
+0e558be docs: Sprint 19 completado — actualizar CONTINUAR.md y memoria  ← HEAD
+8853bd0 feat: Sprint 19 — UX animations + SQLDelight iOS + sonidos Desktop
+fb0d276 docs: Sprint 17 y Sprint 18 completados — actualizar CONTINUAR.md y Resumen.md
+9fa25c3 feat: Sprint 17 UX Premium + Sprint 18 iOS expansion — Multi-IA (Claude+Codex+Gemini)
+592cc94 docs: Sprint 17 UX Premium — animaciones, hapticos, sonidos y pulido visual
+8fcff80 feat: UI sprint — tarjetas visuales + mejoras iconos Android + docs sincronizados
 ```
 
 ---
@@ -357,7 +358,7 @@ Build SUCCESSFUL.
    ```
    Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
 
-6. Continuar con Sprint 10 (ver candidatos al final de este documento).
+6. Continuar con Sprint 20 (ver candidatos al final de este documento).
 
 ---
 
@@ -1039,12 +1040,21 @@ Verificado en emulador Pixel_9_Pro API 36: LoginScreen, RecipeList, RecipeDetail
 
 ---
 
-## Sprint 18 — iOS Expansion
+## Sprint 20 — Candidatos (siguiente sprint)
 
-Candidatos (antes llamado Sprint 17 iOS):
+### Prioridad Alta — iOS
 
-1. **Navegacion por tabs iOS** — TabView con 4-5 tabs (Recetas, Stock, Lista, Notas, Menu). Actualmente solo hay login + lista de recetas.
-2. **StockScreen iOS** — pantalla de stock con `StockRepository` Ktor.
-3. **NotesScreen iOS** — CRUD de notas familiares.
-4. **SQLDelight persistencia local iOS** — cache offline para recetas y stock. Actualmente la app es 100% online.
-5. **Keychain para tokens** — reemplazar NSUserDefaults por SecItem API en `SessionStore.ios.kt`.
+1. **ShoppingListScreen iOS** — implementación real con `ShoppingListRepository` Ktor (actualmente `PlaceholderScreen`).
+2. **MenuScreen iOS** — implementación real con `MenuRepository` Ktor (actualmente `PlaceholderScreen`).
+3. **Sync incremental SQLDelight iOS** — push/pull desde iOS usando los endpoints `/api/v1/sync/pull` y `/api/v1/sync/push` ya existentes en el backend.
+
+### Prioridad Media — Android (prioridad baja Sprint 17)
+
+1. **Lottie empty states Android** — cocinero animado, lista vacía (`com.airbnb.android:lottie-compose:6.x`).
+2. **Micro-animación ❤️ favorito** — escala + partículas al marcar favorito (Android + iOS).
+3. **SharedElementTransition** RecipeList → RecipeDetail Android (Compose experimental API).
+
+### Prioridad Baja — Desktop
+
+1. **Preferencias de sonido UI Desktop** — panel de configuración para toggle de sonidos en `SoundPlayer`.
+2. **SequentialTransition al eliminar** — FadeOut 150ms → colapso tabla 150ms en StockView y NotesView.

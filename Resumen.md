@@ -52,10 +52,10 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 ### iOS - Experiencia Movil Apple (EN DESARROLLO)
 
 - Kotlin Multiplatform + Compose Multiplatform.
-- Navegacion nativa iOS (TabView, NavigationStack).
-- Offline-first con SQLDelight y Ktor.
+- Navegacion nativa iOS (TabView NavigationBar 5 tabs).
+- Offline-first con SQLDelight 2.0.2 y Ktor.
 - UI coherente con Android, adaptada a las convenciones iOS.
-- Sprint 16 completado: scaffolding completo en `ios/` (commit d0bef39).
+- Sprint 19 completado: SQLDelight cache offline + hápticos UIKit + SwipeToReveal (commit 8853bd0).
 
 ## Estilo Visual y UX
 
@@ -107,7 +107,7 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT UI COMPLETO — 2026-05-29)
+### Android Kotlin + Compose (SPRINT 19 COMPLETO — 2026-05-29)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -144,7 +144,7 @@ SDK: C:\Users\GipsyDavy\AndroidSDK
 AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-### Desktop JavaFX (SPRINT 15 COMPLETO — 2026-05-29)
+### Desktop JavaFX (SPRINT 19 COMPLETO — 2026-05-29)
 
 JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
@@ -167,31 +167,39 @@ Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de 
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-### iOS KMP + Compose Multiplatform (SPRINT 16 COMPLETADO — 2026-05-29)
+### iOS KMP + Compose Multiplatform (SPRINT 19 COMPLETADO — 2026-05-29)
 
 Stack implementado:
 - Kotlin Multiplatform + Compose Multiplatform (Kotlin 2.0.21, Compose 1.7.0)
 - Ktor 3.0.3 (HttpClient Darwin — iOS engine)
-- NSUserDefaults para sesion MVP (Keychain en Sprint 17+)
+- SQLDelight 2.0.2 + NativeSqliteDriver (cache offline)
+- Keychain (SecItemAdd/Copy/Delete) para tokens — Sprint 18.4
 - Targets: iosX64, iosArm64, iosSimulatorArm64
 
-Pantallas implementadas (Sprint 16):
+Pantallas implementadas (Sprint 16-19):
 - `LoginScreen` (Compose M3, coroutines, error handling)
-- `RecipeListScreen` (LazyColumn, loading/error/empty/datos, dificultad localizada)
+- `RecipeListScreen` (LazyColumn, paginado Ktor, haptic.selection() al tocar)
+- `StockScreen` (SwipeToReveal por item con Animatable, badge bajo stock)
+- `NotesScreen` (preview 80 chars, pin emoji, haptic.selection() al tocar)
+- 2 PlaceholderScreens (ShoppingList + Menu — Sprint 20)
+- `MainTabScreen` (NavigationBar 5 tabs)
+
+Infraestructura (Sprint 18-19):
+- `DatabaseDriverFactory` expect/actual + `AppDatabase.sq` (recipes + stock_items)
+- `RecipeRepository` + `StockRepository`: cache-first offline con SQLDelight
+- `HapticFeedback` expect/actual — UIImpactFeedbackGenerator / UISelectionFeedbackGenerator / UINotificationFeedbackGenerator
 
 Arquitectura ios/ (proyecto Gradle KMP independiente):
-- `composeApp/src/commonMain/` — UI Compose + repositorios + DTOs (multiplataforma)
-- `composeApp/src/iosMain/` — MainViewController (puente Swift↔Compose) + SessionStore.ios.kt
+- `composeApp/src/commonMain/` — UI Compose + repositorios + DTOs + SQLDelight schemas
+- `composeApp/src/iosMain/` — MainViewController + SessionStore.ios + DatabaseDriverFactory.ios + HapticFeedback.ios
 - `iosApp/` — Entry point SwiftUI: iosApp.swift + ContentView.swift
 
 Compilacion: requiere macOS + Xcode para generar binario/framework.
 En Windows: edicion Kotlin completa via Android Studio.
 
-Pendiente Sprint 17:
-- TabView iOS (5 tabs: Recetas, Stock, Lista, Notas, Menú)
-- StockScreen, NotesScreen iOS
-- SQLDelight (persistencia offline iOS)
-- Keychain para tokens
+Pendiente Sprint 20:
+- ShoppingListScreen + MenuScreen iOS (placeholder → implementación real)
+- Sync incremental SQLDelight (push/pull desde iOS)
 
 ### Base de Datos MySQL
 
@@ -266,13 +274,18 @@ Pendiente Sprint 17:
 | 18.2 | 2026-05-29 | iOS StockScreen: StockRepository (Ktor) + StockScreen composable con estados loading/error/empty |
 | 18.3 | 2026-05-29 | iOS NotesScreen: NoteRepository (Ktor) + NotesScreen composable completo |
 | 18.4 | 2026-05-29 | iOS Keychain: SessionStore.ios.kt migrado de NSUserDefaults a SecItemAdd/Copy/Delete |
+| 19-Android | 2026-05-29 | UX Polish Android: ModalBottomSheet menú ⋮, AnimatedContent timer, SkeletonRecipeCard shimmer, animateColorAsState chips+badges, animateContentSize RatingsSection |
+| 19-Desktop | 2026-05-29 | UX Polish Desktop: TranslateTransition ExpiryNotification, skeleton RecipeListView, SoundPlayer (playConfirm/Delete/TimerComplete) desactivado por defecto |
+| 19-iOS | 2026-05-29 | iOS SQLDelight 2.0.2: DatabaseDriverFactory expect/actual, RecipeRepo+StockRepo cache offline; HapticFeedback expect/actual UIKit; SwipeToReveal StockScreen (pointerInput+Animatable) |
 
-## Proximos Pasos — Sprint 19
+## Proximos Pasos — Sprint 20
 
 Prioridad alta:
-- **Android**: Prioridad media Sprint 17 pendiente: `animateContentSize()`, `ModalBottomSheet` menú ⋮ RecipeDetail, `AnimatedContent` timer CookingScreen, skeleton loading shimmer RecipeList, `animateColorAsState` chips+badges.
-- **iOS**: SQLDelight cache offline (recipes + stock-items); `SwipeToReveal` items lista; hápticos `expect/actual` (UIImpactFeedbackGenerator).
-- **Desktop**: Skeleton placeholders, `TranslateTransition` notificaciones ExpiryNotification, `AudioClip` sonidos desactivables.
+- **iOS**: ShoppingListScreen + MenuScreen (placeholder → implementación real con Ktor).
+- **iOS**: Sync incremental SQLDelight (push/pull desde iOS usando endpoints backend ya existentes).
 
-Prioridad media: Shopping y Menú screens en iOS. SQLDelight sync incremental.
-Prioridad baja: Lottie empty states Android, SharedElementTransition, micro-animación ❤️ favorito.
+Prioridad media:
+- **Android**: Lottie empty states, micro-animación ❤️ favorito, SharedElementTransition RecipeList→Detail.
+
+Prioridad baja:
+- **Desktop**: Preferencias de sonido UI, SequentialTransition al eliminar tabla.
