@@ -253,7 +253,7 @@ Build: `./gradlew assembleDebug` desde `android/` — BUILD SUCCESSFUL
 
 ---
 
-## Desktop JavaFX — SPRINT 19 COMPLETO (2026-05-29)
+## Desktop JavaFX — SPRINT 20 COMPLETO (2026-05-29)
 
 Stack: Java 21 + JavaFX 21.0.2 + OkHttp 4.12.0 + Gson 2.10.1 + Maven.
 
@@ -287,12 +287,11 @@ Rama: `main`. HEAD limpio en el último commit documentado.
 
 Commits recientes:
 ```
-0e558be docs: Sprint 19 completado — actualizar CONTINUAR.md y memoria  ← HEAD
-8853bd0 feat: Sprint 19 — UX animations + SQLDelight iOS + sonidos Desktop
-fb0d276 docs: Sprint 17 y Sprint 18 completados — actualizar CONTINUAR.md y Resumen.md
-9fa25c3 feat: Sprint 17 UX Premium + Sprint 18 iOS expansion — Multi-IA (Claude+Codex+Gemini)
-592cc94 docs: Sprint 17 UX Premium — animaciones, hapticos, sonidos y pulido visual
-8fcff80 feat: UI sprint — tarjetas visuales + mejoras iconos Android + docs sincronizados
+a1248e8 docs: Sprint 20 completado — actualizar CONTINUAR.md, Resumen.md y preparar Sprint 21  ← HEAD
+6963f04 feat: Sprint 20 completo — iOS sync incremental + Desktop polish (Multi-IA)
+847c528 feat: Sprint 20 iOS — ShoppingListScreen + MenuScreen implementados
+ab6c58e docs: Sprint 20 preparado — actualizar CONTINUAR.md y Resumen.md al estado Sprint 19
+0e558be docs: Sprint 19 completado — actualizar CONTINUAR.md y memoria
 ```
 
 ---

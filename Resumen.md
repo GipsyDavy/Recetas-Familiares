@@ -144,7 +144,7 @@ SDK: C:\Users\GipsyDavy\AndroidSDK
 AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-### Desktop JavaFX (SPRINT 19 COMPLETO — 2026-05-29)
+### Desktop JavaFX (SPRINT 20 COMPLETO — 2026-05-29)
 
 JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
@@ -167,26 +167,28 @@ Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de 
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-### iOS KMP + Compose Multiplatform (SPRINT 19 COMPLETADO — 2026-05-29)
+### iOS KMP + Compose Multiplatform (SPRINT 20 COMPLETADO — 2026-05-29)
 
 Stack implementado:
 - Kotlin Multiplatform + Compose Multiplatform (Kotlin 2.0.21, Compose 1.7.0)
 - Ktor 3.0.3 (HttpClient Darwin — iOS engine)
-- SQLDelight 2.0.2 + NativeSqliteDriver (cache offline)
+- SQLDelight 2.0.2 + NativeSqliteDriver (cache offline + sync_metadata)
 - Keychain (SecItemAdd/Copy/Delete) para tokens — Sprint 18.4
 - Targets: iosX64, iosArm64, iosSimulatorArm64
 
-Pantallas implementadas (Sprint 16-19):
+Pantallas implementadas (Sprint 16-20):
 - `LoginScreen` (Compose M3, coroutines, error handling)
 - `RecipeListScreen` (LazyColumn, paginado Ktor, haptic.selection() al tocar)
 - `StockScreen` (SwipeToReveal por item con Animatable, badge bajo stock)
 - `NotesScreen` (preview 80 chars, pin emoji, haptic.selection() al tocar)
-- 2 PlaceholderScreens (ShoppingList + Menu — Sprint 20)
-- `MainTabScreen` (NavigationBar 5 tabs)
+- `ShoppingListScreen` (Sprint 20 — 2 niveles: lista de listas → items drill-down, tachado read-only)
+- `MenuScreen` (Sprint 20 — cards por día, chips tipo comida Desayuno/Almuerzo/Merienda/Cena)
+- `MainTabScreen` (NavigationBar 5 tabs — todos operativos)
 
-Infraestructura (Sprint 18-19):
-- `DatabaseDriverFactory` expect/actual + `AppDatabase.sq` (recipes + stock_items)
+Infraestructura (Sprint 18-20):
+- `DatabaseDriverFactory` expect/actual + `AppDatabase.sq` (recipes + stock_items + sync_metadata)
 - `RecipeRepository` + `StockRepository`: cache-first offline con SQLDelight
+- `SyncRepository` (Sprint 20): `pullIncremental()` — GET /sync/pull?since=X, upsert SQLDelight; disparo silencioso al login
 - `HapticFeedback` expect/actual — UIImpactFeedbackGenerator / UISelectionFeedbackGenerator / UINotificationFeedbackGenerator
 
 Arquitectura ios/ (proyecto Gradle KMP independiente):
@@ -197,9 +199,9 @@ Arquitectura ios/ (proyecto Gradle KMP independiente):
 Compilacion: requiere macOS + Xcode para generar binario/framework.
 En Windows: edicion Kotlin completa via Android Studio.
 
-Pendiente Sprint 20:
-- ShoppingListScreen + MenuScreen iOS (placeholder → implementación real)
-- Sync incremental SQLDelight (push/pull desde iOS)
+Pendiente Sprint 21:
+- Pull-to-refresh manual en RecipeListScreen y StockScreen
+- Navegación semanas en MenuScreen (requiere kotlinx.datetime)
 
 ### Base de Datos MySQL
 
