@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
@@ -36,21 +38,35 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import java.time.Instant
 import java.time.LocalDate
@@ -71,6 +87,10 @@ internal fun StockList(
     var error by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var sortByExpiry by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    var pendingDeleteItem by remember { mutableStateOf<StockItemEntity?>(null) }
+    var pendingDismissState by remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
     val filtered = stockItems
         .let { list -> if (query.isBlank()) list else list.filter { it.name.contains(query, ignoreCase = true) } }
         .let { list -> if (sortByExpiry) list.sortedBy { it.expiresAt ?: "9999-99-99" } else list }
@@ -106,12 +126,24 @@ internal fun StockList(
                             verticalAlignment = Alignment.CenterVertically) {
                             Text("Stock Familiar", style = MaterialTheme.typography.headlineSmall)
                             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { sortByExpiry = !sortByExpiry }) {
-                                    Icon(Icons.Filled.Sort, contentDescription = "Ordenar por caducidad",
-                                        tint = if (sortByExpiry) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                TooltipBox(
+                                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                                    tooltip = { PlainTooltip { Text(if (sortByExpiry) "Ordenando por caducidad (activo)" else "Ordenar por caducidad") } },
+                                    state = rememberTooltipState()
+                                ) {
+                                    IconButton(onClick = { sortByExpiry = !sortByExpiry }) {
+                                        Icon(Icons.Filled.Sort, contentDescription = "Ordenar por caducidad",
+                                            tint = if (sortByExpiry) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                    }
                                 }
-                                IconButton(onClick = { viewModel.refresh() }) {
-                                    Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
+                                TooltipBox(
+                                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                                    tooltip = { PlainTooltip { Text("Actualizar") } },
+                                    state = rememberTooltipState()
+                                ) {
+                                    IconButton(onClick = { viewModel.refresh() }) {
+                                        Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
+                                    }
                                 }
                             }
                         }
@@ -145,7 +177,34 @@ internal fun StockList(
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                                 items(filtered, key = { it.id }) { item ->
-                                    StockItemCard(item, onClick = { selectedItem = item; error = null })
+                                    val swipeState = rememberSwipeToDismissBoxState()
+                                    LaunchedEffect(swipeState.currentValue) {
+                                        if (swipeState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                                            pendingDeleteItem = item
+                                            pendingDismissState = swipeState
+                                        }
+                                    }
+                                    SwipeToDismissBox(
+                                        state = swipeState,
+                                        enableDismissFromStartToEnd = false,
+                                        backgroundContent = {
+                                            Box(
+                                                Modifier.fillMaxSize()
+                                                    .clip(MaterialTheme.shapes.medium)
+                                                    .background(MaterialTheme.colorScheme.errorContainer),
+                                                contentAlignment = Alignment.CenterEnd
+                                            ) {
+                                                Icon(
+                                                    Icons.Filled.Delete,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.padding(horizontal = Spacing.xl),
+                                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            }
+                                        }
+                                    ) {
+                                        StockItemCard(item, onClick = { selectedItem = item; error = null })
+                                    }
                                 }
                             }
                         }
@@ -159,6 +218,30 @@ internal fun StockList(
                 ) { Icon(Icons.Filled.Add, contentDescription = "Nuevo item de stock") }
             }
         }
+    }
+
+    pendingDeleteItem?.let { item ->
+        AlertDialog(
+            onDismissRequest = {
+                scope.launch { pendingDismissState?.reset() }
+                pendingDeleteItem = null; pendingDismissState = null
+            },
+            title = { Text("¿Eliminar ítem?") },
+            text = { Text("\"${item.name}\" se eliminará del stock familiar.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.deleteStockItem(item)
+                    pendingDeleteItem = null; pendingDismissState = null
+                }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    scope.launch { pendingDismissState?.reset() }
+                    pendingDeleteItem = null; pendingDismissState = null
+                }) { Text("Cancelar") }
+            }
+        )
     }
 }
 

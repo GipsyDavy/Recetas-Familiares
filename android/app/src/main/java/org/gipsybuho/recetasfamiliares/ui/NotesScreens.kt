@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.foundation.background
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -32,18 +34,29 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +72,10 @@ internal fun NotesScreen(
     var showCreateForm by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    var pendingDeleteNote by remember { mutableStateOf<FamilyNoteEntity?>(null) }
+    var pendingNoteSwipeState by remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
     val filtered = if (query.isBlank()) notes
         else notes.filter {
             it.title.contains(query, ignoreCase = true) || it.body.contains(query, ignoreCase = true)
@@ -131,13 +148,64 @@ internal fun NotesScreen(
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                             items(filtered, key = { it.id }) { note ->
-                                NoteCard(note, onClick = { selectedNote = note; error = null })
+                                val swipeState = rememberSwipeToDismissBoxState()
+                                LaunchedEffect(swipeState.currentValue) {
+                                    if (swipeState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                                        pendingDeleteNote = note
+                                        pendingNoteSwipeState = swipeState
+                                    }
+                                }
+                                SwipeToDismissBox(
+                                    state = swipeState,
+                                    enableDismissFromStartToEnd = false,
+                                    backgroundContent = {
+                                        Box(
+                                            Modifier.fillMaxSize()
+                                                .clip(MaterialTheme.shapes.medium)
+                                                .background(MaterialTheme.colorScheme.errorContainer),
+                                            contentAlignment = Alignment.CenterEnd
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.Delete,
+                                                contentDescription = null,
+                                                modifier = Modifier.padding(horizontal = Spacing.xl),
+                                                tint = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+                                        }
+                                    }
+                                ) {
+                                    NoteCard(note, onClick = { selectedNote = note; error = null })
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    pendingDeleteNote?.let { note ->
+        AlertDialog(
+            onDismissRequest = {
+                scope.launch { pendingNoteSwipeState?.reset() }
+                pendingDeleteNote = null; pendingNoteSwipeState = null
+            },
+            title = { Text("¿Eliminar nota?") },
+            text = { Text("\"${note.title}\" se eliminará de las notas familiares.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.deleteNote(note)
+                    pendingDeleteNote = null; pendingNoteSwipeState = null
+                }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    scope.launch { pendingNoteSwipeState?.reset() }
+                    pendingDeleteNote = null; pendingNoteSwipeState = null
+                }) { Text("Cancelar") }
+            }
+        )
     }
 }
 

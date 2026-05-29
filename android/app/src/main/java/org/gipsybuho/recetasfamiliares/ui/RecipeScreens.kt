@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.ui
 
 import android.content.Intent
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -186,29 +187,31 @@ internal fun RecipeList(
                             }
                         }
                         Spacer(Modifier.height(Spacing.md))
-                        if (filtered.isEmpty()) {
-                            if (query.isBlank() && difficultyFilter == null) {
-                                EmptyStateView(icon = Icons.Outlined.Restaurant,
-                                    title = "Sin recetas aún",
-                                    subtitle = "Empieza a guardar las recetas de tu familia y construid vuestro recetario",
-                                    actionLabel = "Crear primera receta", onAction = { showCreateForm = true })
+                        Crossfade(targetState = filtered.isEmpty(), label = "recipeListState") { isEmpty ->
+                            if (isEmpty) {
+                                if (query.isBlank() && difficultyFilter == null) {
+                                    EmptyStateView(icon = Icons.Outlined.Restaurant,
+                                        title = "Sin recetas aún",
+                                        subtitle = "Empieza a guardar las recetas de tu familia y construid vuestro recetario",
+                                        actionLabel = "Crear primera receta", onAction = { showCreateForm = true })
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("Sin resultados para \"$query\"",
+                                            color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center)
+                                    }
+                                }
                             } else {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("Sin resultados para \"$query\"",
-                                        color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center)
-                                }
-                            }
-                        } else {
-                            LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                                items(filtered, key = { it.id }) { recipe ->
-                                    RecipeCard(recipe) { selectedRecipe = recipe; error = null }
-                                }
-                                if (recipeHasMore && query.isBlank()) {
-                                    item {
-                                        OutlinedButton(
-                                            onClick = { viewModel.loadNextRecipePage() },
-                                            modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)
-                                        ) { Text("Cargar más recetas") }
+                                LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                    items(filtered, key = { it.id }) { recipe ->
+                                        RecipeCard(recipe, modifier = Modifier.animateItem()) { selectedRecipe = recipe; error = null }
+                                    }
+                                    if (recipeHasMore && query.isBlank()) {
+                                        item {
+                                            OutlinedButton(
+                                                onClick = { viewModel.loadNextRecipePage() },
+                                                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)
+                                            ) { Text("Cargar más recetas") }
+                                        }
                                     }
                                 }
                             }
@@ -235,10 +238,10 @@ internal fun RecipeList(
 }
 
 @Composable
-private fun RecipeCard(recipe: RecipeEntity, onClick: () -> Unit) {
+private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {

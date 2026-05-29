@@ -7,9 +7,12 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
+
+import java.util.function.Consumer;
 
 public class StockView extends VBox {
 
@@ -17,6 +20,7 @@ public class StockView extends VBox {
 
     private final AppContext context;
     private final Runnable onSync;
+    private final Consumer<String> onStatusUpdate;
     private final TableView<StockDtos.StockItemDto> table = new TableView<>();
     private final Label statusLabel = new Label();
     private final TextField filterField = new TextField();
@@ -27,8 +31,13 @@ public class StockView extends VBox {
     private Button loadMoreBtn;
 
     public StockView(AppContext context, Runnable onSync) {
+        this(context, onSync, msg -> {});
+    }
+
+    public StockView(AppContext context, Runnable onSync, Consumer<String> onStatusUpdate) {
         this.context = context;
         this.onSync = onSync;
+        this.onStatusUpdate = onStatusUpdate;
         build();
     }
 
@@ -87,6 +96,25 @@ public class StockView extends VBox {
                 "Stock vacío",
                 "Registra ingredientes de casa para controlar caducidades y bajo stock"
         ));
+        ContextMenu cm = new ContextMenu();
+        MenuItem cmEdit = new MenuItem("Editar");
+        MenuItem cmDelete = new MenuItem("Eliminar");
+        cmEdit.setOnAction(e -> openEditDialog());
+        cmDelete.setOnAction(e -> deleteSelected());
+        cm.getItems().addAll(cmEdit, new SeparatorMenuItem(), cmDelete);
+        table.setContextMenu(cm);
+        table.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.DELETE || e.getCode() == KeyCode.BACK_SPACE) {
+                deleteSelected();
+                e.consume();
+            } else if (e.getCode() == KeyCode.ENTER) {
+                openEditDialog();
+                e.consume();
+            } else if (e.isControlDown() && e.getCode() == KeyCode.N) {
+                openCreateDialog();
+                e.consume();
+            }
+        });
         VBox.setVgrow(table, Priority.ALWAYS);
 
         statusLabel.getStyleClass().add("status-label");
@@ -104,16 +132,19 @@ public class StockView extends VBox {
         Button newBtn = new Button("+ Nuevo");
         newBtn.getStyleClass().add("action-button-primary");
         newBtn.setOnAction(e -> openCreateDialog());
+        Tooltip.install(newBtn, new Tooltip("Nuevo ítem de stock (Ctrl+N)"));
 
         Button editBtn = new Button("Editar");
         editBtn.getStyleClass().add("action-button-secondary");
         editBtn.setDisable(true);
         editBtn.setOnAction(e -> openEditDialog());
+        Tooltip.install(editBtn, new Tooltip("Editar ítem seleccionado (Enter)"));
 
         Button deleteBtn = new Button("Eliminar");
         deleteBtn.getStyleClass().add("action-button-secondary");
         deleteBtn.setDisable(true);
         deleteBtn.setOnAction(e -> confirmDelete());
+        Tooltip.install(deleteBtn, new Tooltip("Eliminar ítem seleccionado (Supr)"));
 
         table.getSelectionModel().selectedItemProperty().addListener((obs, old, sel) -> {
             boolean hasSelection = sel != null;
@@ -182,6 +213,7 @@ public class StockView extends VBox {
                             context.getStockRepository().getCache().getItems().remove(selected);
                             refreshDisplay();
                             statusLabel.setText("Item eliminado.");
+                            onStatusUpdate.accept("Ítem eliminado");
                         });
                     } catch (Exception ex) {
                         Platform.runLater(() -> statusLabel.setText("Error al eliminar: " + ex.getMessage()));
@@ -189,6 +221,10 @@ public class StockView extends VBox {
                 });
             }
         });
+    }
+
+    private void deleteSelected() {
+        confirmDelete();
     }
 
     private void refreshDisplay() {

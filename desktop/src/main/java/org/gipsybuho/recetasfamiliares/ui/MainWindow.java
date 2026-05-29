@@ -1,12 +1,17 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
+import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.util.Objects;
@@ -26,6 +31,7 @@ public class MainWindow {
     private String activeView = "dashboard";
     private boolean navigating = false;
     private final TextField globalSearch = new TextField();
+    private final Label statusBar = new Label("");
 
     public MainWindow(Stage stage, AppContext context) {
         this.stage = stage;
@@ -39,7 +45,16 @@ public class MainWindow {
 
         stage.setTitle("Recetas Familiares");
         stage.setScene(scene);
+        statusBar.getStyleClass().add("status-bar");
+        root.setBottom(statusBar);
+        BorderPane.setMargin(statusBar, new Insets(0, 12, 4, 12));
         stage.show();
+        scene.setOnKeyPressed((KeyEvent e) -> {
+            if (e.isControlDown() && e.getCode() == KeyCode.F) {
+                globalSearch.requestFocus();
+                e.consume();
+            }
+        });
 
         if (context.getSession().isLoggedIn()) {
             showMain();
@@ -67,7 +82,7 @@ public class MainWindow {
                 () -> navigateTo("stock"),
                 () -> navigateTo("notes"));
         recipeListView = new RecipeListView(context, this::triggerSync);
-        stockView = new StockView(context, this::triggerSync);
+        stockView = new StockView(context, this::triggerSync, this::setStatus);
         weeklyMenuView = new WeeklyMenuView(context, this::triggerSync);
         shoppingListView = new ShoppingListView(context, this::triggerSync);
         notesView = new NotesView(context, this::triggerSync);
@@ -165,29 +180,53 @@ public class MainWindow {
         navigating = false;
         switch (view) {
             case "dashboard" -> {
-                root.setCenter(dashboardView);
+                setCenterWithFade(dashboardView);
                 dashboardView.refresh();
             }
             case "recipes" -> {
-                root.setCenter(recipeListView);
+                setCenterWithFade(recipeListView);
                 recipeListView.refresh();
             }
             case "stock" -> {
-                root.setCenter(stockView);
+                setCenterWithFade(stockView);
                 stockView.refresh();
             }
             case "menu" -> {
-                root.setCenter(weeklyMenuView);
+                setCenterWithFade(weeklyMenuView);
                 weeklyMenuView.refresh();
             }
             case "shopping" -> {
-                root.setCenter(shoppingListView);
+                setCenterWithFade(shoppingListView);
                 shoppingListView.refresh();
             }
             case "notes" -> {
-                root.setCenter(notesView);
+                setCenterWithFade(notesView);
                 notesView.refresh();
             }
+        }
+    }
+
+    public void setStatus(String msg) {
+        Platform.runLater(() -> statusBar.setText(msg));
+    }
+
+    private void setCenterWithFade(Node nextNode) {
+        Node prev = root.getCenter();
+        if (prev != null) {
+            FadeTransition out = new FadeTransition(Duration.millis(180), prev);
+            out.setFromValue(1.0);
+            out.setToValue(0.0);
+            out.setOnFinished(ev -> {
+                root.setCenter(nextNode);
+                nextNode.setOpacity(0.0);
+                FadeTransition in = new FadeTransition(Duration.millis(180), nextNode);
+                in.setFromValue(0.0);
+                in.setToValue(1.0);
+                in.play();
+            });
+            out.play();
+        } else {
+            root.setCenter(nextNode);
         }
     }
 

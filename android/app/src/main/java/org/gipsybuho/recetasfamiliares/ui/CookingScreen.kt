@@ -39,6 +39,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -60,6 +62,7 @@ internal fun CookingScreen(
     }
     var timerRunning by remember(currentIndex) { mutableStateOf(false) }
 
+    val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         try { focusRequester.requestFocus() } catch (_: Exception) {}
@@ -67,11 +70,13 @@ internal fun CookingScreen(
 
     LaunchedEffect(timerRunning) {
         if (timerRunning) {
+            val hadTimer = timerSecondsLeft != null
             while ((timerSecondsLeft ?: 0) > 0) {
                 delay(1_000L)
                 timerSecondsLeft = (timerSecondsLeft ?: 0) - 1
             }
             timerRunning = false
+            if (hadTimer) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
 
@@ -96,13 +101,21 @@ internal fun CookingScreen(
                 when (event.nativeKeyEvent.keyCode) {
                     android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
                         val idx = currentIndexState.value
-                        if (idx < stepsSize - 1) currentIndexState.value = idx + 1
-                        else if (idx == stepsSize - 1 && stepsSize > 0) currentIndexState.value = stepsSize
+                        if (idx < stepsSize - 1) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentIndexState.value = idx + 1
+                        } else if (idx == stepsSize - 1 && stepsSize > 0) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentIndexState.value = stepsSize
+                        }
                         true
                     }
                     android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
                         val idx = currentIndexState.value
-                        if (idx > 0) currentIndexState.value = idx - 1
+                        if (idx > 0) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentIndexState.value = idx - 1
+                        }
                         true
                     }
                     else -> false
@@ -223,7 +236,12 @@ internal fun CookingScreen(
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
-                    onClick = { if (currentIndex > 0) { currentIndex--; timerRunning = false } },
+                    onClick = {
+                        if (currentIndex > 0) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentIndex--; timerRunning = false
+                        }
+                    },
                     enabled = currentIndex > 0,
                     modifier = Modifier.weight(1f)
                 ) { Text("← Anterior") }
@@ -232,12 +250,18 @@ internal fun CookingScreen(
                     Button(onClick = onExit, modifier = Modifier.weight(1f)) { Text("Cerrar") }
                 } else if (currentIndex < steps.size - 1) {
                     Button(
-                        onClick = { currentIndex++; timerRunning = false },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentIndex++; timerRunning = false
+                        },
                         modifier = Modifier.weight(1f)
                     ) { Text("Siguiente →") }
                 } else {
                     Button(
-                        onClick = { currentIndex = steps.size },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentIndex = steps.size
+                        },
                         modifier = Modifier.weight(1f)
                     ) { Text("¡Finalizar!") }
                 }

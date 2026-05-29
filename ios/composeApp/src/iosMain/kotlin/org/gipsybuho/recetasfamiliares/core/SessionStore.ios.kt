@@ -1,37 +1,100 @@
 package org.gipsybuho.recetasfamiliares.core
 
-import platform.Foundation.NSUserDefaults
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.ObjCObjectVar
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
+import platform.Foundation.NSMutableDictionary
+import platform.Foundation.NSNumber
+import platform.Foundation.NSString
+import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.create
+import platform.Foundation.dataUsingEncoding
+import platform.Foundation.setObject
+import platform.Security.SecItemAdd
+import platform.Security.SecItemCopyMatching
+import platform.Security.SecItemDelete
+import platform.Security.errSecSuccess
+import platform.Security.kSecAttrAccount
+import platform.Security.kSecAttrService
+import platform.Security.kSecClass
+import platform.Security.kSecClassGenericPassword
+import platform.Security.kSecMatchLimit
+import platform.Security.kSecMatchLimitOne
+import platform.Security.kSecReturnData
+import platform.Security.kSecValueData
 
-// MVP: NSUserDefaults (equivalente a SharedPreferences, no cifrado).
-// Sprint 17+: migrar a Keychain para tokens de autenticación.
+@OptIn(ExperimentalForeignApi::class)
 actual class SessionStore {
-    private val prefs = NSUserDefaults.standardUserDefaults
+
+    private val SERVICE = "com.gipsybuho.recetasfamiliares"
 
     actual var accessToken: String?
-        get() = prefs.stringForKey("rf_access_token")
-        set(value) = if (value != null) prefs.setObject(value, "rf_access_token")
-                     else prefs.removeObjectForKey("rf_access_token")
+        get()  = kcRead(KEY_ACCESS)
+        set(v) = if (v != null) kcWrite(KEY_ACCESS, v) else kcDelete(KEY_ACCESS)
 
     actual var refreshToken: String?
-        get() = prefs.stringForKey("rf_refresh_token")
-        set(value) = if (value != null) prefs.setObject(value, "rf_refresh_token")
-                     else prefs.removeObjectForKey("rf_refresh_token")
+        get()  = kcRead(KEY_REFRESH)
+        set(v) = if (v != null) kcWrite(KEY_REFRESH, v) else kcDelete(KEY_REFRESH)
 
     actual var familyId: String?
-        get() = prefs.stringForKey("rf_family_id")
-        set(value) = if (value != null) prefs.setObject(value, "rf_family_id")
-                     else prefs.removeObjectForKey("rf_family_id")
+        get()  = kcRead(KEY_FAMILY)
+        set(v) = if (v != null) kcWrite(KEY_FAMILY, v) else kcDelete(KEY_FAMILY)
 
     actual var userId: String?
-        get() = prefs.stringForKey("rf_user_id")
-        set(value) = if (value != null) prefs.setObject(value, "rf_user_id")
-                     else prefs.removeObjectForKey("rf_user_id")
+        get()  = kcRead(KEY_USER)
+        set(v) = if (v != null) kcWrite(KEY_USER, v) else kcDelete(KEY_USER)
 
     actual val isLoggedIn: Boolean
         get() = !accessToken.isNullOrBlank() && !familyId.isNullOrBlank()
 
     actual fun clear() {
-        listOf("rf_access_token", "rf_refresh_token", "rf_family_id", "rf_user_id")
-            .forEach { prefs.removeObjectForKey(it) }
+        listOf(KEY_ACCESS, KEY_REFRESH, KEY_FAMILY, KEY_USER).forEach { kcDelete(it) }
+    }
+
+    // ── Keychain helpers ──────────────────────────────────────────────────────
+
+    private fun kcWrite(key: String, value: String) {
+        val data = (value as NSString).dataUsingEncoding(NSUTF8StringEncoding) ?: return
+        kcDelete(key)                               // prevent duplicate-item error
+        val q = baseQuery(key)
+        q.setObject(data, forKey = kSecValueData as NSCopying)
+        SecItemAdd(q as platform.CoreFoundation.CFDictionaryRef, null)
+    }
+
+    private fun kcRead(key: String): String? = memScoped {
+        val q = baseQuery(key)
+        q.setObject(NSNumber.numberWithBool(true), forKey = kSecReturnData as NSCopying)
+        q.setObject(kSecMatchLimitOne, forKey = kSecMatchLimit as NSCopying)
+        val out = alloc<ObjCObjectVar<Any?>>()
+        val status = SecItemCopyMatching(
+            q as platform.CoreFoundation.CFDictionaryRef,
+            out.ptr.reinterpret()
+        )
+        if (status != errSecSuccess) return@memScoped null
+        (out.value as? platform.Foundation.NSData)?.let { data ->
+            NSString.create(data = data, encoding = NSUTF8StringEncoding) as? String
+        }
+    }
+
+    private fun kcDelete(key: String) {
+        SecItemDelete(baseQuery(key) as platform.CoreFoundation.CFDictionaryRef)
+    }
+
+    private fun baseQuery(key: String): NSMutableDictionary {
+        val q = NSMutableDictionary()
+        q.setObject(kSecClassGenericPassword, forKey = kSecClass as NSCopying)
+        q.setObject(SERVICE as NSString, forKey = kSecAttrService as NSCopying)
+        q.setObject(key as NSString, forKey = kSecAttrAccount as NSCopying)
+        return q
+    }
+
+    companion object {
+        private const val KEY_ACCESS  = "rf_access_token"
+        private const val KEY_REFRESH = "rf_refresh_token"
+        private const val KEY_FAMILY  = "rf_family_id"
+        private const val KEY_USER    = "rf_user_id"
     }
 }

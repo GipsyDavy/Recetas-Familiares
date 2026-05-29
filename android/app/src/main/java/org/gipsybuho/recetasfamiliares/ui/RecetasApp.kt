@@ -39,13 +39,19 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -191,10 +197,21 @@ private fun MainShell(viewModel: RecetasViewModel) {
                 )
             } else {
                 TopAppBar(
-                    title = { Text("Recetas Familiares") },
+                    title = {
+                        Text(
+                            "Recetas Familiares",
+                            modifier = Modifier.semantics { heading() }
+                        )
+                    },
                     actions = {
-                        IconButton(onClick = { searchActive = true }) {
-                            Icon(Icons.Filled.Search, contentDescription = "Buscar")
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = { PlainTooltip { Text("Buscar") } },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(onClick = { searchActive = true }) {
+                                Icon(Icons.Filled.Search, contentDescription = "Buscar")
+                            }
                         }
                     }
                 )

@@ -6,15 +6,13 @@ import org.gipsybuho.recetasfamiliares.auth.AuthRepository
 import org.gipsybuho.recetasfamiliares.auth.LoginScreen
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.network.ApiClient
-import org.gipsybuho.recetasfamiliares.recipes.RecipeListScreen
-import org.gipsybuho.recetasfamiliares.recipes.RecipeRepository
+import org.gipsybuho.recetasfamiliares.ui.MainTabScreen
 
 @Composable
 fun App() {
-    val session        = remember { SessionStore() }
-    val apiClient      = remember { ApiClient(session) }
-    val authRepo       = remember { AuthRepository(apiClient, session) }
-    val recipeRepo     = remember { RecipeRepository(apiClient, session) }
+    val session   = remember { SessionStore() }
+    val apiClient = remember { ApiClient(session) }
+    val authRepo  = remember { AuthRepository(apiClient, session) }
 
     var isLoggedIn by remember { mutableStateOf(session.isLoggedIn) }
 
@@ -22,7 +20,11 @@ fun App() {
         if (!isLoggedIn) {
             LoginScreen(repository = authRepo, onLoginSuccess = { isLoggedIn = true })
         } else {
-            RecipeListScreen(repository = recipeRepo)
+            MainTabScreen(
+                apiClient = apiClient,
+                session   = session,
+                onLogout  = { session.clear(); isLoggedIn = false }
+            )
         }
     }
 }

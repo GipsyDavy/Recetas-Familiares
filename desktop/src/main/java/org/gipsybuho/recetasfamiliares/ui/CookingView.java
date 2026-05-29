@@ -6,6 +6,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
@@ -63,6 +64,13 @@ public class CookingView {
 
     private void show() {
         stage.show();
+        stage.getScene().setOnKeyPressed((KeyEvent e) -> {
+            switch (e.getCode()) {
+                case LEFT -> prevStep();
+                case RIGHT -> nextStep();
+                default -> {}
+            }
+        });
         stage.setMaximized(true);
         renderStep(0);
     }
@@ -133,15 +141,13 @@ public class CookingView {
         prevBtn.getStyleClass().add("action-button-secondary");
         prevBtn.setStyle(prevBtn.getStyle() +
             "; -fx-font-size: 15px; -fx-min-width: 180px;");
-        prevBtn.setOnAction(e -> {
-            if (currentIndex > 0) { stopTimer(); renderStep(currentIndex - 1); }
-        });
+        prevBtn.setOnAction(e -> prevStep());
 
         nextBtn.setStyle(
             "-fx-background-color: #C17D52; -fx-text-fill: white; -fx-font-size: 15px; " +
             "-fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 20; " +
             "-fx-cursor: hand; -fx-min-width: 180px;");
-        nextBtn.setOnAction(e -> onNext());
+        nextBtn.setOnAction(e -> nextStep());
 
         HBox navBar = new HBox(20, prevBtn, nextBtn);
         navBar.setAlignment(Pos.CENTER);
@@ -208,7 +214,7 @@ public class CookingView {
         prevBtn.setDisable(index == 0);
         boolean isLast = index == steps.size() - 1;
         nextBtn.setText(isLast ? "¡Finalizar!" : "Siguiente →");
-        nextBtn.setOnAction(e -> onNext());
+        nextBtn.setOnAction(e -> nextStep());
         nextBtn.setStyle(
             "-fx-background-color: " + (isLast ? "#8DBF8A" : "#C17D52") +
             "; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold; " +
@@ -227,7 +233,14 @@ public class CookingView {
 
     // ── Actions ───────────────────────────────────────────────────────────────
 
-    private void onNext() {
+    private void prevStep() {
+        if (currentIndex > 0) {
+            stopTimer();
+            renderStep(currentIndex - 1);
+        }
+    }
+
+    private void nextStep() {
         stopTimer();
         renderStep(currentIndex < steps.size() - 1 ? currentIndex + 1 : steps.size());
     }

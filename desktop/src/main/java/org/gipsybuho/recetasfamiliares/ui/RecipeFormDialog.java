@@ -1,13 +1,17 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
+import javafx.animation.Interpolator;
+import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeCreateDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
@@ -73,6 +77,18 @@ public class RecipeFormDialog {
         dialog.setMinWidth(560);
         dialog.setMinHeight(600);
         build();
+        dialog.setOnShown(e -> {
+            Node dialogRoot = dialog.getScene().getRoot();
+            dialogRoot.setScaleX(0.95);
+            dialogRoot.setScaleY(0.95);
+            ScaleTransition st = new ScaleTransition(Duration.millis(200), dialogRoot);
+            st.setFromX(0.95);
+            st.setFromY(0.95);
+            st.setToX(1.0);
+            st.setToY(1.0);
+            st.setInterpolator(Interpolator.EASE_OUT);
+            st.play();
+        });
     }
 
     public void show() {

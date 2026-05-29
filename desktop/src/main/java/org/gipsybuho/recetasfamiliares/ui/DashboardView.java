@@ -1,10 +1,12 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
+import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
+import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
@@ -215,6 +217,18 @@ public class DashboardView extends ScrollPane {
         HBox card = new HBox(16);
         card.getStyleClass().add("dashboard-recipe-card");
         card.setPadding(new Insets(12, 16, 12, 16));
+        card.setOnMouseEntered(e -> {
+            ScaleTransition st = new ScaleTransition(Duration.millis(100), card);
+            st.setToX(1.02);
+            st.setToY(1.02);
+            st.play();
+        });
+        card.setOnMouseExited(e -> {
+            ScaleTransition st = new ScaleTransition(Duration.millis(100), card);
+            st.setToX(1.0);
+            st.setToY(1.0);
+            st.play();
+        });
 
         VBox info = new VBox(4);
         HBox.setHgrow(info, Priority.ALWAYS);
