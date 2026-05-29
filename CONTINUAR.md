@@ -1040,21 +1040,31 @@ Verificado en emulador Pixel_9_Pro API 36: LoginScreen, RecipeList, RecipeDetail
 
 ---
 
-## Sprint 20 — Candidatos (siguiente sprint)
+## Sprint 20 — EN CURSO (2026-05-29) — commit 847c528
 
-### Prioridad Alta — iOS
+### iOS — COMPLETADO (Claude Code) ✅
 
-1. **ShoppingListScreen iOS** — implementación real con `ShoppingListRepository` Ktor (actualmente `PlaceholderScreen`).
-2. **MenuScreen iOS** — implementación real con `MenuRepository` Ktor (actualmente `PlaceholderScreen`).
-3. **Sync incremental SQLDelight iOS** — push/pull desde iOS usando los endpoints `/api/v1/sync/pull` y `/api/v1/sync/push` ya existentes en el backend.
+- `shopping/ShoppingListRepository.kt` (nuevo): `loadLists()` + `loadItems(listId)` via Ktor.
+  Endpoints: `GET /api/v1/families/{fid}/shopping-lists` y `/{listId}/items`.
+- `shopping/ShoppingListScreen.kt` (nuevo): dos niveles — lista de listas → items con drill-down.
+  Back button nativo, haptic.selection() al tap, items con tachado + Checkbox read-only.
+- `menu/MenuRepository.kt` (nuevo): `loadCurrentWeek()` sin weekStart param (backend auto-selecciona).
+  Orden por plannedDate + mealType (BREAKFAST/LUNCH/SNACK/DINNER).
+- `menu/MenuScreen.kt` (nuevo): cards por día con chips de tipo comida, empty state con icono.
+- `ui/MainTabScreen.kt`: ambas tabs cableadas con repos reales, PlaceholderScreen eliminado.
+
+### Desktop (Codex) — pendiente respuesta
+
+- SequentialTransition al eliminar en StockView y NotesView.
+- Panel de preferencias de sonido (botón ⚙ + Dialog con CheckBox).
+
+### Prioridad Alta pendiente — Sprint 21
+
+1. **Sync incremental SQLDelight iOS** — pull desde iOS usando `/api/v1/sync/pull?since=X`.
+   Diseño arquitectónico pendiente de análisis Gemini (bloque enviado).
 
 ### Prioridad Media — Android (prioridad baja Sprint 17)
 
 1. **Lottie empty states Android** — cocinero animado, lista vacía (`com.airbnb.android:lottie-compose:6.x`).
 2. **Micro-animación ❤️ favorito** — escala + partículas al marcar favorito (Android + iOS).
 3. **SharedElementTransition** RecipeList → RecipeDetail Android (Compose experimental API).
-
-### Prioridad Baja — Desktop
-
-1. **Preferencias de sonido UI Desktop** — panel de configuración para toggle de sonidos en `SoundPlayer`.
-2. **SequentialTransition al eliminar** — FadeOut 150ms → colapso tabla 150ms en StockView y NotesView.
