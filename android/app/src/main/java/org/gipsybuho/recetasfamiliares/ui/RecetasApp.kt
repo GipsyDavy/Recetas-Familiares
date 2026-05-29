@@ -65,6 +65,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.work.WorkManager
+import org.gipsybuho.recetasfamiliares.R
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 
@@ -297,9 +298,10 @@ private fun ShoppingListScreen(lists: List<ShoppingListEntity>, modifier: Modifi
                 }
                 Spacer(Modifier.height(Spacing.lg))
                 if (lists.isEmpty()) {
-                    EmptyStateView(icon = Icons.Outlined.ShoppingCart,
-                        title = "Sin listas de la compra",
-                        subtitle = "Las listas se generan desde el menú semanal o se sincronizan desde otro dispositivo")
+                    LottieEmptyStateView(
+                        lottieRes = R.raw.lottie_empty_list,
+                        title     = "Sin listas de la compra",
+                        subtitle  = "Las listas se generan desde el menú semanal o se sincronizan desde otro dispositivo")
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                         items(lists, key = { it.id }) { list ->
@@ -342,9 +344,10 @@ private fun ShoppingListDetail(list: ShoppingListEntity, viewModel: RecetasViewM
         }
         Spacer(Modifier.height(Spacing.md))
         if (items.isEmpty()) {
-            EmptyStateView(icon = Icons.Outlined.ShoppingCart,
-                title = "Lista vacía",
-                subtitle = "Desliza hacia abajo para sincronizar los artículos")
+            LottieEmptyStateView(
+                lottieRes = R.raw.lottie_empty_list,
+                title     = "Lista vacía",
+                subtitle  = "Desliza hacia abajo para sincronizar los artículos")
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 items(items, key = { it.id }) { item ->

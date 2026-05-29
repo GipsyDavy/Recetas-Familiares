@@ -9,6 +9,7 @@ import org.gipsybuho.recetasfamiliares.database.Recipes
 import org.gipsybuho.recetasfamiliares.network.ApiClient
 import org.gipsybuho.recetasfamiliares.network.PageDto
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
+import org.gipsybuho.recetasfamiliares.network.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.network.RecipeIngredientDto
 import org.gipsybuho.recetasfamiliares.network.RecipeStepDto
 
@@ -65,6 +66,27 @@ class RecipeRepository(
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    suspend fun loadIsFavorite(recipeId: String): Boolean {
+        val familyId = session.familyId ?: return false
+        return try {
+            val response: PageDto<FavoriteRecipeDto> = apiClient.http
+                .get("api/v1/families/$familyId/favorites") { parameter("size", 200) }.body()
+            response.items.any { it.recipeId == recipeId }
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun addFavorite(recipeId: String): Boolean {
+        val familyId = session.familyId ?: return false
+        return try { apiClient.http.post("api/v1/families/$familyId/recipes/$recipeId/favorites"); true }
+        catch (e: Exception) { false }
+    }
+
+    suspend fun removeFavorite(recipeId: String): Boolean {
+        val familyId = session.familyId ?: return false
+        return try { apiClient.http.delete("api/v1/families/$familyId/recipes/$recipeId/favorites"); true }
+        catch (e: Exception) { false }
     }
 
     private fun Recipes.toDto() = RecipeDto(

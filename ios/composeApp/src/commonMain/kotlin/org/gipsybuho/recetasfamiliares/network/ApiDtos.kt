@@ -136,6 +136,13 @@ data class RecipeStepDto(
 )
 
 @Serializable
+data class FavoriteRecipeDto(
+    val recipeId: String,
+    val recipeTitle: String? = null,
+    val createdAt: String? = null
+)
+
+@Serializable
 data class SyncPullResponseDto(
     val serverTime: String,
     val recipes: List<RecipeDto> = emptyList(),

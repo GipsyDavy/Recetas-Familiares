@@ -1,5 +1,10 @@
 package org.gipsybuho.recetasfamiliares.shopping
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
@@ -48,17 +54,7 @@ fun ShoppingListScreen(repository: ShoppingListRepository) {
                 Text(error!!, color = MaterialTheme.colorScheme.error)
             }
             lists.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Outlined.ShoppingCart, contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.outline)
-                    Spacer(Modifier.height(12.dp))
-                    Text("Sin listas de la compra", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Crea listas desde Android o Desktop",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline)
-                }
+                AnimatedShoppingEmptyState()
             }
             else -> {
                 val haptic = rememberHapticFeedback()
@@ -147,6 +143,32 @@ private fun ShoppingItemsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AnimatedShoppingEmptyState() {
+    val pulse by rememberInfiniteTransition(label = "emptyPulse")
+        .animateFloat(
+            initialValue = 1f, targetValue = 1.10f,
+            animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
+            label = "iconScale"
+        )
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            Icons.Outlined.ShoppingCart,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp).graphicsLayer { scaleX = pulse; scaleY = pulse },
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+        )
+        Spacer(Modifier.height(16.dp))
+        Text("Sin listas de la compra", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Crea listas desde Android o Desktop",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
     }
 }
 

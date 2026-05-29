@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.animation.ExperimentalSharedTransitionApi::class
+)
 
 package org.gipsybuho.recetasfamiliares.ui
 
@@ -6,8 +9,15 @@ import android.content.Intent
 import org.gipsybuho.recetasfamiliares.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -163,99 +173,124 @@ internal fun RecipeList(
                         recipe = selectedRecipe!!, viewModel = viewModel,
                         onExit = { cookingMode = false }
                     )
-                    selectedRecipe != null -> RecipeDetail(
-                        recipe = selectedRecipe!!, viewModel = viewModel,
-                        onBack = { selectedRecipe = null },
-                        onEdit = { ings, stps ->
-                            editingIngredients = ings; editingSteps = stps
-                            editingRecipe = selectedRecipe
-                        },
-                        onDelete = { viewModel.deleteRecipe(selectedRecipe!!); selectedRecipe = null },
-                        onCookingMode = { cookingMode = true }
-                    )
-                    else -> {
-                        Row(
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Recetas", style = MaterialTheme.typography.headlineSmall)
-                            IconButton(onClick = onRefresh) {
-                                Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
-                            }
-                        }
-                        error?.let {
-                            Spacer(Modifier.height(Spacing.xs))
-                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Spacer(Modifier.height(Spacing.md))
-                        OutlinedTextField(
-                            value = query, onValueChange = { query = it },
-                            placeholder = { Text("Buscar recetas...") },
-                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                            trailingIcon = if (query.isNotEmpty()) {
-                                { IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Borrar") } }
-                            } else null,
-                            singleLine = true, modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(Modifier.height(Spacing.xs))
-                        Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                        ) {
-                            listOf("EASY" to "Fácil", "MEDIUM" to "Media", "HARD" to "Difícil").forEach { (value, label) ->
-                                val isSelected = difficultyFilter == value
-                                val chipContainerColor by animateColorAsState(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant,
-                                    label = "chipColor_$value"
-                                )
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { difficultyFilter = if (isSelected) null else value },
-                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = chipContainerColor,
-                                        containerColor = chipContainerColor
-                                    )
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(Spacing.md))
-                        if (recipes.isEmpty() && isRefreshing) {
-                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                                repeat(4) { SkeletonRecipeCard() }
-                            }
-                        } else Crossfade(targetState = filtered.isEmpty(), label = "recipeListState") { isEmpty ->
-                            if (isEmpty) {
-                                if (query.isBlank() && difficultyFilter == null) {
-                                    LottieEmptyStateView(
-                                        lottieRes   = R.raw.lottie_chef,
-                                        title       = "Sin recetas aún",
-                                        subtitle    = "Empieza a guardar las recetas de tu familia y construid vuestro recetario",
-                                        actionLabel = "Crear primera receta",
-                                        onAction    = { showCreateForm = true }
-                                    )
-                                } else {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text("Sin resultados para \"$query\"",
-                                            color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center)
+                    else -> SharedTransitionLayout(Modifier.fillMaxSize()) {
+                        AnimatedContent(
+                            targetState = selectedRecipe,
+                            transitionSpec = {
+                                fadeIn(tween(300)) + slideInHorizontally { it / 6 } togetherWith
+                                fadeOut(tween(250)) + slideOutHorizontally { -it / 6 }
+                            },
+                            label = "recipeNavTransition"
+                        ) { currentRecipe ->
+                            if (currentRecipe == null) {
+                                Column {
+                                    Row(
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Recetas", style = MaterialTheme.typography.headlineSmall)
+                                        IconButton(onClick = onRefresh) {
+                                            Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
+                                        }
                                     }
-                                }
-                            } else {
-                                LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                                    items(filtered, key = { it.id }) { recipe ->
-                                        RecipeCard(recipe, modifier = Modifier.animateItem()) { selectedRecipe = recipe; error = null }
+                                    error?.let {
+                                        Spacer(Modifier.height(Spacing.xs))
+                                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                                     }
-                                    if (recipeHasMore && query.isBlank()) {
-                                        item {
-                                            OutlinedButton(
-                                                onClick = { viewModel.loadNextRecipePage() },
-                                                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)
-                                            ) { Text("Cargar más recetas") }
+                                    Spacer(Modifier.height(Spacing.md))
+                                    OutlinedTextField(
+                                        value = query, onValueChange = { query = it },
+                                        placeholder = { Text("Buscar recetas...") },
+                                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                                        trailingIcon = if (query.isNotEmpty()) {
+                                            { IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Borrar") } }
+                                        } else null,
+                                        singleLine = true, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Spacer(Modifier.height(Spacing.xs))
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                                    ) {
+                                        listOf("EASY" to "Fácil", "MEDIUM" to "Media", "HARD" to "Difícil").forEach { (value, label) ->
+                                            val isSelected = difficultyFilter == value
+                                            val chipContainerColor by animateColorAsState(
+                                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                                else MaterialTheme.colorScheme.surfaceVariant,
+                                                label = "chipColor_$value"
+                                            )
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = { difficultyFilter = if (isSelected) null else value },
+                                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = chipContainerColor,
+                                                    containerColor = chipContainerColor
+                                                )
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(Spacing.md))
+                                    if (recipes.isEmpty() && isRefreshing) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                            repeat(4) { SkeletonRecipeCard() }
+                                        }
+                                    } else Crossfade(targetState = filtered.isEmpty(), label = "recipeListState") { isEmpty ->
+                                        if (isEmpty) {
+                                            if (query.isBlank() && difficultyFilter == null) {
+                                                LottieEmptyStateView(
+                                                    lottieRes   = R.raw.lottie_chef,
+                                                    title       = "Sin recetas aún",
+                                                    subtitle    = "Empieza a guardar las recetas de tu familia y construid vuestro recetario",
+                                                    actionLabel = "Crear primera receta",
+                                                    onAction    = { showCreateForm = true }
+                                                )
+                                            } else {
+                                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                    Text("Sin resultados para \"$query\"",
+                                                        color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center)
+                                                }
+                                            }
+                                        } else {
+                                            LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                                items(filtered, key = { it.id }) { recipe ->
+                                                    val boundsState = this@SharedTransitionLayout.rememberSharedContentState("recipe_bounds_${recipe.id}")
+                                                    RecipeCard(
+                                                        recipe,
+                                                        modifier = Modifier.animateItem().let { m ->
+                                                            with(this@SharedTransitionLayout) { m.sharedBounds(boundsState, this@AnimatedContent) }
+                                                        }
+                                                    ) { selectedRecipe = recipe; error = null }
+                                                }
+                                                if (recipeHasMore && query.isBlank()) {
+                                                    item {
+                                                        OutlinedButton(
+                                                            onClick = { viewModel.loadNextRecipePage() },
+                                                            modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)
+                                                        ) { Text("Cargar más recetas") }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
+                            } else {
+                                val boundsState = this@SharedTransitionLayout.rememberSharedContentState("recipe_bounds_${currentRecipe.id}")
+                                RecipeDetail(
+                                    recipe = currentRecipe,
+                                    viewModel = viewModel,
+                                    modifier = with(this@SharedTransitionLayout) {
+                                        Modifier.sharedBounds(boundsState, this@AnimatedContent)
+                                    },
+                                    onBack = { selectedRecipe = null },
+                                    onEdit = { ings, stps ->
+                                        editingIngredients = ings; editingSteps = stps
+                                        editingRecipe = currentRecipe
+                                    },
+                                    onDelete = { viewModel.deleteRecipe(currentRecipe); selectedRecipe = null },
+                                    onCookingMode = { cookingMode = true }
+                                )
                             }
                         }
                     }
@@ -368,6 +403,7 @@ private fun SkeletonRecipeCard() {
 internal fun RecipeDetail(
     recipe: RecipeEntity,
     viewModel: RecetasViewModel,
+    modifier: Modifier = Modifier,
     onBack: () -> Unit,
     onEdit: (List<RecipeIngredientEntity>, List<RecipeStepEntity>) -> Unit,
     onDelete: () -> Unit,
@@ -394,7 +430,7 @@ internal fun RecipeDetail(
         uri?.let { viewModel.launchUploadPhoto(context, recipe.id, it) }
     }
 
-    LazyColumn(contentPadding = PaddingValues(bottom = Spacing.xxl), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+    LazyColumn(modifier = modifier, contentPadding = PaddingValues(bottom = Spacing.xxl), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 IconButton(onClick = onBack) {

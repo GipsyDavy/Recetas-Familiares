@@ -1,16 +1,23 @@
 package org.gipsybuho.recetasfamiliares.recipes
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
 import org.gipsybuho.recetasfamiliares.network.RecipeIngredientDto
@@ -25,9 +32,13 @@ fun RecipeDetailScreen(
     var ingredients by remember { mutableStateOf<List<RecipeIngredientDto>>(emptyList()) }
     var steps       by remember { mutableStateOf<List<RecipeStepDto>>(emptyList()) }
     var loading     by remember { mutableStateOf(true) }
+    var isFavorite  by remember { mutableStateOf(false) }
+    val favoriteScale = remember { Animatable(1f) }
     val haptic      = rememberHapticFeedback()
+    val scope       = rememberCoroutineScope()
 
     LaunchedEffect(recipe.id) {
+        isFavorite = repository.loadIsFavorite(recipe.id)
         runCatching {
             ingredients = repository.loadIngredients(recipe.id)
             steps       = repository.loadSteps(recipe.id)
@@ -46,9 +57,26 @@ fun RecipeDetailScreen(
             Text(
                 recipe.title,
                 style    = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                modifier = Modifier.weight(1f).padding(end = 4.dp),
                 maxLines = 2
             )
+            IconButton(onClick = {
+                haptic.impact()
+                scope.launch {
+                    isFavorite = !isFavorite
+                    val ok = if (isFavorite) repository.addFavorite(recipe.id) else repository.removeFavorite(recipe.id)
+                    if (!ok) isFavorite = !isFavorite
+                    favoriteScale.animateTo(1.35f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                    favoriteScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                }
+            }) {
+                Icon(
+                    imageVector        = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Quitar favorito" else "Añadir favorito",
+                    tint               = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier           = Modifier.graphicsLayer { scaleX = favoriteScale.value; scaleY = favoriteScale.value }
+                )
+            }
         }
         HorizontalDivider()
 
