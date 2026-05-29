@@ -14,6 +14,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -29,6 +30,7 @@ public class WeeklyMenuView extends VBox {
     private final Label weekLabel    = new Label();
     private final Label statusLabel  = new Label();
     private LocalDate weekStart      = currentMonday();
+    private boolean monthView        = false;
 
     public WeeklyMenuView(AppContext context, Runnable onSync) {
         this.context = context;
@@ -58,6 +60,14 @@ public class WeeklyMenuView extends VBox {
         nextBtn.getStyleClass().add("action-button-secondary");
         nextBtn.setOnAction(e -> { weekStart = weekStart.plusWeeks(1); refresh(); });
 
+        Button viewToggleBtn = new Button("Vista mes");
+        viewToggleBtn.getStyleClass().add("action-button-secondary");
+        viewToggleBtn.setOnAction(e -> {
+            monthView = !monthView;
+            viewToggleBtn.setText(monthView ? "Vista semana" : "Vista mes");
+            refresh();
+        });
+
         weekLabel.getStyleClass().add("menu-week-label");
         Region navSpacer = new Region();
         HBox.setHgrow(navSpacer, Priority.ALWAYS);
@@ -66,30 +76,9 @@ public class WeeklyMenuView extends VBox {
         syncBtn.getStyleClass().add("action-button-secondary");
         syncBtn.setOnAction(e -> onSync.run());
 
-        HBox navBar = new HBox(10, prevBtn, todayBtn, nextBtn, syncBtn, navSpacer, weekLabel);
+        HBox navBar = new HBox(10, prevBtn, todayBtn, nextBtn, viewToggleBtn, syncBtn, navSpacer, weekLabel);
         navBar.setAlignment(Pos.CENTER_LEFT);
         navBar.setPadding(new Insets(12, 0, 16, 0));
-
-        // Grid column constraints: col0 = label, cols1-7 = days (equal flex)
-        ColumnConstraints labelCol = new ColumnConstraints(92);
-        labelCol.setHgrow(Priority.NEVER);
-        grid.getColumnConstraints().add(labelCol);
-        for (int i = 0; i < 7; i++) {
-            ColumnConstraints dayCol = new ColumnConstraints();
-            dayCol.setHgrow(Priority.ALWAYS);
-            dayCol.setFillWidth(true);
-            grid.getColumnConstraints().add(dayCol);
-        }
-
-        // Grid row constraints: row0 = header, rows1-4 = meals
-        RowConstraints headerRow = new RowConstraints(48);
-        headerRow.setVgrow(Priority.NEVER);
-        grid.getRowConstraints().add(headerRow);
-        for (int r = 0; r < 4; r++) {
-            RowConstraints mealRow = new RowConstraints(80);
-            mealRow.setVgrow(Priority.ALWAYS);
-            grid.getRowConstraints().add(mealRow);
-        }
 
         grid.setHgap(8);
         grid.setVgap(8);
@@ -105,8 +94,13 @@ public class WeeklyMenuView extends VBox {
     // ── Refresh ────────────────────────────────────────────────────────────────
 
     public void refresh() {
+        if (monthView) {
+            refreshMonth();
+            return;
+        }
+
         updateWeekLabel();
-        buildStaticStructure();
+        buildWeeklyStructure();
         statusLabel.setText("Cargando...");
 
         Thread.ofVirtual().start(() -> {
@@ -123,10 +117,57 @@ public class WeeklyMenuView extends VBox {
         });
     }
 
+    private void refreshMonth() {
+        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        LocalDate calendarStart = monthStart.with(DayOfWeek.MONDAY);
+        updateMonthLabel(monthStart);
+        buildMonthStructure(monthStart, calendarStart);
+        statusLabel.setText("Cargando...");
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                List<SyncDtos.MenuDtos.MenuItemDto> items = new ArrayList<>();
+                for (int w = 0; w < 5; w++) {
+                    items.addAll(context.getMenuRepository().loadForWeek(calendarStart.plusWeeks(w)));
+                }
+                List<SyncDtos.MenuDtos.MenuItemDto> monthItems = items.stream()
+                        .filter(item -> isInMonth(item, monthStart))
+                        .toList();
+                Platform.runLater(() -> {
+                    populateMonthCells(monthStart, calendarStart, monthItems);
+                    statusLabel.setText(monthItems.size() + " entradas este mes");
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> statusLabel.setText("No se pudo cargar el menú."));
+            }
+        });
+    }
+
     // ── Grid structure ─────────────────────────────────────────────────────────
 
-    private void buildStaticStructure() {
+    private void buildWeeklyStructure() {
         grid.getChildren().clear();
+        grid.getColumnConstraints().clear();
+        grid.getRowConstraints().clear();
+
+        ColumnConstraints labelCol = new ColumnConstraints(92);
+        labelCol.setHgrow(Priority.NEVER);
+        grid.getColumnConstraints().add(labelCol);
+        for (int i = 0; i < 7; i++) {
+            ColumnConstraints dayCol = new ColumnConstraints();
+            dayCol.setHgrow(Priority.ALWAYS);
+            dayCol.setFillWidth(true);
+            grid.getColumnConstraints().add(dayCol);
+        }
+
+        RowConstraints headerRow = new RowConstraints(48);
+        headerRow.setVgrow(Priority.NEVER);
+        grid.getRowConstraints().add(headerRow);
+        for (int r = 0; r < 4; r++) {
+            RowConstraints mealRow = new RowConstraints(80);
+            mealRow.setVgrow(Priority.ALWAYS);
+            grid.getRowConstraints().add(mealRow);
+        }
 
         // Corner cell
         grid.add(new Label(""), 0, 0);
@@ -166,6 +207,41 @@ public class WeeklyMenuView extends VBox {
         }
     }
 
+    private void buildMonthStructure(LocalDate monthStart, LocalDate calendarStart) {
+        grid.getChildren().clear();
+        grid.getColumnConstraints().clear();
+        grid.getRowConstraints().clear();
+
+        for (int i = 0; i < 7; i++) {
+            ColumnConstraints dayCol = new ColumnConstraints();
+            dayCol.setHgrow(Priority.ALWAYS);
+            dayCol.setFillWidth(true);
+            grid.getColumnConstraints().add(dayCol);
+        }
+
+        for (int r = 0; r < 6; r++) {
+            RowConstraints row = new RowConstraints(r == 0 ? 42 : 108);
+            row.setVgrow(r == 0 ? Priority.NEVER : Priority.ALWAYS);
+            grid.getRowConstraints().add(row);
+        }
+
+        for (int d = 0; d < 7; d++) {
+            Label dayLabel = new Label(DAY_NAMES[d]);
+            dayLabel.getStyleClass().add("menu-day-header");
+            dayLabel.setAlignment(Pos.CENTER);
+            dayLabel.setMaxWidth(Double.MAX_VALUE);
+            dayLabel.setMaxHeight(Double.MAX_VALUE);
+            grid.add(dayLabel, d, 0);
+        }
+
+        for (int r = 0; r < 5; r++) {
+            for (int d = 0; d < 7; d++) {
+                LocalDate day = calendarStart.plusDays((long) r * 7 + d);
+                grid.add(monthCell(day, monthStart), d, r + 1);
+            }
+        }
+    }
+
     // ── Cell population ────────────────────────────────────────────────────────
 
     private void populateCells(List<SyncDtos.MenuDtos.MenuItemDto> items) {
@@ -191,6 +267,31 @@ public class WeeklyMenuView extends VBox {
                 return fc == (c != null ? c : 0) && fr == (r != null ? r : 0);
             });
             grid.add(filledCell(item), col, row);
+        }
+    }
+
+    private void populateMonthCells(LocalDate monthStart, LocalDate calendarStart, List<SyncDtos.MenuDtos.MenuItemDto> items) {
+        for (SyncDtos.MenuDtos.MenuItemDto item : items) {
+            if (item.plannedDate() == null) continue;
+
+            LocalDate date;
+            try { date = LocalDate.parse(item.plannedDate()); }
+            catch (Exception ignored) { continue; }
+
+            long dayOffset = ChronoUnit.DAYS.between(calendarStart, date);
+            if (dayOffset < 0 || dayOffset >= 35) continue;
+
+            int col = (int) (dayOffset % 7);
+            int row = (int) (dayOffset / 7) + 1;
+            VBox cell = monthCellAt(col, row);
+            if (cell == null) continue;
+
+            String title = item.recipeTitle() != null ? item.recipeTitle() : "Sin título";
+            Label titleLabel = new Label(title);
+            titleLabel.getStyleClass().add("menu-cell-title");
+            titleLabel.setWrapText(true);
+            titleLabel.setMaxWidth(Double.MAX_VALUE);
+            cell.getChildren().add(titleLabel);
         }
     }
 
@@ -232,6 +333,27 @@ public class WeeklyMenuView extends VBox {
         }
 
         cell.setOnMouseClicked(e -> confirmRemove(item));
+        return cell;
+    }
+
+    private VBox monthCell(LocalDate day, LocalDate monthStart) {
+        VBox cell = new VBox(4);
+        cell.getStyleClass().add("menu-cell");
+        cell.setMaxWidth(Double.MAX_VALUE);
+        cell.setMaxHeight(Double.MAX_VALUE);
+        cell.setPadding(new Insets(8));
+
+        Label dayLabel = new Label(String.valueOf(day.getDayOfMonth()));
+        dayLabel.getStyleClass().add("menu-cell-note");
+        if (day.equals(LocalDate.now())) {
+            dayLabel.getStyleClass().add("menu-cell-title");
+        }
+        cell.getChildren().add(dayLabel);
+
+        if (!day.getMonth().equals(monthStart.getMonth())) {
+            cell.setOpacity(0.45);
+        }
+
         return cell;
     }
 
@@ -313,6 +435,35 @@ public class WeeklyMenuView extends VBox {
                 Locale.forLanguageTag("es"));
         LocalDate weekEnd = weekStart.plusDays(6);
         weekLabel.setText(weekStart.format(fmt) + " – " + weekEnd.format(fmt));
+    }
+
+    private void updateMonthLabel(LocalDate monthStart) {
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MMMM yyyy",
+                Locale.forLanguageTag("es"));
+        weekLabel.setText(monthStart.format(fmt));
+    }
+
+    private boolean isInMonth(SyncDtos.MenuDtos.MenuItemDto item, LocalDate monthStart) {
+        if (item.plannedDate() == null) return false;
+        try {
+            LocalDate date = LocalDate.parse(item.plannedDate());
+            return !date.isBefore(monthStart) && date.isBefore(monthStart.plusMonths(1));
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private VBox monthCellAt(int col, int row) {
+        for (javafx.scene.Node node : grid.getChildren()) {
+            Integer nodeCol = GridPane.getColumnIndex(node);
+            Integer nodeRow = GridPane.getRowIndex(node);
+            int c = nodeCol != null ? nodeCol : 0;
+            int r = nodeRow != null ? nodeRow : 0;
+            if (c == col && r == row && node instanceof VBox cell) {
+                return cell;
+            }
+        }
+        return null;
     }
 
     private static LocalDate currentMonday() {

@@ -1342,24 +1342,37 @@ Build: Android BUILD SUCCESSFUL (11s) · Desktop BUILD SUCCESS
 
 ---
 
-## Sprint 30 — Candidatos
+## Sprint 30 — COMPLETADO (2026-05-29)
+
+### Claude Code (commit 4e3b6c6) ✅
+- **UI-9**: `RecipeScreens.kt` — inner heading "Recetas" → contador contextual "N recetas"
+- **UI-8**: `OnboardingScreen.kt` Android + iOS — `Box Brush.verticalGradient(primary.copy(0.07f))`
+- **UI-10**: `CookingScreen.kt` Android + iOS — `CircularProgressIndicator` 96dp (progreso real)
+- **UI-11**: `StockScreen.kt` iOS — fechas relativas ("Caduca en N días", color `tertiary`/`error`≤2)
+- **UI-12**: Haptics toggle COMPLETO:
+  - Android: `ThemePreference` DataStore boolean + `LocalHapticsEnabled` CompositionLocal + guard en 13 call sites + `Switch` en `ThemePickerDialog`
+  - iOS: `ThemePreference` NSUserDefaults + `HapticFeedback.ios.kt` auto-guarda + `Switch` en `SettingsScreen`
+
+### Codex (commit siguiente) ✅
+- **Desktop**: `WeeklyMenuView.java` — vista mes completo (grid 7×5). Botón "Vista mes" / "Vista semana". Carga mensual via `loadForWeek()` × 5 semanas + filtrado client-side. Día actual resaltado. Días de mes adyacente con opacidad 0.45.
+
+---
+
+## Sprint 31 — Candidatos
 
 ### Prioridad Alta — Funcional
 
-1. **Desktop** (Codex): UI-7 user card sidebar + PDF export — ejecutar el bloque Codex generado en Sprint 29.
-2. **Android + iOS**: Foto de avatar — upload multipart a `/api/v1/users/me/avatar`, mostrar en ProfileScreen/SettingsScreen.
-3. **iOS**: StockScreen pull-to-refresh + notificaciones caducidad (iOS Background Tasks).
+1. **Backend + Android + iOS**: Foto de avatar de usuario — `POST /api/v1/users/me/avatar` (multipart, almacena URL), mostrar imagen circular en `ProfileScreen` / `SettingsScreen` (Coil en Android).
+2. **iOS**: Filtro "Con mi stock" en `RecipeListScreen` (paridad con Android Sprint 28.C). Ver UI-13.
+3. **Android + iOS**: Haptics toggle visibilidad — confirmar que el `Switch` del toggle se muestra y persiste correctamente en sesión real.
 
-### Prioridad Media — UI/UX
+### Prioridad Media — Funcional
 
-1. **Android + iOS**: Onboarding gradiente de fondo sutil (`primary.copy(alpha=0.07f)` por página). Ver UI-8.
-2. **Android**: Eliminar inner `Text("Recetas", headlineSmall)` en `RecipeScreens.kt` ~línea 194 (TopAppBar ya muestra el título). Ver UI-9.
-3. **Android + iOS**: CookingScreen timer circular (`CircularProgressIndicator` determinado alrededor del MM:SS). Ver UI-10.
-4. **iOS**: Fechas caducidad stock relativas ("Caduca en N días", color `tertiary`/`error`). Ver UI-11.
-5. **Android + iOS**: Haptics toggle en Settings (exigido por CLAUDE.md §16). Ver UI-12.
-6. **iOS**: Filtro "Con mi stock" (paridad con Android Sprint 28.C). Ver UI-13.
+1. **Android**: Widget de receta del día mejorado (foto si existe, acción "Cocinar desde widget").
+2. **iOS**: Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
+3. **Desktop**: Editar displayName desde Desktop (conectar con `PUT /api/v1/users/me` del Sprint 29).
 
-### Prioridad Baja — Funcional
+### Prioridad Baja — UI/UX
 
-1. **Android**: Widget de receta del día mejorado (foto si existe, acción "Cocinar").
-2. **Desktop**: Menú semanal — vista mes completo (calendar grid 7×5).
+1. **iOS**: Haptics toggle — en iOS el toggle actualiza `ThemePreference` pero la instancia de `HapticFeedback` lee la preferencia en cada llamada (correcto). Sin cambios necesarios.
+2. **Android + iOS**: SharedElementTransition entre RecipeList y RecipeDetail en iOS (ya en Android desde Sprint 23).
