@@ -11,15 +11,18 @@ import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
+import org.gipsybuho.recetasfamiliares.menu.MenuRepository
+import org.gipsybuho.recetasfamiliares.menu.MenuScreen
 import org.gipsybuho.recetasfamiliares.network.ApiClient
 import org.gipsybuho.recetasfamiliares.notes.NoteRepository
 import org.gipsybuho.recetasfamiliares.notes.NotesScreen
 import org.gipsybuho.recetasfamiliares.recipes.RecipeListScreen
 import org.gipsybuho.recetasfamiliares.recipes.RecipeRepository
+import org.gipsybuho.recetasfamiliares.shopping.ShoppingListRepository
+import org.gipsybuho.recetasfamiliares.shopping.ShoppingListScreen
 import org.gipsybuho.recetasfamiliares.stock.StockRepository
 import org.gipsybuho.recetasfamiliares.stock.StockScreen
 
@@ -27,9 +30,11 @@ private enum class Tab { RECIPES, STOCK, SHOPPING, NOTES, MENU }
 
 @Composable
 fun MainTabScreen(apiClient: ApiClient, session: SessionStore, driverFactory: DatabaseDriverFactory, onLogout: () -> Unit) {
-    val recipeRepo = remember { RecipeRepository(apiClient, session, driverFactory) }
-    val stockRepo  = remember { StockRepository(apiClient, session, driverFactory) }
-    val noteRepo   = remember { NoteRepository(apiClient, session) }
+    val recipeRepo   = remember { RecipeRepository(apiClient, session, driverFactory) }
+    val stockRepo    = remember { StockRepository(apiClient, session, driverFactory) }
+    val noteRepo     = remember { NoteRepository(apiClient, session) }
+    val shoppingRepo = remember { ShoppingListRepository(apiClient, session) }
+    val menuRepo     = remember { MenuRepository(apiClient, session) }
 
     var selectedTab by remember { mutableStateOf(Tab.RECIPES) }
 
@@ -74,20 +79,10 @@ fun MainTabScreen(apiClient: ApiClient, session: SessionStore, driverFactory: Da
                 Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo)
                 Tab.STOCK    -> StockScreen(repository = stockRepo)
                 Tab.NOTES    -> NotesScreen(repository = noteRepo)
-                Tab.SHOPPING -> PlaceholderScreen("Lista de la compra", "Próximamente en Sprint 19")
-                Tab.MENU     -> PlaceholderScreen("Menú semanal", "Próximamente en Sprint 19")
+                Tab.SHOPPING -> ShoppingListScreen(repository = shoppingRepo)
+                Tab.MENU     -> MenuScreen(repository = menuRepo)
             }
         }
     }
 }
 
-@Composable
-private fun PlaceholderScreen(title: String, subtitle: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, style = MaterialTheme.typography.headlineSmall)
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
