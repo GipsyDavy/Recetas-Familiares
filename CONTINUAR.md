@@ -1095,15 +1095,39 @@ Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (41s, 0 errores).
 
 Build final: **BUILD SUCCESSFUL**.
 
-## Sprint 22 — Candidatos
+## Sprint 22 — COMPLETADO (2026-05-29)
+
+### Sprint 22.1 — iOS RecipeDetailScreen ✅ COMPLETADO
+
+- `ApiDtos.kt`: `RecipeIngredientDto` (id, position, name, quantity, unit, note) + `RecipeStepDto` (id, position, instruction, timerMinutes).
+- `RecipeRepository.kt`: `loadIngredients(recipeId)` GET `/ingredients` + `loadSteps(recipeId)` GET `/steps`; ambos con fallback `emptyList()`.
+- `RecipeDetailScreen.kt` (nuevo): header con ← back + haptic; meta chips; descripción; ingredientes ordenados por `position`; pasos con círculo numerado + timer.
+- `RecipeListScreen.kt`: `var selectedRecipe`; tap en card → navega al detalle; back → vuelve a lista.
+
+### Sprint 22.2 — iOS MenuScreen navegación semanas ✅ COMPLETADO
+
+- `libs.versions.toml`: `datetime = "0.6.0"` + entrada `kotlinx-datetime`.
+- `build.gradle.kts`: `implementation(libs.kotlinx.datetime)` en `commonMain.dependencies`.
+- `MenuRepository.kt`: `loadAllItems()` con `size=200`.
+- `MenuScreen.kt`: `weekOffset` state; calcula `weekStart/weekEnd` con `kotlinx.datetime`; filtro client-side; botones ← → con `Icons.AutoMirrored`; labels "Esta semana / Semana pasada / Próxima semana / Hace N semanas / En N semanas".
+
+### Sprint 22.3 — Android Lottie en StockList y NotesScreen ✅ COMPLETADO
+
+- `StockScreens.kt`: `LottieEmptyStateView(R.raw.lottie_empty_list)` en empty state stock.
+- `NotesScreens.kt`: `LottieEmptyStateView(R.raw.lottie_empty_list)` en empty state notas.
+
+Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (5s, 0 errores).
+
+## Sprint 23 — Candidatos
 
 ### Prioridad Alta
 
-1. **Android:** Micro-animación ❤️ favorito iOS (pendiente — iOS no tiene RecipeDetail aún).
+1. **iOS:** Micro-animación ❤️ favorito — ahora que existe `RecipeDetailScreen`, añadir toggle favorito vía Ktor + animación scale + haptic.
 2. **Android:** `SharedElementTransition` RecipeList → RecipeDetail (Compose experimental API).
-3. **iOS:** Navegación semanas en MenuScreen (requiere `kotlinx.datetime`).
+3. **Android + iOS:** Lottie en ShoppingListScreen (sin animación de empty state aún).
 
 ### Prioridad Media
 
-1. **Android:** `LottieEmptyStateView` integrado en StockList, NotesScreen y ShoppingList (actualmente solo en RecipeList).
-2. **iOS:** RecipeDetail screen (actualmente iOS solo muestra lista).
+1. **iOS:** CookingScreen — paso a paso desde `RecipeDetailScreen` (sin captura volumen, gestos swipe).
+2. **iOS:** Compartir receta — `UIActivityViewController` vía `expect/actual`.
+3. **Desktop:** Ajuste visual DashboardView con datos reales del día actual.

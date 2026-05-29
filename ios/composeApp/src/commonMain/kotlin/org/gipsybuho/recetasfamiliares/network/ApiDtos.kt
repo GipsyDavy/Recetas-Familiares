@@ -118,6 +118,24 @@ data class ShoppingListItemDto(
 )
 
 @Serializable
+data class RecipeIngredientDto(
+    val id: String,
+    val position: Int,
+    val name: String,
+    val quantity: Double? = null,
+    val unit: String? = null,
+    val note: String? = null
+)
+
+@Serializable
+data class RecipeStepDto(
+    val id: String,
+    val position: Int,
+    val instruction: String,
+    val timerMinutes: Int? = null
+)
+
+@Serializable
 data class SyncPullResponseDto(
     val serverTime: String,
     val recipes: List<RecipeDto> = emptyList(),

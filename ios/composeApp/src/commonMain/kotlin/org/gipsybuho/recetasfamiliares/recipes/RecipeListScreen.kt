@@ -18,12 +18,13 @@ import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 
 @Composable
 fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
-    var recipes      by remember { mutableStateOf<List<RecipeDto>>(emptyList()) }
-    var loading      by remember { mutableStateOf(true) }
-    var isRefreshing by remember { mutableStateOf(false) }
-    var error        by remember { mutableStateOf<String?>(null) }
-    val haptic       = rememberHapticFeedback()
-    val scope        = rememberCoroutineScope()
+    var recipes        by remember { mutableStateOf<List<RecipeDto>>(emptyList()) }
+    var loading        by remember { mutableStateOf(true) }
+    var isRefreshing   by remember { mutableStateOf(false) }
+    var error          by remember { mutableStateOf<String?>(null) }
+    var selectedRecipe by remember { mutableStateOf<RecipeDto?>(null) }
+    val haptic         = rememberHapticFeedback()
+    val scope          = rememberCoroutineScope()
 
     suspend fun loadData() {
         runCatching { recipes = repository.loadRecipes() }
@@ -43,6 +44,15 @@ fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
             loadData()
             isRefreshing = false
         }
+    }
+
+    if (selectedRecipe != null) {
+        RecipeDetailScreen(
+            recipe     = selectedRecipe!!,
+            repository = repository,
+            onBack     = { selectedRecipe = null }
+        )
+        return
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -86,7 +96,10 @@ fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
             }
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(recipes, key = { it.id }) { recipe ->
-                    Card(modifier = Modifier.fillMaxWidth().clickable { haptic.selection() }) {
+                    Card(modifier = Modifier.fillMaxWidth().clickable {
+                        haptic.selection()
+                        selectedRecipe = recipe
+                    }) {
                         ListItem(
                             headlineContent   = { Text(recipe.title) },
                             supportingContent = { Text(recipe.description ?: "Sin descripción") },

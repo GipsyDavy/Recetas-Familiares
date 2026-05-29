@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.gipsybuho.recetasfamiliares.R
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -135,10 +136,13 @@ internal fun NotesScreen(
                     Spacer(Modifier.height(Spacing.md))
                     if (filtered.isEmpty()) {
                         if (query.isBlank()) {
-                            EmptyStateView(icon = Icons.Outlined.Description,
-                                title = "Sin notas familiares",
-                                subtitle = "Escribe recuerdos, anécdotas y secretos culinarios de vuestra familia",
-                                actionLabel = "Nueva nota", onAction = { showCreateForm = true })
+                            LottieEmptyStateView(
+                                lottieRes   = R.raw.lottie_empty_list,
+                                title       = "Sin notas familiares",
+                                subtitle    = "Escribe recuerdos, anécdotas y secretos culinarios de vuestra familia",
+                                actionLabel = "Nueva nota",
+                                onAction    = { showCreateForm = true }
+                            )
                         } else {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text("Sin resultados para \"$query\"",

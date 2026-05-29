@@ -11,12 +11,12 @@ class MenuRepository(
     private val apiClient: ApiClient,
     private val session: SessionStore
 ) {
-    suspend fun loadCurrentWeek(page: Int = 0, size: Int = 50): List<MenuItemDto> {
+    suspend fun loadAllItems(): List<MenuItemDto> {
         val familyId = session.familyId ?: return emptyList()
         val response: PageDto<MenuItemDto> = apiClient.http
             .get("api/v1/families/$familyId/menu-items") {
-                parameter("page", page)
-                parameter("size", size)
+                parameter("page", 0)
+                parameter("size", 200)
             }.body()
         return response.items.filter { !it.deleted }.sortedWith(
             compareBy({ it.plannedDate }, { mealTypeOrder(it.mealType) })

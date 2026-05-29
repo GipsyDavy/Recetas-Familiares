@@ -68,6 +68,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.gipsybuho.recetasfamiliares.R
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import java.time.Instant
 import java.time.LocalDate
@@ -165,10 +166,13 @@ internal fun StockList(
                         Spacer(Modifier.height(Spacing.md))
                         if (filtered.isEmpty()) {
                             if (query.isBlank()) {
-                                EmptyStateView(icon = Icons.Outlined.Inventory2,
-                                    title = "Stock vacío",
-                                    subtitle = "Registra los ingredientes de casa para controlar caducidades y bajo stock",
-                                    actionLabel = "Añadir primer artículo", onAction = { showCreateForm = true })
+                                LottieEmptyStateView(
+                                    lottieRes   = R.raw.lottie_empty_list,
+                                    title       = "Stock vacío",
+                                    subtitle    = "Registra los ingredientes de casa para controlar caducidades y bajo stock",
+                                    actionLabel = "Añadir primer artículo",
+                                    onAction    = { showCreateForm = true }
+                                )
                             } else {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text("Sin resultados para \"$query\"",

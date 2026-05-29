@@ -9,6 +9,8 @@ import org.gipsybuho.recetasfamiliares.database.Recipes
 import org.gipsybuho.recetasfamiliares.network.ApiClient
 import org.gipsybuho.recetasfamiliares.network.PageDto
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
+import org.gipsybuho.recetasfamiliares.network.RecipeIngredientDto
+import org.gipsybuho.recetasfamiliares.network.RecipeStepDto
 
 class RecipeRepository(
     private val apiClient: ApiClient,
@@ -44,6 +46,24 @@ class RecipeRepository(
             }
         } catch (e: Exception) {
             db.recipesQueries.selectAllRecipes().executeAsList().map { it.toDto() }
+        }
+    }
+
+    suspend fun loadIngredients(recipeId: String): List<RecipeIngredientDto> {
+        val familyId = session.familyId ?: return emptyList()
+        return try {
+            apiClient.http.get("api/v1/families/$familyId/recipes/$recipeId/ingredients").body()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun loadSteps(recipeId: String): List<RecipeStepDto> {
+        val familyId = session.familyId ?: return emptyList()
+        return try {
+            apiClient.http.get("api/v1/families/$familyId/recipes/$recipeId/steps").body()
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 

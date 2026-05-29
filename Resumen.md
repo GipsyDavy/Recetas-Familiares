@@ -284,14 +284,17 @@ Pendiente Sprint 21:
 | 21.1-iOS | 2026-05-29 | Pull-to-refresh manual: syncRepo pasado App→MainTabScreen→RecipeListScreen+StockScreen; IconButton Refresh + CircularProgressIndicator + pullIncremental() + botón Reintentar |
 | 21.2-Android | 2026-05-29 | Lottie 6.5.0: LottieEmptyStateView en SharedComposables; lottie_chef.json (cocinero bounce) + lottie_empty_list.json (portapapeles swing) en res/raw; RecipeList usa LottieEmptyStateView |
 | 21.3-Android | 2026-05-29 | Micro-animación ❤️ favorito: Animatable scale 1→1.35→1 spring(MediumBouncy) + HapticFeedbackType.LongPress; graphicsLayer en Icon favorito en RecipeDetail |
+| 22.1-iOS | 2026-05-29 | RecipeDetailScreen: DTOs ingredientes+pasos; loadIngredients/loadSteps en RecipeRepository; pantalla detalle con meta chips, descripción, ingredientes, pasos numerados; nav tap→detalle, back→lista |
+| 22.2-iOS | 2026-05-29 | MenuScreen semanas: kotlinx.datetime 0.6.0; weekOffset state; weekStart/weekEnd cálculo; filtro client-side; botones ← → AutoMirrored; labels semana; loadAllItems size=200 |
+| 22.3-Android | 2026-05-29 | Lottie StockList + NotesScreen: LottieEmptyStateView(lottie_empty_list) en ambas pantallas (BUILD SUCCESSFUL 5s) |
 
-## Proximos Pasos — Sprint 22
+## Proximos Pasos — Sprint 23
 
 Prioridad alta:
-- **iOS**: RecipeDetail screen (actualmente iOS solo muestra lista de recetas).
-- **iOS**: Navegación semanas en MenuScreen (requiere `kotlinx.datetime`).
-- **Android**: `LottieEmptyStateView` en StockList, NotesScreen, ShoppingList (actualmente solo en RecipeList).
+- **iOS**: Micro-animación ❤️ favorito en `RecipeDetailScreen` (toggle Ktor + animación + haptic).
+- **Android**: `SharedElementTransition` RecipeList → RecipeDetail (Compose experimental API).
+- **Android + iOS**: Lottie en `ShoppingListScreen`.
 
-Prioridad baja:
-- **Android**: SharedElementTransition RecipeList→Detail (Compose experimental API).
-- **iOS**: Micro-animación ❤️ favorito (pendiente RecipeDetail iOS).
+Prioridad media:
+- **iOS**: `CookingScreen` (paso a paso desde `RecipeDetailScreen`).
+- **iOS**: Compartir receta (`UIActivityViewController` vía `expect/actual`).
