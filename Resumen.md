@@ -107,7 +107,7 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT 25A COMPLETO — 2026-05-29)
+### Android Kotlin + Compose (SPRINT 28 COMPLETO — 2026-05-29)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -125,7 +125,7 @@ Sistema de temas (Sprint 25A):
 Pantallas implementadas (Sprint 1-15 + UI):
 - **LoginScreen** rediseñada — ícono brand circular, tipografía centrada, botón "Entrar →"
 - TopAppBar con búsqueda global unificada (Recetas + Stock + Notas)
-- **RecipeListScreen** — **tarjetas visuales** con gradiente + placeholder + chips (⏱ tiempo, dificultad, porciones); paginación; búsqueda; FilterChips dificultad; pull-to-refresh; **FAB "+"**
+- **RecipeListScreen** — **tarjetas visuales** con gradiente + placeholder + chips (⏱ tiempo, dificultad, porciones); paginación; búsqueda; FilterChips dificultad + **"Con mi stock"** (filtro reactivo vs stock Room); pull-to-refresh; **FAB "+"**
 - **RecipeDetailScreen** — `←` IconButton back; ❤️ favorito; ⋮ menú; fotos carrusel; valoraciones; **ExtendedFAB "▶ Cocinar"** visible
 - RecipeForm (SegmentedButton dificultad, filas dinámicas ingredientes/pasos)
 - CookingScreen (paso a paso, temporizador countdown, keep screen on, **volumen ↑↓ cambia paso**)
@@ -133,9 +133,10 @@ Pantallas implementadas (Sprint 1-15 + UI):
 - **ShoppingListScreen** — `←` IconButton back; check offline-resilient; **tachado en ítems marcados**; botón "Compartir"
 - **NotesScreen** — `←` IconButton back; botones ✏ Editar / 🗑 Eliminar con ícono; CRUD completo; búsqueda; empty states
 - GlobalSearchScreen (resultados agrupados entre tabs)
+- **ProfileScreen** (6º tab "Perfil" — avatar con iniciales, nombre, email, botón cerrar sesión)
 - **MenuScreen** (5º tab "Menú", navegación ← → semanas, CRUD assign/remove, "Ver receta")
 - Widgets: RecipeWidget (receta del día) + StockWidget (ítems críticos)
-- Bottom Navigation: **5 tabs** (RECIPES, STOCK, SHOPPING, NOTES, MENU)
+- Bottom Navigation: **6 tabs** (RECIPES, STOCK, SHOPPING, NOTES, MENU, PROFILE)
 - Snackbar feedback en todas las mutaciones
 - **SyncWorker pushThenPull: 7 tipos** — Recetas + Ingredientes + Pasos + Stock + Shopping items + Favoritos + Notas
 - **Notificaciones caducidad**: HOY urgente (PRIORITY_HIGH) + esta semana 1-7 días (PRIORITY_DEFAULT)
@@ -180,7 +181,7 @@ Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de 
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-### iOS KMP + Compose Multiplatform (SPRINT 25A COMPLETADO — 2026-05-29)
+### iOS KMP + Compose Multiplatform (SPRINT 28.A COMPLETADO — 2026-05-29)
 
 Stack implementado:
 - Kotlin Multiplatform + Compose Multiplatform (Kotlin 2.0.21, Compose 1.7.0)
@@ -213,7 +214,7 @@ Sistema de temas (Sprint 25A):
 - `theme/AppTheme.kt` (commonMain) — 10 temas, `lightColors()` / `darkColors()`, `AppTypography`
 - `theme/ThemePreference.kt` (commonMain) + `ThemePreference.ios.kt` (iosMain, NSUserDefaults) — expect/actual
 - `App.kt` — `MaterialTheme(colorScheme, typography)` con el tema seleccionado
-- `ui/SettingsScreen.kt` — pantalla ajustes con swatches + chips modo + botón logout
+- `ui/SettingsScreen.kt` — pantalla ajustes con **sección usuario** (avatar iniciales + nombre + email) + swatches tema + chips modo + botón logout
 - `ui/MainTabScreen.kt` — 6º tab "Ajustes" con ícono `Settings`
 
 Compilacion: requiere macOS + Xcode para generar binario/framework.
@@ -314,6 +315,17 @@ Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + 
 | 25A-Android | 2026-05-29 | Sistema temas Android: AppTheme (10 temas×2 modos), ThemePreference (DataStore), Theme.kt refactor, ThemePickerDialog (swatches+chips), botón paleta TopAppBar (BUILD SUCCESSFUL) |
 | 25A-Desktop | 2026-05-29 | Sistema temas Desktop: ThemeManager.java (singleton+CSS dinámico), style.css (looked-up colors), 20 CSS themes/, MainWindow selector tema+modo en Ajustes (BUILD SUCCESS) |
 | 25A-iOS | 2026-05-29 | Sistema temas iOS: AppTheme.kt+ThemePreference expect/actual (NSUserDefaults), App.kt+MaterialTheme, SettingsScreen.kt, MainTabScreen 6º tab Ajustes |
+| 25B-Android | 2026-05-29 | TopAppBar título contextual AnimatedContent; FAB NotesScreen; SkeletonStockCard+NoteCard shimmer; Crossfade; difficultyLabel(); botón Eliminar errorContainer; MenuScreen Lottie |
+| 25C-Desktop | 2026-05-29 | Sidebar emojis; updateActiveSidebarButton CSS active; DashboardView loadingLabel() HBox |
+| 25D-iOS | 2026-05-29 | Spacing.kt commonMain; RecipeCard rica 152dp+gradiente+MetaChips; AnimatedEmptyState 4 pantallas; animateItem(); DayMenuCard isToday; PullToRefreshBox |
+| 26.A-Android | 2026-05-29 | Drag-to-reorder ingredientes+pasos RecipeForm: reorderable 2.4.3; UUID en IngredientDraft/StepDraft; ReorderableItem+draggableHandle; lookup por id estable |
+| 26.B-iOS | 2026-05-29 | NotesScreen CRUD: CreateNoteRequest DTO; createNote/updateNote/deleteNote Ktor; NotesScreen reescrito con FAB overlay + when states + NoteForm + NoteDetail |
+| 26.C-Desktop | 2026-05-29 | DashboardView menú del día real: loadTodayMenu() desde MenuRepository; mealTypeLabel() emojis ☀️🍽🫖🌙; sección menuTodaySection en header |
+| 27.A-Android+iOS | 2026-05-29 | Onboarding primera vez: OnboardingPreference expect/actual (NSUserDefaults iOS / SharedPrefs Android); OnboardingScreen 3 páginas AnimatedContent+dots; flujo !onboarding→!login→main |
+| 27.B-iOS | 2026-05-29 | StockScreen CRUD: CreateStockItemRequest DTO; create/update/delete Ktor; StockScreen reescrito FAB+StockForm (avanzada colapsable)+SwipeToReveal delete real |
+| 27.C-Android | 2026-05-29 | CookingScreen swipe hint: AnimatedVisibility pill "← Desliza para navegar →" centrado; LaunchedEffect auto-oculta 3s; fadeIn 400ms / fadeOut 600ms |
+| 28.A-Android+iOS | 2026-05-29 | Perfil read-only: SessionStore +displayName+email (EncryptedSharedPrefs / Keychain); AuthRepository guarda datos al login; ProfileScreen Android (6º tab); SettingsScreen iOS sección usuario |
+| 28.C-Android | 2026-05-29 | Filtro "Con mi stock": RecipeIngredientDao.observeAllIngredients(); filteredRecipes combine 4 flows con LOWER(TRIM) matching; FilterChip tertiaryContainer en RecipeList |
 
 ## Sprint 25B/C/D — COMPLETADOS (2026-05-29)
 
@@ -340,14 +352,14 @@ Build: `mvn compile` — BUILD SUCCESS
 - **D-5** `DayMenuCard(isToday: Boolean)` — `primaryContainer` + chip "Hoy"
 - **D-6** `PullToRefreshBox` en RecipeListScreen y StockScreen iOS
 
-## Sprint 26 — Candidatos
+## Sprint 29 — Candidatos
 
 ### Prioridad Alta
-1. **Android:** Drag-to-reorder ingredientes y pasos en `RecipeForm`
-2. **iOS:** `NotesScreen` — crear/editar notas (solo lectura actualmente)
-3. **Desktop + Android:** DashboardView con menú del día actual real
+1. **Backend + Android + iOS:** Editar displayName desde perfil — `UserController` (`GET/PUT /api/v1/users/me`) + form edición en `ProfileScreen` / `SettingsScreen`
+2. **Desktop:** Exportar receta como PDF (Apache PDFBox, Apache 2.0)
+3. **Android + iOS:** Foto de avatar — upload multipart `/api/v1/users/me/avatar`, mostrar en perfil
 
 ### Prioridad Media
-1. **iOS + Android:** Onboarding primera vez (3 pantallas, SharedPreferences/NSUserDefaults)
-2. **iOS:** `StockScreen` CRUD — crear/editar stock items
-3. **Android:** `CookingScreen` swipe visual hint (`AnimatedVisibility`)
+4. **Android:** Widget receta del día mejorado (con foto, acción "Cocinar")
+5. **iOS:** StockScreen pull-to-refresh + notificaciones caducidad (Background Tasks)
+6. **Desktop:** Menú semanal — vista mes completo (calendar grid 7×5)

@@ -191,7 +191,7 @@ Migraciones Flyway V1-V9 (tablas: users, families, family_members, recipes, ingr
 
 ---
 
-## Android Kotlin + Compose — SPRINT 19 COMPLETO (2026-05-29)
+## Android Kotlin + Compose — SPRINT 28 COMPLETO (2026-05-29)
 
 Stack:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -232,7 +232,7 @@ Stack:
 - `GlobalSearchScreen` (resultados agrupados entre tabs)
 - **`MenuScreen`** — 5º tab; nav ← → semanas; CRUD assign/remove; tap comida → "Ver receta" / "Eliminar"
 - `Widgets`: `RecipeWidget` (receta del día, 4×2) + `StockWidget` (ítems críticos, 2×2)
-- Bottom Navigation: **5 tabs** (RECIPES, STOCK, SHOPPING, NOTES, MENU)
+- Bottom Navigation: **6 tabs** (RECIPES, STOCK, SHOPPING, NOTES, MENU, PROFILE)
 - Snackbar feedback en todas las mutaciones
 - **SyncWorker pushThenPull: 7 tipos**
 - **Notificaciones caducidad**: HOY (PRIORITY_HIGH, ID 1001) + esta semana (PRIORITY_DEFAULT, ID 1002)
@@ -253,7 +253,7 @@ Build: `./gradlew assembleDebug` desde `android/` — BUILD SUCCESSFUL
 
 ---
 
-## Desktop JavaFX — SPRINT 20 COMPLETO (2026-05-29)
+## Desktop JavaFX — SPRINT 26.C COMPLETO (2026-05-29)
 
 Stack: Java 21 + JavaFX 21.0.2 + OkHttp 4.12.0 + Gson 2.10.1 + Maven.
 
@@ -392,7 +392,7 @@ Build SUCCESSFUL.
    ```
    Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
 
-6. Continuar con Sprint 20 (ver candidatos al final de este documento).
+6. Continuar con Sprint 29 (ver candidatos al final de este documento).
 
 ---
 
@@ -1253,10 +1253,77 @@ Build: `./gradlew assembleDebug` — **BUILD SUCCESSFUL** (27s).
 
 Build: `mvn compile` — **BUILD SUCCESS** (0 output).
 
-## Sprint 27 — Candidatos
+## Sprint 27 — COMPLETADO (2026-05-29)
+
+### Sprint 27.A — Onboarding primera vez (iOS + Android) ✅
+
+- **`core/OnboardingPreference.kt`** (commonMain iOS, expect) + **`OnboardingPreference.ios.kt`** (iosMain actual, NSUserDefaults)
+- **`core/OnboardingPreference.kt`** (Android) — SharedPreferences `rf_onboarding`
+- **`ui/OnboardingScreen.kt`** (iOS commonMain + Android) — 3 páginas `AnimatedContent` fadeIn/fadeOut, dots indicador animados, botones Siguiente/Anterior/Comenzar
+- **`App.kt`** (iOS): flujo `!onboardingDone → !isLoggedIn → MainTabScreen`
+- **`RecetasApp.kt`** (Android): ídem con `viewModel.markOnboardingDone()`
+- **`AppContainer.kt`**: añadido `onboardingPreference`
+- **`RecetasViewModel.kt`**: `onboardingDone: StateFlow<Boolean>` + `markOnboardingDone()`
+
+### Sprint 27.B — iOS StockScreen CRUD ✅
+
+- **`ApiDtos.kt`**: `CreateStockItemRequest` (name, quantity, unit, expiresAt, lowStockThreshold, note)
+- **`StockRepository.kt`**: `createStockItem` POST, `updateStockItem` PUT, `deleteStockItem` DELETE
+- **`StockScreen.kt`** (reescrito): FAB + `when(showCreate/editingItem)` + `StockForm` inline
+  - Campos primarios: nombre*, cantidad, unidad, caducidad (ISO string)
+  - Sección Avanzada colapsable (`AnimatedVisibility`): mínimo stock, nota
+  - `SwipeToRevealItem.onDelete` conectado a `repository.deleteStockItem()` real
+  - Tap en card → edición inline
+
+### Sprint 27.C — Android CookingScreen swipe hint ✅
+
+- **`CookingScreen.kt`**: `AnimatedVisibility` pill centrado `← Desliza para navegar →`
+- Auto-oculta tras 3 s (`LaunchedEffect("hint")`)
+- fadeIn(400ms) / fadeOut(600ms) sobre `Box` wrapper en Surface
+
+Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** · `mvn compile` — **BUILD SUCCESS**
+Commit: `fc64e1c`
+
+## Sprint 28 — COMPLETADO (2026-05-29) — commit 3e59eb3
+
+### Sprint 28.A — Pantalla de perfil (Android + iOS) ✅
+
+- **`SessionStore.kt`** (Android + iOS): nuevos campos `displayName: String?` + `email: String?`
+  - Android: EncryptedSharedPreferences ("display_name", "email")
+  - iOS expect: añadidos a commonMain; actual: Keychain KEY_DISPLAY_NAME + KEY_EMAIL; `clear()` actualizado
+- **`AuthRepository.login()`** (Android + iOS): guarda `response.user.displayName` y `response.user.email`
+- **`ProfileScreen.kt`** (Android, nuevo): 6º tab "Perfil" — avatar circular con iniciales 2 letras (o icono Person si vacío), nombre, email como `ListItem`, botón "Cerrar sesión" en `errorContainer`
+- **`RecetasApp.kt`** (Android): `MainTab.PROFILE` añadido; `NavigationBarItem` Person icon; título "Mi perfil"
+- **`RecetasViewModel.kt`** (Android): `StateFlow<String?> displayName` + `email`; reset en `logout()`
+- **`SettingsScreen.kt`** (iOS): sección usuario opcional al inicio — avatar iniciales 48dp + nombre + email (solo si `session != null`); parámetro `session: SessionStore? = null`
+- **`MainTabScreen.kt`** (iOS): pasa `session = session` a `SettingsScreen`
+
+> Nota: perfil es read-only (sin edición de displayName). Edición requiere `UserController` backend (`GET/PUT /api/v1/users/me`) — pendiente Sprint 29.
+
+### Sprint 28.C — Filtro recetas por ingrediente en stock (Android) ✅
+
+- **`Daos.kt`** (`RecipeIngredientDao`): nuevo `observeAllIngredients(): Flow<List<RecipeIngredientEntity>>`
+- **`RecetasViewModel.kt`**:
+  - `_filterByStock: MutableStateFlow<Boolean>` + `filterByStock: StateFlow<Boolean>`
+  - `filteredRecipes: StateFlow<List<RecipeEntity>>` — `combine(recipes, stockItems, allIngredients, _filterByStock)` con matching `LOWER(TRIM(name))`; cuando filtro OFF devuelve lista completa
+  - `toggleStockFilter()` — toggle booleano
+- **`RecetasApp.kt`**: recoge `filteredRecipes` y `filterByStock`; pasa `filteredRecipes` como `recipes` a `RecipeList`
+- **`RecipeScreens.kt`** (`RecipeList`): nuevos params `filterByStock: Boolean` + `onToggleStockFilter: () -> Unit`; `FilterChip "Con mi stock"` en la fila horizontal de chips (tras Fácil/Media/Difícil), color `tertiaryContainer` cuando activo
+
+Build: Android BUILD SUCCESSFUL (11s) · Desktop BUILD SUCCESS
+
+---
+
+## Sprint 29 — Candidatos
 
 ### Prioridad Alta
 
-1. **iOS + Android:** Onboarding primera vez — 3 pantallas (`SharedPreferences` / `NSUserDefaults`, mostrar una sola vez).
-2. **iOS:** `StockScreen` CRUD — crear/editar stock items (actualmente solo lectura).
-3. **Android:** `CookingScreen` swipe visual (mostrar hint deslizamiento con `AnimatedVisibility`).
+1. **Backend + Android + iOS:** Editar displayName desde perfil — añadir `UserController` backend (`GET/PUT /api/v1/users/me`) + form de edición en `ProfileScreen` / `SettingsScreen`.
+2. **Desktop:** Exportar receta como PDF (Apache PDFBox, Apache 2.0 — sin dependencias AGPL).
+3. **Android + iOS:** Foto de avatar de usuario — upload multipart a `/api/v1/users/me/avatar`, mostrar en `ProfileScreen`.
+
+### Prioridad Media
+
+4. **Android:** Widget de receta del día mejorado (con foto si existe, acción "Cocinar").
+5. **iOS:** StockScreen swipe pull-to-refresh + notificaciones caducidad (Background Tasks).
+6. **Desktop:** Menú semanal — vista mes completo (calendar grid 7×5).
