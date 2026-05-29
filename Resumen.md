@@ -315,25 +315,39 @@ Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + 
 | 25A-Desktop | 2026-05-29 | Sistema temas Desktop: ThemeManager.java (singleton+CSS dinámico), style.css (looked-up colors), 20 CSS themes/, MainWindow selector tema+modo en Ajustes (BUILD SUCCESS) |
 | 25A-iOS | 2026-05-29 | Sistema temas iOS: AppTheme.kt+ThemePreference expect/actual (NSUserDefaults), App.kt+MaterialTheme, SettingsScreen.kt, MainTabScreen 6º tab Ajustes |
 
-## Proximos Pasos — Sprint 25B/C/D (UI/UX Polish)
+## Sprint 25B/C/D — COMPLETADOS (2026-05-29)
 
-### Sprint 25B — Polish Android (prioridad alta)
-- **B-1** `RecetasApp.kt`: TopAppBar contextual según tab activo + `AnimatedContent` al cambiar tab
-- **B-2** `NotesScreens.kt`: FAB flotante (consistente con RecipeList y StockList)
-- **B-3** `StockScreens.kt`: `animateItem()` en LazyColumn + skeleton loading
-- **B-4** `NotesScreens.kt`: `animateItem()` + skeleton loading
-- **B-5** `RecipeScreens.kt`: chips dificultad traducidos (EASY→Fácil/MEDIUM→Media/HARD→Difícil)
-- **B-6** `StockScreens.kt:328`: botón Eliminar en StockDetail con color error
-- **B-7** `MenuScreen.kt`: empty state con Lottie (lottie_empty_list)
+### Sprint 25B — Polish Android ✅
+- **B-1** TopAppBar título contextual por tab + `AnimatedContent` fade 200/150ms entre tabs
+- **B-2** FAB flotante en NotesScreen (idéntico a RecipeList y StockList)
+- **B-3** StockList: `animateItem()` + `SkeletonStockCard` shimmer + `Crossfade`
+- **B-4** NotesScreen: `animateItem()` + `SkeletonNoteCard` shimmer + `Crossfade`
+- **B-5** RecipeCard: dificultad traducida (EASY→Fácil, MEDIUM→Media, HARD→Difícil)
+- **B-6** StockDetail: botón Eliminar con `ButtonDefaults.buttonColors(errorContainer)`
+- **B-7** MenuScreen empty state con `LottieEmptyStateView`
+Build: `gradle assembleDebug` — BUILD SUCCESSFUL (48s)
 
-### Sprint 25C — Polish Desktop (prioridad media)
-- **C-1** `MainWindow.java`: sidebar con estado activo visual (clase CSS `sidebar-nav-button-active`)
-- **C-2** `DashboardView.java`: indicador de carga real (spinner/ProgressBar) en vez de texto
-- **C-3** `MainWindow.java`: iconos en botones de la sidebar
+### Sprint 25C — Polish Desktop ✅
+- **C-1+C-3** MainWindow: iconos emoji en sidebar + `updateActiveSidebarButton` aplica CSS `sidebar-nav-button-active`
+- **C-2** DashboardView: `loadingLabel()` devuelve `HBox(ProgressIndicator + Label)`
+Build: `mvn compile` — BUILD SUCCESS
 
-### Sprint 25D — Polish iOS (prioridad media)
-- **D-1** `RecipeListScreen.kt`: RecipeCard rica con imagen placeholder + gradiente + meta chips
-- **D-2** `StockScreen.kt`, `NotesScreen.kt`, `RecipeListScreen.kt`: empty states animados
-- **D-3** Todas las LazyColumns iOS: `animateItem()`
-- **D-4** `MenuScreen.kt`: resaltar "hoy" con `primaryContainer` como Android
-- **D-5** `RecipeListScreen.kt`, `StockScreen.kt`: PullToRefresh nativo
+### Sprint 25D — Polish iOS ✅
+- **D-1** Nuevo `Spacing.kt` (commonMain) — objeto Spacing idéntico al de Android
+- **D-2** `RecipeListScreen.kt`: RecipeCard rica (header 152dp + gradiente + MetaChips) + `AnimatedEmptyState` (internal, reutilizada en 4 pantallas)
+- **D-3** Empty states animados en RecipeList, NotesScreen, StockScreen, MenuScreen (emoji pulsante alpha 0.5→1.0)
+- **D-4** `animateItem()` en RecipeList, NotesScreen, StockScreen (via `Box(Modifier.animateItem())`)
+- **D-5** `DayMenuCard(isToday: Boolean)` — `primaryContainer` + chip "Hoy"
+- **D-6** `PullToRefreshBox` en RecipeListScreen y StockScreen iOS
+
+## Sprint 26 — Candidatos
+
+### Prioridad Alta
+1. **Android:** Drag-to-reorder ingredientes y pasos en `RecipeForm`
+2. **iOS:** `NotesScreen` — crear/editar notas (solo lectura actualmente)
+3. **Desktop + Android:** DashboardView con menú del día actual real
+
+### Prioridad Media
+1. **iOS + Android:** Onboarding primera vez (3 pantallas, SharedPreferences/NSUserDefaults)
+2. **iOS:** `StockScreen` CRUD — crear/editar stock items
+3. **Android:** `CookingScreen` swipe visual hint (`AnimatedVisibility`)

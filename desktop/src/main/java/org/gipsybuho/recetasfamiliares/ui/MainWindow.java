@@ -31,6 +31,7 @@ public class MainWindow {
     private GlobalSearchView searchResultsView;
     private String activeView = "dashboard";
     private boolean navigating = false;
+    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes;
     private final TextField globalSearch = new TextField();
     private final Label statusBar = new Label("");
 
@@ -124,12 +125,12 @@ public class MainWindow {
             }
         });
 
-        Button btnDashboard = sidebarButton("Inicio", "dashboard");
-        Button btnRecipes = sidebarButton("Recetas", "recipes");
-        Button btnStock = sidebarButton("Stock", "stock");
-        Button btnMenu = sidebarButton("Menú semanal", "menu");
-        Button btnShopping = sidebarButton("Lista de la compra", "shopping");
-        Button btnNotes = sidebarButton("Notas familiares", "notes");
+        btnDashboard = sidebarButton("🏠  Inicio", "dashboard");
+        btnRecipes   = sidebarButton("📖  Recetas", "recipes");
+        btnStock     = sidebarButton("🧂  Stock", "stock");
+        btnMenu      = sidebarButton("📅  Menú semanal", "menu");
+        btnShopping  = sidebarButton("🛒  Lista de la compra", "shopping");
+        btnNotes     = sidebarButton("📝  Notas familiares", "notes");
         Button settingsBtn = new Button("⚙ Ajustes");
         settingsBtn.getStyleClass().add("sidebar-nav-button");
         settingsBtn.setMaxWidth(Double.MAX_VALUE);
@@ -189,6 +190,7 @@ public class MainWindow {
         activeView = view;
         globalSearch.clear();
         navigating = false;
+        updateActiveSidebarButton(view);
         switch (view) {
             case "dashboard" -> {
                 setCenterWithFade(dashboardView);
@@ -278,6 +280,23 @@ public class MainWindow {
     }
 
     // ── Logout ───────────────────────────────────────────────────────────────
+
+    private void updateActiveSidebarButton(String view) {
+        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes};
+        for (Button btn : navButtons) {
+            if (btn != null) btn.getStyleClass().remove("sidebar-nav-button-active");
+        }
+        Button active = switch (view) {
+            case "dashboard" -> btnDashboard;
+            case "recipes"   -> btnRecipes;
+            case "stock"     -> btnStock;
+            case "menu"      -> btnMenu;
+            case "shopping"  -> btnShopping;
+            case "notes"     -> btnNotes;
+            default          -> null;
+        };
+        if (active != null) active.getStyleClass().add("sidebar-nav-button-active");
+    }
 
     private void doLogout() {
         Thread.ofVirtual().start(() -> {

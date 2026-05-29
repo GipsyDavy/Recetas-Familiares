@@ -22,7 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.CalendarMonth
+import org.gipsybuho.recetasfamiliares.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -47,7 +47,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import org.gipsybuho.recetasfamiliares.data.local.MenuItemEntity
@@ -151,21 +150,11 @@ fun MenuScreen(
 
             if (weekItems.isEmpty()) {
                 item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-                    ) {
-                        Icon(Icons.Outlined.CalendarMonth, contentDescription = null,
-                            modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.outlineVariant)
-                        Text(
-                            "Sin comidas esta semana. Toca «+» en cualquier día para añadir.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    LottieEmptyStateView(
+                        lottieRes = R.raw.lottie_empty_list,
+                        title     = "Sin comidas esta semana",
+                        subtitle  = "Toca «+» en cualquier día para planificar el menú"
+                    )
                 }
             }
         }

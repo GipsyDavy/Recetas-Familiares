@@ -371,7 +371,7 @@ private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onCl
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 if (totalMin > 0) MetaChip("⏱ ${totalMin}m")
-                recipe.difficulty?.let { MetaChip(it) }
+                recipe.difficulty?.let { MetaChip(difficultyLabel(it)) }
                 recipe.servings?.let { MetaChip("$it porciones") }
             }
         }
@@ -505,7 +505,7 @@ internal fun RecipeDetail(
                 recipe.servings?.let { MetaChip("$it porciones") }
                 val totalMin = (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
                 if (totalMin > 0) MetaChip("$totalMin min")
-                recipe.difficulty?.let { MetaChip(it) }
+                recipe.difficulty?.let { MetaChip(difficultyLabel(it)) }
             }
         }
         recipe.description?.let { desc ->
@@ -705,6 +705,13 @@ private fun shareRecipe(
         putExtra(Intent.EXTRA_SUBJECT, recipe.title)
     }
     context.startActivity(Intent.createChooser(intent, "Compartir receta"))
+}
+
+private fun difficultyLabel(difficulty: String): String = when (difficulty.uppercase()) {
+    "EASY"   -> "Fácil"
+    "MEDIUM" -> "Media"
+    "HARD"   -> "Difícil"
+    else     -> difficulty.lowercase().replaceFirstChar { it.uppercase() }
 }
 
 @Composable

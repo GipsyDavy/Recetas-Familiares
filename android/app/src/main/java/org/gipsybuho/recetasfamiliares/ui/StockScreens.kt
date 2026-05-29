@@ -25,9 +25,16 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -164,51 +171,58 @@ internal fun StockList(
                             singleLine = true, modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(Spacing.md))
-                        if (filtered.isEmpty()) {
-                            if (query.isBlank()) {
-                                LottieEmptyStateView(
-                                    lottieRes   = R.raw.lottie_empty_list,
-                                    title       = "Stock vacío",
-                                    subtitle    = "Registra los ingredientes de casa para controlar caducidades y bajo stock",
-                                    actionLabel = "Añadir primer artículo",
-                                    onAction    = { showCreateForm = true }
-                                )
-                            } else {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("Sin resultados para \"$query\"",
-                                        color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center)
-                                }
+                        if (stockItems.isEmpty() && isRefreshing) {
+                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                repeat(4) { SkeletonStockCard() }
                             }
-                        } else {
-                            LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                                items(filtered, key = { it.id }) { item ->
-                                    val swipeState = rememberSwipeToDismissBoxState()
-                                    LaunchedEffect(swipeState.currentValue) {
-                                        if (swipeState.currentValue == SwipeToDismissBoxValue.EndToStart) {
-                                            pendingDeleteItem = item
-                                            pendingDismissState = swipeState
-                                        }
+                        } else Crossfade(targetState = filtered.isEmpty(), label = "stockListState") { isEmpty ->
+                            if (isEmpty) {
+                                if (query.isBlank()) {
+                                    LottieEmptyStateView(
+                                        lottieRes   = R.raw.lottie_empty_list,
+                                        title       = "Stock vacío",
+                                        subtitle    = "Registra los ingredientes de casa para controlar caducidades y bajo stock",
+                                        actionLabel = "Añadir primer artículo",
+                                        onAction    = { showCreateForm = true }
+                                    )
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("Sin resultados para \"$query\"",
+                                            color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center)
                                     }
-                                    SwipeToDismissBox(
-                                        state = swipeState,
-                                        enableDismissFromStartToEnd = false,
-                                        backgroundContent = {
-                                            Box(
-                                                Modifier.fillMaxSize()
-                                                    .clip(MaterialTheme.shapes.medium)
-                                                    .background(MaterialTheme.colorScheme.errorContainer),
-                                                contentAlignment = Alignment.CenterEnd
-                                            ) {
-                                                Icon(
-                                                    Icons.Filled.Delete,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.padding(horizontal = Spacing.xl),
-                                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                                )
+                                }
+                            } else {
+                                LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                    items(filtered, key = { it.id }) { item ->
+                                        val swipeState = rememberSwipeToDismissBoxState()
+                                        LaunchedEffect(swipeState.currentValue) {
+                                            if (swipeState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                                                pendingDeleteItem = item
+                                                pendingDismissState = swipeState
                                             }
                                         }
-                                    ) {
-                                        StockItemCard(item, onClick = { selectedItem = item; error = null })
+                                        SwipeToDismissBox(
+                                            state = swipeState,
+                                            modifier = Modifier.animateItem(),
+                                            enableDismissFromStartToEnd = false,
+                                            backgroundContent = {
+                                                Box(
+                                                    Modifier.fillMaxSize()
+                                                        .clip(MaterialTheme.shapes.medium)
+                                                        .background(MaterialTheme.colorScheme.errorContainer),
+                                                    contentAlignment = Alignment.CenterEnd
+                                                ) {
+                                                    Icon(
+                                                        Icons.Filled.Delete,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.padding(horizontal = Spacing.xl),
+                                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                                    )
+                                                }
+                                            }
+                                        ) {
+                                            StockItemCard(item, onClick = { selectedItem = item; error = null })
+                                        }
                                     }
                                 }
                             }
@@ -325,7 +339,13 @@ internal fun StockDetail(item: StockItemEntity, onBack: () -> Unit, onEdit: () -
                 Spacer(Modifier.width(Spacing.xs))
                 Text("Editar")
             }
-            OutlinedButton(onClick = onDelete) {
+            Button(
+                onClick = onDelete,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor   = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
                 Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(Spacing.xs))
                 Text("Eliminar")
@@ -405,5 +425,28 @@ internal fun StockForm(
             }) { Text(if (initial == null) "Guardar" else "Guardar cambios") }
             OutlinedButton(onClick = onCancel) { Text("Cancelar") }
         }
+    }
+}
+
+@Composable
+private fun SkeletonStockCard() {
+    val alpha by rememberInfiniteTransition(label = "shimmer")
+        .animateFloat(initialValue = 0.25f, targetValue = 0.65f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "alpha")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = {
+                Box(modifier = Modifier.fillMaxWidth(0.55f).height(16.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = alpha)))
+            },
+            supportingContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                    Box(modifier = Modifier.fillMaxWidth(0.35f).height(12.dp)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                }
+            }
+        )
     }
 }

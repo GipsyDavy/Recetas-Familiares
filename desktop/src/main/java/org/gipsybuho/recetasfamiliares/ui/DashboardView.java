@@ -286,10 +286,14 @@ public class DashboardView extends ScrollPane {
         return l;
     }
 
-    private Label loadingLabel() {
+    private HBox loadingLabel() {
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setPrefSize(20, 20);
         Label l = new Label("Cargando...");
         l.getStyleClass().add("status-label");
-        return l;
+        HBox hbox = new HBox(8, spinner, l);
+        hbox.setPadding(new Insets(8, 0, 8, 0));
+        return hbox;
     }
 
     private String buildMeta(RecipeDtos.RecipeDto r) {

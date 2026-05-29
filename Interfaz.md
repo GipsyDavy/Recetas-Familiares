@@ -887,27 +887,14 @@ Sprint 25A: Sistema de Temas ✅ COMPLETADO (2026-05-29)
   ├── 25A.2: Desktop ThemeSystem ✅ (ThemeManager + style.css variables + 20 CSS themes + MainWindow ajustes)
   └── 25A.3: iOS ThemeSystem ✅ (AppTheme + ThemePreference expect/actual NSUserDefaults + App.kt + SettingsScreen)
 
-Sprint 25B: Polish Android ← SIGUIENTE
-  ├── B-1: TopAppBar contextual por tab + AnimatedContent al cambiar tab  [RecetasApp.kt]
-  ├── B-2: FAB en NotesScreen  [NotesScreens.kt]
-  ├── B-3: animateItem() + skeleton en StockList  [StockScreens.kt]
-  ├── B-4: animateItem() + skeleton en NotesScreen  [NotesScreens.kt]
-  ├── B-5: Dificultad traducida en chips RecipeCard  [RecipeScreens.kt:374]
-  ├── B-6: Botón Eliminar StockDetail con ButtonDefaults.buttonColors(containerColor=errorContainer)  [StockScreens.kt:328]
-  └── B-7: Empty state MenuScreen con LottieEmptyStateView  [MenuScreen.kt:158]
+Sprint 25B: Polish Android ✅ COMPLETADO (2026-05-29)
+Sprint 25C: Polish Desktop ✅ COMPLETADO (2026-05-29)
+Sprint 25D: Polish iOS ✅ COMPLETADO (2026-05-29)
 
-Sprint 25C: Polish Desktop
-  ├── C-1: Estado activo sidebar (clase CSS sidebar-nav-button-active + trackeo en navigateTo)  [MainWindow.java]
-  ├── C-2: ProgressIndicator en DashboardView.loadingLabel()  [DashboardView.java:289]
-  └── C-3: Iconos emoji → unicode en botones sidebar  [MainWindow.java:126-132]
-
-Sprint 25D: Polish iOS
-  ├── D-1: Objeto Spacing en commonMain + aplicar en todas las pantallas iOS
-  ├── D-2: RecipeCard rica (imagen placeholder + gradiente + meta chips)  [RecipeListScreen.kt]
-  ├── D-3: Empty states animados (Stock, Notas, Recetas, Menú)
-  ├── D-4: animateItem() en LazyColumns iOS
-  ├── D-5: DayMenuCard con resaltado de hoy (primaryContainer)  [MenuScreen.kt]
-  └── D-6: PullToRefresh en RecipeListScreen y StockScreen
+Sprint 26 — SIGUIENTE:
+  ├── Android: Drag-to-reorder ingredientes/pasos en RecipeForm
+  ├── iOS: NotesScreen CRUD (crear/editar notas)
+  └── Desktop+Android: Dashboard con menú del día real (/menu-items?plannedDate=HOY)
 ```
 
 ---

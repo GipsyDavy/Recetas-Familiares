@@ -1196,7 +1196,37 @@ Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (4s, 0 errores; 1 warning
 
 Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (3s, 0 errores).
 
-## Sprint 25 — Candidatos
+## Sprint 25B — Polish Android ✅ COMPLETADO (2026-05-29)
+
+- **B-1** `RecetasApp.kt`: TopAppBar con título contextual por tab + `AnimatedContent(targetState=tab)` fade 200/150ms entre tabs.
+- **B-2** `NotesScreens.kt`: FAB flotante (Box + `FloatingActionButton` BottomEnd) consistente con RecipeList y StockList.
+- **B-3** `StockScreens.kt`: `animateItem()` en `SwipeToDismissBox`, `SkeletonStockCard` shimmer, `Crossfade` empty/list, skeleton cuando `stockItems.isEmpty() && isRefreshing`.
+- **B-4** `NotesScreens.kt`: `animateItem()` + `SkeletonNoteCard` shimmer + `Crossfade` same pattern.
+- **B-5** `RecipeScreens.kt`: `difficultyLabel()` helper — EASY→Fácil, MEDIUM→Media, HARD→Difícil (ambas ocurrencias: RecipeCard + RecipeDetail).
+- **B-6** `StockScreens.kt:328`: Botón Eliminar `StockDetail` → `Button(colors=ButtonDefaults.buttonColors(errorContainer, onErrorContainer))`.
+- **B-7** `MenuScreen.kt`: Empty state → `LottieEmptyStateView(lottie_empty_list, "Sin comidas esta semana", ...)`.
+
+Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (48s, solo warnings pre-existentes).
+
+## Sprint 25C — Polish Desktop ✅ COMPLETADO (2026-05-29)
+
+- **C-1+C-3** `MainWindow.java`: campos de instancia `btnDashboard...btnNotes`, emojis en sidebar (`🏠 Inicio`, `📖 Recetas`, `🧂 Stock`, `📅 Menú semanal`, `🛒 Lista de la compra`, `📝 Notas familiares`), `updateActiveSidebarButton(view)` aplica/quita CSS `sidebar-nav-button-active` al navegar.
+- **C-2** `DashboardView.java`: `loadingLabel()` devuelve `HBox(ProgressIndicator + Label)` en vez de texto plano. Return type `HBox`, callers usan `Node`.
+
+Build: `mvn compile` — **BUILD SUCCESS**.
+
+## Sprint 25D — Polish iOS ✅ COMPLETADO (2026-05-29)
+
+- **D-1** `Spacing.kt` (nuevo, commonMain, base package): objeto `Spacing` idéntico al de Android (xxs/xs/sm/md/lg/xl/xxl = 2/4/6/8/12/16/24 dp).
+- **D-2** `RecipeListScreen.kt`: `RecipeCard` rica — header 152dp con secondaryContainer + icono Restaurant semitransparente + gradiente vertical + MetaChips (tiempo, dificultad, porciones). `RecipeMetaChip` composable.
+- **D-3** `AnimatedEmptyState` (en `RecipeListScreen.kt`, `internal`): emoji pulsante con `rememberInfiniteTransition` + `animateFloat` alpha 0.5→1.0 1400ms. Usada en RecipeListScreen, NotesScreen, StockScreen, MenuScreen.
+- **D-4** `animateItem()`: RecipeCard + NotesScreen cards + StockScreen items (via `Box(Modifier.animateItem())`).
+- **D-5** `MenuScreen.kt` iOS: `DayMenuCard(isToday: Boolean)` — `CardDefaults.cardColors(primaryContainer)` + chip "Hoy" cuando es hoy.
+- **D-6** `PullToRefreshBox` en `RecipeListScreen.kt` y `StockScreen.kt` iOS (`@OptIn(ExperimentalMaterial3Api::class)`).
+
+Nota: build iOS en Windows falla por issue pre-existente SQLDelight + Gradle 9.5.1. Cambios iOS son Kotlin editable en Android Studio; compilación binaria requiere macOS + Xcode.
+
+## Sprint 26 — Candidatos
 
 ### Prioridad Alta
 

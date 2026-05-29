@@ -9,8 +9,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.gipsybuho.recetasfamiliares.Spacing
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.FamilyNoteDto
+import org.gipsybuho.recetasfamiliares.recipes.AnimatedEmptyState
 
 @Composable
 fun NotesScreen(repository: NoteRepository) {
@@ -36,18 +38,14 @@ fun NotesScreen(repository: NoteRepository) {
             error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(error!!, color = MaterialTheme.colorScheme.error)
             }
-            notes.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Sin notas aún", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Escribe recuerdos y secretos culinarios desde Android o Desktop",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline)
-                }
-            }
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            notes.isEmpty() -> AnimatedEmptyState(
+                icon     = "📝",
+                title    = "Sin notas familiares",
+                subtitle = "Escribe recuerdos y secretos culinarios desde Android o Desktop"
+            )
+            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 items(notes, key = { it.id }) { note ->
-                    Card(modifier = Modifier.fillMaxWidth().clickable { haptic.selection() }) {
+                    Card(modifier = Modifier.fillMaxWidth().animateItem().clickable { haptic.selection() }) {
                         ListItem(
                             headlineContent   = {
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

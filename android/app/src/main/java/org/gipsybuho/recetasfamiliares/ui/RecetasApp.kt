@@ -1,6 +1,11 @@
 package org.gipsybuho.recetasfamiliares.ui
 
 import android.content.Intent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -203,8 +208,15 @@ private fun MainShell(viewModel: RecetasViewModel) {
             } else {
                 TopAppBar(
                     title = {
+                        val tabTitle = when (tab) {
+                            MainTab.RECIPES  -> "Recetas"
+                            MainTab.STOCK    -> "Stock familiar"
+                            MainTab.SHOPPING -> "Lista de la compra"
+                            MainTab.NOTES    -> "Notas familiares"
+                            MainTab.MENU     -> "Menú semanal"
+                        }
                         Text(
-                            "Recetas Familiares",
+                            tabTitle,
                             modifier = Modifier.semantics { heading() }
                         )
                     },
@@ -274,27 +286,35 @@ private fun MainShell(viewModel: RecetasViewModel) {
                 }
             )
         } else {
-            when (tab) {
-                MainTab.RECIPES  -> RecipeList(
-                    recipes = recipes, modifier = Modifier.padding(padding),
-                    viewModel = viewModel, onRefresh = viewModel::refresh,
-                    openRecipeId = navigateToRecipeId,
-                    onRecipeOpened = { navigateToRecipeId = null }
-                )
-                MainTab.STOCK    -> StockList(stockItems, Modifier.padding(padding), viewModel)
-                MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
-                MainTab.NOTES    -> NotesScreen(notes, Modifier.padding(padding), viewModel)
-                MainTab.MENU     -> MenuScreen(
-                    menuItems = menuItems, recipes = recipes,
-                    modifier = Modifier.padding(padding),
-                    isRefreshing = isRefreshing, onRefresh = viewModel::refresh,
-                    onAssignToMenu = { date, recipeId, mealType -> viewModel.assignToMenu(recipeId, date, mealType) },
-                    onRemoveFromMenu = { item -> viewModel.removeFromMenu(item) },
-                    onNavigateToRecipe = { recipeId ->
-                        navigateToRecipeId = recipeId
-                        tab = MainTab.RECIPES
-                    }
-                )
+            AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    fadeIn(tween(200)) togetherWith fadeOut(tween(150))
+                },
+                label = "tabContent"
+            ) { currentTab ->
+                when (currentTab) {
+                    MainTab.RECIPES  -> RecipeList(
+                        recipes = recipes, modifier = Modifier.padding(padding),
+                        viewModel = viewModel, onRefresh = viewModel::refresh,
+                        openRecipeId = navigateToRecipeId,
+                        onRecipeOpened = { navigateToRecipeId = null }
+                    )
+                    MainTab.STOCK    -> StockList(stockItems, Modifier.padding(padding), viewModel)
+                    MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
+                    MainTab.NOTES    -> NotesScreen(notes, Modifier.padding(padding), viewModel)
+                    MainTab.MENU     -> MenuScreen(
+                        menuItems = menuItems, recipes = recipes,
+                        modifier = Modifier.padding(padding),
+                        isRefreshing = isRefreshing, onRefresh = viewModel::refresh,
+                        onAssignToMenu = { date, recipeId, mealType -> viewModel.assignToMenu(recipeId, date, mealType) },
+                        onRemoveFromMenu = { item -> viewModel.removeFromMenu(item) },
+                        onNavigateToRecipe = { recipeId ->
+                            navigateToRecipeId = recipeId
+                            tab = MainTab.RECIPES
+                        }
+                    )
+                }
             }
         }
     }

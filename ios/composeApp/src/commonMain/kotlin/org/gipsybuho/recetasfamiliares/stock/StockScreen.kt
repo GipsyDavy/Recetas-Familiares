@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,11 +21,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.gipsybuho.recetasfamiliares.Spacing
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.StockItemDto
+import org.gipsybuho.recetasfamiliares.recipes.AnimatedEmptyState
 import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StockScreen(repository: StockRepository, syncRepo: SyncRepository) {
     var items        by remember { mutableStateOf<List<StockItemDto>>(emptyList()) }
@@ -54,52 +58,41 @@ fun StockScreen(repository: StockRepository, syncRepo: SyncRepository) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh    = { onRefresh() },
+        modifier     = Modifier.fillMaxSize()
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(Spacing.xl)) {
             Text("Stock Familiar", style = MaterialTheme.typography.headlineSmall)
-            IconButton(onClick = { if (!isRefreshing) onRefresh() }) {
-                if (isRefreshing) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.xl))
 
-        when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            error != null && items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(error!!, color = MaterialTheme.colorScheme.error)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = { onRefresh() }) { Text("Reintentar") }
+            when {
+                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
-            }
-            items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Stock vacío", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Gestiona el stock desde Android o Desktop",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                error != null && items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(error!!, color = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(Spacing.md))
+                        OutlinedButton(onClick = { onRefresh() }) { Text("Reintentar") }
+                    }
                 }
-            }
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(items, key = { it.id }) { item ->
-                    SwipeToRevealItem(
-                        item     = item,
-                        onTap    = { haptic.selection() },
-                        onDelete = { haptic.error() }
-                    )
+                items.isEmpty() -> AnimatedEmptyState(
+                    icon     = "🥦",
+                    title    = "Stock vacío",
+                    subtitle = "Gestiona el stock desde Android o Desktop"
+                )
+                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    items(items, key = { it.id }) { item ->
+                        Box(Modifier.animateItem()) {
+                            SwipeToRevealItem(
+                                item     = item,
+                                onTap    = { haptic.selection() },
+                                onDelete = { haptic.error() }
+                            )
+                        }
+                    }
                 }
             }
         }

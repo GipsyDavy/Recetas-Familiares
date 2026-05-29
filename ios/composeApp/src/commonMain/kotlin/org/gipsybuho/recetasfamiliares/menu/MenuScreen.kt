@@ -6,14 +6,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.datetime.*
+import org.gipsybuho.recetasfamiliares.Spacing
 import org.gipsybuho.recetasfamiliares.network.MenuItemDto
+import org.gipsybuho.recetasfamiliares.recipes.AnimatedEmptyState
 
 @Composable
 fun MenuScreen(repository: MenuRepository) {
@@ -79,29 +80,22 @@ fun MenuScreen(repository: MenuRepository) {
             error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(error!!, color = MaterialTheme.colorScheme.error)
             }
-            weekItems.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Outlined.CalendarMonth,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint     = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text("Sin menú esta semana", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Planifica el menú desde Android o Desktop",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
+            weekItems.isEmpty() -> AnimatedEmptyState(
+                icon     = "📅",
+                title    = "Sin menú esta semana",
+                subtitle = "Planifica el menú desde Android o Desktop"
+            )
             else -> {
                 val byDate = weekItems.groupBy { it.plannedDate.take(10) }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
                     byDate.entries.sortedBy { it.key }.forEach { (date, dayItems) ->
-                        item(key = date) { DayMenuCard(date = date, items = dayItems) }
+                        item(key = date) {
+                            DayMenuCard(
+                                date    = date,
+                                items   = dayItems,
+                                isToday = date == today.toString()
+                            )
+                        }
                     }
                 }
             }
@@ -110,14 +104,34 @@ fun MenuScreen(repository: MenuRepository) {
 }
 
 @Composable
-private fun DayMenuCard(date: String, items: List<MenuItemDto>) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun DayMenuCard(date: String, items: List<MenuItemDto>, isToday: Boolean = false) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = if (isToday) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                 else CardDefaults.cardColors()
+    ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text  = formatDate(date),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text  = formatDate(date),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+                if (isToday) {
+                    Surface(
+                        shape = MaterialTheme.shapes.extraSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Text("Hoy",
+                            style    = MaterialTheme.typography.labelSmall,
+                            color    = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+            }
             HorizontalDivider(thickness = 0.5.dp)
             items.forEach { item ->
                 Row(

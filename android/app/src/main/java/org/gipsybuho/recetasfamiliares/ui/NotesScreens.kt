@@ -22,9 +22,16 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -83,6 +90,7 @@ internal fun NotesScreen(
         }
 
     PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { viewModel.refresh() }, modifier = modifier) {
+        Box(Modifier.fillMaxSize()) {
         Column(Modifier.padding(Spacing.xl)) {
             when {
                 showCreateForm -> NoteForm(
@@ -134,57 +142,71 @@ internal fun NotesScreen(
                         singleLine = true, modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(Spacing.md))
-                    if (filtered.isEmpty()) {
-                        if (query.isBlank()) {
-                            LottieEmptyStateView(
-                                lottieRes   = R.raw.lottie_empty_list,
-                                title       = "Sin notas familiares",
-                                subtitle    = "Escribe recuerdos, anécdotas y secretos culinarios de vuestra familia",
-                                actionLabel = "Nueva nota",
-                                onAction    = { showCreateForm = true }
-                            )
-                        } else {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("Sin resultados para \"$query\"",
-                                    color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center)
-                            }
+                    if (notes.isEmpty() && isRefreshing) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            repeat(4) { SkeletonNoteCard() }
                         }
-                    } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            items(filtered, key = { it.id }) { note ->
-                                val swipeState = rememberSwipeToDismissBoxState()
-                                LaunchedEffect(swipeState.currentValue) {
-                                    if (swipeState.currentValue == SwipeToDismissBoxValue.EndToStart) {
-                                        pendingDeleteNote = note
-                                        pendingNoteSwipeState = swipeState
-                                    }
+                    } else Crossfade(targetState = filtered.isEmpty(), label = "notesListState") { isEmpty ->
+                        if (isEmpty) {
+                            if (query.isBlank()) {
+                                LottieEmptyStateView(
+                                    lottieRes   = R.raw.lottie_empty_list,
+                                    title       = "Sin notas familiares",
+                                    subtitle    = "Escribe recuerdos, anécdotas y secretos culinarios de vuestra familia",
+                                    actionLabel = "Nueva nota",
+                                    onAction    = { showCreateForm = true }
+                                )
+                            } else {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("Sin resultados para \"$query\"",
+                                        color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center)
                                 }
-                                SwipeToDismissBox(
-                                    state = swipeState,
-                                    enableDismissFromStartToEnd = false,
-                                    backgroundContent = {
-                                        Box(
-                                            Modifier.fillMaxSize()
-                                                .clip(MaterialTheme.shapes.medium)
-                                                .background(MaterialTheme.colorScheme.errorContainer),
-                                            contentAlignment = Alignment.CenterEnd
-                                        ) {
-                                            Icon(
-                                                Icons.Filled.Delete,
-                                                contentDescription = null,
-                                                modifier = Modifier.padding(horizontal = Spacing.xl),
-                                                tint = MaterialTheme.colorScheme.onErrorContainer
-                                            )
+                            }
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                items(filtered, key = { it.id }) { note ->
+                                    val swipeState = rememberSwipeToDismissBoxState()
+                                    LaunchedEffect(swipeState.currentValue) {
+                                        if (swipeState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                                            pendingDeleteNote = note
+                                            pendingNoteSwipeState = swipeState
                                         }
                                     }
-                                ) {
-                                    NoteCard(note, onClick = { selectedNote = note; error = null })
+                                    SwipeToDismissBox(
+                                        state = swipeState,
+                                        modifier = Modifier.animateItem(),
+                                        enableDismissFromStartToEnd = false,
+                                        backgroundContent = {
+                                            Box(
+                                                Modifier.fillMaxSize()
+                                                    .clip(MaterialTheme.shapes.medium)
+                                                    .background(MaterialTheme.colorScheme.errorContainer),
+                                                contentAlignment = Alignment.CenterEnd
+                                            ) {
+                                                Icon(
+                                                    Icons.Filled.Delete,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.padding(horizontal = Spacing.xl),
+                                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            }
+                                        }
+                                    ) {
+                                        NoteCard(note, onClick = { selectedNote = note; error = null })
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+        if (!showCreateForm && editingNote == null && selectedNote == null) {
+            FloatingActionButton(
+                onClick = { showCreateForm = true; error = null },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.xl)
+            ) { Icon(Icons.Filled.Add, contentDescription = "Nueva nota") }
+        }
         }
     }
 
@@ -295,5 +317,31 @@ internal fun NoteForm(
                 enabled = title.isNotBlank()) { Text("Guardar") }
             OutlinedButton(onClick = onCancel) { Text("Cancelar") }
         }
+    }
+}
+
+@Composable
+private fun SkeletonNoteCard() {
+    val alpha by rememberInfiniteTransition(label = "shimmer")
+        .animateFloat(initialValue = 0.25f, targetValue = 0.65f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "alpha")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = {
+                Box(modifier = Modifier.fillMaxWidth(0.6f).height(16.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = alpha)))
+            },
+            supportingContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                    Box(modifier = Modifier.fillMaxWidth(0.9f).height(12.dp)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                    Box(modifier = Modifier.fillMaxWidth(0.7f).height(12.dp)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                }
+            }
+        )
     }
 }
