@@ -281,13 +281,17 @@ Pendiente Sprint 21:
 | 19-iOS | 2026-05-29 | iOS SQLDelight 2.0.2: DatabaseDriverFactory expect/actual, RecipeRepo+StockRepo cache offline; HapticFeedback expect/actual UIKit; SwipeToReveal StockScreen (pointerInput+Animatable) |
 | 20-iOS | 2026-05-29 | ShoppingListScreen (2 niveles: listas→items drill-down, tachado read-only); MenuScreen (cards por día, chips tipo comida); SyncRepository pullIncremental (sync_metadata SQLDelight); LaunchedEffect sync al login |
 | 20-Desktop | 2026-05-29 | StockView+NotesView animateDelete() FadeTransition+colapso 150ms; MainWindow ⚙ Ajustes con PreferencesDialog toggle sonidos (Codex, BUILD SUCCESS) |
+| 21.1-iOS | 2026-05-29 | Pull-to-refresh manual: syncRepo pasado App→MainTabScreen→RecipeListScreen+StockScreen; IconButton Refresh + CircularProgressIndicator + pullIncremental() + botón Reintentar |
+| 21.2-Android | 2026-05-29 | Lottie 6.5.0: LottieEmptyStateView en SharedComposables; lottie_chef.json (cocinero bounce) + lottie_empty_list.json (portapapeles swing) en res/raw; RecipeList usa LottieEmptyStateView |
+| 21.3-Android | 2026-05-29 | Micro-animación ❤️ favorito: Animatable scale 1→1.35→1 spring(MediumBouncy) + HapticFeedbackType.LongPress; graphicsLayer en Icon favorito en RecipeDetail |
 
-## Proximos Pasos — Sprint 21
+## Proximos Pasos — Sprint 22
 
 Prioridad alta:
-- **iOS**: Pull-to-refresh manual en RecipeListScreen y StockScreen (`syncRepo.pullIncremental()` + recarga lista).
-- **Android**: Lottie empty states, micro-animación ❤️ favorito.
+- **iOS**: RecipeDetail screen (actualmente iOS solo muestra lista de recetas).
+- **iOS**: Navegación semanas en MenuScreen (requiere `kotlinx.datetime`).
+- **Android**: `LottieEmptyStateView` en StockList, NotesScreen, ShoppingList (actualmente solo en RecipeList).
 
 Prioridad baja:
 - **Android**: SharedElementTransition RecipeList→Detail (Compose experimental API).
-- **iOS**: Navegación semanas en MenuScreen (requiere `kotlinx.datetime`).
+- **iOS**: Micro-animación ❤️ favorito (pendiente RecipeDetail iOS).

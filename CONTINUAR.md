@@ -1066,15 +1066,44 @@ Verificado en emulador Pixel_9_Pro API 36: LoginScreen, RecipeList, RecipeDetail
 - Triggers: al login (App.kt) + pull-to-refresh manual (futuro Sprint 21).
 - Conflictos: ninguno por ahora (iOS solo lee; LWW ya en backend).
 
-## Sprint 21 — Candidatos
+## Sprint 21 — COMPLETADO (2026-05-29)
+
+### Sprint 21.1 — Pull-to-refresh iOS ✅ COMPLETADO
+
+- `App.kt`: pasa `syncRepo` a `MainTabScreen` (parámetro nuevo).
+- `MainTabScreen.kt`: recibe `syncRepo: SyncRepository` + import + pasa a `RecipeListScreen` y `StockScreen`.
+- `RecipeListScreen.kt`: `IconButton(Refresh)` en header; `isRefreshing` state; al pulsar → `syncRepo.pullIncremental()` + `repository.loadRecipes()`; indicador `CircularProgressIndicator` mientras carga; botón "Reintentar" en estado de error.
+- `StockScreen.kt`: mismo patrón. Import `Icons.Filled.Refresh` añadido.
+
+### Sprint 21.2 — Lottie Empty States Android ✅ COMPLETADO
+
+- `build.gradle.kts`: `com.airbnb.android:lottie-compose:6.5.0`.
+- `res/raw/lottie_chef.json`: animación cocinero bounce (sombrero + cabeza + cuerpo + vapor).
+- `res/raw/lottie_empty_list.json`: animación portapapeles swing.
+- `SharedComposables.kt`: `LottieEmptyStateView` con `rememberLottieComposition` + `LottieConstants.IterateForever` + tamaño 160dp + mismo layout que `EmptyStateView`.
+- `RecipeScreens.kt`: empty state recetas (sin filtro) usa `LottieEmptyStateView(R.raw.lottie_chef)`.
+
+Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (41s, 0 errores).
+
+### Sprint 21.3 — Micro-animación ❤️ favorito Android ✅ COMPLETADO
+
+- `RecipeScreens.kt`: en `RecipeDetail`:
+  - `val favoriteScale = remember { Animatable(1f) }`.
+  - Al hacer click: `haptic.performHapticFeedback(HapticFeedbackType.LongPress)` + `scope.launch { animateTo(1.35f, spring(MediumBouncy)) → animateTo(1f, spring(MediumBouncy)) }`.
+  - `Icon` del favorito con `Modifier.graphicsLayer { scaleX/scaleY = favoriteScale.value }`.
+- Imports añadidos: `Animatable`, `Spring`, `spring`, `graphicsLayer`, `HapticFeedbackType`, `LocalHapticFeedback`, `rememberCoroutineScope`, `launch`.
+
+Build final: **BUILD SUCCESSFUL**.
+
+## Sprint 22 — Candidatos
 
 ### Prioridad Alta
 
-1. **Pull-to-refresh manual iOS** — botón/swipe en RecipeListScreen y StockScreen que llame a `syncRepo.pullIncremental()` y recargue la lista.
-2. **Lottie empty states Android** — cocinero animado, lista vacía (`com.airbnb.android:lottie-compose:6.x`).
-3. **Micro-animación ❤️ favorito** — escala + partículas al marcar favorito (Android + iOS).
+1. **Android:** Micro-animación ❤️ favorito iOS (pendiente — iOS no tiene RecipeDetail aún).
+2. **Android:** `SharedElementTransition` RecipeList → RecipeDetail (Compose experimental API).
+3. **iOS:** Navegación semanas en MenuScreen (requiere `kotlinx.datetime`).
 
-### Prioridad Baja
+### Prioridad Media
 
-1. **SharedElementTransition** RecipeList → RecipeDetail Android (Compose experimental API).
-2. Semana navigation en MenuScreen iOS (requiere `kotlinx.datetime` o expect/actual para cálculo de fechas).
+1. **Android:** `LottieEmptyStateView` integrado en StockList, NotesScreen y ShoppingList (actualmente solo en RecipeList).
+2. **iOS:** RecipeDetail screen (actualmente iOS solo muestra lista).

@@ -25,11 +25,18 @@ import org.gipsybuho.recetasfamiliares.shopping.ShoppingListRepository
 import org.gipsybuho.recetasfamiliares.shopping.ShoppingListScreen
 import org.gipsybuho.recetasfamiliares.stock.StockRepository
 import org.gipsybuho.recetasfamiliares.stock.StockScreen
+import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 
 private enum class Tab { RECIPES, STOCK, SHOPPING, NOTES, MENU }
 
 @Composable
-fun MainTabScreen(apiClient: ApiClient, session: SessionStore, driverFactory: DatabaseDriverFactory, onLogout: () -> Unit) {
+fun MainTabScreen(
+    apiClient: ApiClient,
+    session: SessionStore,
+    driverFactory: DatabaseDriverFactory,
+    syncRepo: SyncRepository,
+    onLogout: () -> Unit
+) {
     val recipeRepo   = remember { RecipeRepository(apiClient, session, driverFactory) }
     val stockRepo    = remember { StockRepository(apiClient, session, driverFactory) }
     val noteRepo     = remember { NoteRepository(apiClient, session) }
@@ -76,8 +83,8 @@ fun MainTabScreen(apiClient: ApiClient, session: SessionStore, driverFactory: Da
     ) { paddingValues ->
         Box(Modifier.fillMaxSize().padding(paddingValues)) {
             when (selectedTab) {
-                Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo)
-                Tab.STOCK    -> StockScreen(repository = stockRepo)
+                Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo, syncRepo = syncRepo)
+                Tab.STOCK    -> StockScreen(repository = stockRepo, syncRepo = syncRepo)
                 Tab.NOTES    -> NotesScreen(repository = noteRepo)
                 Tab.SHOPPING -> ShoppingListScreen(repository = shoppingRepo)
                 Tab.MENU     -> MenuScreen(repository = menuRepo)

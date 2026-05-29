@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,46 +22,82 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.StockItemDto
+import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 import kotlin.math.roundToInt
 
 @Composable
-fun StockScreen(repository: StockRepository) {
-    var items   by remember { mutableStateOf<List<StockItemDto>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var error   by remember { mutableStateOf<String?>(null) }
-    val haptic  = rememberHapticFeedback()
+fun StockScreen(repository: StockRepository, syncRepo: SyncRepository) {
+    var items        by remember { mutableStateOf<List<StockItemDto>>(emptyList()) }
+    var loading      by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var error        by remember { mutableStateOf<String?>(null) }
+    val haptic       = rememberHapticFeedback()
+    val scope        = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
+    suspend fun loadData() {
         runCatching { items = repository.loadStockItems() }
             .onFailure { error = it.message }
+    }
+
+    LaunchedEffect(Unit) {
+        loadData()
         loading = false
     }
 
+    fun onRefresh() {
+        scope.launch {
+            isRefreshing = true
+            error = null
+            syncRepo.pullIncremental()
+            loadData()
+            isRefreshing = false
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Stock Familiar", style = MaterialTheme.typography.headlineSmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Stock Familiar", style = MaterialTheme.typography.headlineSmall)
+            IconButton(onClick = { if (!isRefreshing) onRefresh() }) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
+                }
+            }
+        }
         Spacer(Modifier.height(16.dp))
 
         when {
             loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(error!!, color = MaterialTheme.colorScheme.error)
+            error != null && items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(error!!, color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { onRefresh() }) { Text("Reintentar") }
+                }
             }
             items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Stock vacío", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("Gestiona el stock desde Android o Desktop",
+                    Text(
+                        "Gestiona el stock desde Android o Desktop",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline)
+                        color = MaterialTheme.colorScheme.outline
+                    )
                 }
             }
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(items, key = { it.id }) { item ->
                     SwipeToRevealItem(
-                        item    = item,
-                        onTap   = { haptic.selection() },
+                        item     = item,
+                        onTap    = { haptic.selection() },
                         onDelete = { haptic.error() }
                     )
                 }

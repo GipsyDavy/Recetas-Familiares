@@ -68,5 +68,7 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.0.4")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
 
+    implementation("com.airbnb.android:lottie-compose:6.5.0")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

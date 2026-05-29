@@ -3,14 +3,18 @@
 package org.gipsybuho.recetasfamiliares.ui
 
 import android.content.Intent
+import org.gipsybuho.recetasfamiliares.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -78,12 +82,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -220,10 +229,13 @@ internal fun RecipeList(
                         } else Crossfade(targetState = filtered.isEmpty(), label = "recipeListState") { isEmpty ->
                             if (isEmpty) {
                                 if (query.isBlank() && difficultyFilter == null) {
-                                    EmptyStateView(icon = Icons.Outlined.Restaurant,
-                                        title = "Sin recetas aún",
-                                        subtitle = "Empieza a guardar las recetas de tu familia y construid vuestro recetario",
-                                        actionLabel = "Crear primera receta", onAction = { showCreateForm = true })
+                                    LottieEmptyStateView(
+                                        lottieRes   = R.raw.lottie_chef,
+                                        title       = "Sin recetas aún",
+                                        subtitle    = "Empieza a guardar las recetas de tu familia y construid vuestro recetario",
+                                        actionLabel = "Crear primera receta",
+                                        onAction    = { showCreateForm = true }
+                                    )
                                 } else {
                                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                         Text("Sin resultados para \"$query\"",
@@ -361,7 +373,9 @@ internal fun RecipeDetail(
     onDelete: () -> Unit,
     onCookingMode: () -> Unit = {}
 ) {
-    val context = LocalContext.current
+    val context    = LocalContext.current
+    val haptic     = LocalHapticFeedback.current
+    val scope      = rememberCoroutineScope()
     val ingredients by viewModel.ingredientsFor(recipe.id).collectAsState(initial = emptyList())
     val steps by viewModel.stepsFor(recipe.id).collectAsState(initial = emptyList())
     val isFavorite by viewModel.isFavorite(recipe.id).collectAsState(initial = false)
@@ -369,6 +383,7 @@ internal fun RecipeDetail(
     val ratings by viewModel.recipeRatings.collectAsState()
     val myUserId = viewModel.myUserId
     var showMenu by remember { mutableStateOf(false) }
+    val favoriteScale = remember { Animatable(1f) }
 
     LaunchedEffect(recipe.id) {
         viewModel.loadPhotos(recipe.id)
@@ -386,11 +401,24 @@ internal fun RecipeDetail(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                 }
                 Text(recipe.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                IconButton(onClick = { viewModel.toggleFavorite(recipe.id) }) {
+                IconButton(onClick = {
+                    viewModel.toggleFavorite(recipe.id)
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    scope.launch {
+                        favoriteScale.animateTo(1.35f,
+                            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                        favoriteScale.animateTo(1f,
+                            spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                    }
+                }) {
                     Icon(
-                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        imageVector        = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                         contentDescription = if (isFavorite) "Quitar favorito" else "Añadir favorito",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint               = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier           = Modifier.graphicsLayer {
+                            scaleX = favoriteScale.value
+                            scaleY = favoriteScale.value
+                        }
                     )
                 }
                 IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones") }

@@ -32,6 +32,7 @@ fun App() {
                 apiClient     = apiClient,
                 session       = session,
                 driverFactory = driverFactory,
+                syncRepo      = syncRepo,
                 onLogout      = { session.clear(); isLoggedIn = false }
             )
         }
