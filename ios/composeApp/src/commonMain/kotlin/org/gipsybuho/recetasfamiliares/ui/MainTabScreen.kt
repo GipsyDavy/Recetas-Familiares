@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,8 +27,10 @@ import org.gipsybuho.recetasfamiliares.shopping.ShoppingListScreen
 import org.gipsybuho.recetasfamiliares.stock.StockRepository
 import org.gipsybuho.recetasfamiliares.stock.StockScreen
 import org.gipsybuho.recetasfamiliares.sync.SyncRepository
+import org.gipsybuho.recetasfamiliares.theme.AppTheme
+import org.gipsybuho.recetasfamiliares.theme.ThemeMode
 
-private enum class Tab { RECIPES, STOCK, SHOPPING, NOTES, MENU }
+private enum class Tab { RECIPES, STOCK, SHOPPING, NOTES, MENU, SETTINGS }
 
 @Composable
 fun MainTabScreen(
@@ -35,6 +38,10 @@ fun MainTabScreen(
     session: SessionStore,
     driverFactory: DatabaseDriverFactory,
     syncRepo: SyncRepository,
+    selectedTheme: AppTheme,
+    themeMode: ThemeMode,
+    onThemeChange: (AppTheme) -> Unit,
+    onModeChange: (ThemeMode) -> Unit,
     onLogout: () -> Unit
 ) {
     val recipeRepo   = remember { RecipeRepository(apiClient, session, driverFactory) }
@@ -78,6 +85,12 @@ fun MainTabScreen(
                     icon     = { Icon(Icons.Outlined.CalendarMonth, contentDescription = "Menú") },
                     label    = { Text("Menú") }
                 )
+                NavigationBarItem(
+                    selected = selectedTab == Tab.SETTINGS,
+                    onClick  = { selectedTab = Tab.SETTINGS },
+                    icon     = { Icon(Icons.Outlined.Settings, contentDescription = "Ajustes") },
+                    label    = { Text("Ajustes") }
+                )
             }
         }
     ) { paddingValues ->
@@ -88,8 +101,14 @@ fun MainTabScreen(
                 Tab.NOTES    -> NotesScreen(repository = noteRepo)
                 Tab.SHOPPING -> ShoppingListScreen(repository = shoppingRepo)
                 Tab.MENU     -> MenuScreen(repository = menuRepo)
+                Tab.SETTINGS -> SettingsScreen(
+                    selectedTheme = selectedTheme,
+                    themeMode     = themeMode,
+                    onThemeChange = onThemeChange,
+                    onModeChange  = onModeChange,
+                    onLogout      = onLogout
+                )
             }
         }
     }
 }
-

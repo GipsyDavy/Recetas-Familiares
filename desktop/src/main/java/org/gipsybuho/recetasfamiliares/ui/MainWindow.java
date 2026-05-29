@@ -43,6 +43,7 @@ public class MainWindow {
         Scene scene = new Scene(root, 1200, 780);
         scene.getStylesheets().add(
                 Objects.requireNonNull(getClass().getResource("/style.css")).toExternalForm());
+        ThemeManager.getInstance().attach(scene);
 
         stage.setTitle("Recetas Familiares");
         stage.setScene(scene);
@@ -298,25 +299,72 @@ public class MainWindow {
         dialog.setTitle("Ajustes");
         dialog.initOwner(stage);
         dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
-        dialog.getDialogPane().setPrefSize(350, 200);
+        dialog.getDialogPane().setPrefSize(480, 380);
         dialog.getDialogPane().getStylesheets().add(
                 Objects.requireNonNull(getClass().getResource("/style.css")).toExternalForm());
 
+        // ── Sonido ──────────────────────────────────────────────────────────────
         CheckBox cbSounds = new CheckBox("Efectos de sonido");
         cbSounds.setSelected(SoundPlayer.isSoundEnabled());
-        cbSounds.setStyle("-fx-text-fill: #3D2B1F; -fx-font-size: 13px;");
 
-        VBox content = new VBox(16, cbSounds);
+        // ── Modo de tema ─────────────────────────────────────────────────────────
+        Label lblMode = new Label("Modo de interfaz");
+        lblMode.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+        ToggleGroup modeGroup = new ToggleGroup();
+        RadioButton rbLight  = new RadioButton("Claro");
+        RadioButton rbDark   = new RadioButton("Oscuro");
+        RadioButton rbSystem = new RadioButton("Sistema");
+        rbLight.setToggleGroup(modeGroup);
+        rbDark.setToggleGroup(modeGroup);
+        rbSystem.setToggleGroup(modeGroup);
+        ThemeManager.ThemeMode currentMode = ThemeManager.getInstance().loadMode();
+        (switch (currentMode) {
+            case LIGHT  -> rbLight;
+            case DARK   -> rbDark;
+            case SYSTEM -> rbSystem;
+        }).setSelected(true);
+        javafx.scene.layout.HBox modeRow = new javafx.scene.layout.HBox(16, rbLight, rbDark, rbSystem);
+
+        // ── Selector de tema ─────────────────────────────────────────────────────
+        Label lblTheme = new Label("Color del tema");
+        lblTheme.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+        ComboBox<ThemeManager.AppTheme> themeCombo = new ComboBox<>();
+        themeCombo.getItems().setAll(ThemeManager.AppTheme.values());
+        themeCombo.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(ThemeManager.AppTheme item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.displayName());
+            }
+        });
+        themeCombo.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(ThemeManager.AppTheme item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.displayName());
+            }
+        });
+        themeCombo.setValue(ThemeManager.getInstance().loadTheme());
+        themeCombo.setMaxWidth(Double.MAX_VALUE);
+
+        VBox content = new VBox(14,
+                cbSounds,
+                new Separator(),
+                lblMode, modeRow,
+                new Separator(),
+                lblTheme, themeCombo
+        );
         content.setPadding(new Insets(18));
-        content.setStyle(
-                "-fx-background-color: #F6E7D8; -fx-background-radius: 10; " +
-                "-fx-border-color: #D4A574; -fx-border-radius: 10; -fx-border-width: 1;");
         dialog.getDialogPane().setContent(content);
 
         dialog.showAndWait().ifPresent(type -> {
             if (type == ButtonType.OK) {
                 Preferences.userRoot().node("recetas")
                         .putBoolean("sound", cbSounds.isSelected());
+                ThemeManager.ThemeMode mode = rbLight.isSelected() ? ThemeManager.ThemeMode.LIGHT
+                        : rbDark.isSelected() ? ThemeManager.ThemeMode.DARK
+                        : ThemeManager.ThemeMode.SYSTEM;
+                ThemeManager.AppTheme theme = themeCombo.getValue() != null
+                        ? themeCombo.getValue() : ThemeManager.AppTheme.BOSQUE;
+                ThemeManager.getInstance().applyTheme(theme, mode);
             }
         });
     }

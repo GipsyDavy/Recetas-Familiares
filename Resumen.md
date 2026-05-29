@@ -107,13 +107,20 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT 19 COMPLETO — 2026-05-29)
+### Android Kotlin + Compose (SPRINT 25A COMPLETO — 2026-05-29)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
-- Compose + Material 3 (BOM 2026.05.00)
+- Compose + Material 3 (BOM 2026.05.00) + DataStore Preferences 1.1.4
 - Retrofit 3 + OkHttp 5 + Room 2.8.4 (v2) + WorkManager 2.11.2
 - MVVM + AppContainer (DI manual) + EncryptedSharedPreferences
+
+Sistema de temas (Sprint 25A):
+- `AppTheme.kt` — 10 temas × 2 modos = 20 ColorSchemes Material3 completos (Bosque, Terracota, Ocaso, Mediterráneo, Lavanda, Oliva, Canela, Menta, Frambuesa, Noche de Verano)
+- `ThemePreference.kt` — DataStore persistencia tema + modo (LIGHT/DARK/SYSTEM)
+- `Theme.kt` — `RecetasTheme(appTheme, themeMode)` con `AppTypography` (13 tokens)
+- `ThemePickerDialog.kt` — cuadrícula 5×2 de swatches de color + chips modo
+- `RecetasApp.kt` — botón paleta 🎨 en TopAppBar abre el diálogo
 
 Pantallas implementadas (Sprint 1-15 + UI):
 - **LoginScreen** rediseñada — ícono brand circular, tipografía centrada, botón "Entrar →"
@@ -144,10 +151,16 @@ SDK: C:\Users\GipsyDavy\AndroidSDK
 AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-### Desktop JavaFX (SPRINT 20 COMPLETO — 2026-05-29)
+### Desktop JavaFX (SPRINT 25A COMPLETO — 2026-05-29)
 
 JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
+
+Sistema de temas (Sprint 25A):
+- `ThemeManager.java` — singleton, Java Preferences API, carga CSS dinámico, detección dark mode Windows
+- `style.css` — refactorizado con looked-up colors JavaFX (`recetas-primary`, `recetas-bg`, etc.)
+- `themes/` — 20 archivos CSS (10 temas × light/dark), cada uno sobreescribe solo `.root { recetas-*: #valor }`
+- `MainWindow.java` — `ThemeManager.attach(scene)`; diálogo Ajustes con RadioButton modo + ComboBox tema
 
 Pantallas implementadas (Sprint 1-15):
 - LoginView
@@ -167,7 +180,7 @@ Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de 
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-### iOS KMP + Compose Multiplatform (SPRINT 20 COMPLETADO — 2026-05-29)
+### iOS KMP + Compose Multiplatform (SPRINT 25A COMPLETADO — 2026-05-29)
 
 Stack implementado:
 - Kotlin Multiplatform + Compose Multiplatform (Kotlin 2.0.21, Compose 1.7.0)
@@ -196,12 +209,16 @@ Arquitectura ios/ (proyecto Gradle KMP independiente):
 - `composeApp/src/iosMain/` — MainViewController + SessionStore.ios + DatabaseDriverFactory.ios + HapticFeedback.ios
 - `iosApp/` — Entry point SwiftUI: iosApp.swift + ContentView.swift
 
+Sistema de temas (Sprint 25A):
+- `theme/AppTheme.kt` (commonMain) — 10 temas, `lightColors()` / `darkColors()`, `AppTypography`
+- `theme/ThemePreference.kt` (commonMain) + `ThemePreference.ios.kt` (iosMain, NSUserDefaults) — expect/actual
+- `App.kt` — `MaterialTheme(colorScheme, typography)` con el tema seleccionado
+- `ui/SettingsScreen.kt` — pantalla ajustes con swatches + chips modo + botón logout
+- `ui/MainTabScreen.kt` — 6º tab "Ajustes" con ícono `Settings`
+
 Compilacion: requiere macOS + Xcode para generar binario/framework.
 En Windows: edicion Kotlin completa via Android Studio.
-
-Pendiente Sprint 21:
-- Pull-to-refresh manual en RecipeListScreen y StockScreen
-- Navegación semanas en MenuScreen (requiere kotlinx.datetime)
+Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + Gradle 9.5.1 (no relacionado con Sprint 25A).
 
 ### Base de Datos MySQL
 
@@ -294,15 +311,29 @@ Pendiente Sprint 21:
 | 24.1-iOS | 2026-05-29 | CookingScreen.kt (commonMain): swipe H gestures ±80f; timer countdown AnimatedContent slideInVertically; ScreenWakeLock expect/actual (UIApplication.idleTimerDisabled); FAB Cocinar en RecipeDetailScreen; cookingMode state en RecipeListScreen |
 | 24.2-iOS | 2026-05-29 | Compartir receta: ShareSheet expect/actual (UIActivityViewController keyWindow); buildShareText() título+meta+ingredientes+pasos; botón Share en RecipeDetailScreen header |
 | 24.3-Android | 2026-05-29 | CookingScreen swipe gestures: detectHorizontalDragGestures + pointerInput(steps.size); swipe izq→sig/finaliza, dcha→ant; haptic LongPress (BUILD SUCCESSFUL 3s) |
+| 25A-Android | 2026-05-29 | Sistema temas Android: AppTheme (10 temas×2 modos), ThemePreference (DataStore), Theme.kt refactor, ThemePickerDialog (swatches+chips), botón paleta TopAppBar (BUILD SUCCESSFUL) |
+| 25A-Desktop | 2026-05-29 | Sistema temas Desktop: ThemeManager.java (singleton+CSS dinámico), style.css (looked-up colors), 20 CSS themes/, MainWindow selector tema+modo en Ajustes (BUILD SUCCESS) |
+| 25A-iOS | 2026-05-29 | Sistema temas iOS: AppTheme.kt+ThemePreference expect/actual (NSUserDefaults), App.kt+MaterialTheme, SettingsScreen.kt, MainTabScreen 6º tab Ajustes |
 
-## Proximos Pasos — Sprint 25
+## Proximos Pasos — Sprint 25B/C/D (UI/UX Polish)
 
-Prioridad alta:
-- **Android**: Drag-to-reorder ingredientes y pasos en `RecipeForm`.
-- **iOS**: `NotesScreen` crear/editar notas (actualmente solo lectura).
-- **Desktop + Android**: DashboardView con menú del día actual real.
+### Sprint 25B — Polish Android (prioridad alta)
+- **B-1** `RecetasApp.kt`: TopAppBar contextual según tab activo + `AnimatedContent` al cambiar tab
+- **B-2** `NotesScreens.kt`: FAB flotante (consistente con RecipeList y StockList)
+- **B-3** `StockScreens.kt`: `animateItem()` en LazyColumn + skeleton loading
+- **B-4** `NotesScreens.kt`: `animateItem()` + skeleton loading
+- **B-5** `RecipeScreens.kt`: chips dificultad traducidos (EASY→Fácil/MEDIUM→Media/HARD→Difícil)
+- **B-6** `StockScreens.kt:328`: botón Eliminar en StockDetail con color error
+- **B-7** `MenuScreen.kt`: empty state con Lottie (lottie_empty_list)
 
-Prioridad media:
-- **iOS + Android**: Onboarding primera vez (3 pantallas, mostrar una sola vez).
-- **iOS**: `StockScreen` CRUD crear/editar items.
-- **Android**: Hint visual swipe en `CookingScreen`.
+### Sprint 25C — Polish Desktop (prioridad media)
+- **C-1** `MainWindow.java`: sidebar con estado activo visual (clase CSS `sidebar-nav-button-active`)
+- **C-2** `DashboardView.java`: indicador de carga real (spinner/ProgressBar) en vez de texto
+- **C-3** `MainWindow.java`: iconos en botones de la sidebar
+
+### Sprint 25D — Polish iOS (prioridad media)
+- **D-1** `RecipeListScreen.kt`: RecipeCard rica con imagen placeholder + gradiente + meta chips
+- **D-2** `StockScreen.kt`, `NotesScreen.kt`, `RecipeListScreen.kt`: empty states animados
+- **D-3** Todas las LazyColumns iOS: `animateItem()`
+- **D-4** `MenuScreen.kt`: resaltar "hoy" con `primaryContainer` como Android
+- **D-5** `RecipeListScreen.kt`, `StockScreen.kt`: PullToRefresh nativo

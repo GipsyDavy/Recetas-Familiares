@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -159,12 +160,15 @@ private fun MainShell(viewModel: RecetasViewModel) {
     var tab by remember { mutableStateOf(MainTab.RECIPES) }
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var showThemePicker by remember { mutableStateOf(false) }
     val recipes by viewModel.recipes.collectAsState()
     val stockItems by viewModel.stockItems.collectAsState()
     val shoppingLists by viewModel.shoppingLists.collectAsState()
     val notes by viewModel.notes.collectAsState()
     val menuItems by viewModel.menuItems.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val selectedTheme by viewModel.selectedTheme.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
     var navigateToRecipeId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -207,6 +211,15 @@ private fun MainShell(viewModel: RecetasViewModel) {
                     actions = {
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = { PlainTooltip { Text("Tema") } },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(onClick = { showThemePicker = true }) {
+                                Icon(Icons.Filled.Palette, contentDescription = "Cambiar tema")
+                            }
+                        }
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                             tooltip = { PlainTooltip { Text("Buscar") } },
                             state = rememberTooltipState()
                         ) {
@@ -234,6 +247,19 @@ private fun MainShell(viewModel: RecetasViewModel) {
             }
         }
     ) { padding ->
+        if (showThemePicker) {
+            ThemePickerDialog(
+                currentTheme = selectedTheme,
+                currentMode  = themeMode,
+                onDismiss    = { showThemePicker = false },
+                onApply      = { theme, mode ->
+                    viewModel.setTheme(theme)
+                    viewModel.setThemeMode(mode)
+                    showThemePicker = false
+                }
+            )
+        }
+
         if (searchActive && searchQuery.trim().length >= 2) {
             GlobalSearchScreen(
                 query = searchQuery.trim(),

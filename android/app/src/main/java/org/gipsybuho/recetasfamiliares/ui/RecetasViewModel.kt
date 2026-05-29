@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
+import org.gipsybuho.recetasfamiliares.ui.theme.AppTheme
+import org.gipsybuho.recetasfamiliares.ui.theme.ThemeMode
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -156,6 +158,20 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     val notes: StateFlow<List<FamilyNoteEntity>> = container.familyNoteRepository.notes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val selectedTheme: StateFlow<AppTheme> = container.themePreference.selectedTheme
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppTheme.BOSQUE)
+
+    val themeMode: StateFlow<ThemeMode> = container.themePreference.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.SYSTEM)
+
+    fun setTheme(theme: AppTheme) {
+        viewModelScope.launch { container.themePreference.setTheme(theme) }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { container.themePreference.setThemeMode(mode) }
+    }
 
     fun createRecipe(
         title: String, description: String?, servings: Int?,

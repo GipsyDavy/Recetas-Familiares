@@ -281,17 +281,52 @@ mvn compile — BUILD SUCCESS. Ejecutar: `mvn javafx:run -Dapi.base.url=http://l
 
 ---
 
-## Estado Git (2026-05-29)
+## Sprint 25A — SISTEMA DE TEMAS COMPLETO (2026-05-29)
 
-Rama: `main`. HEAD limpio en el último commit documentado.
+### Objetivo
+Sistema de 10 temas × 2 modos (Claro/Oscuro) = 20 esquemas de color en las 3 plataformas.
+Usuario puede elegir tema y modo desde la UI. Preferencia persistida localmente.
+
+### Android — COMPLETADO ✅
+- **`AppTheme.kt`** (nuevo): enum `AppTheme` (10 valores), enum `ThemeMode`, extensiones `lightColors()` / `darkColors()` con todos los roles Material3, `AppTypography` con escala tipográfica completa (13 tokens).
+- **`ThemePreference.kt`** (nuevo): DataStore<Preferences> para persistir tema + modo.
+- **`Theme.kt`** (modificado): acepta `AppTheme` + `ThemeMode`; selecciona colors y aplica `AppTypography`.
+- **`AppContainer.kt`** (modificado): añadido `val themePreference = ThemePreference(context)`.
+- **`RecetasViewModel.kt`** (modificado): `selectedTheme: StateFlow<AppTheme>`, `themeMode: StateFlow<ThemeMode>`, `setTheme()`, `setThemeMode()`.
+- **`MainActivity.kt`** (modificado): lee estado del ViewModel y pasa a `RecetasTheme`.
+- **`ThemePickerDialog.kt`** (nuevo): diálogo `AlertDialog` con grid 5-columnas de swatches de color + chips Claro/Oscuro/Sistema.
+- **`RecetasApp.kt`** (modificado): botón Paleta en TopAppBar que abre `ThemePickerDialog`.
+- **`build.gradle.kts`** (modificado): añadida dependencia `datastore-preferences:1.1.4`.
+- Compilación: `./gradlew assembleDebug` — BUILD SUCCESSFUL ✅
+
+### Desktop — COMPLETADO ✅
+- **`ThemeManager.java`** (nuevo): singleton, carga CSS de temas vía `Java Preferences API`, método `applyTheme(AppTheme, ThemeMode)`, detección de dark mode del sistema (Windows registry).
+- **`style.css`** (refactorizado): variables looked-up JavaFX en `.root` (`recetas-primary`, `recetas-bg`, etc.); todos los hexadecimales reemplazados por referencias a variables.
+- **`themes/` directorio** (nuevo): 20 archivos CSS, uno por tema×modo (bosque-light/dark, terracota-light/dark, ocaso-light/dark, mediterraneo-light/dark, lavanda-light/dark, oliva-light/dark, canela-light/dark, menta-light/dark, frambuesa-light/dark, noche-verano-light/dark). Cada fichero solo define `.root { recetas-*: #valor; ... }`.
+- **`MainWindow.java`** (modificado): llama `ThemeManager.getInstance().attach(scene)` al crear la escena; `showPreferencesDialog()` ampliado con `RadioButton` modo y `ComboBox` tema.
+- Compilación: `mvn compile` — BUILD SUCCESS ✅
+
+### iOS KMP — COMPLETADO (código listo, build pre-existente no compila en Windows) ✅
+- **`theme/AppTheme.kt`** (nuevo, commonMain): mismas definiciones que Android — enum `AppTheme`, `ThemeMode`, `lightColors()`, `darkColors()`, `AppTypography`.
+- **`theme/ThemePreference.kt`** (nuevo, commonMain): `expect class ThemePreference()` con `selectedTheme` y `themeMode`.
+- **`theme/ThemePreference.ios.kt`** (nuevo, iosMain): `actual class ThemePreference` usando `NSUserDefaults`.
+- **`App.kt`** (modificado): sustituye `MaterialTheme {}` por `MaterialTheme(colorScheme, typography)` usando el tema seleccionado; crea `ThemePreference` y expone estado via `mutableStateOf`.
+- **`ui/SettingsScreen.kt`** (nuevo, commonMain): pantalla de ajustes con grid de swatches + chips de modo + botón logout.
+- **`ui/MainTabScreen.kt`** (modificado): acepta `selectedTheme`, `themeMode`, `onThemeChange`, `onModeChange`; añade tab 6 "Ajustes" con icono `Settings`.
+- Nota: build iOS en Windows falla por incompatibilidad pre-existente SQLDelight plugin + Gradle 9.5.1 (error `DefaultArtifactPublicationSet`). No relacionado con estos cambios.
+
+### Estado Git (2026-05-29)
+
+Rama: `main`. Sprint 25A completo, sin commit aún.
+
+Archivos modificados: `build.gradle.kts`, `MainActivity.kt`, `AppContainer.kt`, `RecetasApp.kt`, `RecetasViewModel.kt`, `Theme.kt`, `MainWindow.java`, `style.css`, `App.kt`, `MainTabScreen.kt`.
+Archivos nuevos: `AppTheme.kt` (x2), `ThemePreference.kt` (x2), `ThemePreference.ios.kt`, `ThemePickerDialog.kt`, `ThemeManager.java`, `SettingsScreen.kt`, `themes/` (20 CSS), `Interfaz.md`.
 
 Commits recientes:
 ```
 a1248e8 docs: Sprint 20 completado — actualizar CONTINUAR.md, Resumen.md y preparar Sprint 21  ← HEAD
 6963f04 feat: Sprint 20 completo — iOS sync incremental + Desktop polish (Multi-IA)
 847c528 feat: Sprint 20 iOS — ShoppingListScreen + MenuScreen implementados
-ab6c58e docs: Sprint 20 preparado — actualizar CONTINUAR.md y Resumen.md al estado Sprint 19
-0e558be docs: Sprint 19 completado — actualizar CONTINUAR.md y memoria
 ```
 
 ---

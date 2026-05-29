@@ -6,6 +6,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.gipsybuho.recetasfamiliares.ui.RecetasApp
 import org.gipsybuho.recetasfamiliares.ui.RecetasViewModel
@@ -24,8 +26,10 @@ class MainActivity : ComponentActivity() {
         }
         val container = (application as RecetasApplication).container
         setContent {
-            RecetasTheme {
-                val viewModel: RecetasViewModel = viewModel(factory = RecetasViewModelFactory(container))
+            val viewModel: RecetasViewModel = viewModel(factory = RecetasViewModelFactory(container))
+            val appTheme  by viewModel.selectedTheme.collectAsState()
+            val themeMode by viewModel.themeMode.collectAsState()
+            RecetasTheme(appTheme = appTheme, themeMode = themeMode) {
                 RecetasApp(viewModel)
             }
         }
