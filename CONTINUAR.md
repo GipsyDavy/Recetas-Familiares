@@ -1314,16 +1314,52 @@ Build: Android BUILD SUCCESSFUL (11s) · Desktop BUILD SUCCESS
 
 ---
 
-## Sprint 29 — Candidatos
+## Sprint 29 — COMPLETADO (2026-05-29) — commit c075594
 
-### Prioridad Alta
+### Android ✅
+- **UI-1**: Nunito + Lato activados via Google Fonts provider (`ui-text-google-fonts` + `font_certs.xml` + `AppTheme.kt`)
+- **UI-2**: NavigationBar usa `Icons.Filled.*` (activo) / `Icons.Outlined.*` (inactivo)
+- **UI-3**: ProfileScreen eliminados ListItems duplicados (nombre/email ya en el header)
+- **UI-4**: Iniciales avatar — primera+inicial apellido ("MG" en vez de "MA")
+- **Sprint 29.1**: `UserRepository` + `GET/PUT /api/v1/users/me` + edición inline displayName en ProfileScreen
 
-1. **Backend + Android + iOS:** Editar displayName desde perfil — añadir `UserController` backend (`GET/PUT /api/v1/users/me`) + form de edición en `ProfileScreen` / `SettingsScreen`.
-2. **Desktop:** Exportar receta como PDF (Apache PDFBox, Apache 2.0 — sin dependencias AGPL).
-3. **Android + iOS:** Foto de avatar de usuario — upload multipart a `/api/v1/users/me/avatar`, mostrar en `ProfileScreen`.
+### Backend ✅
+- **Sprint 29.1**: `UserController`, `UserService`, `UserResponse`, `UpdateUserRequest`, setter `displayName` en `UserEntity` — 62 tests, 0 fallos
 
-### Prioridad Media
+### iOS ✅
+- **UI-4**: Iniciales avatar sincronizadas (`SettingsScreen.kt`)
+- **UI-5**: CookingScreen — swipe hint como pill `AnimatedVisibility` (fadeIn 400ms, auto-oculta 3s)
+- **UI-6**: RecipeListScreen — buscador `OutlinedTextField` + FilterChips Fácil/Media/Difícil
 
-4. **Android:** Widget de receta del día mejorado (con foto si existe, acción "Cocinar").
-5. **iOS:** StockScreen swipe pull-to-refresh + notificaciones caducidad (Background Tasks).
-6. **Desktop:** Menú semanal — vista mes completo (calendar grid 7×5).
+### Desktop ✅ (Codex + corrección Claude Code — commit e505e23)
+- **UI-7**: User card en sidebar con avatar-iniciales + nombre + email
+  - `AppSession`: `getDisplayName()`/`getEmail()` con persistencia en java.util.prefs
+  - `AuthDtos`: `AuthUserInfo`/`AuthFamilyInfo` anidados; `AuthRepository` guarda el nombre al login
+  - `MainWindow`: `buildUserCard()` llama directamente a `session.getDisplayName()` (Codex usaba reflexión — corregido)
+- **Sprint 29.2**: Exportar receta como PDF vía PDFBox 3.0.3; botón "📄 PDF" en `RecipeDetailView`
+  - `module-info.java`: `requires org.apache.pdfbox`
+  - `style.css`: `.avatar-circle`, `.sidebar-user-name`, `.sidebar-user-email`
+
+---
+
+## Sprint 30 — Candidatos
+
+### Prioridad Alta — Funcional
+
+1. **Desktop** (Codex): UI-7 user card sidebar + PDF export — ejecutar el bloque Codex generado en Sprint 29.
+2. **Android + iOS**: Foto de avatar — upload multipart a `/api/v1/users/me/avatar`, mostrar en ProfileScreen/SettingsScreen.
+3. **iOS**: StockScreen pull-to-refresh + notificaciones caducidad (iOS Background Tasks).
+
+### Prioridad Media — UI/UX
+
+1. **Android + iOS**: Onboarding gradiente de fondo sutil (`primary.copy(alpha=0.07f)` por página). Ver UI-8.
+2. **Android**: Eliminar inner `Text("Recetas", headlineSmall)` en `RecipeScreens.kt` ~línea 194 (TopAppBar ya muestra el título). Ver UI-9.
+3. **Android + iOS**: CookingScreen timer circular (`CircularProgressIndicator` determinado alrededor del MM:SS). Ver UI-10.
+4. **iOS**: Fechas caducidad stock relativas ("Caduca en N días", color `tertiary`/`error`). Ver UI-11.
+5. **Android + iOS**: Haptics toggle en Settings (exigido por CLAUDE.md §16). Ver UI-12.
+6. **iOS**: Filtro "Con mi stock" (paridad con Android Sprint 28.C). Ver UI-13.
+
+### Prioridad Baja — Funcional
+
+1. **Android**: Widget de receta del día mejorado (foto si existe, acción "Cocinar").
+2. **Desktop**: Menú semanal — vista mes completo (calendar grid 7×5).
