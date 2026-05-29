@@ -74,6 +74,7 @@ class AppContainer(context: Context) {
     val menuItemRepository = MenuItemRepository(api, database, sessionStore)
     val recipeRatingRepository = RecipeRatingRepository(api, sessionStore)
     val themePreference = ThemePreference(context)
+    val onboardingPreference = OnboardingPreference(context)
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {

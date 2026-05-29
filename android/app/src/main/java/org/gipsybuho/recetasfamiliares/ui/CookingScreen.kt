@@ -12,13 +12,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -74,6 +77,7 @@ internal fun CookingScreen(
     val focusRequester = remember { FocusRequester() }
     var totalDrag by remember { mutableStateOf(0f) }
     val swipeThresh = 80f
+    var showHint by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         try { focusRequester.requestFocus() } catch (_: Exception) {}
     }
@@ -89,6 +93,7 @@ internal fun CookingScreen(
             if (hadTimer) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
+    LaunchedEffect("hint") { delay(3_000L); showHint = false }
 
     val view = LocalView.current
     DisposableEffect(Unit) {
@@ -157,6 +162,7 @@ internal fun CookingScreen(
             },
         color = MaterialTheme.colorScheme.background
     ) {
+        Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize().padding(Spacing.xxl),
             verticalArrangement = Arrangement.SpaceBetween
@@ -309,6 +315,32 @@ internal fun CookingScreen(
                     ) { Text("¡Finalizar!") }
                 }
             }
+        }
+        AnimatedVisibility(
+            visible  = showHint,
+            enter    = fadeIn(tween(400)),
+            exit     = fadeOut(tween(600)),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+            ) {
+                Row(
+                    modifier              = Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.lg),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Desliza para navegar",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
         }
     }
 }

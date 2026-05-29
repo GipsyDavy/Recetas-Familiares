@@ -80,7 +80,8 @@ internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES, MENU }
 @Composable
 fun RecetasApp(viewModel: RecetasViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val isLoggedIn     by viewModel.isLoggedIn.collectAsState()
+    val onboardingDone by viewModel.onboardingDone.collectAsState()
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
@@ -89,7 +90,13 @@ fun RecetasApp(viewModel: RecetasViewModel) {
         }
     }
 
-    if (!isLoggedIn) LoginScreen(viewModel) else MainShell(viewModel)
+    if (!onboardingDone) {
+        OnboardingScreen(onFinished = { viewModel.markOnboardingDone() })
+    } else if (!isLoggedIn) {
+        LoginScreen(viewModel)
+    } else {
+        MainShell(viewModel)
+    }
 }
 
 @Composable

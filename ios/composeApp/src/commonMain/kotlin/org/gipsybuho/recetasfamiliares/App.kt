@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import org.gipsybuho.recetasfamiliares.auth.AuthRepository
 import org.gipsybuho.recetasfamiliares.auth.LoginScreen
+import org.gipsybuho.recetasfamiliares.core.OnboardingPreference
+import org.gipsybuho.recetasfamiliares.ui.OnboardingScreen
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
 import org.gipsybuho.recetasfamiliares.network.ApiClient
@@ -24,11 +26,13 @@ fun App() {
     val authRepo      = remember { AuthRepository(apiClient, session) }
     val driverFactory = remember { DatabaseDriverFactory() }
     val syncRepo      = remember { SyncRepository(apiClient, session, driverFactory) }
-    val themePref     = remember { ThemePreference() }
+    val themePref       = remember { ThemePreference() }
+    val onboardingPref  = remember { OnboardingPreference() }
 
-    var isLoggedIn    by remember { mutableStateOf(session.isLoggedIn) }
-    var selectedTheme by remember { mutableStateOf(themePref.selectedTheme) }
-    var themeMode     by remember { mutableStateOf(themePref.themeMode) }
+    var isLoggedIn     by remember { mutableStateOf(session.isLoggedIn) }
+    var onboardingDone by remember { mutableStateOf(onboardingPref.onboardingDone) }
+    var selectedTheme  by remember { mutableStateOf(themePref.selectedTheme) }
+    var themeMode      by remember { mutableStateOf(themePref.themeMode) }
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) syncRepo.pullIncremental()
@@ -44,7 +48,9 @@ fun App() {
         colorScheme = if (darkTheme) selectedTheme.darkColors() else selectedTheme.lightColors(),
         typography  = AppTypography
     ) {
-        if (!isLoggedIn) {
+        if (!onboardingDone) {
+            OnboardingScreen(onFinished = { onboardingPref.onboardingDone = true; onboardingDone = true })
+        } else if (!isLoggedIn) {
             LoginScreen(repository = authRepo, onLoginSuccess = { isLoggedIn = true })
         } else {
             MainTabScreen(

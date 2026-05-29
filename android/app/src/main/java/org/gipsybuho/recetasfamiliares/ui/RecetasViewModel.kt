@@ -55,6 +55,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private val _isLoggedIn = MutableStateFlow(container.authRepository.isLoggedIn)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
+    private val _onboardingDone = MutableStateFlow(container.onboardingPreference.onboardingDone)
+    val onboardingDone: StateFlow<Boolean> = _onboardingDone.asStateFlow()
+
     val myUserId: String? get() = container.sessionStore.userId
 
     private val _isRefreshing = MutableStateFlow(false)
@@ -80,6 +83,11 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     fun logout() {
         container.authRepository.logout()
         _isLoggedIn.value = false
+    }
+
+    fun markOnboardingDone() {
+        container.onboardingPreference.onboardingDone = true
+        _onboardingDone.value = true
     }
 
     fun refresh() {

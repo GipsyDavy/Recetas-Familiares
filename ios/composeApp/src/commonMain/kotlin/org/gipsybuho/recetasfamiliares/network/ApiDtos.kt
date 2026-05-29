@@ -146,6 +146,16 @@ data class FavoriteRecipeDto(
 data class CreateNoteRequest(val title: String, val body: String, val pinned: Boolean)
 
 @Serializable
+data class CreateStockItemRequest(
+    val name: String,
+    val quantity: Double? = null,
+    val unit: String? = null,
+    val expiresAt: String? = null,
+    val lowStockThreshold: Double? = null,
+    val note: String? = null
+)
+
+@Serializable
 data class SyncPullResponseDto(
     val serverTime: String,
     val recipes: List<RecipeDto> = emptyList(),
