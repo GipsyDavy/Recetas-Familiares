@@ -11,6 +11,12 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
@@ -77,6 +83,10 @@ public class RecipeDetailView extends VBox {
         exportBtn.getStyleClass().add("action-button-secondary");
         exportBtn.setOnAction(e -> exportToFile());
 
+        Button pdfBtn = new Button("📄  PDF");
+        pdfBtn.getStyleClass().add("action-button-secondary");
+        pdfBtn.setOnAction(e -> exportToPdf());
+
         Button editBtn = new Button("Editar");
         editBtn.getStyleClass().add("action-button-secondary");
         editBtn.setOnAction(e -> openEditForm());
@@ -87,7 +97,7 @@ public class RecipeDetailView extends VBox {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, copyBtn, exportBtn, editBtn, deleteBtn);
+        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, copyBtn, exportBtn, pdfBtn, editBtn, deleteBtn);
         actionBar.setPadding(new Insets(12, 16, 8, 16));
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -551,6 +561,95 @@ public class RecipeDetailView extends VBox {
             statusLabel.setText("Error al exportar: " + ex.getMessage());
             statusLabel.setVisible(true);
         }
+    }
+
+    private void exportToPdf() {
+        if (currentRecipe == null) return;
+
+        String safeTitle = currentRecipe.title().replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Exportar receta como PDF");
+        chooser.setInitialFileName(safeTitle + ".pdf");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF", "*.pdf"));
+        File file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) return;
+
+        statusLabel.setText("Exportando PDF...");
+        statusLabel.setVisible(true);
+
+        Thread.ofVirtual().start(() -> {
+            try (PDDocument document = new PDDocument()) {
+                PDPage page = new PDPage(PDRectangle.A4);
+                document.addPage(page);
+
+                PDType1Font titleFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+                PDType1Font textFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+                float y = 760;
+
+                try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                    y = writeLine(content, currentRecipe.title(), titleFont, 18, 50, y);
+                    y -= 10;
+
+                    String meta = buildMeta(currentRecipe);
+                    if (!meta.isBlank()) {
+                        y = writeLine(content, meta, textFont, 12, 50, y);
+                        y -= 18;
+                    }
+
+                    y = writeLine(content, "🥗 Ingredientes", titleFont, 14, 50, y);
+                    for (var ing : currentIngredients) {
+                        y = writeLine(content, "• " + ingredientText(ing), textFont, 12, 62, y);
+                    }
+
+                    y -= 12;
+                    y = writeLine(content, "👨‍🍳 Pasos", titleFont, 14, 50, y);
+                    int stepNumber = 1;
+                    for (var step : currentSteps) {
+                        String text = stepNumber++ + ". " + step.instruction();
+                        if (step.timerMinutes() != null) text += " [" + step.timerMinutes() + " min]";
+                        y = writeLine(content, text, textFont, 12, 62, y);
+                    }
+                }
+
+                document.save(file);
+                Platform.runLater(() -> {
+                    statusLabel.setText("PDF exportado: " + file.getName() + " ✓");
+                    statusLabel.setVisible(true);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    statusLabel.setText("Error al exportar PDF: " + ex.getMessage());
+                    statusLabel.setVisible(true);
+                });
+            }
+        });
+    }
+
+    private float writeLine(PDPageContentStream content, String text, PDType1Font font, int size, float x, float y) throws java.io.IOException {
+        content.beginText();
+        content.setFont(font, size);
+        content.newLineAtOffset(x, y);
+        content.showText(pdfSafeText(text));
+        content.endText();
+        return y - size - 6;
+    }
+
+    private String ingredientText(RecipeDtos.RecipeIngredientDto ing) {
+        var sb = new StringBuilder(ing.name());
+        if (ing.quantity() != null) {
+            sb.append(" - ").append(java.math.BigDecimal.valueOf(ing.quantity()).stripTrailingZeros().toPlainString());
+            if (ing.unit() != null && !ing.unit().isBlank()) sb.append(" ").append(ing.unit());
+        }
+        return sb.toString();
+    }
+
+    private String pdfSafeText(String text) {
+        if (text == null) return "";
+        return text.replace("🥗", "")
+                .replace("👨‍🍳", "")
+                .replace("•", "-")
+                .replace("—", "-")
+                .trim();
     }
 
     private Label noDataLabel(String text) {

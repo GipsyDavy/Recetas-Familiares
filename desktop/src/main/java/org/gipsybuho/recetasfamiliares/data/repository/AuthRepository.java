@@ -20,7 +20,12 @@ public class AuthRepository {
         var request = new AuthDtos.LoginRequest(email, password);
         AuthDtos.AuthResponse response = api.postAuth("api/v1/auth/login", request, AuthDtos.AuthResponse.class);
         session.setTokens(response.accessToken(), response.refreshToken());
-        session.setFamilyId(response.familyId());
+        // prefer nested family.id; fall back to legacy flat familyId field
+        String fid = (response.family() != null) ? response.family().id() : response.familyId();
+        session.setFamilyId(fid);
+        if (response.user() != null) {
+            session.setUserInfo(response.user().displayName(), response.user().email());
+        }
     }
 
     public void logout() {

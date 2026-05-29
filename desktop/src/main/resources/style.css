@@ -112,6 +112,26 @@
     -fx-line-spacing: 4;
 }
 
+.avatar-circle {
+    -fx-background-color: derive(recetas-primary, 40%);
+    -fx-background-radius: 19px;
+    -fx-min-width: 38px;
+    -fx-min-height: 38px;
+    -fx-max-width: 38px;
+    -fx-max-height: 38px;
+}
+
+.sidebar-user-name {
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-text-fill: recetas-surface;
+}
+
+.sidebar-user-email {
+    -fx-font-size: 11px;
+    -fx-text-fill: derive(recetas-surface, -30%);
+}
+
 .sidebar-nav-button {
     -fx-background-color: transparent;
     -fx-text-fill: recetas-sidebar-fg;

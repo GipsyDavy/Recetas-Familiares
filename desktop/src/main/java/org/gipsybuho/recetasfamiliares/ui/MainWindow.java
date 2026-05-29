@@ -9,6 +9,8 @@ import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -154,8 +156,58 @@ public class MainWindow {
         VBox bottom = new VBox(8, syncBtn, logoutBtn);
         bottom.setPadding(new Insets(8, 16, 24, 16));
 
-        sidebar.getChildren().addAll(header, globalSearch, btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, settingsBtn, spacer, bottom);
+        HBox userCard = buildUserCard();
+
+        sidebar.getChildren().addAll(header, globalSearch, userCard, btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, settingsBtn, spacer, bottom);
         return sidebar;
+    }
+
+    private HBox buildUserCard() {
+        String displayName = context.getSession().getDisplayName();
+        String email = context.getSession().getEmail();
+        String cleanName = displayName != null ? displayName.trim() : "";
+
+        Label avatar = new Label(cleanName.isBlank() ? "👤" : initials(cleanName));
+        avatar.getStyleClass().add("avatar-circle");
+        avatar.setTextFill(javafx.scene.paint.Color.WHITE);
+        avatar.setFont(Font.font("System", FontWeight.BOLD, 18));
+        avatar.setAlignment(javafx.geometry.Pos.CENTER);
+
+        HBox userCard = new HBox(10);
+        userCard.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        userCard.setPadding(new Insets(8, 16, 10, 16));
+
+        if (cleanName.isBlank()) {
+            userCard.getChildren().add(avatar);
+        } else {
+            Label nameLabel = new Label(cleanName);
+            nameLabel.getStyleClass().add("sidebar-user-name");
+
+            Label emailLabel = new Label(truncateEmail(email));
+            emailLabel.getStyleClass().add("sidebar-user-email");
+
+            VBox textBox = new VBox(2, nameLabel, emailLabel);
+            userCard.getChildren().addAll(avatar, textBox);
+        }
+
+        return userCard;
+    }
+
+    private String initials(String displayName) {
+        StringBuilder sb = new StringBuilder(2);
+        for (String part : displayName.split("\\s+")) {
+            if (!part.isBlank()) {
+                sb.append(Character.toUpperCase(part.charAt(0)));
+                if (sb.length() == 2) break;
+            }
+        }
+        return sb.toString();
+    }
+
+    private String truncateEmail(String email) {
+        if (email == null) return "";
+        String cleanEmail = email.trim();
+        return cleanEmail.length() > 24 ? cleanEmail.substring(0, 24) : cleanEmail;
     }
 
     private Button sidebarButton(String label, String view) {

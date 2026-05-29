@@ -12,11 +12,13 @@ import java.util.prefs.Preferences;
  */
 public class AppSession {
 
-    private static final String PREF_NODE     = "recetas-familiares";
-    private static final String KEY_ACCESS    = "accessToken";
-    private static final String KEY_REFRESH   = "refreshToken";
-    private static final String KEY_FAMILY_ID = "familyId";
-    private static final String KEY_LAST_SYNC = "lastSyncTime";
+    private static final String PREF_NODE        = "recetas-familiares";
+    private static final String KEY_ACCESS       = "accessToken";
+    private static final String KEY_REFRESH      = "refreshToken";
+    private static final String KEY_FAMILY_ID    = "familyId";
+    private static final String KEY_LAST_SYNC    = "lastSyncTime";
+    private static final String KEY_DISPLAY_NAME = "displayName";
+    private static final String KEY_EMAIL        = "email";
 
     private final Preferences prefs = Preferences.userRoot().node(PREF_NODE);
 
@@ -24,22 +26,28 @@ public class AppSession {
     private String refreshToken;
     private String familyId;
     private String lastSyncTime;
+    private String displayName;
+    private String email;
 
     public AppSession() {
-        this.accessToken  = prefs.get(KEY_ACCESS,    null);
-        this.refreshToken = prefs.get(KEY_REFRESH,   null);
-        this.familyId     = prefs.get(KEY_FAMILY_ID, null);
-        this.lastSyncTime = prefs.get(KEY_LAST_SYNC, null);
+        this.accessToken  = prefs.get(KEY_ACCESS,        null);
+        this.refreshToken = prefs.get(KEY_REFRESH,       null);
+        this.familyId     = prefs.get(KEY_FAMILY_ID,     null);
+        this.lastSyncTime = prefs.get(KEY_LAST_SYNC,     null);
+        this.displayName  = prefs.get(KEY_DISPLAY_NAME,  null);
+        this.email        = prefs.get(KEY_EMAIL,         null);
     }
 
     public boolean isLoggedIn() {
         return accessToken != null && !accessToken.isBlank();
     }
 
-    public String getAccessToken() { return accessToken; }
+    public String getAccessToken()  { return accessToken; }
     public String getRefreshToken() { return refreshToken; }
-    public String getFamilyId() { return familyId; }
+    public String getFamilyId()     { return familyId; }
     public String getLastSyncTime() { return lastSyncTime; }
+    public String getDisplayName()  { return displayName; }
+    public String getEmail()        { return email; }
 
     public void setTokens(String accessToken, String refreshToken) {
         this.accessToken  = accessToken;
@@ -60,14 +68,25 @@ public class AppSession {
         else prefs.remove(KEY_LAST_SYNC);
     }
 
+    public void setUserInfo(String displayName, String email) {
+        this.displayName = displayName;
+        this.email       = email;
+        if (displayName != null) prefs.put(KEY_DISPLAY_NAME, displayName); else prefs.remove(KEY_DISPLAY_NAME);
+        if (email       != null) prefs.put(KEY_EMAIL,        email);       else prefs.remove(KEY_EMAIL);
+    }
+
     public void clear() {
         accessToken  = null;
         refreshToken = null;
         familyId     = null;
         lastSyncTime = null;
+        displayName  = null;
+        email        = null;
         prefs.remove(KEY_ACCESS);
         prefs.remove(KEY_REFRESH);
         prefs.remove(KEY_FAMILY_ID);
         prefs.remove(KEY_LAST_SYNC);
+        prefs.remove(KEY_DISPLAY_NAME);
+        prefs.remove(KEY_EMAIL);
     }
 }

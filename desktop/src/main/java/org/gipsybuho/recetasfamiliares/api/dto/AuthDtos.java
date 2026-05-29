@@ -8,11 +8,16 @@ public final class AuthDtos {
 
     public record RefreshRequest(String refreshToken) {}
 
+    public record AuthUserInfo(String id, String email, String displayName) {}
+
+    public record AuthFamilyInfo(String id, String name) {}
+
     public record AuthResponse(
             String accessToken,
             String refreshToken,
-            String familyId,
-            String userId,
-            String role
+            AuthUserInfo user,
+            AuthFamilyInfo family,
+            // legacy flat fields kept for backwards compat with older backend versions
+            String familyId
     ) {}
 }
