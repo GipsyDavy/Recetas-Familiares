@@ -124,6 +124,18 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     fun toggleStockFilter() { _filterByStock.value = !_filterByStock.value }
 
+    fun updateDisplayName(newName: String) {
+        viewModelScope.launch {
+            runCatching {
+                val response = container.userRepository.updateDisplayName(newName)
+                _displayName.value = response.displayName
+                _userMessage.emit("Nombre actualizado")
+            }.onFailure {
+                _userMessage.emit("Error al actualizar el nombre")
+            }
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             _isRefreshing.value = true

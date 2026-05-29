@@ -28,6 +28,12 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Inventory2
@@ -258,17 +264,17 @@ private fun MainShell(viewModel: RecetasViewModel) {
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(selected = tab == MainTab.RECIPES, onClick = { tab = MainTab.RECIPES },
-                    icon = { Icon(Icons.Outlined.Restaurant, contentDescription = null) }, label = { Text("Recetas") })
+                    icon = { Icon(if (tab == MainTab.RECIPES) Icons.Filled.Restaurant else Icons.Outlined.Restaurant, contentDescription = null) }, label = { Text("Recetas") })
                 NavigationBarItem(selected = tab == MainTab.STOCK, onClick = { tab = MainTab.STOCK },
-                    icon = { Icon(Icons.Outlined.Inventory2, contentDescription = null) }, label = { Text("Stock") })
+                    icon = { Icon(if (tab == MainTab.STOCK) Icons.Filled.Inventory2 else Icons.Outlined.Inventory2, contentDescription = null) }, label = { Text("Stock") })
                 NavigationBarItem(selected = tab == MainTab.SHOPPING, onClick = { tab = MainTab.SHOPPING },
-                    icon = { Icon(Icons.Outlined.ShoppingCart, contentDescription = null) }, label = { Text("Lista") })
+                    icon = { Icon(if (tab == MainTab.SHOPPING) Icons.Filled.ShoppingCart else Icons.Outlined.ShoppingCart, contentDescription = null) }, label = { Text("Lista") })
                 NavigationBarItem(selected = tab == MainTab.NOTES, onClick = { tab = MainTab.NOTES },
-                    icon = { Icon(Icons.Outlined.Description, contentDescription = null) }, label = { Text("Notas") })
+                    icon = { Icon(if (tab == MainTab.NOTES) Icons.Filled.Description else Icons.Outlined.Description, contentDescription = null) }, label = { Text("Notas") })
                 NavigationBarItem(selected = tab == MainTab.MENU, onClick = { tab = MainTab.MENU },
-                    icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) }, label = { Text("Menú") })
+                    icon = { Icon(if (tab == MainTab.MENU) Icons.Filled.CalendarMonth else Icons.Outlined.CalendarMonth, contentDescription = null) }, label = { Text("Menú") })
                 NavigationBarItem(selected = tab == MainTab.PROFILE, onClick = { tab = MainTab.PROFILE },
-                    icon = { Icon(Icons.Outlined.Person, contentDescription = null) }, label = { Text("Perfil") })
+                    icon = { Icon(if (tab == MainTab.PROFILE) Icons.Filled.Person else Icons.Outlined.Person, contentDescription = null) }, label = { Text("Perfil") })
             }
         }
     ) { padding ->

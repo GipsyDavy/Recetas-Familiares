@@ -74,5 +74,7 @@ dependencies {
 
     implementation("sh.calvin.reorderable:reorderable:2.4.3")
 
+    implementation("androidx.compose.ui:ui-text-google-fonts")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

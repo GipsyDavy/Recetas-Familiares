@@ -1,11 +1,13 @@
 package org.gipsybuho.recetasfamiliares.cooking
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -40,6 +42,12 @@ fun CookingScreen(
     val haptic        = rememberHapticFeedback()
     val wakeLock      = remember { ScreenWakeLock() }
     var totalDrag     by remember { mutableStateOf(0f) }
+    var showSwipeHint by remember { mutableStateOf(true) }
+
+    LaunchedEffect("hint") {
+        kotlinx.coroutines.delay(3_000L)
+        showSwipeHint = false
+    }
 
     LaunchedEffect(recipe.id) {
         steps = repository.loadSteps(recipe.id).sortedBy { it.position }
@@ -154,19 +162,33 @@ fun CookingScreen(
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center
                     )
-                    else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
                             currentStep!!.instruction,
                             style = MaterialTheme.typography.headlineMedium,
                             textAlign = TextAlign.Center,
-                            lineHeight = MaterialTheme.typography.headlineMedium.lineHeight
+                            lineHeight = MaterialTheme.typography.headlineMedium.lineHeight,
+                            modifier = Modifier.padding(bottom = 40.dp)
                         )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "← Desliza para navegar →",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+                        AnimatedVisibility(
+                            visible = showSwipeHint,
+                            enter   = fadeIn(tween(400)),
+                            exit    = fadeOut(tween(600)),
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        ) {
+                            Surface(
+                                shape = MaterialTheme.shapes.extraLarge,
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                Text(
+                                    "← Desliza para navegar →",
+                                    style    = MaterialTheme.typography.labelSmall,
+                                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

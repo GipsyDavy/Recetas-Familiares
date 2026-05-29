@@ -65,7 +65,9 @@ fun SettingsScreen(
                     modifier = Modifier.size(48.dp).clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
                 ) {
-                    val initials = session.displayName?.take(2)?.uppercase()
+                    val initials = session.displayName
+                        ?.split(" ")?.filter { it.isNotBlank() }?.take(2)
+                        ?.map { it.first().uppercaseChar() }?.joinToString("")
                     if (!initials.isNullOrBlank()) {
                         Text(initials, style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer)

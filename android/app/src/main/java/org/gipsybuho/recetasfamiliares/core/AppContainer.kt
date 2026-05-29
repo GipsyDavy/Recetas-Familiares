@@ -19,6 +19,7 @@ import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository
 import org.gipsybuho.recetasfamiliares.data.repository.ShoppingListRepository
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository
 import org.gipsybuho.recetasfamiliares.data.repository.SyncRepository
+import org.gipsybuho.recetasfamiliares.data.repository.UserRepository
 import org.gipsybuho.recetasfamiliares.ui.theme.ThemePreference
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -73,6 +74,7 @@ class AppContainer(context: Context) {
     val recipePhotoRepository = RecipePhotoRepository(api, database, sessionStore)
     val menuItemRepository = MenuItemRepository(api, database, sessionStore)
     val recipeRatingRepository = RecipeRatingRepository(api, sessionStore)
+    val userRepository = UserRepository(api, sessionStore)
     val themePreference = ThemePreference(context)
     val onboardingPreference = OnboardingPreference(context)
 

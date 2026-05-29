@@ -86,4 +86,8 @@ public class UserEntity {
     public boolean isDeleted() {
         return deleted;
     }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
 }

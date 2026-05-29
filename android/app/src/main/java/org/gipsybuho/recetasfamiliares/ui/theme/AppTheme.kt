@@ -8,7 +8,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
+import org.gipsybuho.recetasfamiliares.R
 
 enum class AppTheme {
     BOSQUE, TERRACOTA, OCASO, MEDITERRANEO, LAVANDA,
@@ -549,10 +552,20 @@ fun AppTheme.darkColors(): ColorScheme = when (this) {
     )
 }
 
-// Fuente principal: usa el sistema por defecto.
-// Para activar Nunito + Lato: añadir los TTF a res/font/ y reemplazar FontFamily.Default aquí.
-private val NunitoFamily = FontFamily.Default
-private val LatoFamily   = FontFamily.SansSerif
+private val fontProvider = GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage   = "com.google.android.gms",
+    certificates      = R.array.com_google_android_gms_fonts_certs
+)
+
+private val NunitoFamily = FontFamily(
+    Font(GoogleFont("Nunito"), fontProvider, FontWeight.SemiBold),
+    Font(GoogleFont("Nunito"), fontProvider, FontWeight.Bold),
+)
+private val LatoFamily = FontFamily(
+    Font(GoogleFont("Lato"), fontProvider, FontWeight.Normal),
+    Font(GoogleFont("Lato"), fontProvider, FontWeight.SemiBold),
+)
 
 val AppTypography = Typography(
     displaySmall   = TextStyle(fontFamily = NunitoFamily, fontWeight = FontWeight.Bold,   fontSize = 36.sp, lineHeight = 44.sp),

@@ -32,14 +32,24 @@ import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
-    var recipes        by remember { mutableStateOf<List<RecipeDto>>(emptyList()) }
-    var loading        by remember { mutableStateOf(true) }
-    var isRefreshing   by remember { mutableStateOf(false) }
-    var error          by remember { mutableStateOf<String?>(null) }
-    var selectedRecipe by remember { mutableStateOf<RecipeDto?>(null) }
-    var cookingMode    by remember { mutableStateOf(false) }
-    val haptic         = rememberHapticFeedback()
-    val scope          = rememberCoroutineScope()
+    var recipes          by remember { mutableStateOf<List<RecipeDto>>(emptyList()) }
+    var loading          by remember { mutableStateOf(true) }
+    var isRefreshing     by remember { mutableStateOf(false) }
+    var error            by remember { mutableStateOf<String?>(null) }
+    var selectedRecipe   by remember { mutableStateOf<RecipeDto?>(null) }
+    var cookingMode      by remember { mutableStateOf(false) }
+    var query            by remember { mutableStateOf("") }
+    var difficultyFilter by remember { mutableStateOf<String?>(null) }
+    val haptic           = rememberHapticFeedback()
+    val scope            = rememberCoroutineScope()
+
+    val filtered = remember(recipes, query, difficultyFilter) {
+        recipes.filter { r ->
+            (query.isBlank() || r.title.contains(query, ignoreCase = true) ||
+                r.description?.contains(query, ignoreCase = true) == true) &&
+            (difficultyFilter == null || r.difficulty?.uppercase() == difficultyFilter)
+        }
+    }
 
     suspend fun loadData() {
         runCatching { recipes = repository.loadRecipes() }
@@ -85,9 +95,28 @@ fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
         onRefresh    = { onRefresh() },
         modifier     = Modifier.fillMaxSize()
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(Spacing.xl)) {
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.xl, vertical = Spacing.md)) {
             Text("Recetas", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(Spacing.xl))
+            Spacer(Modifier.height(Spacing.md))
+
+            OutlinedTextField(
+                value         = query,
+                onValueChange = { query = it },
+                placeholder   = { Text("Buscar recetas…") },
+                singleLine    = true,
+                modifier      = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                listOf("EASY" to "Fácil", "MEDIUM" to "Media", "HARD" to "Difícil").forEach { (key, label) ->
+                    FilterChip(
+                        selected = difficultyFilter == key,
+                        onClick  = { difficultyFilter = if (difficultyFilter == key) null else key },
+                        label    = { Text(label) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(Spacing.md))
 
             when {
                 loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -100,13 +129,13 @@ fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
                         OutlinedButton(onClick = { onRefresh() }) { Text("Reintentar") }
                     }
                 }
-                recipes.isEmpty() -> AnimatedEmptyState(
-                    icon     = "🍳",
-                    title    = "Sin recetas aún",
-                    subtitle = "Añade recetas desde Android o Desktop"
+                filtered.isEmpty() -> AnimatedEmptyState(
+                    icon     = if (query.isNotBlank() || difficultyFilter != null) "🔍" else "🍳",
+                    title    = if (query.isNotBlank() || difficultyFilter != null) "Sin resultados" else "Sin recetas aún",
+                    subtitle = if (query.isNotBlank() || difficultyFilter != null) "Prueba con otros filtros" else "Añade recetas desde Android o Desktop"
                 )
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    items(recipes, key = { it.id }) { recipe ->
+                    items(filtered, key = { it.id }) { recipe ->
                         RecipeCard(recipe = recipe, onClick = {
                             haptic.selection()
                             selectedRecipe = recipe

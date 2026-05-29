@@ -29,6 +29,8 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.StockItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPullDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateUserRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UserResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import okhttp3.MultipartBody
@@ -44,6 +46,12 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface RecetasApi {
+
+    @GET("api/v1/users/me")
+    suspend fun getMe(): UserResponseDto
+
+    @PUT("api/v1/users/me")
+    suspend fun updateMe(@Body request: UpdateUserRequestDto): UserResponseDto
 
     @POST("api/v1/auth/login")
     suspend fun login(@Body request: LoginRequestDto): AuthResponseDto
