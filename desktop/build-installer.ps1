@@ -36,6 +36,7 @@ $ShadedJar      = "$TargetDir\recetas-familiares-desktop-1.0-SNAPSHOT.jar"
 
 # ── Rutas de herramientas ─────────────────────────────────────────────────────
 $JDK       = "C:\Program Files\Java\jdk-26"
+$NSIS      = "C:\Program Files (x86)\NSIS\makensis.exe"
 $InnoSetup = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 
 $MvnCandidates = @(
@@ -116,6 +117,69 @@ function New-IcoFromPng {
     }
 }
 
+# Genera los dos BMP requeridos por NSIS MUI2 usando System.Drawing (siempre disponible)
+function New-NsisBitmaps {
+    param([string]$InstallerDir)
+    Add-Type -AssemblyName System.Drawing
+    $brown  = [System.Drawing.Color]::FromArgb(61,  43, 31)   # #3D2B1F sidebar
+    $terra  = [System.Drawing.Color]::FromArgb(193, 125, 82)  # #C17D52 accent
+    $white  = [System.Drawing.Brushes]::White
+    $lgray  = [System.Drawing.Brushes]::LightGray
+
+    # ── Welcome panel 164x314 ─────────────────────────────────
+    $bmp = New-Object System.Drawing.Bitmap 164, 314
+    $g   = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear($brown)
+
+    # Franja superior con gradiente
+    $topRect  = New-Object System.Drawing.Rectangle 0, 0, 164, 100
+    $gradient = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+        $topRect, $terra, $brown,
+        [System.Drawing.Drawing2D.LinearGradientMode]::Vertical)
+    $g.FillRectangle($gradient, $topRect)
+    $gradient.Dispose()
+
+    # Textos
+    $fBig  = New-Object System.Drawing.Font "Segoe UI", 15, ([System.Drawing.FontStyle]::Bold)
+    $fMed  = New-Object System.Drawing.Font "Segoe UI", 10
+    $fSm   = New-Object System.Drawing.Font "Segoe UI", 8
+    $sf    = New-Object System.Drawing.StringFormat
+    $sf.Alignment = [System.Drawing.StringAlignment]::Center
+
+    $g.DrawString("Recetas",     $fBig, $white, 82, 28, $sf)
+    $g.DrawString("Familiares",  $fBig, $white, 82, 52, $sf)
+    $g.DrawString("v1.0.0",      $fMed, $lgray, 82, 180, $sf)
+    $g.DrawString("Tu recetario", $fSm, $lgray, 82, 260, $sf)
+    $g.DrawString("familiar",     $fSm, $lgray, 82, 276, $sf)
+    $g.DrawString("Gipsybuho",    $fSm, $lgray, 82, 296, $sf)
+
+    foreach ($obj in @($fBig,$fMed,$fSm,$sf,$g)) { $obj.Dispose() }
+    $bmp.Save("$InstallerDir\nsis-welcome.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $bmp.Dispose()
+
+    # ── Header 150x57 ─────────────────────────────────────────
+    $hdr = New-Object System.Drawing.Bitmap 150, 57
+    $g   = [System.Drawing.Graphics]::FromImage($hdr)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $topR = New-Object System.Drawing.Rectangle 0, 0, 150, 57
+    $grad = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+        $topR, $terra, $brown,
+        [System.Drawing.Drawing2D.LinearGradientMode]::Horizontal)
+    $g.FillRectangle($grad, $topR)
+    $grad.Dispose()
+
+    $fH  = New-Object System.Drawing.Font "Segoe UI", 9, ([System.Drawing.FontStyle]::Bold)
+    $sfH = New-Object System.Drawing.StringFormat
+    $sfH.Alignment     = [System.Drawing.StringAlignment]::Center
+    $sfH.LineAlignment = [System.Drawing.StringAlignment]::Center
+    $g.DrawString("Recetas Familiares", $fH, $white, $topR, $sfH)
+
+    foreach ($obj in @($fH,$sfH,$g)) { $obj.Dispose() }
+    $hdr.Save("$InstallerDir\nsis-header.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $hdr.Dispose()
+}
+
 # ── INICIO ─────────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "  +--------------------------------------------------+" -ForegroundColor Magenta
@@ -144,13 +208,16 @@ if (-not $MVN) {
 }
 Write-OK "Maven: $MVN"
 
+$hasNsis = Test-Path $NSIS
 $hasInno = Test-Path $InnoSetup
-if ($hasInno) {
+if ($hasNsis) {
+    Write-OK "NSIS: $NSIS"
+} elseif ($hasInno) {
     Write-OK "Inno Setup 6: $InnoSetup"
 } else {
-    Write-Warn "Inno Setup 6 no encontrado en $InnoSetup"
-    Write-Warn "Se creara solo el app-image (sin .exe instalador)"
-    Write-Warn "Descarga desde: https://jrsoftware.org/isdl.php"
+    Write-Warn "Ni NSIS ni Inno Setup encontrados."
+    Write-Warn "Se creara solo el app-image (sin .exe instalador)."
+    Write-Warn "NSIS: https://nsis.sourceforge.io/Download"
 }
 
 # ── PASO 2: Preparar directorios (solo los que Maven no borrará) ───────────────
@@ -272,24 +339,45 @@ if (-not (Test-Path "$AppImageDir\$AppName.exe")) {
 $imageMB = '{0:N0}' -f ((Get-ChildItem $AppImageDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB)
 Write-OK "App-image creado: $AppImageDir ($imageMB MB)"
 
-# ── PASO 7: Inno Setup ────────────────────────────────────────────────────────
+# ── PASO 7: Crear instalador .exe (NSIS → Inno Setup → aviso) ────────────────
 Write-Step "7/7  Creando instalador .exe..."
 
-if ($hasInno) {
+$exePath = "$OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe"
+
+if ($hasNsis) {
+    # Generar graficas BMP para NSIS MUI2
+    Write-OK "Generando graficas del instalador..."
+    New-NsisBitmaps -InstallerDir "$ProjectDir\installer"
+
+    # Compilar con NSIS (la ruta del .nsi debe ser relativa a donde esta el .nsi)
+    Push-Location $ProjectDir
+    try {
+        & $NSIS "$ProjectDir\installer.nsi"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "NSIS fallo con codigo $LASTEXITCODE"
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+
+    if (Test-Path $exePath) {
+        $exeMB = '{0:N1}' -f ((Get-Item $exePath).Length / 1MB)
+        Write-OK "Instalador .exe: $exePath ($exeMB MB)"
+    }
+} elseif ($hasInno) {
     & $InnoSetup "$ProjectDir\installer.iss"
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "Inno Setup fallo con codigo $LASTEXITCODE"
         exit 1
     }
-
-    $exePath = "$OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe"
     if (Test-Path $exePath) {
         $exeMB = '{0:N1}' -f ((Get-Item $exePath).Length / 1MB)
         Write-OK "Instalador .exe: $exePath ($exeMB MB)"
     }
 } else {
-    Write-Warn "Inno Setup no disponible. Instalador .exe omitido."
-    Write-Warn "Puedes distribuir directamente la carpeta: $AppImageDir"
+    Write-Warn "Sin herramienta de instalador. Instala NSIS desde https://nsis.sourceforge.io"
+    Write-Warn "App-image portable disponible en: $AppImageDir"
 }
 
 # ── RESULTADO ─────────────────────────────────────────────────────────────────
@@ -299,7 +387,7 @@ Write-Host "  |   BUILD COMPLETADO - $AppDisplayName v$AppVersion        |" -For
 Write-Host "  +--------------------------------------------------+" -ForegroundColor Green
 Write-Host ""
 
-if ($hasInno -and (Test-Path "$OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe")) {
+if (Test-Path "$OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe") {
     Write-Host "  Instalador:  $OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe" -ForegroundColor White
 }
 Write-Host "  App-image:   $AppImageDir\$AppName.exe" -ForegroundColor White
