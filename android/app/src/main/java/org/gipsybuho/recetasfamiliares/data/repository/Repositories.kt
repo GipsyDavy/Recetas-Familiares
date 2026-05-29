@@ -67,10 +67,12 @@ class AuthRepository(
 
     suspend fun login(email: String, password: String) {
         val response = api.login(LoginRequestDto(email.trim(), password))
-        sessionStore.accessToken = response.accessToken
+        sessionStore.accessToken  = response.accessToken
         sessionStore.refreshToken = response.refreshToken
-        sessionStore.familyId = response.family.id
-        sessionStore.userId = response.user.id
+        sessionStore.familyId     = response.family.id
+        sessionStore.userId       = response.user.id
+        sessionStore.displayName  = response.user.displayName
+        sessionStore.email        = response.user.email
     }
 
     fun logout() {

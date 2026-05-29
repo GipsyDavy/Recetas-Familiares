@@ -106,7 +106,8 @@ fun MainTabScreen(
                     themeMode     = themeMode,
                     onThemeChange = onThemeChange,
                     onModeChange  = onModeChange,
-                    onLogout      = onLogout
+                    onLogout      = onLogout,
+                    session       = session
                 )
             }
         }

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.Button
@@ -75,7 +76,7 @@ import org.gipsybuho.recetasfamiliares.R
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 
-internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES, MENU }
+internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES, MENU, PROFILE }
 
 @Composable
 fun RecetasApp(viewModel: RecetasViewModel) {
@@ -174,6 +175,8 @@ private fun MainShell(viewModel: RecetasViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     var showThemePicker by remember { mutableStateOf(false) }
     val recipes by viewModel.recipes.collectAsState()
+    val filteredRecipes by viewModel.filteredRecipes.collectAsState()
+    val filterByStock by viewModel.filterByStock.collectAsState()
     val stockItems by viewModel.stockItems.collectAsState()
     val shoppingLists by viewModel.shoppingLists.collectAsState()
     val notes by viewModel.notes.collectAsState()
@@ -221,6 +224,7 @@ private fun MainShell(viewModel: RecetasViewModel) {
                             MainTab.SHOPPING -> "Lista de la compra"
                             MainTab.NOTES    -> "Notas familiares"
                             MainTab.MENU     -> "Menú semanal"
+                            MainTab.PROFILE  -> "Mi perfil"
                         }
                         Text(
                             tabTitle,
@@ -263,6 +267,8 @@ private fun MainShell(viewModel: RecetasViewModel) {
                     icon = { Icon(Icons.Outlined.Description, contentDescription = null) }, label = { Text("Notas") })
                 NavigationBarItem(selected = tab == MainTab.MENU, onClick = { tab = MainTab.MENU },
                     icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) }, label = { Text("Menú") })
+                NavigationBarItem(selected = tab == MainTab.PROFILE, onClick = { tab = MainTab.PROFILE },
+                    icon = { Icon(Icons.Outlined.Person, contentDescription = null) }, label = { Text("Perfil") })
             }
         }
     ) { padding ->
@@ -302,10 +308,12 @@ private fun MainShell(viewModel: RecetasViewModel) {
             ) { currentTab ->
                 when (currentTab) {
                     MainTab.RECIPES  -> RecipeList(
-                        recipes = recipes, modifier = Modifier.padding(padding),
+                        recipes = filteredRecipes, modifier = Modifier.padding(padding),
                         viewModel = viewModel, onRefresh = viewModel::refresh,
                         openRecipeId = navigateToRecipeId,
-                        onRecipeOpened = { navigateToRecipeId = null }
+                        onRecipeOpened = { navigateToRecipeId = null },
+                        filterByStock = filterByStock,
+                        onToggleStockFilter = viewModel::toggleStockFilter
                     )
                     MainTab.STOCK    -> StockList(stockItems, Modifier.padding(padding), viewModel)
                     MainTab.SHOPPING -> ShoppingListScreen(shoppingLists, Modifier.padding(padding), viewModel)
@@ -321,6 +329,7 @@ private fun MainShell(viewModel: RecetasViewModel) {
                             tab = MainTab.RECIPES
                         }
                     )
+                    MainTab.PROFILE  -> ProfileScreen(viewModel, Modifier.padding(padding))
                 }
             }
         }

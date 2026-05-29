@@ -19,9 +19,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.theme.ThemeMode
 import org.gipsybuho.recetasfamiliares.theme.lightColors
@@ -39,7 +42,8 @@ fun SettingsScreen(
     themeMode: ThemeMode,
     onThemeChange: (AppTheme) -> Unit,
     onModeChange: (ThemeMode) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    session: SessionStore? = null
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -47,6 +51,40 @@ fun SettingsScreen(
     ) {
         Text("Ajustes", style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(vertical = 8.dp))
+
+        if (session != null) {
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(48.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    val initials = session.displayName?.take(2)?.uppercase()
+                    if (!initials.isNullOrBlank()) {
+                        Text(initials, style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    } else {
+                        Icon(Icons.Outlined.Person, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(24.dp))
+                    }
+                }
+                Column {
+                    Text(session.displayName ?: "—", style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface)
+                    Text(session.email ?: "—", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
         Text("Modo de pantalla", style = MaterialTheme.typography.titleSmall,

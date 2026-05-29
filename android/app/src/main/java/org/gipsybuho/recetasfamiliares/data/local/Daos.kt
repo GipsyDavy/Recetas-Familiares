@@ -34,6 +34,9 @@ interface RecipeIngredientDao {
     @Query("SELECT * FROM recipe_ingredients WHERE recipeId IN (:recipeIds) AND deleted = 0 ORDER BY position ASC")
     suspend fun findByRecipeIds(recipeIds: List<String>): List<RecipeIngredientEntity>
 
+    @Query("SELECT * FROM recipe_ingredients WHERE deleted = 0")
+    fun observeAllIngredients(): Flow<List<RecipeIngredientEntity>>
+
     @Upsert
     suspend fun upsertAll(ingredients: List<RecipeIngredientEntity>)
 }

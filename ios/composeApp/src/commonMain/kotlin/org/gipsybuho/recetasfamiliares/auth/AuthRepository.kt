@@ -19,6 +19,8 @@ class AuthRepository(
         session.refreshToken = response.refreshToken
         session.familyId     = response.family.id
         session.userId       = response.user.id
+        session.displayName  = response.user.displayName
+        session.email        = response.user.email
     }
 
     fun logout() = session.clear()

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
@@ -60,6 +61,35 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     val myUserId: String? get() = container.sessionStore.userId
 
+    private val _displayName = MutableStateFlow(container.sessionStore.displayName)
+    val displayName: StateFlow<String?> = _displayName.asStateFlow()
+
+    private val _email = MutableStateFlow(container.sessionStore.email)
+    val email: StateFlow<String?> = _email.asStateFlow()
+
+    private val _filterByStock = MutableStateFlow(false)
+    val filterByStock: StateFlow<Boolean> = _filterByStock.asStateFlow()
+
+    val filteredRecipes: StateFlow<List<RecipeEntity>> = combine(
+        container.recipeRepository.recipes,
+        stockItems,
+        container.database.recipeIngredientDao().observeAllIngredients(),
+        _filterByStock
+    ) { recipeList, stock, ingredients, active ->
+        if (!active) recipeList
+        else {
+            val stockNames = stock.map { it.name.lowercase().trim() }.toSet()
+            if (stockNames.isEmpty()) recipeList
+            else {
+                val matchingIds = ingredients
+                    .filter { it.name.lowercase().trim() in stockNames }
+                    .map { it.recipeId }
+                    .toSet()
+                recipeList.filter { it.id in matchingIds }
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
@@ -83,12 +113,16 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     fun logout() {
         container.authRepository.logout()
         _isLoggedIn.value = false
+        _displayName.value = null
+        _email.value = null
     }
 
     fun markOnboardingDone() {
         container.onboardingPreference.onboardingDone = true
         _onboardingDone.value = true
     }
+
+    fun toggleStockFilter() { _filterByStock.value = !_filterByStock.value }
 
     fun refresh() {
         viewModelScope.launch {

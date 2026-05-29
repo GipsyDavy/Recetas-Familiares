@@ -47,11 +47,19 @@ actual class SessionStore {
         get()  = kcRead(KEY_USER)
         set(v) = if (v != null) kcWrite(KEY_USER, v) else kcDelete(KEY_USER)
 
+    actual var displayName: String?
+        get()  = kcRead(KEY_DISPLAY_NAME)
+        set(v) = if (v != null) kcWrite(KEY_DISPLAY_NAME, v) else kcDelete(KEY_DISPLAY_NAME)
+
+    actual var email: String?
+        get()  = kcRead(KEY_EMAIL)
+        set(v) = if (v != null) kcWrite(KEY_EMAIL, v) else kcDelete(KEY_EMAIL)
+
     actual val isLoggedIn: Boolean
         get() = !accessToken.isNullOrBlank() && !familyId.isNullOrBlank()
 
     actual fun clear() {
-        listOf(KEY_ACCESS, KEY_REFRESH, KEY_FAMILY, KEY_USER).forEach { kcDelete(it) }
+        listOf(KEY_ACCESS, KEY_REFRESH, KEY_FAMILY, KEY_USER, KEY_DISPLAY_NAME, KEY_EMAIL).forEach { kcDelete(it) }
     }
 
     // ── Keychain helpers ──────────────────────────────────────────────────────
@@ -92,9 +100,11 @@ actual class SessionStore {
     }
 
     companion object {
-        private const val KEY_ACCESS  = "rf_access_token"
-        private const val KEY_REFRESH = "rf_refresh_token"
-        private const val KEY_FAMILY  = "rf_family_id"
-        private const val KEY_USER    = "rf_user_id"
+        private const val KEY_ACCESS       = "rf_access_token"
+        private const val KEY_REFRESH      = "rf_refresh_token"
+        private const val KEY_FAMILY       = "rf_family_id"
+        private const val KEY_USER         = "rf_user_id"
+        private const val KEY_DISPLAY_NAME = "rf_display_name"
+        private const val KEY_EMAIL        = "rf_email"
     }
 }

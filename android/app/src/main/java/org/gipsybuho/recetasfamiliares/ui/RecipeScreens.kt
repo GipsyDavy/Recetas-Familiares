@@ -122,7 +122,9 @@ internal fun RecipeList(
     viewModel: RecetasViewModel,
     onRefresh: () -> Unit,
     openRecipeId: String? = null,
-    onRecipeOpened: () -> Unit = {}
+    onRecipeOpened: () -> Unit = {},
+    filterByStock: Boolean = false,
+    onToggleStockFilter: () -> Unit = {}
 ) {
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val recipeHasMore by viewModel.recipeHasMore.collectAsState()
@@ -230,6 +232,20 @@ internal fun RecipeList(
                                                 )
                                             )
                                         }
+                                        val stockChipColor by animateColorAsState(
+                                            if (filterByStock) MaterialTheme.colorScheme.tertiaryContainer
+                                            else MaterialTheme.colorScheme.surfaceVariant,
+                                            label = "chipColorStock"
+                                        )
+                                        FilterChip(
+                                            selected = filterByStock,
+                                            onClick = onToggleStockFilter,
+                                            label = { Text("Con mi stock", style = MaterialTheme.typography.labelSmall) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = stockChipColor,
+                                                containerColor = stockChipColor
+                                            )
+                                        )
                                     }
                                     Spacer(Modifier.height(Spacing.md))
                                     if (recipes.isEmpty() && isRefreshing) {
