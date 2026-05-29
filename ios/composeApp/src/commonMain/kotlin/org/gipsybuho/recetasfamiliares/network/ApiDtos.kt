@@ -116,3 +116,11 @@ data class ShoppingListItemDto(
     val syncVersion: Long,
     val deleted: Boolean
 )
+
+@Serializable
+data class SyncPullResponseDto(
+    val serverTime: String,
+    val recipes: List<RecipeDto> = emptyList(),
+    val stockItems: List<StockItemDto> = emptyList(),
+    val familyNotes: List<FamilyNoteDto> = emptyList()
+)

@@ -41,3 +41,14 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectAllStockItems:
 SELECT * FROM stock_items WHERE deleted = 0;
+
+CREATE TABLE sync_metadata (
+    key   TEXT NOT NULL PRIMARY KEY,
+    value TEXT
+);
+
+getMetadata:
+SELECT value FROM sync_metadata WHERE key = ?;
+
+setMetadata:
+INSERT OR REPLACE INTO sync_metadata (key, value) VALUES (?, ?);

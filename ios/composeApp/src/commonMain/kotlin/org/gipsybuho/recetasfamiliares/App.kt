@@ -7,6 +7,7 @@ import org.gipsybuho.recetasfamiliares.auth.LoginScreen
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
 import org.gipsybuho.recetasfamiliares.network.ApiClient
+import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 import org.gipsybuho.recetasfamiliares.ui.MainTabScreen
 
 @Composable
@@ -15,8 +16,13 @@ fun App() {
     val apiClient     = remember { ApiClient(session) }
     val authRepo      = remember { AuthRepository(apiClient, session) }
     val driverFactory = remember { DatabaseDriverFactory() }
+    val syncRepo      = remember { SyncRepository(apiClient, session, driverFactory) }
 
     var isLoggedIn by remember { mutableStateOf(session.isLoggedIn) }
+
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) syncRepo.pullIncremental()
+    }
 
     MaterialTheme {
         if (!isLoggedIn) {

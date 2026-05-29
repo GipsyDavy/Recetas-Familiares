@@ -15,6 +15,7 @@ import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.util.Objects;
+import java.util.prefs.Preferences;
 
 public class MainWindow {
 
@@ -52,6 +53,9 @@ public class MainWindow {
         scene.setOnKeyPressed((KeyEvent e) -> {
             if (e.isControlDown() && e.getCode() == KeyCode.F) {
                 globalSearch.requestFocus();
+                e.consume();
+            } else if (e.isControlDown() && e.getCode() == KeyCode.COMMA) {
+                showPreferencesDialog();
                 e.consume();
             }
         });
@@ -125,6 +129,12 @@ public class MainWindow {
         Button btnMenu = sidebarButton("Menú semanal", "menu");
         Button btnShopping = sidebarButton("Lista de la compra", "shopping");
         Button btnNotes = sidebarButton("Notas familiares", "notes");
+        Button settingsBtn = new Button("⚙ Ajustes");
+        settingsBtn.getStyleClass().add("sidebar-nav-button");
+        settingsBtn.setMaxWidth(Double.MAX_VALUE);
+        settingsBtn.setOnAction(e -> showPreferencesDialog());
+        Tooltip.install(settingsBtn, new Tooltip("Ajustes (Ctrl+,)"));
+        VBox.setMargin(settingsBtn, new Insets(2, 8, 0, 8));
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -142,7 +152,7 @@ public class MainWindow {
         VBox bottom = new VBox(8, syncBtn, logoutBtn);
         bottom.setPadding(new Insets(8, 16, 24, 16));
 
-        sidebar.getChildren().addAll(header, globalSearch, btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, spacer, bottom);
+        sidebar.getChildren().addAll(header, globalSearch, btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, settingsBtn, spacer, bottom);
         return sidebar;
     }
 
@@ -281,5 +291,33 @@ public class MainWindow {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    private void showPreferencesDialog() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Ajustes");
+        dialog.initOwner(stage);
+        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().setPrefSize(350, 200);
+        dialog.getDialogPane().getStylesheets().add(
+                Objects.requireNonNull(getClass().getResource("/style.css")).toExternalForm());
+
+        CheckBox cbSounds = new CheckBox("Efectos de sonido");
+        cbSounds.setSelected(SoundPlayer.isSoundEnabled());
+        cbSounds.setStyle("-fx-text-fill: #3D2B1F; -fx-font-size: 13px;");
+
+        VBox content = new VBox(16, cbSounds);
+        content.setPadding(new Insets(18));
+        content.setStyle(
+                "-fx-background-color: #F6E7D8; -fx-background-radius: 10; " +
+                "-fx-border-color: #D4A574; -fx-border-radius: 10; -fx-border-width: 1;");
+        dialog.getDialogPane().setContent(content);
+
+        dialog.showAndWait().ifPresent(type -> {
+            if (type == ButtonType.OK) {
+                Preferences.userRoot().node("recetas")
+                        .putBoolean("sound", cbSounds.isSelected());
+            }
+        });
     }
 }

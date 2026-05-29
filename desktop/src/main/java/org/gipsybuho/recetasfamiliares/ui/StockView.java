@@ -1,5 +1,9 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
+import javafx.animation.FadeTransition;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.transformation.FilteredList;
@@ -9,6 +13,7 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
@@ -205,27 +210,65 @@ public class StockView extends VBox {
 
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.OK) {
-                statusLabel.setText("Eliminando...");
-                Thread.ofVirtual().start(() -> {
-                    try {
-                        context.getStockRepository().delete(selected.id());
-                        Platform.runLater(() -> {
-                            context.getStockRepository().getCache().getItems().remove(selected);
-                            refreshDisplay();
-                            statusLabel.setText("Item eliminado.");
-                            onStatusUpdate.accept("Ítem eliminado");
-                            SoundPlayer.playDelete();
-                        });
-                    } catch (Exception ex) {
-                        Platform.runLater(() -> statusLabel.setText("Error al eliminar: " + ex.getMessage()));
-                    }
-                });
+                animateDelete(selected, () -> performDelete(selected));
             }
         });
     }
 
     private void deleteSelected() {
         confirmDelete();
+    }
+
+    private void animateDelete(StockDtos.StockItemDto selected, Runnable afterAnimation) {
+        TableRow<?> row = findRow(selected);
+        Node target = row != null ? row : table;
+
+        FadeTransition fade = new FadeTransition(Duration.millis(150), target);
+        fade.setFromValue(1.0);
+        fade.setToValue(0.0);
+        fade.setOnFinished(e -> {
+            if (row == null) {
+                table.setOpacity(1.0);
+                afterAnimation.run();
+                return;
+            }
+            double height = row.getHeight() > 0 ? row.getHeight() : row.getPrefHeight();
+            row.setMinHeight(0);
+            Timeline collapse = new Timeline(
+                    new KeyFrame(Duration.ZERO, new KeyValue(row.prefHeightProperty(), height)),
+                    new KeyFrame(Duration.millis(150), new KeyValue(row.prefHeightProperty(), 0))
+            );
+            collapse.setOnFinished(ev -> afterAnimation.run());
+            collapse.play();
+        });
+        fade.play();
+    }
+
+    private TableRow<?> findRow(StockDtos.StockItemDto selected) {
+        for (Node node : table.lookupAll(".table-row-cell")) {
+            if (node instanceof TableRow<?> row && row.getItem() == selected) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private void performDelete(StockDtos.StockItemDto selected) {
+        statusLabel.setText("Eliminando...");
+        Thread.ofVirtual().start(() -> {
+            try {
+                context.getStockRepository().delete(selected.id());
+                Platform.runLater(() -> {
+                    context.getStockRepository().getCache().getItems().remove(selected);
+                    refreshDisplay();
+                    statusLabel.setText("Item eliminado.");
+                    onStatusUpdate.accept("Ítem eliminado");
+                    SoundPlayer.playDelete();
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> statusLabel.setText("Error al eliminar: " + ex.getMessage()));
+            }
+        });
     }
 
     private void refreshDisplay() {

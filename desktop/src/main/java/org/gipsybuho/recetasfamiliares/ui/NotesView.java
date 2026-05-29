@@ -1,5 +1,9 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
+import javafx.animation.FadeTransition;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -10,6 +14,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
@@ -294,9 +299,44 @@ public class NotesView extends VBox {
         confirm.setHeaderText("¿Eliminar \"" + editing.title() + "\"?");
         confirm.setContentText("Esta acción no se puede deshacer.");
         confirm.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        SyncDtos.NoteDtos.FamilyNoteDto note = editing;
         confirm.showAndWait().ifPresent(type -> {
-            if (type == ButtonType.OK) doDelete(editing);
+            if (type == ButtonType.OK) animateDelete(note, () -> doDelete(note));
         });
+    }
+
+    private void animateDelete(SyncDtos.NoteDtos.FamilyNoteDto note, Runnable afterAnimation) {
+        ListCell<?> cell = findCell(note);
+        Node target = cell != null ? cell : listView;
+
+        FadeTransition fade = new FadeTransition(Duration.millis(150), target);
+        fade.setFromValue(1.0);
+        fade.setToValue(0.0);
+        fade.setOnFinished(e -> {
+            if (cell == null) {
+                listView.setOpacity(1.0);
+                afterAnimation.run();
+                return;
+            }
+            double height = cell.getHeight() > 0 ? cell.getHeight() : cell.getPrefHeight();
+            cell.setMinHeight(0);
+            Timeline collapse = new Timeline(
+                    new KeyFrame(Duration.ZERO, new KeyValue(cell.prefHeightProperty(), height)),
+                    new KeyFrame(Duration.millis(150), new KeyValue(cell.prefHeightProperty(), 0))
+            );
+            collapse.setOnFinished(ev -> afterAnimation.run());
+            collapse.play();
+        });
+        fade.play();
+    }
+
+    private ListCell<?> findCell(SyncDtos.NoteDtos.FamilyNoteDto note) {
+        for (Node node : listView.lookupAll(".list-cell")) {
+            if (node instanceof ListCell<?> cell && cell.getItem() == note) {
+                return cell;
+            }
+        }
+        return null;
     }
 
     private void doDelete(SyncDtos.NoteDtos.FamilyNoteDto note) {
