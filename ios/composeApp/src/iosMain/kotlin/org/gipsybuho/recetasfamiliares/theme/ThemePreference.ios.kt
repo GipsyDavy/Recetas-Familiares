@@ -19,8 +19,13 @@ actual class ThemePreference {
         }
         set(value) { defaults.setObject(value.name, forKey = KEY_MODE) }
 
+    actual var hapticsEnabled: Boolean
+        get() = if (defaults.objectForKey(KEY_HAPTICS) != null) defaults.boolForKey(KEY_HAPTICS) else true
+        set(value) { defaults.setBool(value, forKey = KEY_HAPTICS) }
+
     companion object {
-        private const val KEY_THEME = "rf_selected_theme"
-        private const val KEY_MODE  = "rf_theme_mode"
+        private const val KEY_THEME   = "rf_selected_theme"
+        private const val KEY_MODE    = "rf_theme_mode"
+        private const val KEY_HAPTICS = "rf_haptics_enabled"
     }
 }

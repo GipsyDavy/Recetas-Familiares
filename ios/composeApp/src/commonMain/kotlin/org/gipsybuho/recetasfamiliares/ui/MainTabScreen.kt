@@ -40,8 +40,10 @@ fun MainTabScreen(
     syncRepo: SyncRepository,
     selectedTheme: AppTheme,
     themeMode: ThemeMode,
+    hapticsEnabled: Boolean,
     onThemeChange: (AppTheme) -> Unit,
     onModeChange: (ThemeMode) -> Unit,
+    onHapticsChange: (Boolean) -> Unit,
     onLogout: () -> Unit
 ) {
     val recipeRepo   = remember { RecipeRepository(apiClient, session, driverFactory) }
@@ -102,12 +104,14 @@ fun MainTabScreen(
                 Tab.SHOPPING -> ShoppingListScreen(repository = shoppingRepo)
                 Tab.MENU     -> MenuScreen(repository = menuRepo)
                 Tab.SETTINGS -> SettingsScreen(
-                    selectedTheme = selectedTheme,
-                    themeMode     = themeMode,
-                    onThemeChange = onThemeChange,
-                    onModeChange  = onModeChange,
-                    onLogout      = onLogout,
-                    session       = session
+                    selectedTheme   = selectedTheme,
+                    themeMode       = themeMode,
+                    hapticsEnabled  = hapticsEnabled,
+                    onThemeChange   = onThemeChange,
+                    onModeChange    = onModeChange,
+                    onHapticsChange = onHapticsChange,
+                    onLogout        = onLogout,
+                    session         = session
                 )
             }
         }

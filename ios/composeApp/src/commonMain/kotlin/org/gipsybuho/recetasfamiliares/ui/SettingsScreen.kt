@@ -40,8 +40,10 @@ import org.gipsybuho.recetasfamiliares.theme.lightColors
 fun SettingsScreen(
     selectedTheme: AppTheme,
     themeMode: ThemeMode,
+    hapticsEnabled: Boolean,
     onThemeChange: (AppTheme) -> Unit,
     onModeChange: (ThemeMode) -> Unit,
+    onHapticsChange: (Boolean) -> Unit,
     onLogout: () -> Unit,
     session: SessionStore? = null
 ) {
@@ -87,6 +89,17 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
         }
 
+        HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically,
+            modifier              = Modifier.fillMaxWidth()
+        ) {
+            Text("Hápticos", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Switch(checked = hapticsEnabled, onCheckedChange = onHapticsChange)
+        }
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
         Text("Modo de pantalla", style = MaterialTheme.typography.titleSmall,

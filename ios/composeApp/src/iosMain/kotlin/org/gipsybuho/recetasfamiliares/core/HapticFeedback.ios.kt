@@ -8,12 +8,13 @@ import platform.UIKit.UINotificationFeedbackTypeSuccess
 import platform.UIKit.UISelectionFeedbackGenerator
 
 actual class HapticFeedback {
+    private val prefs          = org.gipsybuho.recetasfamiliares.theme.ThemePreference()
     private val impactGen      = UIImpactFeedbackGenerator(UIImpactFeedbackStyleMedium)
     private val selectionGen   = UISelectionFeedbackGenerator()
     private val notificationGen = UINotificationFeedbackGenerator()
 
-    actual fun impact()    = impactGen.impactOccurred()
-    actual fun selection() = selectionGen.selectionChanged()
-    actual fun success()   = notificationGen.notificationOccurred(UINotificationFeedbackTypeSuccess)
-    actual fun error()     = notificationGen.notificationOccurred(UINotificationFeedbackTypeError)
+    actual fun impact()    { if (prefs.hapticsEnabled) impactGen.impactOccurred() }
+    actual fun selection() { if (prefs.hapticsEnabled) selectionGen.selectionChanged() }
+    actual fun success()   { if (prefs.hapticsEnabled) notificationGen.notificationOccurred(UINotificationFeedbackTypeSuccess) }
+    actual fun error()     { if (prefs.hapticsEnabled) notificationGen.notificationOccurred(UINotificationFeedbackTypeError) }
 }

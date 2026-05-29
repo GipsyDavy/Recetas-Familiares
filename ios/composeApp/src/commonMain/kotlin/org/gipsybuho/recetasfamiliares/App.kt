@@ -33,6 +33,7 @@ fun App() {
     var onboardingDone by remember { mutableStateOf(onboardingPref.onboardingDone) }
     var selectedTheme  by remember { mutableStateOf(themePref.selectedTheme) }
     var themeMode      by remember { mutableStateOf(themePref.themeMode) }
+    var hapticsEnabled by remember { mutableStateOf(themePref.hapticsEnabled) }
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) syncRepo.pullIncremental()
@@ -54,15 +55,17 @@ fun App() {
             LoginScreen(repository = authRepo, onLoginSuccess = { isLoggedIn = true })
         } else {
             MainTabScreen(
-                apiClient     = apiClient,
-                session       = session,
-                driverFactory = driverFactory,
-                syncRepo      = syncRepo,
-                selectedTheme = selectedTheme,
-                themeMode     = themeMode,
-                onThemeChange = { t -> selectedTheme = t; themePref.selectedTheme = t },
-                onModeChange  = { m -> themeMode = m; themePref.themeMode = m },
-                onLogout      = { session.clear(); isLoggedIn = false }
+                apiClient       = apiClient,
+                session         = session,
+                driverFactory   = driverFactory,
+                syncRepo        = syncRepo,
+                selectedTheme   = selectedTheme,
+                themeMode       = themeMode,
+                hapticsEnabled  = hapticsEnabled,
+                onThemeChange   = { t -> selectedTheme = t; themePref.selectedTheme = t },
+                onModeChange    = { m -> themeMode = m; themePref.themeMode = m },
+                onHapticsChange = { h -> hapticsEnabled = h; themePref.hapticsEnabled = h },
+                onLogout        = { session.clear(); isLoggedIn = false }
             )
         }
     }

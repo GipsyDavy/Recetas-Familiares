@@ -195,28 +195,30 @@ fun CookingScreen(
 
             // Temporizador (solo si el paso tiene timer)
             if (currentStep?.timerMinutes != null && !finished) {
-                val secs = timerLeft ?: (currentStep.timerMinutes * 60)
+                val totalSeconds = currentStep.timerMinutes * 60
+                val secs = timerLeft ?: totalSeconds
                 val mm = secs / 60
                 val ss = secs % 60
                 val timerDone = secs == 0
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
+                val progress = if (totalSeconds > 0) secs.toFloat() / totalSeconds else 0f
+                val timerColor = when {
+                    timerDone    -> MaterialTheme.colorScheme.error
+                    timerRunning -> MaterialTheme.colorScheme.primary
+                    else         -> MaterialTheme.colorScheme.outline
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = when {
-                            timerDone   -> MaterialTheme.colorScheme.errorContainer
-                            timerRunning -> MaterialTheme.colorScheme.primaryContainer
-                            else        -> MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            progress    = { progress },
+                            modifier    = Modifier.size(96.dp),
+                            strokeWidth = 6.dp,
+                            color       = timerColor,
+                            trackColor  = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             AnimatedContent(
                                 targetState = if (timerDone) "done" else "%02d:%02d".format(mm, ss),
                                 transitionSpec = {
@@ -226,25 +228,24 @@ fun CookingScreen(
                                 label = "timer"
                             ) { state ->
                                 Text(
-                                    if (state == "done") "⏱ ¡Listo!" else "⏱ $state",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = if (timerDone) MaterialTheme.colorScheme.onErrorContainer
-                                            else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            IconButton(onClick = {
-                                if (timerDone) {
-                                    timerLeft = currentStep.timerMinutes * 60; timerRunning = false
-                                } else {
-                                    timerRunning = !timerRunning
-                                }
-                            }) {
-                                Icon(
-                                    if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                    contentDescription = if (timerRunning) "Pausar" else "Iniciar"
+                                    if (state == "done") "¡Listo!" else state,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = timerColor
                                 )
                             }
                         }
+                    }
+                    IconButton(onClick = {
+                        if (timerDone) {
+                            timerLeft = totalSeconds; timerRunning = false
+                        } else {
+                            timerRunning = !timerRunning
+                        }
+                    }) {
+                        Icon(
+                            if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (timerRunning) "Pausar" else "Iniciar"
+                        )
                     }
                 }
             }

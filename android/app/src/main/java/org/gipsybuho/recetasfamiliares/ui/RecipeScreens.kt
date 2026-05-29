@@ -191,7 +191,11 @@ internal fun RecipeList(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("Recetas", style = MaterialTheme.typography.headlineSmall)
+                                        Text(
+                                            "${filtered.size} recetas",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                         IconButton(onClick = onRefresh) {
                                             Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
                                         }
@@ -426,8 +430,9 @@ internal fun RecipeDetail(
     onCookingMode: () -> Unit = {}
 ) {
     val context    = LocalContext.current
-    val haptic     = LocalHapticFeedback.current
-    val scope      = rememberCoroutineScope()
+    val haptic         = LocalHapticFeedback.current
+    val hapticsEnabled = LocalHapticsEnabled.current
+    val scope          = rememberCoroutineScope()
     val ingredients by viewModel.ingredientsFor(recipe.id).collectAsState(initial = emptyList())
     val steps by viewModel.stepsFor(recipe.id).collectAsState(initial = emptyList())
     val isFavorite by viewModel.isFavorite(recipe.id).collectAsState(initial = false)
@@ -455,7 +460,7 @@ internal fun RecipeDetail(
                 Text(recipe.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                 IconButton(onClick = {
                     viewModel.toggleFavorite(recipe.id)
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     scope.launch {
                         favoriteScale.animateTo(1.35f,
                             spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))

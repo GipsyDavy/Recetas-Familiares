@@ -97,7 +97,8 @@ internal fun StockList(
     var query by remember { mutableStateOf("") }
     var sortByExpiry by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val haptic = LocalHapticFeedback.current
+    val haptic         = LocalHapticFeedback.current
+    val hapticsEnabled = LocalHapticsEnabled.current
     var pendingDeleteItem by remember { mutableStateOf<StockItemEntity?>(null) }
     var pendingDismissState by remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
     val filtered = stockItems
@@ -249,7 +250,7 @@ internal fun StockList(
             text = { Text("\"${item.name}\" se eliminará del stock familiar.") },
             confirmButton = {
                 TextButton(onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     viewModel.deleteStockItem(item)
                     pendingDeleteItem = null; pendingDismissState = null
                 }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }

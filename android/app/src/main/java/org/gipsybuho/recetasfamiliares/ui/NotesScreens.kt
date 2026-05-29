@@ -81,7 +81,8 @@ internal fun NotesScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    val haptic = LocalHapticFeedback.current
+    val haptic         = LocalHapticFeedback.current
+    val hapticsEnabled = LocalHapticsEnabled.current
     var pendingDeleteNote by remember { mutableStateOf<FamilyNoteEntity?>(null) }
     var pendingNoteSwipeState by remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
     val filtered = if (query.isBlank()) notes
@@ -220,7 +221,7 @@ internal fun NotesScreen(
             text = { Text("\"${note.title}\" se eliminará de las notas familiares.") },
             confirmButton = {
                 TextButton(onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     viewModel.deleteNote(note)
                     pendingDeleteNote = null; pendingNoteSwipeState = null
                 }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }

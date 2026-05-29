@@ -84,11 +84,14 @@ import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 
 internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES, MENU, PROFILE }
 
+internal val LocalHapticsEnabled = androidx.compose.runtime.staticCompositionLocalOf { true }
+
 @Composable
 fun RecetasApp(viewModel: RecetasViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val isLoggedIn     by viewModel.isLoggedIn.collectAsState()
     val onboardingDone by viewModel.onboardingDone.collectAsState()
+    val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
@@ -97,12 +100,14 @@ fun RecetasApp(viewModel: RecetasViewModel) {
         }
     }
 
-    if (!onboardingDone) {
-        OnboardingScreen(onFinished = { viewModel.markOnboardingDone() })
-    } else if (!isLoggedIn) {
-        LoginScreen(viewModel)
-    } else {
-        MainShell(viewModel)
+    androidx.compose.runtime.CompositionLocalProvider(LocalHapticsEnabled provides hapticsEnabled) {
+        if (!onboardingDone) {
+            OnboardingScreen(onFinished = { viewModel.markOnboardingDone() })
+        } else if (!isLoggedIn) {
+            LoginScreen(viewModel)
+        } else {
+            MainShell(viewModel)
+        }
     }
 }
 
@@ -188,8 +193,9 @@ private fun MainShell(viewModel: RecetasViewModel) {
     val notes by viewModel.notes.collectAsState()
     val menuItems by viewModel.menuItems.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
-    val selectedTheme by viewModel.selectedTheme.collectAsState()
-    val themeMode by viewModel.themeMode.collectAsState()
+    val selectedTheme  by viewModel.selectedTheme.collectAsState()
+    val themeMode      by viewModel.themeMode.collectAsState()
+    val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
     var navigateToRecipeId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -280,12 +286,14 @@ private fun MainShell(viewModel: RecetasViewModel) {
     ) { padding ->
         if (showThemePicker) {
             ThemePickerDialog(
-                currentTheme = selectedTheme,
-                currentMode  = themeMode,
-                onDismiss    = { showThemePicker = false },
-                onApply      = { theme, mode ->
+                currentTheme    = selectedTheme,
+                currentMode     = themeMode,
+                hapticsEnabled  = hapticsEnabled,
+                onDismiss       = { showThemePicker = false },
+                onApply         = { theme, mode, haptics ->
                     viewModel.setTheme(theme)
                     viewModel.setThemeMode(mode)
+                    viewModel.setHapticsEnabled(haptics)
                     showThemePicker = false
                 }
             )

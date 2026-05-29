@@ -4,9 +4,12 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,7 +28,14 @@ private val PAGES = listOf(
 @Composable
 internal fun OnboardingScreen(onFinished: () -> Unit) {
     var page by remember { mutableStateOf(0) }
+    val gradientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
 
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(listOf(gradientColor, Color.Transparent))
+            )
+        )
     Column(
         modifier            = Modifier.fillMaxSize().padding(Spacing.xxl),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -96,4 +106,5 @@ internal fun OnboardingScreen(onFinished: () -> Unit) {
             }
         }
     }
+    } // Box
 }

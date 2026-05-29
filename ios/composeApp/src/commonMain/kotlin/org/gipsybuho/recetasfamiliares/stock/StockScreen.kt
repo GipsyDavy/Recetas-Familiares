@@ -22,6 +22,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.until
+import kotlinx.datetime.DateTimeUnit
 import org.gipsybuho.recetasfamiliares.Spacing
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.StockItemDto
@@ -294,12 +300,40 @@ private fun SwipeToRevealItem(
             ListItem(
                 headlineContent   = { Text(item.name) },
                 supportingContent = {
+                    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+                    val expiryText = item.expiresAt?.take(10)?.let { raw ->
+                        runCatching {
+                            val expDate = LocalDate.parse(raw)
+                            val days = today.until(expDate, DateTimeUnit.DAY)
+                            when {
+                                days < 0  -> "Caducado"
+                                days == 0 -> "Caduca hoy"
+                                days == 1 -> "Caduca mañana"
+                                else      -> "Caduca en $days días"
+                            }
+                        }.getOrNull()
+                    }
+                    val expiryColor = item.expiresAt?.take(10)?.let { raw ->
+                        runCatching {
+                            val expDate = LocalDate.parse(raw)
+                            val days = today.until(expDate, DateTimeUnit.DAY)
+                            when {
+                                days <= 2 -> MaterialTheme.colorScheme.error
+                                days <= 7 -> MaterialTheme.colorScheme.tertiary
+                                else      -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        }.getOrElse { MaterialTheme.colorScheme.onSurfaceVariant }
+                    } ?: MaterialTheme.colorScheme.onSurfaceVariant
                     val qty = buildString {
                         item.quantity?.let { append("%.1f".format(it)) }
                         item.unit?.let { append(" $it") }
-                        item.expiresAt?.let { append(" · Caduca: ${it.take(10)}") }
                     }
-                    if (qty.isNotBlank()) Text(qty)
+                    Column {
+                        if (qty.isNotBlank()) Text(qty, style = MaterialTheme.typography.bodySmall)
+                        expiryText?.let {
+                            Text(it, style = MaterialTheme.typography.labelSmall, color = expiryColor)
+                        }
+                    }
                 },
                 trailingContent   = item.lowStockThreshold?.let { threshold ->
                     val isLow = item.quantity != null && item.quantity <= threshold

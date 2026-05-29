@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +76,7 @@ internal fun CookingScreen(
     var timerRunning by remember(currentIndex) { mutableStateOf(false) }
 
     val haptic = LocalHapticFeedback.current
+    val hapticsEnabled = LocalHapticsEnabled.current
     val focusRequester = remember { FocusRequester() }
     var totalDrag by remember { mutableStateOf(0f) }
     val swipeThresh = 80f
@@ -90,7 +93,7 @@ internal fun CookingScreen(
                 timerSecondsLeft = (timerSecondsLeft ?: 0) - 1
             }
             timerRunning = false
-            if (hadTimer) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            if (hadTimer) if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
     LaunchedEffect("hint") { delay(3_000L); showHint = false }
@@ -115,15 +118,15 @@ internal fun CookingScreen(
                         val n   = steps.size
                         when {
                             totalDrag < -swipeThresh && idx < n - 1 -> {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 currentIndexState.value = idx + 1; timerRunning = false
                             }
                             totalDrag < -swipeThresh && idx == n - 1 && n > 0 -> {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 currentIndexState.value = n
                             }
                             totalDrag > swipeThresh && idx > 0 -> {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 currentIndexState.value = idx - 1; timerRunning = false
                             }
                         }
@@ -141,10 +144,10 @@ internal fun CookingScreen(
                     android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
                         val idx = currentIndexState.value
                         if (idx < stepsSize - 1) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndexState.value = idx + 1
                         } else if (idx == stepsSize - 1 && stepsSize > 0) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndexState.value = stepsSize
                         }
                         true
@@ -152,7 +155,7 @@ internal fun CookingScreen(
                     android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
                         val idx = currentIndexState.value
                         if (idx > 0) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndexState.value = idx - 1
                         }
                         true
@@ -228,28 +231,30 @@ internal fun CookingScreen(
             }
 
             if (currentStep?.timerMinutes != null && !finished) {
-                val secs = timerSecondsLeft ?: (currentStep.timerMinutes * 60)
+                val totalSeconds = currentStep.timerMinutes * 60
+                val secs = timerSecondsLeft ?: totalSeconds
                 val mm = secs / 60
                 val ss = secs % 60
                 val timerDone = secs == 0
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
+                val progress = if (totalSeconds > 0) secs.toFloat() / totalSeconds else 0f
+                val timerColor = when {
+                    timerDone    -> MaterialTheme.colorScheme.error
+                    timerRunning -> MaterialTheme.colorScheme.primary
+                    else         -> MaterialTheme.colorScheme.outline
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.xl)
                 ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = when {
-                            timerDone -> MaterialTheme.colorScheme.errorContainer
-                            timerRunning -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = Spacing.lg),
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            progress    = { progress },
+                            modifier    = Modifier.size(96.dp),
+                            strokeWidth = 6.dp,
+                            color       = timerColor,
+                            trackColor  = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             AnimatedContent(
                                 targetState = if (timerDone) "done" else "%02d:%02d".format(mm, ss),
                                 transitionSpec = {
@@ -259,26 +264,25 @@ internal fun CookingScreen(
                                 label = "timer"
                             ) { state ->
                                 Text(
-                                    if (state == "done") "⏱ ¡Listo!" else "⏱ $state",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = if (timerDone) MaterialTheme.colorScheme.onErrorContainer
-                                            else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            IconButton(onClick = {
-                                if (timerDone) {
-                                    timerSecondsLeft = currentStep.timerMinutes * 60
-                                    timerRunning = false
-                                } else {
-                                    timerRunning = !timerRunning
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                    contentDescription = if (timerRunning) "Pausar" else "Iniciar temporizador"
+                                    if (state == "done") "¡Listo!" else state,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = timerColor
                                 )
                             }
                         }
+                    }
+                    IconButton(onClick = {
+                        if (timerDone) {
+                            timerSecondsLeft = totalSeconds
+                            timerRunning = false
+                        } else {
+                            timerRunning = !timerRunning
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (timerRunning) "Pausar" else "Iniciar temporizador"
+                        )
                     }
                 }
             }
@@ -287,7 +291,7 @@ internal fun CookingScreen(
                 OutlinedButton(
                     onClick = {
                         if (currentIndex > 0) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndex--; timerRunning = false
                         }
                     },
@@ -300,7 +304,7 @@ internal fun CookingScreen(
                 } else if (currentIndex < steps.size - 1) {
                     Button(
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndex++; timerRunning = false
                         },
                         modifier = Modifier.weight(1f)
@@ -308,7 +312,7 @@ internal fun CookingScreen(
                 } else {
                     Button(
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndex = steps.size
                         },
                         modifier = Modifier.weight(1f)

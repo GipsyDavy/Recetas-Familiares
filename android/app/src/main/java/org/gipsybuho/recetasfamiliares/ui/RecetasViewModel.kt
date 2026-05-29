@@ -227,6 +227,13 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { container.themePreference.setThemeMode(mode) }
     }
 
+    val hapticsEnabled: StateFlow<Boolean> = container.themePreference.hapticsEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun setHapticsEnabled(enabled: Boolean) {
+        viewModelScope.launch { container.themePreference.setHapticsEnabled(enabled) }
+    }
+
     fun createRecipe(
         title: String, description: String?, servings: Int?,
         prepMinutes: Int?, cookMinutes: Int?, difficulty: String?,

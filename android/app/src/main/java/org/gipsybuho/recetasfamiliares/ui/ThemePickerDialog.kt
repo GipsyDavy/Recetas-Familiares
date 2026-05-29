@@ -23,6 +23,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,11 +44,13 @@ import org.gipsybuho.recetasfamiliares.ui.theme.lightColors
 internal fun ThemePickerDialog(
     currentTheme: AppTheme,
     currentMode: ThemeMode,
+    hapticsEnabled: Boolean,
     onDismiss: () -> Unit,
-    onApply: (AppTheme, ThemeMode) -> Unit
+    onApply: (AppTheme, ThemeMode, Boolean) -> Unit
 ) {
-    var selectedTheme by remember { mutableStateOf(currentTheme) }
-    var selectedMode  by remember { mutableStateOf(currentMode) }
+    var selectedTheme   by remember { mutableStateOf(currentTheme) }
+    var selectedMode    by remember { mutableStateOf(currentMode) }
+    var hapticsOn       by remember { mutableStateOf(hapticsEnabled) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -71,6 +74,16 @@ internal fun ThemePickerDialog(
                     }
                 }
                 Spacer(Modifier.height(Spacing.xs))
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                    modifier              = Modifier.fillMaxWidth()
+                ) {
+                    Text("Hápticos", style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Switch(checked = hapticsOn, onCheckedChange = { hapticsOn = it })
+                }
+                Spacer(Modifier.height(Spacing.xs))
                 Text("Color", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(5),
@@ -89,7 +102,7 @@ internal fun ThemePickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onApply(selectedTheme, selectedMode) }) {
+            TextButton(onClick = { onApply(selectedTheme, selectedMode, hapticsOn) }) {
                 Text("Aplicar")
             }
         },
