@@ -902,3 +902,93 @@ Sprint 26 — SIGUIENTE:
 *Documento generado por análisis exhaustivo de todo el código de interfaz del proyecto.*
 *Última actualización: 2026-05-29 — Sprint 25A completado*
 *Plataformas auditadas: Android (28 archivos UI), Desktop (14 archivos UI + style.css), iOS (12 archivos UI)*
+
+---
+
+## PARTE 8 — AUDITORÍA UI/UX POST-SPRINT 28 (2026-05-29)
+
+**Estado de Interfaz.md antes de esta auditoría**: TODO IMPLEMENTADO.
+Sprints 25A → 25B → 25C → 25D → 26 completados. Los ítems `[ ]` del checklist original (Nunito/Lato TTF, WCAG AA) permanecían pendientes deliberadamente.
+
+Esta auditoría revisa el código real del proyecto en estado Sprint 28 e identifica mejoras adicionales para sprints futuros.
+
+---
+
+### 8.1 — Mejoras Críticas (🔴)
+
+| ID | Plataforma | Archivo | Problema | Solución |
+|----|------------|---------|----------|---------|
+| UI-1 | Android | `ui/theme/AppTheme.kt` | Nunito + Lato definidos en la escala tipográfica pero `NunitoFamily = FontFamily.Default` y `LatoFamily = FontFamily.SansSerif`. Sin fuentes personalizadas la app se siente genérica. | Añadir TTF a `res/font/nunito_bold.ttf`, `nunito_semibold.ttf`, `lato_regular.ttf`, `lato_semibold.ttf`. Actualizar `FontFamily(Font(R.font.X, Weight))` en `AppTheme.kt`. |
+| UI-2 | Android | `RecetasApp.kt:260–271` | Todos los `NavigationBarItem` usan `Icons.Outlined.*` siempre, independientemente del estado seleccionado. Material3 exige Filled=activo, Outlined=inactivo. | Pasar `selectedIcon = { Icon(Icons.Filled.X) }` e `icon = { Icon(Icons.Outlined.X) }` en cada `NavigationBarItem`. Añadir imports de las variantes `Icons.Filled.*`. |
+
+---
+
+### 8.2 — Mejoras Altas (🟠)
+
+| ID | Plataforma | Archivo | Problema | Solución |
+|----|------------|---------|----------|---------|
+| UI-3 | Android | `ProfileScreen.kt:84–93` | Header (avatar + nombre + email) + dos `ListItem` debajo repitiendo nombre y email. Información duplicada sin valor añadido. | Eliminar los dos `ListItem` y los `HorizontalDivider` entre ellos. El header ya lo muestra todo. |
+| UI-4 | Android + iOS | `ProfileScreen.kt:53`, `SettingsScreen.kt:68` | `displayName.take(2).uppercase()` → "MA" para "María García". El estándar de avatares es primera+última inicial. | Cambiar a: `displayName!!.split(" ").filter { it.isNotBlank() }.take(2).map { it.first().uppercaseChar() }.joinToString("")`. Aplicar en ambas plataformas. |
+| UI-5 | iOS | `cooking/CookingScreen.kt` | iOS tiene `detectHorizontalDragGestures` funcional pero sin ninguna pista visual al usuario. Android tiene el pill animado desde Sprint 27.C. | Añadir `var showHint by remember { mutableStateOf(true) }` + `LaunchedEffect("hint") { delay(3_000); showHint = false }` + `AnimatedVisibility(showHint, enter=fadeIn(400ms), exit=fadeOut(600ms))` con pill Surface centrado en la parte inferior. |
+| UI-6 | iOS | `recipes/RecipeListScreen.kt` | Sin buscador ni filtros de ningún tipo. Android tiene `OutlinedTextField` + chips Fácil/Media/Difícil + chip "Con mi stock". La pantalla más visitada de la app carece del filtrado básico. | Añadir `var query by remember { mutableStateOf("") }` + `OutlinedTextField` + filtro client-side sobre `recipes`. Los FilterChips de dificultad son directamente portables del código Android. |
+
+---
+
+### 8.3 — Mejoras Medias (🟡)
+
+| ID | Plataforma | Archivo | Problema | Solución |
+|----|------------|---------|----------|---------|
+| UI-7 | Desktop | `MainWindow.java` | El sidebar no muestra quién está logueado. Android+iOS muestran avatar+nombre tras Sprint 28.A. | Añadir un `HBox` en la cabecera del sidebar (sobre `btnDashboard`) con avatar `Label`/`Circle` iniciales + `Label` displayName. Leer de `AppSession` que ya tiene los datos. |
+| UI-8 | Android + iOS | `OnboardingScreen.kt` | Las 3 páginas de onboarding muestran emoji sobre fondo `surface` plano. Primera impresión pobre para una app premium. | Añadir `Box` con `Brush.verticalGradient` de `colorScheme.primary.copy(alpha=0.07f)` → `Color.Transparent` como fondo de cada página. Sin cambios estructurales. |
+| UI-9 | Android | `RecipeScreens.kt:194` | `Text("Recetas", style = MaterialTheme.typography.headlineSmall)` dentro del contenido del tab. El `TopAppBar` ya muestra "Recetas" de forma contextual (Sprint 25B). Duplicación. | Eliminar la línea. Si se quiere jerarquía, reemplazar por `Text("${filtered.size} recetas", style = bodyMedium, color = onSurfaceVariant)` como subtítulo. |
+| UI-10 | Android + iOS | `CookingScreen.kt` | El timer countdown muestra segundos como texto plano. Difícil leer el estado del timer de un vistazo, especialmente con las manos mojadas. | Envolver el texto `MM:SS` en `Box` con `CircularProgressIndicator(progress = timerLeft.toFloat() / totalSeconds, strokeWidth = 6.dp, modifier = Modifier.size(96.dp))` determinado como anillo visual. |
+
+---
+
+### 8.4 — Mejoras Bajas (🟢 — polish)
+
+| ID | Plataforma | Archivo | Problema | Solución |
+|----|------------|---------|----------|---------|
+| UI-11 | iOS | `stock/StockScreen.kt` | Fechas de caducidad muestran "YYYY-MM-DD" raw. Difícil evaluar urgencia de un vistazo. | Calcular `daysLeft` con `kotlinx.datetime`. Mostrar "Caduca en N días" (color `tertiary` si ≤7, color `error` si ≤2, color `onSurfaceVariant` si >7). Ya hay lógica similar en Android `StockScreens.kt`. |
+| UI-12 | Android + iOS | `SettingsScreen.kt`, `ThemePickerDialog.kt` | Los hápticos están activos siempre. `Interfaz.md §16` exige toggle en preferencias. No está implementado. | Añadir `var hapticsEnabled: Boolean` a `ThemePreference`/`OnboardingPreference`. Toggle `Switch` o `FilterChip` en `SettingsScreen` iOS y en `ThemePickerDialog` Android. Consultar antes de llamar `haptic.*`. |
+| UI-13 | iOS | `recipes/RecipeListScreen.kt` | Filtro "Con mi stock" solo existe en Android (Sprint 28.C). iOS no tiene paridad. | Pasar instancia de `StockRepository` a `RecipeListScreen`. Replicar la lógica `combine` de Android en el scope de la composable (sin ViewModel en iOS). |
+
+---
+
+### 8.5 — Ítems del checklist original aún pendientes
+
+| ID | Descripción | Estado |
+|----|-------------|--------|
+| FONT-1 | Nunito/Lato TTF pendiente de añadir a `res/font/` | Cubierto por UI-1 |
+| WCAG-1 | Verificar contraste WCAG AA 4.5:1 en cada uno de los 10 temas | Revisión de diseño — requiere herramienta externa (Colour Contrast Analyser). No bloquea funcionalidad. |
+| BUILD-IOS | Build iOS binario en Windows falla (SQLDelight + Gradle 9.5.1) | Pre-existente, sin relación con UI. Requiere macOS + Xcode. |
+
+---
+
+### 8.6 — Orden de ejecución recomendado
+
+```
+Sprint 29 UI/UX (alta prioridad):
+  ├── UI-1: Nunito + Lato TTF (Android)          ← mayor impacto visual, bajo esfuerzo
+  ├── UI-2: NavigationBar Filled/Outlined (Android)
+  ├── UI-3: ProfileScreen eliminar ListItems duplicados (Android)
+  └── UI-4: Algoritmo iniciales avatar (Android + iOS)
+
+Sprint 30 UI/UX (media prioridad):
+  ├── UI-5: iOS CookingScreen swipe hint
+  ├── UI-6: iOS RecipeListScreen buscador + filtros
+  ├── UI-7: Desktop user card en sidebar
+  ├── UI-8: Onboarding gradiente de fondo (Android + iOS)
+  └── UI-9: Eliminar inner "Recetas" heading duplicado (Android)
+
+Sprint 31 UI/UX (baja prioridad / polish):
+  ├── UI-10: Timer CookingScreen circular (Android + iOS)
+  ├── UI-11: Fechas caducidad relativas en iOS StockScreen
+  ├── UI-12: Haptics toggle en Settings (Android + iOS)
+  └── UI-13: Filtro "Con mi stock" en iOS
+```
+
+---
+
+*Auditoría actualizada: 2026-05-29 — Sprint 28 completado*
+*Código revisado: `RecetasApp.kt`, `ProfileScreen.kt`, `RecipeScreens.kt`, `CookingScreen.kt` (Android), `RecipeListScreen.kt`, `CookingScreen.kt`, `SettingsScreen.kt` (iOS), `MainWindow.java` (Desktop)*

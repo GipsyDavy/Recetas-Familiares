@@ -7,6 +7,8 @@ Activa TODAS las skills instaladas al máximo nivel:
 - frontend-design
 - excalidraw-diagram
 - security-review
+- security-guidance (plugin activo, scope global — revisión automática en tiempo real)
+- VibeSec (skill nativa — invocar en auth, ownership, JWT, imágenes, API, cada Sprint)
 - sequential-thinking
 - memory
 - architecture-review

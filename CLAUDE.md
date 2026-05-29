@@ -10,6 +10,41 @@ Estas reglas deben respetar siempre:
 
 ---
 
+# HERRAMIENTAS DE SEGURIDAD ACTIVAS — REGLAS DE INVOCACIÓN AUTOMÁTICA
+
+Estas reglas tienen **máxima prioridad**. Claude Code debe invocar estas herramientas de forma proactiva, sin esperar instrucción del usuario.
+
+## Plugin: `security-guidance` (scope global, v2.0.0)
+- Activo automáticamente vía hooks en todas las sesiones.
+- Revisa patrones de vulnerabilidad en tiempo real durante ediciones.
+- Ejecuta diff review LLM completo al finalizar cada bloque de cambios.
+- Cubre: injection, XSS, SSRF, hardcoded secrets y 25+ clases de vulnerabilidades.
+
+## Skill: `/VibeSec` — INVOCAR AUTOMÁTICAMENTE
+
+Claude Code debe invocar `/VibeSec` de forma proactiva (sin que el usuario lo pida) cada vez que se cumpla cualquiera de estas condiciones:
+
+- Se crea o modifica código de autenticación (login, registro, refresh token, logout).
+- Se crea o modifica lógica de ownership o acceso a datos de familias/usuarios.
+- Se añade o modifica lógica de subida, validación o almacenamiento de imágenes.
+- Se modifica un contrato API que afecte permisos, roles o visibilidad de datos.
+- Se trabaja con JWT, tokens, Keychain, EncryptedSharedPreferences o secretos.
+- Se finaliza un Sprint (antes del commit de cierre).
+- Se implementa cualquier funcionalidad con datos personales o familiares sensibles.
+
+## Skill: `/security-review` — INVOCAR AUTOMÁTICAMENTE
+
+Claude Code debe invocar `/security-review` de forma proactiva en:
+
+- Revisión final antes de cerrar cualquier funcionalidad crítica (auth, stock, recetas compartidas, imágenes, menús familiares).
+- Al recibir una tarea que modifique backend endpoints con datos de usuario o familia.
+- Al finalizar implementaciones que toquen Spring Security, JWT filters o CORS config.
+
+## Regla general
+Si existe cualquier duda sobre si aplica o no → invocar. Es mejor un análisis de más que una vulnerabilidad sin detectar.
+
+---
+
 # CONTEXTO DEL PROYECTO
 
 "Recetas Familia" es una plataforma cliente-servidor multiplataforma diseñada para ayudar a las familias a:
