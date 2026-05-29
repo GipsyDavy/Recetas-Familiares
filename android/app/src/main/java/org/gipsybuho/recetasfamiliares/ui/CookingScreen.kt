@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.ui
 
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -70,6 +72,8 @@ internal fun CookingScreen(
 
     val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
+    var totalDrag by remember { mutableStateOf(0f) }
+    val swipeThresh = 80f
     LaunchedEffect(Unit) {
         try { focusRequester.requestFocus() } catch (_: Exception) {}
     }
@@ -99,6 +103,30 @@ internal fun CookingScreen(
     Surface(
         modifier = Modifier
             .fillMaxSize()
+            .pointerInput(steps.size) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val idx = currentIndexState.value
+                        val n   = steps.size
+                        when {
+                            totalDrag < -swipeThresh && idx < n - 1 -> {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                currentIndexState.value = idx + 1; timerRunning = false
+                            }
+                            totalDrag < -swipeThresh && idx == n - 1 && n > 0 -> {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                currentIndexState.value = n
+                            }
+                            totalDrag > swipeThresh && idx > 0 -> {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                currentIndexState.value = idx - 1; timerRunning = false
+                            }
+                        }
+                        totalDrag = 0f
+                    },
+                    onHorizontalDrag = { _, delta -> totalDrag += delta }
+                )
+            }
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { event ->

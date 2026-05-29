@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.gipsybuho.recetasfamiliares.cooking.CookingScreen
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
 import org.gipsybuho.recetasfamiliares.sync.SyncRepository
@@ -23,6 +24,7 @@ fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
     var isRefreshing   by remember { mutableStateOf(false) }
     var error          by remember { mutableStateOf<String?>(null) }
     var selectedRecipe by remember { mutableStateOf<RecipeDto?>(null) }
+    var cookingMode    by remember { mutableStateOf(false) }
     val haptic         = rememberHapticFeedback()
     val scope          = rememberCoroutineScope()
 
@@ -46,11 +48,21 @@ fun RecipeListScreen(repository: RecipeRepository, syncRepo: SyncRepository) {
         }
     }
 
-    if (selectedRecipe != null) {
-        RecipeDetailScreen(
+    if (cookingMode && selectedRecipe != null) {
+        CookingScreen(
             recipe     = selectedRecipe!!,
             repository = repository,
-            onBack     = { selectedRecipe = null }
+            onExit     = { cookingMode = false }
+        )
+        return
+    }
+
+    if (selectedRecipe != null) {
+        RecipeDetailScreen(
+            recipe        = selectedRecipe!!,
+            repository    = repository,
+            onBack        = { selectedRecipe = null },
+            onCookingMode = { cookingMode = true }
         )
         return
     }

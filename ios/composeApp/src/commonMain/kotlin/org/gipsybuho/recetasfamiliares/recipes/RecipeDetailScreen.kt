@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
+import org.gipsybuho.recetasfamiliares.core.shareText
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
 import org.gipsybuho.recetasfamiliares.network.RecipeIngredientDto
 import org.gipsybuho.recetasfamiliares.network.RecipeStepDto
@@ -27,7 +30,8 @@ import org.gipsybuho.recetasfamiliares.network.RecipeStepDto
 fun RecipeDetailScreen(
     recipe: RecipeDto,
     repository: RecipeRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onCookingMode: (() -> Unit)? = null
 ) {
     var ingredients by remember { mutableStateOf<List<RecipeIngredientDto>>(emptyList()) }
     var steps       by remember { mutableStateOf<List<RecipeStepDto>>(emptyList()) }
@@ -46,7 +50,8 @@ fun RecipeDetailScreen(
         loading = false
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
@@ -76,6 +81,12 @@ fun RecipeDetailScreen(
                     tint               = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier           = Modifier.graphicsLayer { scaleX = favoriteScale.value; scaleY = favoriteScale.value }
                 )
+            }
+            IconButton(onClick = {
+                haptic.selection()
+                shareText(buildShareText(recipe, ingredients, steps))
+            }) {
+                Icon(Icons.Filled.Share, contentDescription = "Compartir")
             }
         }
         HorizontalDivider()
@@ -211,6 +222,47 @@ fun RecipeDetailScreen(
                 }
             }
         }
+        }
+        if (!loading && steps.isNotEmpty() && onCookingMode != null) {
+            ExtendedFloatingActionButton(
+                onClick  = { haptic.selection(); onCookingMode() },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                icon     = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                text     = { Text("Cocinar") }
+            )
+        }
+    }
+}
+
+private fun buildShareText(
+    recipe: RecipeDto,
+    ingredients: List<RecipeIngredientDto>,
+    steps: List<RecipeStepDto>
+): String = buildString {
+    appendLine("🍳 ${recipe.title}")
+    val meta = buildList {
+        recipe.servings?.let { add("$it porciones") }
+        val mins = (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
+        if (mins > 0) add("$mins min")
+        recipe.difficulty?.let { d ->
+            add(when (d.uppercase()) { "EASY" -> "Fácil"; "MEDIUM" -> "Media"; "HARD" -> "Difícil"; else -> d })
+        }
+    }
+    if (meta.isNotEmpty()) appendLine(meta.joinToString(" · "))
+    recipe.description?.takeIf { it.isNotBlank() }?.let { appendLine(); appendLine(it) }
+    if (ingredients.isNotEmpty()) {
+        appendLine(); appendLine("🥗 Ingredientes:")
+        ingredients.sortedBy { it.position }.forEach { ing ->
+            val qty = buildString {
+                ing.quantity?.let { append("%.1f".format(it)) }
+                ing.unit?.takeIf { it.isNotBlank() }?.let { append(" $it") }
+            }
+            appendLine("• ${ing.name}${if (qty.isNotBlank()) " ($qty)" else ""}")
+        }
+    }
+    if (steps.isNotEmpty()) {
+        appendLine(); appendLine("👨‍🍳 Preparación:")
+        steps.sortedBy { it.position }.forEach { step -> appendLine("${step.position}. ${step.instruction}") }
     }
 }
 
