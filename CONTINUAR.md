@@ -1040,31 +1040,42 @@ Verificado en emulador Pixel_9_Pro API 36: LoginScreen, RecipeList, RecipeDetail
 
 ---
 
-## Sprint 20 — EN CURSO (2026-05-29) — commit 847c528
+## Sprint 20 — COMPLETADO (2026-05-29) — commits 847c528 + 6963f04
 
-### iOS — COMPLETADO (Claude Code) ✅
+### iOS — Claude Code ✅
 
 - `shopping/ShoppingListRepository.kt` (nuevo): `loadLists()` + `loadItems(listId)` via Ktor.
-  Endpoints: `GET /api/v1/families/{fid}/shopping-lists` y `/{listId}/items`.
-- `shopping/ShoppingListScreen.kt` (nuevo): dos niveles — lista de listas → items con drill-down.
-  Back button nativo, haptic.selection() al tap, items con tachado + Checkbox read-only.
-- `menu/MenuRepository.kt` (nuevo): `loadCurrentWeek()` sin weekStart param (backend auto-selecciona).
-  Orden por plannedDate + mealType (BREAKFAST/LUNCH/SNACK/DINNER).
-- `menu/MenuScreen.kt` (nuevo): cards por día con chips de tipo comida, empty state con icono.
-- `ui/MainTabScreen.kt`: ambas tabs cableadas con repos reales, PlaceholderScreen eliminado.
+- `shopping/ShoppingListScreen.kt` (nuevo): lista de listas → drill-down items. Back button, haptic, tachado+Checkbox read-only.
+- `menu/MenuRepository.kt` (nuevo): `loadCurrentWeek()` sin weekStart (backend auto-selecciona semana actual). Orden por fecha + tipo de comida.
+- `menu/MenuScreen.kt` (nuevo): cards por día, chips tipo comida (Desayuno/Almuerzo/Merienda/Cena), empty state con icono.
+- `sync/SyncRepository.kt` (nuevo): `pullIncremental()` — GET /sync/pull?since=X, upsert recipes+stockItems en SQLDelight. Silent en fallo de red.
+- `AppDatabase.sq`: tabla `sync_metadata` (key/value) + queries `getMetadata`/`setMetadata`.
+- `ApiDtos.kt`: `SyncPullResponseDto` (serverTime + recipes + stockItems + familyNotes).
+- `App.kt`: `LaunchedEffect(isLoggedIn)` dispara sync en background al hacer login.
+- `ui/MainTabScreen.kt`: PlaceholderScreen eliminado — ambas tabs con implementación real.
 
-### Desktop (Codex) — pendiente respuesta
+### Desktop — Codex, BUILD SUCCESS ✅
 
-- SequentialTransition al eliminar en StockView y NotesView.
-- Panel de preferencias de sonido (botón ⚙ + Dialog con CheckBox).
+- `StockView.java`: `animateDelete()` — FadeTransition 150ms + colapso altura 150ms antes de borrar.
+- `NotesView.java`: misma secuencia de animación al eliminar nota.
+- `MainWindow.java`: botón ⚙ Ajustes en sidebar + `showPreferencesDialog()` con CheckBox "Efectos de sonido". Persistencia en `Preferences`, tooltip + atajo Ctrl+,.
 
-### Prioridad Alta pendiente — Sprint 21
+### Decisiones arquitectónicas Sprint 20 (Gemini)
 
-1. **Sync incremental SQLDelight iOS** — pull desde iOS usando `/api/v1/sync/pull?since=X`.
-   Diseño arquitectónico pendiente de análisis Gemini (bloque enviado).
+- `lastSyncTime` en SQLDelight `sync_metadata` (atomicidad con los datos).
+- Push diferido: iOS es read-only, push no necesario hasta que haya pantallas de creación.
+- Triggers: al login (App.kt) + pull-to-refresh manual (futuro Sprint 21).
+- Conflictos: ninguno por ahora (iOS solo lee; LWW ya en backend).
 
-### Prioridad Media — Android (prioridad baja Sprint 17)
+## Sprint 21 — Candidatos
 
-1. **Lottie empty states Android** — cocinero animado, lista vacía (`com.airbnb.android:lottie-compose:6.x`).
-2. **Micro-animación ❤️ favorito** — escala + partículas al marcar favorito (Android + iOS).
-3. **SharedElementTransition** RecipeList → RecipeDetail Android (Compose experimental API).
+### Prioridad Alta
+
+1. **Pull-to-refresh manual iOS** — botón/swipe en RecipeListScreen y StockScreen que llame a `syncRepo.pullIncremental()` y recargue la lista.
+2. **Lottie empty states Android** — cocinero animado, lista vacía (`com.airbnb.android:lottie-compose:6.x`).
+3. **Micro-animación ❤️ favorito** — escala + partículas al marcar favorito (Android + iOS).
+
+### Prioridad Baja
+
+1. **SharedElementTransition** RecipeList → RecipeDetail Android (Compose experimental API).
+2. Semana navigation en MenuScreen iOS (requiere `kotlinx.datetime` o expect/actual para cálculo de fechas).

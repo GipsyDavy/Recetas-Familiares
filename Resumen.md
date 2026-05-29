@@ -277,15 +277,15 @@ Pendiente Sprint 20:
 | 19-Android | 2026-05-29 | UX Polish Android: ModalBottomSheet menú ⋮, AnimatedContent timer, SkeletonRecipeCard shimmer, animateColorAsState chips+badges, animateContentSize RatingsSection |
 | 19-Desktop | 2026-05-29 | UX Polish Desktop: TranslateTransition ExpiryNotification, skeleton RecipeListView, SoundPlayer (playConfirm/Delete/TimerComplete) desactivado por defecto |
 | 19-iOS | 2026-05-29 | iOS SQLDelight 2.0.2: DatabaseDriverFactory expect/actual, RecipeRepo+StockRepo cache offline; HapticFeedback expect/actual UIKit; SwipeToReveal StockScreen (pointerInput+Animatable) |
+| 20-iOS | 2026-05-29 | ShoppingListScreen (2 niveles: listas→items drill-down, tachado read-only); MenuScreen (cards por día, chips tipo comida); SyncRepository pullIncremental (sync_metadata SQLDelight); LaunchedEffect sync al login |
+| 20-Desktop | 2026-05-29 | StockView+NotesView animateDelete() FadeTransition+colapso 150ms; MainWindow ⚙ Ajustes con PreferencesDialog toggle sonidos (Codex, BUILD SUCCESS) |
 
-## Proximos Pasos — Sprint 20
+## Proximos Pasos — Sprint 21
 
 Prioridad alta:
-- **iOS**: ShoppingListScreen + MenuScreen (placeholder → implementación real con Ktor).
-- **iOS**: Sync incremental SQLDelight (push/pull desde iOS usando endpoints backend ya existentes).
-
-Prioridad media:
-- **Android**: Lottie empty states, micro-animación ❤️ favorito, SharedElementTransition RecipeList→Detail.
+- **iOS**: Pull-to-refresh manual en RecipeListScreen y StockScreen (`syncRepo.pullIncremental()` + recarga lista).
+- **Android**: Lottie empty states, micro-animación ❤️ favorito.
 
 Prioridad baja:
-- **Desktop**: Preferencias de sonido UI, SequentialTransition al eliminar tabla.
+- **Android**: SharedElementTransition RecipeList→Detail (Compose experimental API).
+- **iOS**: Navegación semanas en MenuScreen (requiere `kotlinx.datetime`).
