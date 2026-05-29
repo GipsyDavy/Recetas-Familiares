@@ -1118,16 +1118,38 @@ Build final: **BUILD SUCCESSFUL**.
 
 Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (5s, 0 errores).
 
-## Sprint 23 — Candidatos
+## Sprint 23 — COMPLETADO (2026-05-29)
+
+### Sprint 23.1 — iOS Micro-animación ❤️ favorito ✅ COMPLETADO
+
+- `ApiDtos.kt`: `FavoriteRecipeDto` (recipeId, recipeTitle, createdAt).
+- `RecipeRepository.kt`: `loadIsFavorite(recipeId)` GET /favorites size=200; `addFavorite()` POST; `removeFavorite()` DELETE.
+- `RecipeDetailScreen.kt`: botón ❤️ en header tras el título; `isFavorite` cargado en `LaunchedEffect`; toggle optimista con rollback en error; `Animatable(1f→1.35f→1f, spring MediumBouncy)` + `haptic.impact()`.
+
+### Sprint 23.2 — Android SharedElementTransition ✅ COMPLETADO
+
+- `RecipeScreens.kt`: `SharedTransitionLayout + AnimatedContent(selectedRecipe)` reemplaza las ramas `selectedRecipe→else` del `when`; transición `fadeIn(300ms)+slideInHorizontally` / `fadeOut(250ms)+slideOutHorizontally`.
+- `sharedBounds` por clave `"recipe_bounds_${id}"` en `RecipeCard` y `RecipeDetail` (via `rememberSharedContentState`).
+- `RecipeDetail` acepta `modifier: Modifier = Modifier` aplicado al `LazyColumn`.
+- OptIn: `ExperimentalSharedTransitionApi` a nivel de fichero.
+
+### Sprint 23.3 — Lottie/animación ShoppingListScreen ✅ COMPLETADO
+
+- `RecetasApp.kt` Android: `EmptyStateView` → `LottieEmptyStateView(lottie_empty_list)` en `ShoppingListScreen` (sin listas) y `ShoppingListDetail` (lista vacía).
+- `ShoppingListScreen.kt` iOS: `AnimatedShoppingEmptyState` — icono carrito pulsante con `rememberInfiniteTransition + animateFloat` (escala 1.0→1.10, 1400ms).
+
+Build: `gradle assembleDebug` — **BUILD SUCCESSFUL** (4s, 0 errores; 1 warning pre-existente tooltip).
+
+## Sprint 24 — Candidatos
 
 ### Prioridad Alta
 
-1. **iOS:** Micro-animación ❤️ favorito — ahora que existe `RecipeDetailScreen`, añadir toggle favorito vía Ktor + animación scale + haptic.
-2. **Android:** `SharedElementTransition` RecipeList → RecipeDetail (Compose experimental API).
-3. **Android + iOS:** Lottie en ShoppingListScreen (sin animación de empty state aún).
+1. **iOS:** CookingScreen — paso a paso desde `RecipeDetailScreen` (sin captura volumen, swipe gestures izquierda/derecha para cambiar paso, temporizador countdown, keep screen awake).
+2. **iOS:** Compartir receta — `UIActivityViewController` vía `expect/actual` (botón en `RecipeDetailScreen`).
+3. **Android:** Drag to reorder ingredientes y pasos en `RecipeForm` (LazyColumn + `reorderableItemModifier`).
 
 ### Prioridad Media
 
-1. **iOS:** CookingScreen — paso a paso desde `RecipeDetailScreen` (sin captura volumen, gestos swipe).
-2. **iOS:** Compartir receta — `UIActivityViewController` vía `expect/actual`.
-3. **Desktop:** Ajuste visual DashboardView con datos reales del día actual.
+1. **Desktop:** DashboardView con menú del día actual real (consulta `/menu-items?date=today`).
+2. **iOS + Android:** Onboarding primera vez — 3 pantallas explicando tabs principales (SharedPreferences / NSUserDefaults, mostrar una sola vez).
+3. **Android:** Swipe left/right en `CookingScreen` como alternativa táctil a botones Anterior/Siguiente.

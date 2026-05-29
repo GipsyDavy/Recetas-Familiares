@@ -287,14 +287,19 @@ Pendiente Sprint 21:
 | 22.1-iOS | 2026-05-29 | RecipeDetailScreen: DTOs ingredientes+pasos; loadIngredients/loadSteps en RecipeRepository; pantalla detalle con meta chips, descripción, ingredientes, pasos numerados; nav tap→detalle, back→lista |
 | 22.2-iOS | 2026-05-29 | MenuScreen semanas: kotlinx.datetime 0.6.0; weekOffset state; weekStart/weekEnd cálculo; filtro client-side; botones ← → AutoMirrored; labels semana; loadAllItems size=200 |
 | 22.3-Android | 2026-05-29 | Lottie StockList + NotesScreen: LottieEmptyStateView(lottie_empty_list) en ambas pantallas (BUILD SUCCESSFUL 5s) |
+| 23.1-iOS | 2026-05-29 | Micro-animación ❤️ favorito: FavoriteRecipeDto; loadIsFavorite/addFavorite/removeFavorite Ktor; botón ❤️ header RecipeDetailScreen; Animatable 1→1.35→1 spring(MediumBouncy) + haptic.impact() |
+| 23.2-Android | 2026-05-29 | SharedElementTransition RecipeList→RecipeDetail: SharedTransitionLayout+AnimatedContent(selectedRecipe); sharedBounds "recipe_bounds_{id}" en RecipeCard y RecipeDetail; fadeIn+slideInHorizontally 300ms |
+| 23.3-Android | 2026-05-29 | Lottie ShoppingList: LottieEmptyStateView(lottie_empty_list) en ShoppingListScreen y ShoppingListDetail (BUILD SUCCESSFUL 4s) |
+| 23.3-iOS | 2026-05-29 | AnimatedShoppingEmptyState: icono carrito pulsante con rememberInfiniteTransition+animateFloat escala 1.0→1.10 1400ms en ShoppingListScreen |
 
-## Proximos Pasos — Sprint 23
+## Proximos Pasos — Sprint 24
 
 Prioridad alta:
-- **iOS**: Micro-animación ❤️ favorito en `RecipeDetailScreen` (toggle Ktor + animación + haptic).
-- **Android**: `SharedElementTransition` RecipeList → RecipeDetail (Compose experimental API).
-- **Android + iOS**: Lottie en `ShoppingListScreen`.
+- **iOS**: `CookingScreen` — paso a paso desde `RecipeDetailScreen` (swipe gestures izquierda/derecha, temporizador countdown, keep screen awake).
+- **iOS**: Compartir receta — `UIActivityViewController` vía `expect/actual`.
+- **Android**: Drag to reorder ingredientes/pasos en `RecipeForm`.
 
 Prioridad media:
-- **iOS**: `CookingScreen` (paso a paso desde `RecipeDetailScreen`).
-- **iOS**: Compartir receta (`UIActivityViewController` vía `expect/actual`).
+- **Desktop**: DashboardView con menú del día actual real.
+- **iOS + Android**: Onboarding primera vez (3 pantallas, mostrar una sola vez).
+- **Android**: Swipe left/right en `CookingScreen` como alternativa táctil.
