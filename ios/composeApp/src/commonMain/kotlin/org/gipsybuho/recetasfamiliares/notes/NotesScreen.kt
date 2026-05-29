@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.notes
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.FamilyNoteDto
 
 @Composable
@@ -15,6 +17,7 @@ fun NotesScreen(repository: NoteRepository) {
     var notes   by remember { mutableStateOf<List<FamilyNoteDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error   by remember { mutableStateOf<String?>(null) }
+    val haptic  = rememberHapticFeedback()
 
     LaunchedEffect(Unit) {
         runCatching { notes = repository.loadNotes() }
@@ -44,7 +47,7 @@ fun NotesScreen(repository: NoteRepository) {
             }
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(notes, key = { it.id }) { note ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(modifier = Modifier.fillMaxWidth().clickable { haptic.selection() }) {
                         ListItem(
                             headlineContent   = {
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

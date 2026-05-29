@@ -1,0 +1,43 @@
+CREATE TABLE recipes (
+    id            TEXT    NOT NULL PRIMARY KEY,
+    familyId      TEXT    NOT NULL,
+    title         TEXT    NOT NULL,
+    description   TEXT,
+    difficulty    TEXT,
+    servings      INTEGER,
+    prepMinutes   INTEGER,
+    cookMinutes   INTEGER,
+    updatedAt     TEXT    NOT NULL,
+    syncVersion   INTEGER NOT NULL DEFAULT 0,
+    deleted       INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE stock_items (
+    id                 TEXT    NOT NULL PRIMARY KEY,
+    familyId           TEXT    NOT NULL,
+    name               TEXT    NOT NULL,
+    quantity           REAL,
+    unit               TEXT,
+    expiresAt          TEXT,
+    lowStockThreshold  REAL,
+    note               TEXT,
+    updatedAt          TEXT    NOT NULL,
+    syncVersion        INTEGER NOT NULL DEFAULT 0,
+    deleted            INTEGER NOT NULL DEFAULT 0
+);
+
+insertOrReplaceRecipe:
+INSERT OR REPLACE INTO recipes
+    (id, familyId, title, description, difficulty, servings, prepMinutes, cookMinutes, updatedAt, syncVersion, deleted)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAllRecipes:
+SELECT * FROM recipes WHERE deleted = 0;
+
+insertOrReplaceStockItem:
+INSERT OR REPLACE INTO stock_items
+    (id, familyId, name, quantity, unit, expiresAt, lowStockThreshold, note, updatedAt, syncVersion, deleted)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAllStockItems:
+SELECT * FROM stock_items WHERE deleted = 0;

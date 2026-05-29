@@ -199,7 +199,11 @@ public class StockFormDialog {
                     saved = context.getStockRepository().update(editItemId,
                             new StockDtos.UpdateStockItemRequest(name, quantity, unit, lowStock, expiresAt, note));
                 }
-                Platform.runLater(() -> { onSaved.accept(saved); dialog.close(); });
+                Platform.runLater(() -> {
+                    onSaved.accept(saved);
+                    SoundPlayer.playConfirm();
+                    dialog.close();
+                });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
                     saveBtn.setDisable(false);

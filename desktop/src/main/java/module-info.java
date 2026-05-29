@@ -4,6 +4,7 @@ module org.gipsybuho.recetasfamiliares {
     requires okhttp3;
     requires com.google.gson;
     requires java.prefs;
+    requires java.desktop;
 
     exports org.gipsybuho.recetasfamiliares;
     exports org.gipsybuho.recetasfamiliares.ui;

@@ -10,6 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
@@ -210,12 +216,21 @@ internal fun CookingScreen(
                             horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                if (timerDone) "⏱ ¡Listo!" else "⏱ %02d:%02d".format(mm, ss),
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = if (timerDone) MaterialTheme.colorScheme.onErrorContainer
-                                        else MaterialTheme.colorScheme.onSurface
-                            )
+                            AnimatedContent(
+                                targetState = if (timerDone) "done" else "%02d:%02d".format(mm, ss),
+                                transitionSpec = {
+                                    slideInVertically { -it } + fadeIn() togetherWith
+                                    slideOutVertically { it } + fadeOut()
+                                },
+                                label = "timer"
+                            ) { state ->
+                                Text(
+                                    if (state == "done") "⏱ ¡Listo!" else "⏱ $state",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = if (timerDone) MaterialTheme.colorScheme.onErrorContainer
+                                            else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                             IconButton(onClick = {
                                 if (timerDone) {
                                     timerSecondsLeft = currentStep.timerMinutes * 60

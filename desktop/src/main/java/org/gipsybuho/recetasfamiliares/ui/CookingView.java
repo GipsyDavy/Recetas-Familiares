@@ -277,6 +277,7 @@ public class CookingView {
                     "-fx-background-color: #FDECEA; -fx-background-radius: 16; " +
                     "-fx-border-color: #D4837A; -fx-border-radius: 16; -fx-border-width: 1;");
                 toggleTimerBtn.setText("↺  Reiniciar");
+                SoundPlayer.playTimerComplete();
             }
         }));
         countdownTimer.setCycleCount(timerSecondsLeft);

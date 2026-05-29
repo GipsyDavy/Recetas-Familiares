@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import org.gipsybuho.recetasfamiliares.core.SessionStore
+import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
 import org.gipsybuho.recetasfamiliares.network.ApiClient
 import org.gipsybuho.recetasfamiliares.notes.NoteRepository
 import org.gipsybuho.recetasfamiliares.notes.NotesScreen
@@ -25,9 +26,9 @@ import org.gipsybuho.recetasfamiliares.stock.StockScreen
 private enum class Tab { RECIPES, STOCK, SHOPPING, NOTES, MENU }
 
 @Composable
-fun MainTabScreen(apiClient: ApiClient, session: SessionStore, onLogout: () -> Unit) {
-    val recipeRepo = remember { RecipeRepository(apiClient, session) }
-    val stockRepo  = remember { StockRepository(apiClient, session) }
+fun MainTabScreen(apiClient: ApiClient, session: SessionStore, driverFactory: DatabaseDriverFactory, onLogout: () -> Unit) {
+    val recipeRepo = remember { RecipeRepository(apiClient, session, driverFactory) }
+    val stockRepo  = remember { StockRepository(apiClient, session, driverFactory) }
     val noteRepo   = remember { NoteRepository(apiClient, session) }
 
     var selectedTab by remember { mutableStateOf(Tab.RECIPES) }

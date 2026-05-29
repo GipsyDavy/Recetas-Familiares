@@ -1,7 +1,9 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
 import javafx.animation.KeyFrame;
+import javafx.animation.Interpolator;
 import javafx.animation.Timeline;
+import javafx.animation.TranslateTransition;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -82,6 +84,12 @@ public final class ExpiryNotificationService {
             toast.setY(bounds.getMaxY() - toast.getHeight() - 20);
         });
         toast.show();
+
+        TranslateTransition slide = new TranslateTransition(Duration.millis(220), content);
+        slide.setFromY(60);
+        slide.setToY(0);
+        slide.setInterpolator(Interpolator.EASE_OUT);
+        slide.play();
 
         // ── Auto-dismiss after 5 s ─────────────────────────────────────────────
         Timeline dismiss = new Timeline(new KeyFrame(Duration.seconds(5), e -> toast.close()));

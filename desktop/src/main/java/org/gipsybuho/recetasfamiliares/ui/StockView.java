@@ -214,6 +214,7 @@ public class StockView extends VBox {
                             refreshDisplay();
                             statusLabel.setText("Item eliminado.");
                             onStatusUpdate.accept("Ítem eliminado");
+                            SoundPlayer.playDelete();
                         });
                     } catch (Exception ex) {
                         Platform.runLater(() -> statusLabel.setText("Error al eliminar: " + ex.getMessage()));

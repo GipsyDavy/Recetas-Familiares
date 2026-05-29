@@ -1,10 +1,16 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
+import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 import java.util.ArrayList;
@@ -20,6 +26,8 @@ public class RecipeListView extends SplitPane {
     private final TextField searchField = new TextField();
     private final Label statusLabel = new Label();
     private final Button loadMoreBtn = new Button("Cargar más recetas");
+    private VBox skeletonPane;
+    private Timeline skeletonShimmer;
     private boolean loadingRecipes;
     private int currentPage = 0;
     private boolean hasMore = false;
@@ -55,6 +63,11 @@ public class RecipeListView extends SplitPane {
             else detailView.showEmpty();
         });
 
+        StackPane stackPane = new StackPane();
+        skeletonPane = buildSkeletonPane();
+        skeletonPane.setVisible(false);
+        stackPane.getChildren().addAll(listView, skeletonPane);
+
         // Bind to cache — updates automatically after sync
         listView.setItems(context.getRecipeRepository().getCache().getItems());
         context.getRecipeRepository().getCache().getItems()
@@ -69,9 +82,9 @@ public class RecipeListView extends SplitPane {
         statusLabel.getStyleClass().add("status-label");
         updateRecipeCount();
 
-        VBox leftPanel = new VBox(10, searchField, statusLabel, refreshBtn, newRecipeBtn, listView, loadMoreBtn);
+        VBox leftPanel = new VBox(10, searchField, statusLabel, refreshBtn, newRecipeBtn, stackPane, loadMoreBtn);
         leftPanel.setPadding(new Insets(16));
-        VBox.setVgrow(listView, Priority.ALWAYS);
+        VBox.setVgrow(stackPane, Priority.ALWAYS);
         leftPanel.setMinWidth(280);
         leftPanel.setMaxWidth(340);
 
@@ -91,6 +104,8 @@ public class RecipeListView extends SplitPane {
         hasMore = false;
         updateLoadMoreBtn();
         statusLabel.setText("Cargando...");
+        skeletonPane.setVisible(true);
+        startSkeletonShimmer();
         Thread.ofVirtual().start(() -> {
             try {
                 var page = context.getRecipeRepository().loadPage(0, PAGE_SIZE);
@@ -99,16 +114,51 @@ public class RecipeListView extends SplitPane {
                             page.items().stream().filter(r -> !r.deleted()).toList());
                     hasMore = page.totalPages() > 1;
                     loadingRecipes = false;
+                    stopSkeletonShimmer();
                     updateRecipeCount();
                     updateLoadMoreBtn();
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
                     loadingRecipes = false;
+                    stopSkeletonShimmer();
                     statusLabel.setText("Error al cargar recetas.");
                 });
             }
         });
+    }
+
+    private VBox buildSkeletonPane() {
+        VBox pane = new VBox(12);
+        pane.setPadding(new Insets(8));
+        for (int i = 0; i < 5; i++) {
+            Rectangle title = new Rectangle(200, 14, Color.web("#E0D0C0"));
+            Rectangle meta = new Rectangle(120, 10, Color.web("#E0D0C0"));
+            HBox row = new HBox(8, title, meta);
+            pane.getChildren().add(row);
+        }
+        return pane;
+    }
+
+    private void startSkeletonShimmer() {
+        if (skeletonShimmer != null) skeletonShimmer.stop();
+        skeletonPane.setOpacity(0.3);
+        skeletonShimmer = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(skeletonPane.opacityProperty(), 0.3)),
+                new KeyFrame(Duration.millis(900), new KeyValue(skeletonPane.opacityProperty(), 0.7))
+        );
+        skeletonShimmer.setAutoReverse(true);
+        skeletonShimmer.setCycleCount(Timeline.INDEFINITE);
+        skeletonShimmer.play();
+    }
+
+    private void stopSkeletonShimmer() {
+        if (skeletonShimmer != null) {
+            skeletonShimmer.stop();
+            skeletonShimmer = null;
+        }
+        skeletonPane.setVisible(false);
+        skeletonPane.setOpacity(1.0);
     }
 
     private void loadNextPage() {

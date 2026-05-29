@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -254,11 +255,12 @@ internal fun StockItemCard(item: StockItemEntity, onClick: () -> Unit = {}) {
         }
     }
     val isLowStock = item.lowStockThreshold != null && item.quantity != null && item.quantity <= item.lowStockThreshold
-    val expiryColor = when {
+    val targetExpiryColor = when {
         expiryDays != null && expiryDays <= 3 -> MaterialTheme.colorScheme.error
         expiryDays != null && expiryDays <= 7 -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val expiryColor by animateColorAsState(targetValue = targetExpiryColor, label = "expiryColor")
     Card(onClick = onClick) {
         ListItem(
             headlineContent = {

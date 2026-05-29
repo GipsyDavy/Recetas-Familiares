@@ -298,7 +298,11 @@ public class RecipeFormDialog {
                     context.getRecipeRepository().replaceSteps(saved.id(),
                             new RecipeCreateDtos.ReplaceStepsRequest(steps));
 
-                Platform.runLater(() -> { onSaved.accept(saved); dialog.close(); });
+                Platform.runLater(() -> {
+                    onSaved.accept(saved);
+                    SoundPlayer.playConfirm();
+                    dialog.close();
+                });
             } catch (Exception ex) {
                 Platform.runLater(() -> { saveBtn.setDisable(false); statusLabel.setText("Error: " + ex.getMessage()); });
             }

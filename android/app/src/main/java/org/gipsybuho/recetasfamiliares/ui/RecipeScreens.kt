@@ -1,8 +1,19 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package org.gipsybuho.recetasfamiliares.ui
 
 import android.content.Intent
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +38,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -36,6 +50,8 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -179,15 +195,29 @@ internal fun RecipeList(
                             horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                         ) {
                             listOf("EASY" to "Fácil", "MEDIUM" to "Media", "HARD" to "Difícil").forEach { (value, label) ->
+                                val isSelected = difficultyFilter == value
+                                val chipContainerColor by animateColorAsState(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                    label = "chipColor_$value"
+                                )
                                 FilterChip(
-                                    selected = difficultyFilter == value,
-                                    onClick = { difficultyFilter = if (difficultyFilter == value) null else value },
-                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                    selected = isSelected,
+                                    onClick = { difficultyFilter = if (isSelected) null else value },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = chipContainerColor,
+                                        containerColor = chipContainerColor
+                                    )
                                 )
                             }
                         }
                         Spacer(Modifier.height(Spacing.md))
-                        Crossfade(targetState = filtered.isEmpty(), label = "recipeListState") { isEmpty ->
+                        if (recipes.isEmpty() && isRefreshing) {
+                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                repeat(4) { SkeletonRecipeCard() }
+                            }
+                        } else Crossfade(targetState = filtered.isEmpty(), label = "recipeListState") { isEmpty ->
                             if (isEmpty) {
                                 if (query.isBlank() && difficultyFilter == null) {
                                     EmptyStateView(icon = Icons.Outlined.Restaurant,
@@ -301,6 +331,26 @@ private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onCl
     }
 }
 
+@Composable
+private fun SkeletonRecipeCard() {
+    val alpha by rememberInfiniteTransition(label = "shimmer")
+        .animateFloat(initialValue = 0.25f, targetValue = 0.65f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "alpha")
+    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(152.dp)
+            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = alpha)))
+        Row(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            repeat(3) {
+                Box(modifier = Modifier.height(20.dp).width(64.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun RecipeDetail(
@@ -343,14 +393,36 @@ internal fun RecipeDetail(
                         tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Box {
-                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones") }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Text("Modo Cocina") }, onClick = { showMenu = false; onCookingMode() })
-                        DropdownMenuItem(text = { Text("Añadir foto") }, onClick = { showMenu = false; photoPicker.launch("image/*") })
-                        DropdownMenuItem(text = { Text("Compartir") }, onClick = { showMenu = false; shareRecipe(context, recipe, ingredients, steps) })
-                        DropdownMenuItem(text = { Text("Editar") }, onClick = { showMenu = false; onEdit(ingredients, steps) })
-                        DropdownMenuItem(text = { Text("Eliminar") }, onClick = { showMenu = false; onDelete() })
+                IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones") }
+                if (showMenu) {
+                    ModalBottomSheet(onDismissRequest = { showMenu = false }) {
+                        Column(modifier = Modifier.padding(bottom = Spacing.xxl)) {
+                            ListItem(
+                                headlineContent = { Text("Modo Cocina") },
+                                leadingContent  = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false; onCookingMode() }
+                            )
+                            ListItem(
+                                headlineContent = { Text("Añadir foto") },
+                                leadingContent  = { Icon(Icons.Filled.Add, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false; photoPicker.launch("image/*") }
+                            )
+                            ListItem(
+                                headlineContent = { Text("Compartir") },
+                                leadingContent  = { Icon(Icons.Filled.Share, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false; shareRecipe(context, recipe, ingredients, steps) }
+                            )
+                            ListItem(
+                                headlineContent = { Text("Editar") },
+                                leadingContent  = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false; onEdit(ingredients, steps) }
+                            )
+                            ListItem(
+                                headlineContent = { Text("Eliminar") },
+                                leadingContent  = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                modifier = Modifier.clickable { showMenu = false; onDelete() }
+                            )
+                        }
                     }
                 }
             }
@@ -476,7 +548,7 @@ internal fun RatingsSection(
     var showForm by remember { mutableStateOf(false) }
     var formError by remember { mutableStateOf<String?>(null) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+    Column(modifier = Modifier.animateContentSize(), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         if (myRating == null) {
             if (!showForm) {
                 OutlinedButton(onClick = { showForm = true }, modifier = Modifier.fillMaxWidth()) { Text("Añadir valoración") }
