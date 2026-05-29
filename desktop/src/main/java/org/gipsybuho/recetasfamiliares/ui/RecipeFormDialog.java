@@ -148,6 +148,7 @@ public class RecipeFormDialog {
         Scene scene = new Scene(scroll, 580, 680);
         scene.getStylesheets().add(
                 Objects.requireNonNull(getClass().getResource("/style.css")).toExternalForm());
+        ThemeManager.getInstance().applyCurrentTheme(scene);
         dialog.setScene(scene);
     }
 

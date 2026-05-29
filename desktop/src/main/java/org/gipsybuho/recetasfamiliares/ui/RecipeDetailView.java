@@ -280,6 +280,7 @@ public class RecipeDetailView extends VBox {
         MenuItem deleteItem = new MenuItem("Eliminar foto");
         deleteItem.setOnAction(e -> deletePhoto(photo));
         ContextMenu menu = new ContextMenu(deleteItem);
+        DialogStyler.apply(menu);
         imageView.setOnContextMenuRequested(e -> menu.show(imageView, e.getScreenX(), e.getScreenY()));
 
         VBox box = new VBox(4, imageView);
@@ -424,6 +425,7 @@ public class RecipeDetailView extends VBox {
         confirm.setHeaderText("¿Eliminar \"" + currentRecipe.title() + "\"?");
         confirm.setContentText("Esta acción no se puede deshacer.");
         confirm.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        DialogStyler.apply(confirm);
 
         confirm.showAndWait().ifPresent(type -> {
             if (type == ButtonType.OK) doDelete();

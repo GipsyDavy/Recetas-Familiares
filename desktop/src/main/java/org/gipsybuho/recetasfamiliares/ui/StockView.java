@@ -107,6 +107,7 @@ public class StockView extends VBox {
         cmEdit.setOnAction(e -> openEditDialog());
         cmDelete.setOnAction(e -> deleteSelected());
         cm.getItems().addAll(cmEdit, new SeparatorMenuItem(), cmDelete);
+        DialogStyler.apply(cm);
         table.setContextMenu(cm);
         table.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.DELETE || e.getCode() == KeyCode.BACK_SPACE) {
@@ -207,6 +208,7 @@ public class StockView extends VBox {
         confirm.setHeaderText("¿Eliminar \"" + selected.name() + "\"?");
         confirm.setContentText("Esta acción no se puede deshacer.");
         confirm.initOwner(getScene().getWindow());
+        DialogStyler.apply(confirm);
 
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.OK) {

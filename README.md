@@ -11,6 +11,15 @@ Aplicacion premium multiplataforma para gestion familiar de recetas, ingrediente
 - `database/`: migraciones Flyway V1-V9. 14 tablas con soft delete y syncVersion.
 - `docs/`: arquitectura, UX, contratos API, seguridad y roadmap.
 
+## Estado reciente Desktop (2026-05-30)
+
+- Instalador Windows actual: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe`.
+- Desktop Ajustes ya no abre ventana emergente: navega como vista central desde el sidebar.
+- Ajustes replica el sistema de pestañas de Nemeterial adaptado a Recetas: Apariencia, Acerca de y Diagnostico.
+- Las tarjetas de temas previsualizan los colores reales de cada tema de Recetas Familiares.
+- Diagnostico muestra bloques de equipo/CPU/RAM/discos/grafica/sistema y el logo real de la aplicacion.
+- La caja de Diagnostico aprovecha la altura disponible de la ventana y llega hasta la parte inferior util de la vista.
+
 ## Estado (Sprint 25A — 2026-05-29)
 
 Sistema de 10 temas con modo Claro/Oscuro/Sistema implementado en las 3 plataformas cliente:

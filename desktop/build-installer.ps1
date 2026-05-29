@@ -1,8 +1,8 @@
 # ==============================================================================
-# build-installer.ps1 — Recetas Familiares v1.0.0 — Instalador Windows
+# build-installer.ps1 — Recetas Familiares v1.1 — Instalador Windows
 # ==============================================================================
 # Requisitos:
-#   - JDK 21+ (probado con JDK 26) en C:\Program Files\Java\jdk-26
+#   - JDK 21 LTS recomendado para empaquetar el runtime embebido
 #   - Maven accesible (NetBeans, IntelliJ o PATH)
 #   - Inno Setup 6 para generar el .exe final (opcional — sin él se crea el app-image)
 #
@@ -12,7 +12,8 @@
 # ==============================================================================
 
 param(
-    [string]$ApiUrl = "http://localhost:8080/"
+    [string]$ApiUrl = "http://localhost:8080/",
+    [string]$JdkPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -21,7 +22,7 @@ $ErrorActionPreference = "Stop"
 # ── Configuración ──────────────────────────────────────────────────────────────
 $AppName        = "RecetasFamiliares"
 $AppDisplayName = "Recetas Familiares"
-$AppVersion     = "1.0.0"
+$AppVersion     = "1.1"
 $MainJar        = "RecetasFamiliares.jar"
 $MainClass      = "org.gipsybuho.recetasfamiliares.Launcher"
 $JavaFxModules  = "javafx.controls,javafx.fxml,javafx.base,javafx.graphics"
@@ -35,7 +36,6 @@ $PngPath        = "$ProjectDir\src\main\resources\brand\gipsy-buho-logo.png"
 $ShadedJar      = "$TargetDir\recetas-familiares-desktop-1.0-SNAPSHOT.jar"
 
 # ── Rutas de herramientas ─────────────────────────────────────────────────────
-$JDK       = "C:\Program Files\Java\jdk-26"
 $NSIS      = "C:\Program Files (x86)\NSIS\makensis.exe"
 $InnoSetup = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 
@@ -58,6 +58,46 @@ function Find-Maven {
         if (Test-Path $candidate)                                    { return $candidate }
         if (Get-Command $candidate -ErrorAction SilentlyContinue)   { return $candidate }
     }
+    return $null
+}
+
+function Get-JdkMajorVersion {
+    param([string]$Path)
+    if (-not (Test-Path "$Path\bin\java.exe")) { return $null }
+    $versionLine = & "$Path\bin\java.exe" -version 2>&1 | Select-Object -First 1
+    if ($versionLine -match '"(\d+)') { return [int]$Matches[1] }
+    return $null
+}
+
+function Find-PackagingJdk {
+    if ($JdkPath -and (Test-Path "$JdkPath\bin\jpackage.exe")) {
+        return $JdkPath
+    }
+
+    $candidates = @()
+    if ($env:RECETAS_JDK21) { $candidates += $env:RECETAS_JDK21 }
+    if ($env:JAVA_HOME) { $candidates += $env:JAVA_HOME }
+    $candidates += @(
+        "C:\Program Files\Eclipse Adoptium\jdk-21",
+        "C:\Program Files\Java\jdk-21",
+        "C:\Program Files\Java\jdk-21.0.9",
+        "C:\Program Files\Java\jdk-21.0.8",
+        "C:\Program Files\Java\jdk-21.0.7",
+        "C:\Program Files\Java\jdk-21.0.6",
+        "C:\Program Files\Java\jdk-21.0.5"
+    )
+
+    foreach ($candidate in $candidates | Select-Object -Unique) {
+        if ((Test-Path "$candidate\bin\jpackage.exe") -and (Get-JdkMajorVersion $candidate) -eq 21) {
+            return $candidate
+        }
+    }
+
+    $jpackage = Get-Command jpackage.exe -ErrorAction SilentlyContinue
+    if ($jpackage) {
+        return Split-Path (Split-Path $jpackage.Source -Parent) -Parent
+    }
+
     return $null
 }
 
@@ -149,7 +189,7 @@ function New-NsisBitmaps {
 
     $g.DrawString("Recetas",     $fBig, $white, 82, 28, $sf)
     $g.DrawString("Familiares",  $fBig, $white, 82, 52, $sf)
-    $g.DrawString("v1.0.0",      $fMed, $lgray, 82, 180, $sf)
+    $g.DrawString("v$AppVersion", $fMed, $lgray, 82, 180, $sf)
     $g.DrawString("Tu recetario", $fSm, $lgray, 82, 260, $sf)
     $g.DrawString("familiar",     $fSm, $lgray, 82, 276, $sf)
     $g.DrawString("Gipsybuho",    $fSm, $lgray, 82, 296, $sf)
@@ -173,7 +213,8 @@ function New-NsisBitmaps {
     $sfH = New-Object System.Drawing.StringFormat
     $sfH.Alignment     = [System.Drawing.StringAlignment]::Center
     $sfH.LineAlignment = [System.Drawing.StringAlignment]::Center
-    $g.DrawString("Recetas Familiares", $fH, $white, $topR, $sfH)
+    $topRf = New-Object System.Drawing.RectangleF 0, 0, 150, 57
+    $g.DrawString("Recetas Familiares", $fH, $white, $topRf, $sfH)
 
     foreach ($obj in @($fH,$sfH,$g)) { $obj.Dispose() }
     $hdr.Save("$InstallerDir\nsis-header.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
@@ -189,9 +230,16 @@ Write-Host "  +--------------------------------------------------+" -ForegroundC
 # ── PASO 1: Validar herramientas ───────────────────────────────────────────────
 Write-Step "1/7  Verificando herramientas..."
 
+$JDK = Find-PackagingJdk
+if (-not $JDK) {
+    Write-Fail "JDK con jpackage no encontrado."
+    Write-Host "     Instala JDK 21 LTS desde https://adoptium.net/ o ejecuta:" -ForegroundColor Yellow
+    Write-Host "     .\build-installer.ps1 -JdkPath 'C:\Ruta\Al\jdk-21'" -ForegroundColor Yellow
+    exit 1
+}
 if (-not (Test-Path "$JDK\bin\java.exe")) {
     Write-Fail "JDK no encontrado: $JDK"
-    Write-Host "     Instala JDK 21+ desde https://adoptium.net/" -ForegroundColor Yellow
+    Write-Host "     Instala JDK 21 LTS desde https://adoptium.net/" -ForegroundColor Yellow
     exit 1
 }
 if (-not (Test-Path "$JDK\bin\jpackage.exe")) {
@@ -200,6 +248,11 @@ if (-not (Test-Path "$JDK\bin\jpackage.exe")) {
 }
 $javaVersion = & "$JDK\bin\java.exe" -version 2>&1 | Select-Object -First 1
 Write-OK "JDK: $javaVersion"
+$jdkMajor = Get-JdkMajorVersion $JDK
+if ($jdkMajor -ne 21) {
+    Write-Warn "JDK 21 LTS no encontrado. Se usara $JDK para empaquetar."
+    Write-Warn "Para instaladores de distribucion, usa -JdkPath con un JDK 21."
+}
 
 $MVN = Find-Maven
 if (-not $MVN) {
@@ -314,10 +367,10 @@ $jpackageArgs = [System.Collections.Generic.List[string]]@(
     "--java-options", "-Djavax.net.ssl.trustStoreType=Windows-ROOT",
     "--java-options", "-Djavax.net.ssl.trustStore=NUL",
     "--java-options", "-Dapi.base.url=$ApiUrl",
-    "--java-options", '--module-path $APPDIR/mods',
-    "--java-options", "--add-modules $JavaFxModules",
-    "--java-options", "--add-opens java.base/java.lang=ALL-UNNAMED",
-    "--java-options", "--add-opens java.base/java.net=ALL-UNNAMED",
+    "--java-options", '--module-path=$APPDIR/mods',
+    "--java-options", "--add-modules=$JavaFxModules",
+    "--java-options", "--add-opens=java.base/java.lang=ALL-UNNAMED",
+    "--java-options", "--add-opens=java.base/java.net=ALL-UNNAMED",
     "--java-options", "-Xmx512m"
 )
 

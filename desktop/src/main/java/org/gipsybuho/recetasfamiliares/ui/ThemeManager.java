@@ -59,22 +59,38 @@ public final class ThemeManager {
         try { return ThemeMode.valueOf(name); } catch (Exception e) { return ThemeMode.SYSTEM; }
     }
 
+    public boolean isDarkModeActive(ThemeMode mode) {
+        return switch (mode) {
+            case LIGHT  -> false;
+            case DARK   -> true;
+            case SYSTEM -> isSystemDark();
+        };
+    }
+
+    public String stylesheetFor(AppTheme theme, ThemeMode mode) {
+        String cssFile = theme.cssFileName(isDarkModeActive(mode));
+        var url = getClass().getResource("/" + cssFile);
+        return url != null ? url.toExternalForm() : null;
+    }
+
+    public void applyCurrentTheme(Scene scene) {
+        if (scene == null) return;
+        String sheet = stylesheetFor(loadTheme(), loadMode());
+        if (sheet == null) return;
+        var sheets = scene.getStylesheets();
+        sheets.removeIf(s -> s.contains("/themes/"));
+        if (!sheets.contains(sheet)) sheets.add(sheet);
+    }
+
     public void applyTheme(AppTheme theme, ThemeMode mode) {
         PREFS.put(KEY_THEME, theme.name());
         PREFS.put(KEY_MODE, mode.name());
         if (currentScene == null) return;
 
-        boolean dark = switch (mode) {
-            case LIGHT  -> false;
-            case DARK   -> true;
-            case SYSTEM -> isSystemDark();
-        };
-
         var sheets = currentScene.getStylesheets();
         sheets.removeIf(s -> s.contains("/themes/"));
-        String cssFile = theme.cssFileName(dark);
-        var url = getClass().getResource("/" + cssFile);
-        if (url != null) sheets.add(url.toExternalForm());
+        String sheet = stylesheetFor(theme, mode);
+        if (sheet != null) sheets.add(sheet);
     }
 
     private static boolean isSystemDark() {

@@ -19,6 +19,7 @@ import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Shows a brief toast notification (bottom-right, auto-dismiss 5s) when stock items
@@ -49,9 +50,10 @@ public final class ExpiryNotificationService {
         toast.setAlwaysOnTop(true);
 
         Label header = new Label("⏰  Stock próximo a caducar");
-        header.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #3D2B1F;");
+        header.getStyleClass().add("expiry-toast-title");
 
         VBox content = new VBox(4, header);
+        content.getStyleClass().add("expiry-toast");
         content.setPadding(new Insets(12, 16, 12, 16));
         content.setMaxWidth(280);
 
@@ -60,21 +62,21 @@ public final class ExpiryNotificationService {
             var item = expiring.get(i);
             String days = daysLabel(item.expiresAt().substring(0, 10), today);
             Label row = new Label("• " + item.name() + "  —  " + days);
-            row.setStyle("-fx-font-size: 12px; -fx-text-fill: #8B6F5E;");
+            row.getStyleClass().add("expiry-toast-row");
             content.getChildren().add(row);
         }
         if (expiring.size() > 4) {
             Label more = new Label("… y " + (expiring.size() - 4) + " más");
-            more.setStyle("-fx-font-size: 11px; -fx-text-fill: #8B6F5E;");
+            more.getStyleClass().add("expiry-toast-more");
             content.getChildren().add(more);
         }
 
-        content.setStyle(
-                "-fx-background-color: #F6E7D8; -fx-background-radius: 10; " +
-                "-fx-border-color: #D4A574; -fx-border-radius: 10; -fx-border-width: 1;");
         content.setOnMouseClicked(e -> toast.close());
 
         Scene scene = new Scene(content, Color.TRANSPARENT);
+        scene.getStylesheets().add(
+                Objects.requireNonNull(ExpiryNotificationService.class.getResource("/style.css")).toExternalForm());
+        ThemeManager.getInstance().applyCurrentTheme(scene);
         toast.setScene(scene);
 
         // ── Position: bottom-right of primary screen ───────────────────────────

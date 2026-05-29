@@ -326,6 +326,8 @@ Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + 
 | 27.C-Android | 2026-05-29 | CookingScreen swipe hint: AnimatedVisibility pill "← Desliza para navegar →" centrado; LaunchedEffect auto-oculta 3s; fadeIn 400ms / fadeOut 600ms |
 | 28.A-Android+iOS | 2026-05-29 | Perfil read-only: SessionStore +displayName+email (EncryptedSharedPrefs / Keychain); AuthRepository guarda datos al login; ProfileScreen Android (6º tab); SettingsScreen iOS sección usuario |
 | 28.C-Android | 2026-05-29 | Filtro "Con mi stock": RecipeIngredientDao.observeAllIngredients(); filteredRecipes combine 4 flows con LOWER(TRIM) matching; FilterChip tertiaryContainer en RecipeList |
+| Desktop-Ajustes-v1.1 | 2026-05-30 | Ajustes Desktop pasa de Dialog emergente a vista central navegable; pestañas Apariencia/Acerca de/Diagnostico estilo Nemeterial; tarjetas previsualizan cada tema real; Diagnostico usa logo real de la app; instalador v1.1 regenerado |
+| Desktop-Diagnostico-v1.1 | 2026-05-30 | Pestaña Diagnostico ajustada para aprovechar todo el alto disponible: sin altura fija en el ScrollPane, crecimiento vertical con VBox.setVgrow y panel lateral de logo estirable; instalador v1.1 reescrito |
 
 ## Sprint 25B/C/D — COMPLETADOS (2026-05-29)
 

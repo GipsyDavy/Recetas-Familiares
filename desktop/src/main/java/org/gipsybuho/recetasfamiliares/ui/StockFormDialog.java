@@ -115,6 +115,7 @@ public class StockFormDialog {
         Scene scene = new Scene(scroll, 500, 420);
         scene.getStylesheets().add(
                 Objects.requireNonNull(getClass().getResource("/style.css")).toExternalForm());
+        ThemeManager.getInstance().applyCurrentTheme(scene);
         dialog.setScene(scene);
     }
 

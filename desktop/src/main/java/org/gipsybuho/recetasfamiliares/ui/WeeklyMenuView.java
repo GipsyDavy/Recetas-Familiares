@@ -362,9 +362,10 @@ public class WeeklyMenuView extends VBox {
     private void showRecipePicker(LocalDate date, String mealType) {
         List<RecipeDtos.RecipeDto> recipes = List.copyOf(context.getRecipeRepository().getCache().getItems());
         if (recipes.isEmpty()) {
-            new Alert(Alert.AlertType.INFORMATION,
-                    "No hay recetas en caché. Sincroniza primero.", ButtonType.OK)
-                    .showAndWait();
+            Alert alert = new Alert(Alert.AlertType.INFORMATION,
+                    "No hay recetas en caché. Sincroniza primero.", ButtonType.OK);
+            DialogStyler.apply(alert);
+            alert.showAndWait();
             return;
         }
 
@@ -374,6 +375,7 @@ public class WeeklyMenuView extends VBox {
         dialog.setHeaderText(mealLabel(mealType) + " — " +
                 date.format(DateTimeFormatter.ofPattern("EEEE d/MM", Locale.forLanguageTag("es"))));
         dialog.setContentText("Receta:");
+        DialogStyler.apply(dialog);
 
         dialog.showAndWait().ifPresent(selectedTitle -> {
             RecipeDtos.RecipeDto selected = recipes.stream()
@@ -399,6 +401,7 @@ public class WeeklyMenuView extends VBox {
                 ButtonType.YES, ButtonType.NO);
         alert.setTitle("Confirmar eliminación");
         alert.setHeaderText(null);
+        DialogStyler.apply(alert);
         alert.showAndWait()
                 .filter(b -> b == ButtonType.YES)
                 .ifPresent(b -> {

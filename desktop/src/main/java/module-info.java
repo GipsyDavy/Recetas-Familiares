@@ -6,6 +6,8 @@ module org.gipsybuho.recetasfamiliares {
     requires org.apache.pdfbox;
     requires java.prefs;
     requires java.desktop;
+    requires java.management;
+    requires jdk.management;
 
     exports org.gipsybuho.recetasfamiliares;
     exports org.gipsybuho.recetasfamiliares.ui;

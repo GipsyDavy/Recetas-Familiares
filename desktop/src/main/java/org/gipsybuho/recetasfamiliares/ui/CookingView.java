@@ -166,6 +166,7 @@ public class CookingView {
         Scene scene = new Scene(root, 1100, 720);
         scene.getStylesheets().add(
                 Objects.requireNonNull(getClass().getResource("/style.css")).toExternalForm());
+        ThemeManager.getInstance().applyCurrentTheme(scene);
         stage.setScene(scene);
     }
 

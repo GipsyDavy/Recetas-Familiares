@@ -1154,3 +1154,53 @@ desktop/src/main/resources/
 ```
 
 *Análisis realizado: 2026-05-30. Implementación autorizada pendiente.*
+
+---
+
+## 10 — Ajustes Desktop v1.1 (2026-05-30)
+
+Implementado en Desktop JavaFX tomando como referencia funcional y visual el sistema de configuración de `C:\Users\GipsyDavy\Nemeterial\app-pc`, adaptado a Recetas Familiares.
+
+### 10.1 — Navegación
+
+- `Ajustes` deja de ser ventana emergente.
+- El botón `⚙ Ajustes` del sidebar navega a una vista central `settings`, igual que Inicio, Recetas, Stock, Menú, Lista y Notas.
+- `Ctrl+,` abre la misma vista central de Ajustes.
+
+### 10.2 — Pestañas
+
+- `Apariencia`
+- `Acerca de`
+- `Diagnostico`
+
+### 10.3 — Apariencia
+
+- Tarjetas de tema tipo Nemeterial.
+- Cada tarjeta previsualiza su propio CSS real de tema, no el tema activo global.
+- Modo oscuro se aplica inmediatamente.
+- Sonido se guarda inmediatamente.
+- Tipografia permite fuente y tamaño persistidos.
+- Vista previa visual de la interfaz con el tema activo.
+
+### 10.4 — Acerca de
+
+- Cabecera con identidad de Recetas Familiares.
+- Badge de versión.
+- Tarjetas de información de aplicación y cobertura funcional.
+
+### 10.5 — Diagnostico
+
+- Secciones: Equipo, Procesador, Memoria RAM, Almacenamiento, Graficos y Sistema.
+- Botones: Actualizar diagnostico, Probar backend, Copiar diagnostico.
+- Panel derecho con el logo real `brand/gipsy-buho-logo.png`.
+- El panel de diagnostico no usa altura fija: crece hasta ocupar la parte inferior util de la ventana.
+- El `ScrollPane` interno tiene crecimiento vertical para reducir espacio muerto y mostrar mas informacion visible.
+
+### 10.6 — Build
+
+- `mvn -q -DskipTests package`: BUILD SUCCESS.
+- Instalador Windows v1.1 regenerado en:
+
+```text
+C:\Users\GipsyDavy\MAVEN\Recetas Familiares\desktop\output\RecetasFamiliares-Instalador-v1.1.exe
+```

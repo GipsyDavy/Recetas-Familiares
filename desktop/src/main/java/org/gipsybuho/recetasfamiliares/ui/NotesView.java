@@ -299,6 +299,7 @@ public class NotesView extends VBox {
         confirm.setHeaderText("¿Eliminar \"" + editing.title() + "\"?");
         confirm.setContentText("Esta acción no se puede deshacer.");
         confirm.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        DialogStyler.apply(confirm);
         SyncDtos.NoteDtos.FamilyNoteDto note = editing;
         confirm.showAndWait().ifPresent(type -> {
             if (type == ButtonType.OK) animateDelete(note, () -> doDelete(note));

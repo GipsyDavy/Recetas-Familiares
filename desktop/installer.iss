@@ -1,5 +1,5 @@
 #define MyAppName        "Recetas Familiares"
-#define MyAppVersion     "1.0.0"
+#define MyAppVersion     "1.1"
 #define MyAppPublisher   "Gipsybuho"
 #define MyAppExeName     "RecetasFamiliares.exe"
 #define MyAppDir         "RecetasFamiliares"

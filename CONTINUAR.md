@@ -1400,6 +1400,61 @@ Build: Android BUILD SUCCESSFUL (11s) · Desktop BUILD SUCCESS
 - **`AppContext.java`**: `userRepository` añadido + `getUserRepository()` getter.
 - **`MainWindow.java`**: botón ✏ en user card → `showEditNameDialog()` → `TextInputDialog` → hilo virtual → `userRepository.updateDisplayName()` → `Platform.runLater` → `sidebar.getChildren().set(2, buildUserCard())`.
 
+### Sprint 31.F — Desktop: Ajustes por pestañas + diálogos tematizados ✅ (Codex, 2026-05-30)
+- **`MainWindow.java`**: `Ajustes` pasa a `TabPane` con pestañas **Apariencia**, **Acerca de** y **Diagnóstico**.
+  - Apariencia mantiene los temas actuales de Recetas Familiares y añade una vista previa visual del tema/modo seleccionado antes de guardar.
+  - Acerca de muestra nombre, descripción, versión, Java, JavaFX y arquitectura.
+  - Diagnóstico muestra sistema, usuario, directorio, backend, sesión y tema; incluye **Copiar diagnóstico** y **Probar backend**.
+- **`DialogStyler.java`** (nuevo): helper central para aplicar `style.css` + tema activo a `Alert`, `Dialog`, `TextInputDialog` y `ChoiceDialog`.
+- **`ThemeManager.java`**: expone `stylesheetFor(...)`, `isDarkModeActive(...)` y `applyCurrentTheme(Scene)` para reutilizar temas en diálogos y ventanas secundarias.
+- Diálogos tematizados: confirmaciones en recetas, stock, notas y menú; selector de receta; detalle de lista de compra; edición de nombre.
+- Ventanas y emergentes secundarios tematizados: `RecipeFormDialog`, `StockFormDialog`, `CookingView`, menús contextuales y toast de caducidades.
+- **`style.css`**: estilos para `recetas-dialog-pane`, tabs de ajustes, tarjetas/secciones de ajustes, vista previa y diagnóstico.
+- Verificación: `desktop > mvn -q -DskipTests package` — **BUILD SUCCESS**.
+
+### Build Desktop Windows v1.1 ✅ (Codex, 2026-05-30)
+- Script usado: `desktop/build-installer.ps1`.
+- Versión del instalador actualizada a **v1.1** en `build-installer.ps1`, `installer.nsi` e `installer.iss`.
+- Instalador generado:
+  ```text
+  C:\Users\GipsyDavy\MAVEN\Recetas Familiares\desktop\output\RecetasFamiliares-Instalador-v1.1.exe
+  ```
+- Tamaño aproximado: **51,8 MB**.
+- App-image generado:
+  ```text
+  C:\Users\GipsyDavy\MAVEN\Recetas Familiares\desktop\output\RecetasFamiliares\RecetasFamiliares.exe
+  ```
+- Nota: el empaquetado usó `C:\Program Files\Java\jdk-24` porque no se encontró JDK 21 LTS instalado. El instalador incluye runtime embebido, por lo que no requiere Java instalado en el PC destino.
+- API URL embebida en este build: `http://localhost:8080/`.
+- Resultado: **BUILD SUCCESS**.
+
+### Corrección Ajustes Desktop estilo Nemeterial ✅ (Codex, 2026-05-30)
+- Rehecha la ventana de **Ajustes** en Desktop tomando como referencia directa `C:\Users\GipsyDavy\Nemeterial\app-pc`.
+- Estructura adaptada a JavaFX:
+  - **Ajustes ya no es ventana emergente**: ahora navega como vista central igual que Inicio, Recetas, Stock, Menú, Lista y Notas.
+  - Botón sidebar `⚙ Ajustes` y atajo `Ctrl+,` navegan a `settings`.
+  - Cabecera `Configuracion` con subtitulo.
+  - Pestañas sin emojis: `Apariencia`, `Acerca de`, `Diagnostico`.
+  - `Apariencia`: tarjetas de tema tipo Nemeterial, cada una previsualiza **sus propios colores reales** usando el CSS del tema correspondiente; modo oscuro inmediato, sonido inmediato, tipografia (fuente/tamaño) persistida y vista previa visual.
+  - `Acerca de`: tarjeta principal con identidad de app + badge de version y dos tarjetas de informacion/cobertura.
+  - `Diagnostico`: bloques tipo Nemeterial para Equipo, Procesador, RAM, Almacenamiento, Graficos y Sistema; botones Actualizar, Probar backend y Copiar diagnostico; panel lateral con el logo real `brand/gipsy-buho-logo.png`.
+- Se mantienen los temas actuales de Recetas Familiares (`ThemeManager.AppTheme` + CSS `themes/`), no se copia la paleta de Nemeterial.
+- `module-info.java`: añadidos `requires java.management;` y `requires jdk.management;` para leer RAM/diagnostico avanzado.
+- Verificación: `desktop > mvn -q -DskipTests package` — **BUILD SUCCESS**.
+- Instalador v1.1 reescrito tras este cambio:
+  ```text
+  C:\Users\GipsyDavy\MAVEN\Recetas Familiares\desktop\output\RecetasFamiliares-Instalador-v1.1.exe
+  ```
+
+### Ajuste Diagnostico Desktop v1.1 ✅ (Codex, 2026-05-30)
+- Corregida la pestaña `Diagnostico` en la vista central de Ajustes:
+  - Eliminada la altura fija del panel de diagnóstico (`setPrefViewportHeight(430)`).
+  - El `ScrollPane` de diagnóstico ahora crece verticalmente con `VBox.setVgrow(..., Priority.ALWAYS)`.
+  - El panel izquierdo y el panel lateral del logo usan altura máxima disponible.
+  - La caja de diagnóstico baja hasta la parte inferior útil de la ventana, evitando el espacio vacío visible.
+- Verificación: `desktop > mvn -q -DskipTests package` — **BUILD SUCCESS**.
+- Instalador v1.1 reescrito de nuevo con este ajuste.
+
 Build: Android **BUILD SUCCESSFUL** · Backend `mvn compile` limpio
 
 ### VibeSec Sprint 31 — Sin vulnerabilidades críticas/altas

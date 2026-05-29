@@ -131,6 +131,7 @@ public class ShoppingListView extends VBox {
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setPrefViewportHeight(400);
         dialog.getDialogPane().setContent(scroll);
+        DialogStyler.apply(dialog);
         dialog.showAndWait();
     }
 
