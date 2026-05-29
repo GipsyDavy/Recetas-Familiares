@@ -854,9 +854,64 @@ Verificado en emulador Pixel_9_Pro API 36: LoginScreen, RecipeList, RecipeDetail
 
 ---
 
-## Sprint 17 — UX Premium: Animaciones, Sonidos y Pulido Visual
+## Sprint 17 — UX Premium ✅ COMPLETADO (2026-05-29) — commit 9fa25c3
 
-Objetivo: llevar la app de "funcional" a "emocional y memorable". Sin cambios de contratos API ni arquitectura.
+### Sprint 17 Android (Claude Code) ✅
+
+- `RecetasApp.kt`: `TooltipBox + PlainTooltip` en botón Buscar TopAppBar; `semantics { heading() }` en título.
+- `RecipeScreens.kt`: `Crossfade` lista↔empty-state; `Modifier.animateItem()` en LazyColumn items; `modifier` param en RecipeCard.
+- `StockScreens.kt`: `SwipeToDismissBox` EndToStart + `AlertDialog` confirmación + haptic `LongPress`; `TooltipBox` Sort/Refresh.
+- `NotesScreens.kt`: `SwipeToDismissBox` + `AlertDialog` + haptic `LongPress` al eliminar.
+- `CookingScreen.kt`: haptic en cambio de paso (volumen + botones Anterior/Siguiente/Finalizar) y al terminar timer.
+
+### Sprint 17 Desktop (Codex) ✅
+
+- `MainWindow.java`: `FadeTransition` sidebar 180ms, status bar Label, Ctrl+F global, `setCenterWithFade()`.
+- `RecipeFormDialog.java` + `StockFormDialog.java`: `ScaleTransition` 0.95→1.0 al abrir (200ms EaseOut).
+- `StockView.java`: `ContextMenu`, tooltips Nuevo/Editar/Eliminar, atajos Delete/Enter/Ctrl+N.
+- `CookingView.java`: ←/→ teclado navega pasos; `prevStep()`/`nextStep()` extraídos.
+- `DashboardView.java`: hover `ScaleTransition` recipe cards (1.0→1.02, 100ms).
+
+### Pendiente Sprint 17 (Prioridad Media — Sprint 19)
+
+Android: `animateContentSize()`, `ModalBottomSheet` menú ⋮, `AnimatedContent` timer, skeleton shimmer, `animateColorAsState`.
+Desktop: skeleton placeholders, `TranslateTransition` notificaciones, `AudioClip` sonidos.
+iOS: hápticos `expect/actual`, `SwipeToReveal`.
+
+---
+
+## Sprint 18 — iOS Expansion ✅ COMPLETADO (2026-05-29) — commit 9fa25c3
+
+### Sprint 18.1 — TabView 5 tabs iOS ✅
+
+- `App.kt`: actualizado para usar `MainTabScreen` con `onLogout`.
+- `ui/MainTabScreen.kt` (nuevo): 5 tabs `NavigationBar` (Recetas, Stock, Lista, Notas, Menú). Shopping y Menú son placeholders para Sprint 19.
+
+### Sprint 18.2 — StockScreen iOS ✅
+
+- `stock/StockRepository.kt` (nuevo): `loadStockItems()` paginado via Ktor GET `/api/v1/families/{fid}/stock-items`.
+- `stock/StockScreen.kt` (nuevo): `LazyColumn` con estados loading/error/empty/datos. Badge bajo stock. Formato cantidad+unidad+caducidad.
+
+### Sprint 18.3 — NotesScreen iOS ✅
+
+- `notes/NoteRepository.kt` (nuevo): `loadNotes()` via Ktor GET `/api/v1/families/{fid}/notes`.
+- `notes/NotesScreen.kt` (nuevo): `LazyColumn` M3 con pin emoji, preview 80 chars, estados completos.
+
+### Sprint 18.4 — Keychain SessionStore iOS ✅
+
+- `core/SessionStore.ios.kt`: reemplaza NSUserDefaults por Keychain (`SecItemAdd`/`SecItemCopyMatching`/`SecItemDelete`) via `NSMutableDictionary`. Requiere `@OptIn(ExperimentalForeignApi::class)`.
+- Servicio: `com.gipsybuho.recetasfamiliares`. Compilación binaria verificable solo en macOS+Xcode.
+
+### iOS pendiente Sprint 19
+
+- Shopping y Menú screens iOS (StockScreen pattern).
+- SQLDelight offline cache (recipes + stock).
+- Hápticos `expect/actual` (UIImpactFeedbackGenerator).
+- SwipeToReveal items lista.
+
+---
+
+## Sprint 18 (prev) — iOS Expansion original plan
 
 ### Prioridad Alta
 

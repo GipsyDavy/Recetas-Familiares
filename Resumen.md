@@ -260,17 +260,19 @@ Pendiente Sprint 17:
 | 16.4 | 2026-05-29 | iOS auth: AuthRepository (Ktor login/logout) + LoginScreen Compose M3 |
 | 16.5 | 2026-05-29 | iOS RecipeListScreen básica: RecipeRepository (paginado) + LazyColumn M3 |
 | UI-Android | 2026-05-29 | Rediseño visual Android: LoginScreen brand, RecipeCards gradiente+chips, IconButton nav, FAB Cocinar, tachado shopping, iconos Editar/Eliminar |
+| 17-Android | 2026-05-29 | UX Premium Android: TooltipBox TopAppBar, semantics heading, Crossfade RecipeList, animateItem LazyColumn, SwipeToDismiss stock+notas con haptic, haptic CookingScreen pasos+timer |
+| 17-Desktop | 2026-05-29 | UX Premium Desktop: FadeTransition sidebar, ScaleTransition modales, hover cards, ←/→ CookingView, tooltips botones, ContextMenu stock, status bar, Ctrl+F global |
+| 18.1 | 2026-05-29 | iOS TabView 5 tabs: MainTabScreen (Recetas/Stock/Lista/Notas/Menú); App.kt actualizado |
+| 18.2 | 2026-05-29 | iOS StockScreen: StockRepository (Ktor) + StockScreen composable con estados loading/error/empty |
+| 18.3 | 2026-05-29 | iOS NotesScreen: NoteRepository (Ktor) + NotesScreen composable completo |
+| 18.4 | 2026-05-29 | iOS Keychain: SessionStore.ios.kt migrado de NSUserDefaults a SecItemAdd/Copy/Delete |
 
-## Proximos Pasos — Sprint 17 (UX Premium)
+## Proximos Pasos — Sprint 19
 
-Objetivo: llevar la app de "funcional" a "emocional y memorable" — animaciones, hápticos, sonidos, tooltips, skeleton loading, keyboard shortcuts Desktop y accesibilidad completa. Sin cambios de contratos API ni arquitectura de fondo.
+Prioridad alta:
+- **Android**: Prioridad media Sprint 17 pendiente: `animateContentSize()`, `ModalBottomSheet` menú ⋮ RecipeDetail, `AnimatedContent` timer CookingScreen, skeleton loading shimmer RecipeList, `animateColorAsState` chips+badges.
+- **iOS**: SQLDelight cache offline (recipes + stock-items); `SwipeToReveal` items lista; hápticos `expect/actual` (UIImpactFeedbackGenerator).
+- **Desktop**: Skeleton placeholders, `TranslateTransition` notificaciones ExpiryNotification, `AudioClip` sonidos desactivables.
 
-Prioridad alta: Tooltips Desktop, AnimatedVisibility Android, SwipeToDismiss notas+stock, keyboard shortcuts Desktop.
-Prioridad media: skeleton loading, ModalBottomSheet menú ⋮, hápticos Android completo, animaciones iOS.
-Prioridad baja: Lottie empty states, SharedElementTransition, micro-animación favorito ❤️.
-
-Ver CONTINUAR.md para plan completo, tabla de prioridad y APIs exactas por plataforma.
-
-### Sprint 18 (en cola)
-
-iOS expansion: TabView 5 tabs, StockScreen, NotesScreen, SQLDelight offline-first, Keychain tokens.
+Prioridad media: Shopping y Menú screens en iOS. SQLDelight sync incremental.
+Prioridad baja: Lottie empty states Android, SharedElementTransition, micro-animación ❤️ favorito.
