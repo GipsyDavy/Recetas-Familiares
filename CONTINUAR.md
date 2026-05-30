@@ -1753,10 +1753,38 @@ Para que las notificaciones se entreguen en background, en Xcode añadir:
 - `buildExportText()`: encabezado con rango de fechas, días con contenido (usando `mealLabel()` ya existente y `recipeTitle()` del MenuItemDto).
 - Build: `mvn compile` → **BUILD SUCCESS**.
 
-## Sprint 39 — Candidatos (próxima sesión)
-1. **iOS:** Onboarding mejorado con imágenes reales o ilustraciones (paridad Sprint 27.A visual).
-2. **Android:** Modo cocina — swipe hint mejorado + pantalla completa landscape.
-3. **Desktop:** Avatar en sidebar animado (FadeTransition al actualizar).
+## Sprint 39 — COMPLETADO (2026-05-30)
+
+### 39.A — iOS: Onboarding visual con ilustraciones ✅ (Claude Code)
+- **`OnboardingScreen.kt`** (commonMain): reescritura completa del componente de bienvenida.
+- `OnboardingPage` data class ampliada con `bgTop`, `bgBottom`, `accent` y `deco` (3 emojis decorativos).
+- 3 páginas con paleta del proyecto: terracota (#F6E7D8), verde suave (#DDEDE0), amarillo cálido (#FDF3D0).
+- `IllustrationCard` composable (260dp): gradiente per-página + 2 círculos decorativos (clipped) + 3 emojis dispersos + icono principal 80.sp.
+- Transición direction-aware: `slideInHorizontally + fadeIn` / `slideOutHorizontally + fadeOut` según dirección del cambio de página.
+- Indicadores pill animados: `animateDpAsState` (8dp → 24dp activo) + `animateColorAsState`.
+- Fondo animado per-página: `animateColorAsState(bgTop.copy(alpha=0.18f))`.
+- Gesto swipe horizontal: `detectHorizontalDragGestures` (umbral 72f) — avanza, retrocede o finaliza.
+- Botón "Omitir" (TopEnd) en páginas 1 y 2.
+- Build iOS en Windows: falla pre-existente SQLDelight+Gradle — no relacionado con estos cambios.
+
+### 39.B — Android: Modo cocina landscape + hint mejorado ✅ (Claude Code)
+- **`CookingScreen.kt`**: 3 importaciones nuevas (`WindowCompat`, `WindowInsetsCompat`, `WindowInsetsControllerCompat`).
+- `DisposableEffect`: full-screen immersivo al entrar en modo cocina.
+  `setDecorFitsSystemWindows(window, false)` + `insetsController.hide(systemBars())` + `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`.
+  Restaura barras del sistema en `onDispose`.
+- Padding landscape adaptativo: `vertical = if (isLandscape) Spacing.sm else Spacing.xxl` (más espacio vertical en landscape).
+- Swipe hint mejorado: posición `BottomCenter` (bottom = 88.dp) + `slideInVertically + fadeIn` / `slideOutVertically + fadeOut` + flechas en `primary` color + `shapes.large` + `tonalElevation = 2.dp`.
+- Build: `gradle assembleDebug` → **BUILD SUCCESSFUL (3s)**.
+
+### 39.C — Desktop: Avatar sidebar con FadeTransition ✅ (Codex)
+- **`MainWindow.java`**: `showAvatarUploadChooser()` y `showEditNameDialog()` usan FadeTransition en el reemplazo del userCard.
+- Patrón: fadeOut(180ms) oldCard → set newCard → fadeIn(220ms) newCard. Todo en `Platform.runLater()`.
+- Build: `mvn compile` → BUILD SUCCESS.
+
+## Sprint 40 — Candidatos (próxima sesión)
+1. **Android:** CookingScreen — layout two-column landscape (paso a la izquierda, controles a la derecha).
+2. **iOS:** StockScreen — skeleton loading shimmer (paridad con Android/Desktop).
+3. **Backend:** Endpoint de estadísticas familia (`GET /api/v1/families/{id}/stats`: total recetas, última actividad).
 
 ---
 

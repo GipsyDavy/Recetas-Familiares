@@ -53,10 +53,15 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import android.content.res.Configuration
 import kotlinx.coroutines.delay
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 
@@ -100,13 +105,24 @@ internal fun CookingScreen(
 
     val view = LocalView.current
     DisposableEffect(Unit) {
-        val window = (view.context as android.app.Activity).window
+        val activity = view.context as android.app.Activity
+        val window   = activity.window
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose { window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val insetsController = WindowCompat.getInsetsController(window, view)
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        onDispose {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            WindowCompat.setDecorFitsSystemWindows(window, true)
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     val currentStep = steps.getOrNull(currentIndex)
-    val finished = steps.isNotEmpty() && currentIndex >= steps.size
+    val finished    = steps.isNotEmpty() && currentIndex >= steps.size
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     Surface(
         modifier = Modifier
@@ -167,7 +183,10 @@ internal fun CookingScreen(
     ) {
         Box(Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(Spacing.xxl),
+            modifier = Modifier.fillMaxSize().padding(
+                horizontal = Spacing.xxl,
+                vertical   = if (isLandscape) Spacing.sm else Spacing.xxl
+            ),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
@@ -322,26 +341,29 @@ internal fun CookingScreen(
         }
         AnimatedVisibility(
             visible  = showHint,
-            enter    = fadeIn(tween(400)),
-            exit     = fadeOut(tween(600)),
-            modifier = Modifier.align(Alignment.Center)
+            enter    = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 2 },
+            exit     = fadeOut(tween(500)) + slideOutVertically(tween(500)) { it / 2 },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp)
         ) {
             Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+                shape          = MaterialTheme.shapes.large,
+                color          = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                tonalElevation = 2.dp
             ) {
                 Row(
-                    modifier              = Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.lg),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    modifier              = Modifier.padding(horizontal = 28.dp, vertical = Spacing.lg),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Desliza para navegar",
+                        tint = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "Desliza para navegar",
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
