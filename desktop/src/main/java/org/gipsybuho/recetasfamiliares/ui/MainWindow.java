@@ -278,7 +278,20 @@ public class MainWindow {
                 Platform.runLater(() -> {
                     VBox sidebar = (VBox) root.getLeft();
                     if (sidebar != null) {
-                        sidebar.getChildren().set(2, buildUserCard());
+                        Node oldCard = sidebar.getChildren().get(2);
+                        HBox newCard = buildUserCard();
+                        FadeTransition fadeOut = new FadeTransition(Duration.millis(180), oldCard);
+                        fadeOut.setFromValue(1.0);
+                        fadeOut.setToValue(0.0);
+                        fadeOut.setOnFinished(ev -> {
+                            sidebar.getChildren().set(2, newCard);
+                            newCard.setOpacity(0.0);
+                            FadeTransition fadeIn = new FadeTransition(Duration.millis(220), newCard);
+                            fadeIn.setFromValue(0.0);
+                            fadeIn.setToValue(1.0);
+                            fadeIn.play();
+                        });
+                        fadeOut.play();
                     }
                     setStatus("Foto de perfil actualizada");
                 });
@@ -303,8 +316,20 @@ public class MainWindow {
                     Platform.runLater(() -> {
                         VBox sidebar = (VBox) root.getLeft();
                         if (sidebar != null) {
+                            Node oldCard = sidebar.getChildren().get(2);
                             HBox newCard = buildUserCard();
-                            sidebar.getChildren().set(2, newCard);
+                            FadeTransition fadeOut = new FadeTransition(Duration.millis(180), oldCard);
+                            fadeOut.setFromValue(1.0);
+                            fadeOut.setToValue(0.0);
+                            fadeOut.setOnFinished(ev -> {
+                                sidebar.getChildren().set(2, newCard);
+                                newCard.setOpacity(0.0);
+                                FadeTransition fadeIn = new FadeTransition(Duration.millis(220), newCard);
+                                fadeIn.setFromValue(0.0);
+                                fadeIn.setToValue(1.0);
+                                fadeIn.play();
+                            });
+                            fadeOut.play();
                         }
                         setStatus("Nombre actualizado");
                     });
