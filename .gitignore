@@ -3,6 +3,7 @@ target/
 build/
 out/
 .gradle/
+desktop/output/
 
 # Maven / Gradle wrappers: keep wrapper jars if they are added intentionally
 !.mvn/wrapper/maven-wrapper.jar
