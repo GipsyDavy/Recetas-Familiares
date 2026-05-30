@@ -6,10 +6,14 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.TextAlignment;
+import javafx.stage.FileChooser;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -76,7 +80,11 @@ public class WeeklyMenuView extends VBox {
         syncBtn.getStyleClass().add("action-button-secondary");
         syncBtn.setOnAction(e -> onSync.run());
 
-        HBox navBar = new HBox(10, prevBtn, todayBtn, nextBtn, viewToggleBtn, syncBtn, navSpacer, weekLabel);
+        Button exportBtn = new Button("💾 Exportar");
+        exportBtn.getStyleClass().add("action-button-secondary");
+        exportBtn.setOnAction(e -> exportCurrentView());
+
+        HBox navBar = new HBox(10, prevBtn, todayBtn, nextBtn, viewToggleBtn, syncBtn, exportBtn, navSpacer, weekLabel);
         navBar.setAlignment(Pos.CENTER_LEFT);
         navBar.setPadding(new Insets(12, 0, 16, 0));
 
@@ -415,6 +423,59 @@ public class WeeklyMenuView extends VBox {
                         }
                     });
                 });
+    }
+
+    private void exportCurrentView() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Exportar menú semanal");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Texto (*.txt)", "*.txt"));
+        chooser.setInitialFileName("menu_semanal_" + weekStart + ".txt");
+        File file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) return;
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                List<SyncDtos.MenuDtos.MenuItemDto> items =
+                        context.getMenuRepository().loadForWeek(weekStart);
+                String content = buildExportText(items);
+                Files.writeString(file.toPath(), content, StandardCharsets.UTF_8);
+                Platform.runLater(() -> statusLabel.setText("Menú exportado: " + file.getName()));
+            } catch (Exception ex) {
+                Platform.runLater(() -> statusLabel.setText("Error al exportar: " + ex.getMessage()));
+            }
+        });
+    }
+
+    private String buildExportText(List<SyncDtos.MenuDtos.MenuItemDto> items) {
+        StringBuilder sb = new StringBuilder();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault());
+        sb.append("Menú Semanal — ")
+                .append(weekStart.format(fmt)).append(" - ")
+                .append(weekStart.plusDays(6).format(fmt)).append("\n");
+        sb.append("=".repeat(50)).append("\n\n");
+
+        for (int d = 0; d < 7; d++) {
+            LocalDate day = weekStart.plusDays(d);
+            List<SyncDtos.MenuDtos.MenuItemDto> dayItems = items.stream()
+                    .filter(item -> day.toString().equals(item.plannedDate()))
+                    .toList();
+            if (dayItems.isEmpty()) continue;
+
+            sb.append(DAY_NAMES[d]).append(" ").append(day.format(fmt)).append(":\n");
+            for (String type : MEAL_TYPES) {
+                dayItems.stream()
+                        .filter(item -> type.equals(item.mealType()))
+                        .forEach(item -> {
+                            String label = mealLabel(type);
+                            sb.append("  ").append(label).append(": ")
+                                    .append(item.recipeTitle() != null ? item.recipeTitle() : "(sin nombre)")
+                                    .append("\n");
+                        });
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

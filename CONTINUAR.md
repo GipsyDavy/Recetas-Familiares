@@ -1733,12 +1733,30 @@ Para que las notificaciones se entreguen en background, en Xcode añadir:
 
 ---
 
-## Sprint 38 — Candidatos
+## Sprint 38 — COMPLETADO (2026-05-30)
 
-### Prioridad Media
-1. **iOS:** SharedElementTransition RecipeList→RecipeDetail (paridad con Android Sprint 23.2) — `sharedElement()` + `SharedTransitionLayout` (Compose 1.7+).
-2. **Android:** Improve ProfileScreen — mostrar stats de la familia (total recetas, miembros, últimas actividades).
-3. **Desktop:** Exportar menú semanal a PDF o .txt.
+### 38.A — iOS: SharedElementTransition RecipeList→RecipeDetail ✅ COMPLETADO
+- **`RecipeListScreen.kt`** (commonMain): `@file:OptIn(ExperimentalSharedTransitionApi::class)` + `SharedTransitionLayout { AnimatedContent(selectedRecipe, transitionSpec = fadeIn+slideIn / fadeOut+slideOut) { } }` reemplaza el `if (selectedRecipe != null) return` directo.
+- **`RecipeCard`**: parámetros opcionales `sharedTransitionScope`, `animatedVisibilityScope`; aplica `Modifier.sharedBounds(rememberSharedContentState("recipe_bounds_${id}"), scope)` con `with(sharedTransitionScope)`.
+- **`RecipeDetailScreen.kt`** (commonMain): mismos parámetros opcionales; `sharedBounds` aplicado al `Box` raíz con clave `"recipe_bounds_${recipe.id}"`.
+- Paridad exacta con Android Sprint 23.2.
+
+### 38.B — Android: ProfileScreen stats familia ✅ COMPLETADO
+- **`ProfileScreen.kt`**: `FamilyStatsSection` + `StatItem` composables (nuevos). Card `surfaceVariant` con 2 stats side-by-side: total recetas (de Room, sin API extra) + fecha última actualización (`maxByOrNull { it.updatedAt }?.updatedAt?.take(10)`).
+- Importaciones añadidas: `Card`, `CardDefaults`, `RecipeEntity`.
+- Build: `gradle assembleDebug` → **BUILD SUCCESSFUL** (4s, 0 errores).
+- VibeSec: lectura de Room data ya autenticada del tenant propio; sin nueva superficie de ataque.
+
+### 38.C — Desktop: Exportar menú semanal a .txt ✅ COMPLETADO (Codex)
+- **`WeeklyMenuView.java`**: botón "💾 Exportar" junto a syncBtn (`action-button-secondary`).
+- `exportCurrentView()`: `FileChooser` (.txt) + hilo virtual → `context.getMenuRepository().loadForWeek(weekStart)` → `Files.writeString` UTF-8.
+- `buildExportText()`: encabezado con rango de fechas, días con contenido (usando `mealLabel()` ya existente y `recipeTitle()` del MenuItemDto).
+- Build: `mvn compile` → **BUILD SUCCESS**.
+
+## Sprint 39 — Candidatos (próxima sesión)
+1. **iOS:** Onboarding mejorado con imágenes reales o ilustraciones (paridad Sprint 27.A visual).
+2. **Android:** Modo cocina — swipe hint mejorado + pantalla completa landscape.
+3. **Desktop:** Avatar en sidebar animado (FadeTransition al actualizar).
 
 ---
 

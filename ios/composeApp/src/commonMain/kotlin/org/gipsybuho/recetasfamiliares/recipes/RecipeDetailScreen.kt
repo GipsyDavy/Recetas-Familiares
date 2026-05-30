@@ -1,5 +1,10 @@
+@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+
 package org.gipsybuho.recetasfamiliares.recipes
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -31,7 +36,9 @@ fun RecipeDetailScreen(
     recipe: RecipeDto,
     repository: RecipeRepository,
     onBack: () -> Unit,
-    onCookingMode: (() -> Unit)? = null
+    onCookingMode: (() -> Unit)? = null,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     var ingredients by remember { mutableStateOf<List<RecipeIngredientDto>>(emptyList()) }
     var steps       by remember { mutableStateOf<List<RecipeStepDto>>(emptyList()) }
@@ -50,7 +57,16 @@ fun RecipeDetailScreen(
         loading = false
     }
 
-    Box(Modifier.fillMaxSize()) {
+    val sharedMod = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                sharedContentState      = rememberSharedContentState(key = "recipe_bounds_${recipe.id}"),
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+        }
+    } else Modifier
+
+    Box(Modifier.fillMaxSize().then(sharedMod)) {
         Column(Modifier.fillMaxSize()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

@@ -20,6 +20,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -195,6 +198,12 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             }
         }
 
+        val recipes by viewModel.recipes.collectAsState()
+        if (recipes.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.lg))
+            FamilyStatsSection(recipes = recipes)
+        }
+
         if (isAdmin) {
             Spacer(Modifier.height(Spacing.lg))
             OutlinedButton(
@@ -219,6 +228,68 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             )
         ) {
             Text("Cerrar sesión")
+        }
+    }
+}
+
+@Composable
+private fun FamilyStatsSection(
+    recipes: List<RecipeEntity>
+) {
+    val lastActivity = recipes.maxByOrNull { it.updatedAt }?.updatedAt?.take(10) ?: "—"
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape     = MaterialTheme.shapes.large
+    ) {
+        Column(modifier = Modifier.padding(Spacing.lg)) {
+            Text(
+                "Familia",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(Spacing.md))
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+            ) {
+                StatItem(
+                    modifier = Modifier.weight(1f),
+                    value    = "${recipes.size}",
+                    label    = if (recipes.size == 1) "receta" else "recetas"
+                )
+                StatItem(
+                    modifier = Modifier.weight(1f),
+                    value    = lastActivity,
+                    label    = "última actualización"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatItem(modifier: Modifier = Modifier, value: String, label: String) {
+    Surface(
+        modifier = modifier,
+        shape    = MaterialTheme.shapes.medium,
+        color    = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier            = Modifier.padding(Spacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                label,
+                style   = MaterialTheme.typography.labelSmall,
+                color   = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
         }
     }
 }

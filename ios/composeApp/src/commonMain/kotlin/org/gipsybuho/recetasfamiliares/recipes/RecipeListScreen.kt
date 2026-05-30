@@ -1,17 +1,28 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
+
 package org.gipsybuho.recetasfamiliares.recipes
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -100,73 +111,87 @@ fun RecipeListScreen(
         return
     }
 
-    if (selectedRecipe != null) {
-        RecipeDetailScreen(
-            recipe        = selectedRecipe!!,
-            repository    = repository,
-            onBack        = { selectedRecipe = null },
-            onCookingMode = { cookingMode = true }
-        )
-        return
-    }
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh    = { onRefresh() },
-        modifier     = Modifier.fillMaxSize()
-    ) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.xl, vertical = Spacing.md)) {
-            Text("Recetas", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(Spacing.md))
-
-            OutlinedTextField(
-                value         = query,
-                onValueChange = { query = it },
-                placeholder   = { Text("Buscar recetas…") },
-                singleLine    = true,
-                modifier      = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                listOf("EASY" to "Fácil", "MEDIUM" to "Media", "HARD" to "Difícil").forEach { (key, label) ->
-                    FilterChip(
-                        selected = difficultyFilter == key,
-                        onClick  = { difficultyFilter = if (difficultyFilter == key) null else key },
-                        label    = { Text(label) }
-                    )
-                }
-                if (stockRepo != null) {
-                    FilterChip(
-                        selected = stockFilter,
-                        onClick  = { stockFilter = !stockFilter },
-                        label    = { Text("Con mi stock") }
-                    )
-                }
-            }
-            Spacer(Modifier.height(Spacing.md))
-
-            when {
-                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-                error != null && recipes.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(error!!, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(Spacing.md))
-                        OutlinedButton(onClick = { onRefresh() }) { Text("Reintentar") }
-                    }
-                }
-                filtered.isEmpty() -> AnimatedEmptyState(
-                    icon     = if (query.isNotBlank() || difficultyFilter != null) "🔍" else "🍳",
-                    title    = if (query.isNotBlank() || difficultyFilter != null) "Sin resultados" else "Sin recetas aún",
-                    subtitle = if (query.isNotBlank() || difficultyFilter != null) "Prueba con otros filtros" else "Añade recetas desde Android o Desktop"
+    SharedTransitionLayout {
+        AnimatedContent(
+            targetState = selectedRecipe,
+            transitionSpec = {
+                (fadeIn(tween(300)) + slideInHorizontally { it }) togetherWith
+                (fadeOut(tween(250)) + slideOutHorizontally { -it })
+            },
+            label = "recipe_nav"
+        ) { targetRecipe ->
+            if (targetRecipe != null) {
+                RecipeDetailScreen(
+                    recipe                  = targetRecipe,
+                    repository              = repository,
+                    onBack                  = { selectedRecipe = null },
+                    onCookingMode           = { cookingMode = true },
+                    sharedTransitionScope   = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@AnimatedContent
                 )
-                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    items(filtered, key = { it.id }) { recipe ->
-                        RecipeCard(recipe = recipe, onClick = {
-                            haptic.selection()
-                            selectedRecipe = recipe
-                        })
+            } else {
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh    = { onRefresh() },
+                    modifier     = Modifier.fillMaxSize()
+                ) {
+                    Column(modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.xl, vertical = Spacing.md)) {
+                        Text("Recetas", style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.height(Spacing.md))
+
+                        OutlinedTextField(
+                            value         = query,
+                            onValueChange = { query = it },
+                            placeholder   = { Text("Buscar recetas…") },
+                            singleLine    = true,
+                            modifier      = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(Spacing.sm))
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            listOf("EASY" to "Fácil", "MEDIUM" to "Media", "HARD" to "Difícil").forEach { (key, label) ->
+                                FilterChip(
+                                    selected = difficultyFilter == key,
+                                    onClick  = { difficultyFilter = if (difficultyFilter == key) null else key },
+                                    label    = { Text(label) }
+                                )
+                            }
+                            if (stockRepo != null) {
+                                FilterChip(
+                                    selected = stockFilter,
+                                    onClick  = { stockFilter = !stockFilter },
+                                    label    = { Text("Con mi stock") }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(Spacing.md))
+
+                        when {
+                            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                            error != null && recipes.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(error!!, color = MaterialTheme.colorScheme.error)
+                                    Spacer(Modifier.height(Spacing.md))
+                                    OutlinedButton(onClick = { onRefresh() }) { Text("Reintentar") }
+                                }
+                            }
+                            filtered.isEmpty() -> AnimatedEmptyState(
+                                icon     = if (query.isNotBlank() || difficultyFilter != null) "🔍" else "🍳",
+                                title    = if (query.isNotBlank() || difficultyFilter != null) "Sin resultados" else "Sin recetas aún",
+                                subtitle = if (query.isNotBlank() || difficultyFilter != null) "Prueba con otros filtros" else "Añade recetas desde Android o Desktop"
+                            )
+                            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                items(filtered, key = { it.id }) { recipe ->
+                                    RecipeCard(
+                                        recipe                  = recipe,
+                                        sharedTransitionScope   = this@SharedTransitionLayout,
+                                        animatedVisibilityScope = this@AnimatedContent,
+                                        onClick                 = { haptic.selection(); selectedRecipe = recipe }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -175,9 +200,23 @@ fun RecipeListScreen(
 }
 
 @Composable
-private fun RecipeCard(recipe: RecipeDto, onClick: () -> Unit) {
+private fun RecipeCard(
+    recipe: RecipeDto,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    onClick: () -> Unit
+) {
+    val sharedMod = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                sharedContentState      = rememberSharedContentState(key = "recipe_bounds_${recipe.id}"),
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+        }
+    } else Modifier
+
     Card(
-        modifier  = Modifier.fillMaxWidth().animateItem().clickable(onClick = onClick),
+        modifier  = Modifier.fillMaxWidth().animateItem().then(sharedMod).clickable(onClick = onClick),
         shape     = MaterialTheme.shapes.large,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
