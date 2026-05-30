@@ -73,11 +73,26 @@ class AuthRepository(
         sessionStore.userId       = response.user.id
         sessionStore.displayName  = response.user.displayName
         sessionStore.email        = response.user.email
+        try {
+            val families = api.families()
+            sessionStore.familyRole = families.firstOrNull { it.id == response.family.id }?.role
+        } catch (_: Exception) { }
     }
 
     fun logout() {
         sessionStore.clear()
     }
+}
+
+class FamilyMemberRepository(
+    private val api: RecetasApi,
+    private val sessionStore: SessionStore
+) {
+    suspend fun invite(email: String, role: String) =
+        api.inviteMember(
+            sessionStore.familyId ?: error("No family session"),
+            org.gipsybuho.recetasfamiliares.data.remote.dto.InviteMemberRequestDto(email.trim(), role)
+        )
 }
 
 class RecipeRepository(

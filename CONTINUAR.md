@@ -153,7 +153,7 @@ mvn javafx:run -Dapi.base.url=http://localhost:8080/
 
 Stack: Spring Boot 3.5.14 + Java 21 + MySQL + Flyway + JWT.
 
-Estado: **62 tests, 0 fallos.**
+Estado: **73 tests, 0 fallos.**
 
 Modulos implementados:
 - auth (register, login, refresh, logout)
@@ -392,7 +392,7 @@ Build SUCCESSFUL.
    ```
    Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
 
-6. Continuar con Sprint 34 (ver candidatos al final de este documento).
+6. Continuar con Sprint 35 (ver candidatos al final de este documento).
 
 ---
 
@@ -1490,6 +1490,89 @@ Build: Android **BUILD SUCCESSFUL** · Backend `mvn compile` limpio
 ### VibeSec Sprint 33
 - Sin vulnerabilidades críticas/altas
 - Deuda MVP documentada: token revocation al expulsar miembro (ventana 15 min JWT) → Sprint 34
+
+---
+
+## Sprint 34 — COMPLETADO, PENDIENTE DE COMMIT (2026-05-30)
+
+### 34.A — Backend: Invitar miembro existente a familia ✅
+- **`InviteMemberRequest.java`** (nuevo): `{email @Email @NotBlank, role @NotBlank}`.
+- **`FamilyController.java`**: `POST /api/v1/families/{familyId}/members`.
+- **`FamilyService.java`**: `inviteMember()` con:
+  - `requireAdminOrAbove(familyId, callerUserId)` antes de invitar.
+  - rol parseado server-side; `OWNER` bloqueado.
+  - usuario invitado buscado por email normalizado/case-insensitive.
+  - duplicados en familia → `409 CONFLICT`.
+  - creación de `FamilyMemberEntity(family, invitedUser, role)`.
+- **`FamilyMemberControllerTest.java`**: 4 tests nuevos para invitar, duplicado, usuario inexistente y permisos.
+
+Alcance real actual: MVP "añadir usuario existente por email". No hay todavía flujo de invitación pendiente/aceptación por enlace.
+
+### 34.B — Backend: Revocar refresh tokens al expulsar miembro ✅
+- **`RefreshTokenRepository.java`**: `revokeAllActiveByUserId(userId, now)`.
+- **`RefreshTokenService.java`**: `revokeAllForUser(userId)`.
+- **`FamilyService.removeMember()`**: revoca refresh tokens activos tras soft-delete del miembro.
+- Nota de seguridad: el JWT de acceso sigue siendo short-lived; los refresh tokens quedan revocados inmediatamente.
+
+### 34.C — Backend: Validar magic bytes en imágenes ✅
+- **`FileStorageService.java`**:
+  - valida contenido real contra `Content-Type` declarado para JPEG, PNG y WebP.
+  - PNG ahora valida la firma completa de 8 bytes.
+  - mantiene límite 8 MB, subdir allowlist y nombres UUID.
+- **`FileStorageServiceTest.java`** (nuevo): cubre aceptación JPEG/PNG/WebP válidos y rechazo de contenido falso con tipo permitido.
+
+### 34.D — Android: Invitación desde perfil ✅
+- **`SessionStore.kt`**: persistencia `familyRole`.
+- **`ApiDtos.kt`**: `FamilyDto.role`, `FamilyMemberResponseDto`, `InviteMemberRequestDto`.
+- **`RecetasApi.kt`**: `POST /api/v1/families/{familyId}/members`.
+- **`Repositories.kt`**: `AuthRepository` guarda `familyRole` desde `GET /families`; nuevo `FamilyMemberRepository.invite()`.
+- **`AppContainer.kt`**: instancia `familyMemberRepository`.
+- **`RecetasViewModel.kt`**: `isAdmin` + `inviteMember()`.
+- **`ProfileScreen.kt`**: botón "Invitar miembro a la familia" visible solo para ADMIN/OWNER + diálogo email/rol.
+
+### 34.E — iOS: Invitación desde Ajustes ✅
+- **`SessionStore.kt` expect + `SessionStore.ios.kt` actual**: `familyRole` en Keychain y limpieza en logout.
+- **`ApiDtos.kt`**: `FamilyDto.role`, `FamilyMemberResponseDto`, `InviteMemberRequestDto`.
+- **`AuthRepository.kt`**: tras login llama a `GET /api/v1/families` y guarda `session.familyRole`.
+- **`families/FamilyMemberRepository.kt`** (nuevo): `invite(email, role)` con Ktor.
+- **`MainTabScreen.kt`**: crea y pasa `FamilyMemberRepository`.
+- **`SettingsScreen.kt`**: botón de invitación solo para ADMIN/OWNER + diálogo con email y chips Miembro/Administrador.
+
+### Verificación Sprint 34
+- Backend: `mvn test` → **73 tests, 0 fallos**.
+- Android: `android > .\gradlew.bat assembleDebug` → **BUILD SUCCESSFUL**.
+- iOS: `ios > .\gradlew.bat :composeApp:compileKotlinMetadata` sigue fallando en Windows antes de compilar Kotlin por incompatibilidad preexistente SQLDelight/Gradle:
+  `org/gradle/api/internal/plugins/DefaultArtifactPublicationSet`.
+  No está relacionado con los cambios del Sprint 34.
+
+### 34.F — Fixes UX/Feedback (revisión post-sprint, Codex) ✅
+- **`RecetasViewModel.kt`**: `inviteMember()` envuelto en try/catch; emite a `_userMessage` en éxito y en fallo; rethrow de `CancellationException` (patrón existente).
+- **`ProfileScreen.kt`**: email field en `InviteMemberDialog` añade `keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)`.
+- **`SettingsScreen.kt`** (iOS): onClick del botón invitar hace `showInviteDialog = true` + `inviteMessage = null` simultáneamente (evitaba mostrar el mensaje de la invitación anterior).
+
+### VibeSec Sprint 34
+- Ownership: correcto; invitación exige ADMIN/OWNER de la familia solicitada.
+- Privilege escalation: `OWNER` no asignable desde cliente.
+- Token lifecycle: refresh tokens revocados al expulsar miembros.
+- Uploads: content-type ya no basta; se validan magic bytes.
+- Deuda pendiente: el flujo completo join-by-invite por enlace/token no existe todavía; el MVP actual añade usuarios ya registrados.
+
+---
+
+## Sprint 35 — Candidatos
+
+### Prioridad Alta (deuda técnica de seguridad/calidad)
+1. **Backend:** Anti-enumeración en `inviteMember()` — respuesta uniforme 201 independientemente de si el email existe; el body indica "solicitud registrada" sin revelar si el usuario existe. Sin infraestructura de email: solo respuesta neutral.
+2. **Backend:** Tests faltantes — happy path `removeMember()` con verificación de revocación de tokens; happy path `updateMemberRole()`; verificar que el refresh token queda revocado al expulsar (flujo completo con captura de refreshToken real y posterior intento de uso → 401).
+3. **Android + iOS:** `isAdmin` reactivo — exponer `familyRole` como `StateFlow<String?>` desde `SessionStore` (commonMain `expect`) en lugar de `get()` property no-reactivo; el rol puede cambiar en sesión.
+
+### Prioridad Media
+4. **Backend:** Verificar unique constraint `(family_id, user_id)` en Flyway para la tabla `family_members` — actualmente la lógica en `FamilyService` previene duplicados pero sin constraint a nivel BD.
+5. **Android:** Widget receta del día mejorado (foto + acción "Cocinar desde widget").
+6. **iOS:** Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
+
+### Prioridad Baja
+7. **Desktop:** Avatar upload desde Desktop (paridad completa con Android/iOS).
 
 ---
 

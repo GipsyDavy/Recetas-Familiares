@@ -3,7 +3,9 @@ package org.gipsybuho.recetasfamiliares.families;
 import java.util.List;
 import java.util.Locale;
 
+import org.gipsybuho.recetasfamiliares.auth.RefreshTokenService;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
+import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,9 +15,20 @@ import org.springframework.web.server.ResponseStatusException;
 public class FamilyService {
 
     private final FamilyMemberRepository familyMemberRepository;
+    private final FamilyRepository familyRepository;
+    private final UserRepository userRepository;
+    private final RefreshTokenService refreshTokenService;
 
-    public FamilyService(FamilyMemberRepository familyMemberRepository) {
+    public FamilyService(
+            FamilyMemberRepository familyMemberRepository,
+            FamilyRepository familyRepository,
+            UserRepository userRepository,
+            RefreshTokenService refreshTokenService
+    ) {
         this.familyMemberRepository = familyMemberRepository;
+        this.familyRepository = familyRepository;
+        this.userRepository = userRepository;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +83,25 @@ public class FamilyService {
         }
         target.softDelete();
         familyMemberRepository.save(target);
+        refreshTokenService.revokeAllForUser(targetUserId);
+    }
+
+    @Transactional
+    public FamilyMemberResponse inviteMember(String familyId, String callerUserId, InviteMemberRequest request) {
+        requireAdminOrAbove(familyId, callerUserId);
+        FamilyRole role = parseRole(request.role());
+        if (role == FamilyRole.OWNER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot assign OWNER role");
+        }
+        UserEntity invitedUser = userRepository.findByEmailIgnoreCaseAndDeletedFalse(request.email())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, invitedUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "User is already a member of this family");
+        }
+        FamilyEntity family = familyRepository.findById(familyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
+        FamilyMemberEntity newMember = new FamilyMemberEntity(family, invitedUser, role);
+        return toMemberResponse(familyMemberRepository.save(newMember));
     }
 
     private void requireMembership(String familyId, String userId) {

@@ -85,6 +85,90 @@ class FamilyMemberControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void inviteMemberAddsUserToFamily() throws Exception {
+        RegisteredUser owner  = register("invite-owner@example.com", "Familia Invite");
+        RegisteredUser guest  = register("invite-guest@example.com", "Familia Guest");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "invite-guest@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value("invite-guest@example.com"))
+                .andExpect(jsonPath("$.role").value("MEMBER"));
+
+        // guest now sees the owner's family in the members list
+        mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void inviteDuplicateMemberReturnsConflict() throws Exception {
+        RegisteredUser owner = register("invite-dup-owner@example.com", "Familia InviteDup");
+        register("invite-dup-guest@example.com", "Familia Guest2");
+
+        // first invite
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "invite-dup-guest@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isCreated());
+
+        // second invite — same user, same family
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "invite-dup-guest@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void inviteNonExistentUserReturnsNotFound() throws Exception {
+        RegisteredUser owner = register("invite-notfound-owner@example.com", "Familia NotFound");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "nobody@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void inviteRequiresAdminRole() throws Exception {
+        RegisteredUser owner  = register("invite-perm-owner@example.com", "Familia InvPerm");
+        RegisteredUser member = register("invite-perm-member@example.com", "Familia InvPerm2");
+        register("invite-perm-target@example.com", "Familia InvPerm3");
+
+        // owner invites member as MEMBER
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "invite-perm-member@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isCreated());
+
+        // member (not admin) tries to invite — must be forbidden
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + member.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "invite-perm-target@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private record RegisteredUser(String accessToken, String familyId, String userId) {}

@@ -25,7 +25,19 @@ data class UserResponseDto(
 )
 
 @Serializable
-data class FamilyDto(val id: String, val name: String)
+data class FamilyDto(val id: String, val name: String, val role: String? = null)
+
+@Serializable
+data class FamilyMemberResponseDto(
+    val userId: String,
+    val displayName: String? = null,
+    val email: String,
+    val avatarUrl: String? = null,
+    val role: String
+)
+
+@Serializable
+data class InviteMemberRequestDto(val email: String, val role: String)
 
 @Serializable
 data class PageDto<T>(

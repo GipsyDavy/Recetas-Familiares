@@ -36,7 +36,21 @@ data class AuthFamilyDto(
 
 data class FamilyDto(
     val id: String,
-    val name: String
+    val name: String,
+    val role: String? = null
+)
+
+data class FamilyMemberResponseDto(
+    val userId: String,
+    val displayName: String?,
+    val email: String,
+    val avatarUrl: String?,
+    val role: String
+)
+
+data class InviteMemberRequestDto(
+    val email: String,
+    val role: String
 )
 
 data class PageDto<T>(

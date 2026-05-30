@@ -5,6 +5,7 @@ import io.ktor.client.request.*
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.network.ApiClient
 import org.gipsybuho.recetasfamiliares.network.AuthResponseDto
+import org.gipsybuho.recetasfamiliares.network.FamilyDto
 import org.gipsybuho.recetasfamiliares.network.LoginRequestDto
 
 class AuthRepository(
@@ -21,6 +22,10 @@ class AuthRepository(
         session.userId       = response.user.id
         session.displayName  = response.user.displayName
         session.email        = response.user.email
+        runCatching {
+            val families: List<FamilyDto> = apiClient.http.get("api/v1/families").body()
+            session.familyRole = families.firstOrNull { it.id == response.family.id }?.role
+        }
     }
 
     fun logout() = session.clear()

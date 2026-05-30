@@ -10,6 +10,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.AuthInterceptor
 import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.TokenRefreshAuthenticator
 import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository
+import org.gipsybuho.recetasfamiliares.data.repository.FamilyMemberRepository
 import org.gipsybuho.recetasfamiliares.data.repository.FamilyNoteRepository
 import org.gipsybuho.recetasfamiliares.data.repository.MenuItemRepository
 import org.gipsybuho.recetasfamiliares.data.repository.FavoriteRepository
@@ -75,6 +76,7 @@ class AppContainer(context: Context) {
     val menuItemRepository = MenuItemRepository(api, database, sessionStore)
     val recipeRatingRepository = RecipeRatingRepository(api, sessionStore)
     val userRepository = UserRepository(api, sessionStore)
+    val familyMemberRepository = FamilyMemberRepository(api, sessionStore)
     val themePreference = ThemePreference(context)
     val onboardingPreference = OnboardingPreference(context)
 

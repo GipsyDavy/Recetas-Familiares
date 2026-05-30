@@ -3,7 +3,6 @@ package org.gipsybuho.recetasfamiliares.photos;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Set;
 import java.util.UUID;
 
@@ -56,6 +55,8 @@ public class FileStorageService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Unsupported file type. Allowed: JPEG, PNG, WebP");
         }
+        byte[] bytes = file.getBytes();
+        validateMagicBytes(bytes, contentType);
         String ext = switch (contentType) {
             case "image/png"  -> ".png";
             case "image/webp" -> ".webp";
@@ -66,10 +67,38 @@ public class FileStorageService {
                 ? uploadDir.resolve(subdir)
                 : uploadDir;
         Files.createDirectories(targetDir);
-        Files.copy(file.getInputStream(), targetDir.resolve(filename), StandardCopyOption.REPLACE_EXISTING);
+        Files.write(targetDir.resolve(filename), bytes);
         String urlPath = (subdir != null && !subdir.isBlank())
                 ? "/uploads/" + subdir + "/" + filename
                 : "/uploads/" + filename;
-        return new StoredFile(baseUrl + urlPath, contentType, file.getSize());
+        return new StoredFile(baseUrl + urlPath, contentType, bytes.length);
+    }
+
+    private void validateMagicBytes(byte[] bytes, String contentType) {
+        if (bytes.length < 12) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image file");
+        }
+        boolean valid = switch (contentType) {
+            // JPEG: FF D8 FF
+            case "image/jpeg", "image/jpg" ->
+                    (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8 && (bytes[2] & 0xFF) == 0xFF;
+            // PNG: 89 50 4E 47 0D 0A 1A 0A
+            case "image/png" ->
+                    (bytes[0] & 0xFF) == 0x89 && (bytes[1] & 0xFF) == 0x50
+                            && (bytes[2] & 0xFF) == 0x4E && (bytes[3] & 0xFF) == 0x47
+                            && (bytes[4] & 0xFF) == 0x0D && (bytes[5] & 0xFF) == 0x0A
+                            && (bytes[6] & 0xFF) == 0x1A && (bytes[7] & 0xFF) == 0x0A;
+            // WebP: RIFF (bytes 0-3) + WEBP (bytes 8-11)
+            case "image/webp" ->
+                    (bytes[0] & 0xFF) == 0x52 && (bytes[1] & 0xFF) == 0x49
+                            && (bytes[2] & 0xFF) == 0x46 && (bytes[3] & 0xFF) == 0x46
+                            && (bytes[8] & 0xFF) == 0x57 && (bytes[9] & 0xFF) == 0x45
+                            && (bytes[10] & 0xFF) == 0x42 && (bytes[11] & 0xFF) == 0x50;
+            default -> false;
+        };
+        if (!valid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "File content does not match declared type");
+        }
     }
 }

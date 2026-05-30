@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
 import org.gipsybuho.recetasfamiliares.ui.theme.AppTheme
@@ -60,6 +61,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     val onboardingDone: StateFlow<Boolean> = _onboardingDone.asStateFlow()
 
     val myUserId: String? get() = container.sessionStore.userId
+    val isAdmin: Boolean get() = container.sessionStore.familyRole.let { it == "ADMIN" || it == "OWNER" }
 
     private val _displayName = MutableStateFlow(container.sessionStore.displayName)
     val displayName: StateFlow<String?> = _displayName.asStateFlow()
@@ -148,6 +150,18 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 _userMessage.emit("Foto de perfil actualizada")
             }.onFailure {
                 _userMessage.emit("Error al subir la foto")
+            }
+        }
+    }
+
+    fun inviteMember(email: String, role: String) {
+        viewModelScope.launch {
+            try {
+                container.familyMemberRepository.invite(email, role)
+                _userMessage.emit("Miembro invitado correctamente")
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                _userMessage.emit("No se pudo invitar: usuario no encontrado o sin permisos")
             }
         }
     }

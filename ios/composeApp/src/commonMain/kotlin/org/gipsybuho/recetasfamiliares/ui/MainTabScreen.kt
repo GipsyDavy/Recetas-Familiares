@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
+import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
 import org.gipsybuho.recetasfamiliares.menu.MenuRepository
 import org.gipsybuho.recetasfamiliares.menu.MenuScreen
 import org.gipsybuho.recetasfamiliares.network.ApiClient
@@ -53,6 +54,7 @@ fun MainTabScreen(
     val shoppingRepo = remember { ShoppingListRepository(apiClient, session) }
     val menuRepo     = remember { MenuRepository(apiClient, session) }
     val userRepo     = remember { UserRepository(apiClient, session) }
+    val familyMemberRepo = remember { FamilyMemberRepository(apiClient, session) }
 
     var selectedTab by remember { mutableStateOf(Tab.RECIPES) }
 
@@ -114,7 +116,8 @@ fun MainTabScreen(
                     onHapticsChange = onHapticsChange,
                     onLogout        = onLogout,
                     session         = session,
-                    userRepository  = userRepo
+                    userRepository  = userRepo,
+                    familyMemberRepository = familyMemberRepo
                 )
             }
         }

@@ -76,13 +76,15 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 
 ## Estado del Proyecto por Modulo
 
-### Backend Spring Boot (COMPLETO — SIN TOCAR)
+### Backend Spring Boot (SPRINT 34 COMPLETO)
 
 - Spring Boot 3.5.14 + Java 21 + MySQL + Flyway.
 - Auth JWT + refresh tokens + rate limiting.
 - CRUD completo: recetas, ingredientes, pasos, stock, menus, listas de compra, favoritos, notas, fotos, valoraciones.
 - Sync pull/push con tombstones, LWW y deteccion de conflictos.
-- **62 tests, 0 fallos** (incluye RecipeRatingControllerTest x5).
+- Gestión miembros familia: listMembers, updateMemberRole, removeMember (Sprint 33) + inviteMember (Sprint 34).
+- Revocación refresh tokens al expulsar miembro. Validación magic bytes JPEG/PNG/WebP en uploads.
+- **73 tests, 0 fallos**.
 - Hardening HTTP: CSP, HSTS, CORS deny-by-default. Fix SSRF en validateHttpsUrl.
 - OpenAPI/Swagger desactivado en produccion.
 - Seed de desarrollo: demo@recetas.local / Demo1234!Familia
@@ -107,7 +109,7 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT 28 COMPLETO — 2026-05-29)
+### Android Kotlin + Compose (SPRINT 34 COMPLETO — 2026-05-30)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -181,7 +183,7 @@ Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de 
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-### iOS KMP + Compose Multiplatform (SPRINT 28.A COMPLETADO — 2026-05-29)
+### iOS KMP + Compose Multiplatform (SPRINT 34.E COMPLETADO — 2026-05-30)
 
 Stack implementado:
 - Kotlin Multiplatform + Compose Multiplatform (Kotlin 2.0.21, Compose 1.7.0)
@@ -330,6 +332,7 @@ Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + 
 | Desktop-Diagnostico-v1.1 | 2026-05-30 | Pestaña Diagnostico ajustada para aprovechar todo el alto disponible: sin altura fija en el ScrollPane, crecimiento vertical con VBox.setVgrow y panel lateral de logo estirable; instalador v1.1 reescrito |
 | 32-Desktop | 2026-05-30 | Auth/Roles Desktop: LoginView UX premium (card+animación+toggle password), FamilyRole enum (OWNER/ADMIN/MEMBER), AppSession.isAdmin(), FamilyRepository.detectAndSaveRole() desde GET /api/v1/families, sidebar permission-gated (ADMIN ve Ajustes+Miembros; MIEMBRO solo módulos diarios), FamilyMembersView read-only. VibeSec: BUILD SUCCESS |
 | 33-Backend+Desktop | 2026-05-30 | Gestión miembros familia: GET/PUT/DELETE /api/v1/families/{id}/members; FamilyMemberResponse DTO; FamilyService listMembers/updateMemberRole/removeMember con ownership+admin checks+protección OWNER; 5 tests (67 total, 0 fallos). Desktop FamilyMembersView CRUD real: TableView API, Cambiar rol (ChoiceDialog), Expulsar (confirm), isSelf por email, botones permission-gated. VibeSec: sin críticos/altos |
+| 34-Backend+Android+iOS | 2026-05-30 | Invitar miembro (POST /families/{id}/members); revocar refresh tokens al expulsar; magic bytes JPEG/PNG/WebP; Android ProfileScreen invite dialog; iOS SettingsScreen invite dialog; SessionStore familyRole; 6 tests nuevos (73 total, 0 fallos). Fixes UX: feedback invitación Android, reset inviteMessage iOS, KeyboardType.Email Android. Pendiente commit. |
 
 ## Sprint 25B/C/D — COMPLETADOS (2026-05-29)
 

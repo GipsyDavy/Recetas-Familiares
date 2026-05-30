@@ -20,16 +20,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +46,7 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.core.rememberImagePickerLauncher
+import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.theme.ThemeMode
 import org.gipsybuho.recetasfamiliares.theme.lightColors
@@ -54,9 +62,13 @@ fun SettingsScreen(
     onHapticsChange: (Boolean) -> Unit,
     onLogout: () -> Unit,
     session: SessionStore? = null,
-    userRepository: UserRepository? = null
+    userRepository: UserRepository? = null,
+    familyMemberRepository: FamilyMemberRepository? = null
 ) {
     val scope = rememberCoroutineScope()
+    var showInviteDialog by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var inviteMessage by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
+    val isAdmin = session?.familyRole == "ADMIN" || session?.familyRole == "OWNER"
 
     val imagePicker = rememberImagePickerLauncher { bytes ->
         if (bytes != null && userRepository != null) {
@@ -64,6 +76,23 @@ fun SettingsScreen(
                 runCatching { userRepository.uploadAvatar(bytes) }
             }
         }
+    }
+
+    if (showInviteDialog && familyMemberRepository != null) {
+        InviteMemberDialog(
+            onDismiss = { showInviteDialog = false },
+            onConfirm = { email, role ->
+                scope.launch {
+                    val result = runCatching { familyMemberRepository.invite(email, role) }
+                    inviteMessage = if (result.isSuccess) {
+                        showInviteDialog = false
+                        "Miembro invitado correctamente"
+                    } else {
+                        "No se pudo invitar al miembro"
+                    }
+                }
+            }
+        )
     }
 
     Column(
@@ -138,6 +167,29 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
         }
 
+        if (isAdmin && familyMemberRepository != null) {
+            OutlinedButton(
+                onClick = {
+                    showInviteDialog = true
+                    inviteMessage = null
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Filled.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text("Invitar miembro a la familia")
+            }
+            inviteMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
         Row(
@@ -199,6 +251,61 @@ fun SettingsScreen(
                 .padding(vertical = 12.dp)
         )
     }
+}
+
+@Composable
+private fun InviteMemberDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var email by androidx.compose.runtime.remember { mutableStateOf("") }
+    var selectedRole by androidx.compose.runtime.remember { mutableStateOf("MEMBER") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Invitar miembro") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email del miembro") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Rol",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selectedRole == "MEMBER",
+                        onClick = { selectedRole = "MEMBER" },
+                        label = { Text("Miembro") }
+                    )
+                    FilterChip(
+                        selected = selectedRole == "ADMIN",
+                        onClick = { selectedRole = "ADMIN" },
+                        label = { Text("Administrador") }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(email.trim(), selectedRole) },
+                enabled = email.isNotBlank()
+            ) {
+                Text("Invitar")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 @Composable

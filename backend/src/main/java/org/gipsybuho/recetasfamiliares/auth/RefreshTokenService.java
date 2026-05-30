@@ -63,6 +63,11 @@ public class RefreshTokenService {
                 });
     }
 
+    @Transactional
+    public void revokeAllForUser(String userId) {
+        refreshTokenRepository.revokeAllActiveByUserId(userId, Instant.now());
+    }
+
     @Scheduled(cron = "${app.security.jwt.refresh-token-cleanup-cron:0 0 3 * * *}")
     @Transactional
     public void purgeExpiredAndOldRevokedTokens() {

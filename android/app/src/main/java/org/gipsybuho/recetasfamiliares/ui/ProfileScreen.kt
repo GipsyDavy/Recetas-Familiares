@@ -13,13 +13,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,10 +45,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Modifier) {
     val displayName by viewModel.displayName.collectAsState()
@@ -49,7 +58,18 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     val avatarUrl   by viewModel.avatarUrl.collectAsState()
     var editing     by remember { mutableStateOf(false) }
     var editName    by remember { mutableStateOf("") }
+    var showInvite  by remember { mutableStateOf(false) }
     val context     = LocalContext.current
+
+    if (showInvite) {
+        InviteMemberDialog(
+            onDismiss = { showInvite = false },
+            onConfirm = { inviteEmail, role ->
+                viewModel.inviteMember(inviteEmail, role)
+                showInvite = false
+            }
+        )
+    }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -174,6 +194,19 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             }
         }
 
+        if (viewModel.isAdmin) {
+            Spacer(Modifier.height(Spacing.lg))
+            OutlinedButton(
+                onClick  = { showInvite = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Filled.PersonAdd, contentDescription = null,
+                    modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(Spacing.sm))
+                Text("Invitar miembro a la familia")
+            }
+        }
+
         Spacer(Modifier.weight(1f))
 
         Button(
@@ -187,4 +220,65 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             Text("Cerrar sesión")
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InviteMemberDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
+    val roles = listOf("MEMBER" to "Miembro", "ADMIN" to "Administrador")
+    var inviteEmail  by remember { mutableStateOf("") }
+    var selectedRole by remember { mutableStateOf(roles[0]) }
+    var roleExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title  = { Text("Invitar miembro") },
+        text   = {
+            androidx.compose.foundation.layout.Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            ) {
+                OutlinedTextField(
+                    value         = inviteEmail,
+                    onValueChange = { inviteEmail = it },
+                    label         = { Text("Email del miembro") },
+                    singleLine    = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    modifier      = Modifier.fillMaxWidth()
+                )
+                ExposedDropdownMenuBox(
+                    expanded         = roleExpanded,
+                    onExpandedChange = { roleExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value         = selectedRole.second,
+                        onValueChange = {},
+                        readOnly      = true,
+                        label         = { Text("Rol") },
+                        trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(roleExpanded) },
+                        modifier      = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded         = roleExpanded,
+                        onDismissRequest = { roleExpanded = false }
+                    ) {
+                        roles.forEach { role ->
+                            DropdownMenuItem(
+                                text    = { Text(role.second) },
+                                onClick = { selectedRole = role; roleExpanded = false }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(inviteEmail.trim(), selectedRole.first) },
+                enabled = inviteEmail.isNotBlank()
+            ) { Text("Invitar") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
