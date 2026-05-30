@@ -1677,6 +1677,15 @@ Alcance real actual: MVP "añadir usuario existente por email". No hay todavía 
 - Desktop: `mvn -q -DskipTests package` → **BUILD SUCCESS**.
 - VibeSec: sin críticos/altos. Defense-in-depth: extensión+tamaño client-side + magic bytes backend. `return` en lambda `ifPresent` correcto — sale del consumer sin afectar al método enclosing.
 
+### Instalador Windows v1.1 — COMPLETADO (2026-05-30) — commit 3006040
+
+- Ejecutado `desktop/build-installer.ps1` con NSIS 3.x instalado en `C:\Program Files (x86)\NSIS\`.
+- Genera: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe` (~52 MB, LZMA, JRE embebido).
+- App-image portable: `desktop/output/RecetasFamiliares/RecetasFamiliares.exe` (178 MB carpeta).
+- `desktop/pom.xml` actualizado a versión `1.1` (sin SNAPSHOT).
+- `desktop/build-installer.ps1` corregido: ruta fat JAR apunta a `1.1`.
+- Proceso completo documentado en CONTINUAR.md → sección "Desktop Windows — Compilar instalador .exe".
+
 ---
 
 ## Sprint 37 — Candidatos

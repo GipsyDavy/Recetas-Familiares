@@ -335,6 +335,7 @@ Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + 
 | 34-Backend+Android+iOS | 2026-05-30 | Invitar miembro (POST /families/{id}/members); revocar refresh tokens al expulsar; magic bytes JPEG/PNG/WebP; Android ProfileScreen invite dialog; iOS SettingsScreen invite dialog; SessionStore familyRole; 6 tests nuevos (73 total, 0 fallos). Fixes UX: feedback invitación Android, reset inviteMessage iOS, KeyboardType.Email Android. |
 | 35-Backend+Android+iOS | 2026-05-30 | Anti-enumeración inviteMember (email inexistente → 201 silencioso); tests revocación refreshToken; isAdmin reactivo StateFlow Android+iOS; VibeSec: 76 tests, 0 fallos. |
 | 36-Backend+Desktop | 2026-05-30 | Anti-enumeración completa (CONFLICT 409 → 201 silencioso); Desktop avatar upload (FileChooser + postMultipart + AppSession.avatarUrl + circular clip); 76 tests, 0 fallos. |
+| Instalador-v1.1 | 2026-05-30 | Instalador Windows .exe generado con NSIS 3.x + jpackage app-image; build-installer.ps1 corregido; pom.xml a v1.1; proceso documentado en CONTINUAR.md. Artefacto: RecetasFamiliares-Instalador-v1.1.exe (~52 MB, JRE embebido). |
 
 ## Sprint 25B/C/D — COMPLETADOS (2026-05-29)
 
