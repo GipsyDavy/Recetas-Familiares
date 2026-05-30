@@ -17,4 +17,8 @@ public interface RecipeRepository extends JpaRepository<RecipeEntity, String> {
     Optional<RecipeEntity> findByIdAndFamily_Id(String id, String familyId);
 
     List<RecipeEntity> findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(String familyId, Instant since);
+
+    long countByFamily_IdAndDeletedFalse(String familyId);
+
+    Optional<RecipeEntity> findFirstByFamily_IdAndDeletedFalseOrderByUpdatedAtDesc(String familyId);
 }

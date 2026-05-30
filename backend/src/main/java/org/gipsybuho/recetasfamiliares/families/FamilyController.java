@@ -68,4 +68,12 @@ public class FamilyController {
     ) {
         familyService.removeMember(familyId, userId, authentication.getName());
     }
+
+    @GetMapping("/{familyId}/stats")
+    public FamilyStatsResponse getFamilyStats(
+            @PathVariable String familyId,
+            Authentication authentication
+    ) {
+        return familyService.getFamilyStats(familyId, authentication.getName());
+    }
 }

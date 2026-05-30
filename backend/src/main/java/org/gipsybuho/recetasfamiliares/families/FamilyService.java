@@ -1,9 +1,12 @@
 package org.gipsybuho.recetasfamiliares.families;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
 import org.gipsybuho.recetasfamiliares.auth.RefreshTokenService;
+import org.gipsybuho.recetasfamiliares.recipes.RecipeEntity;
+import org.gipsybuho.recetasfamiliares.recipes.RecipeRepository;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -18,17 +21,20 @@ public class FamilyService {
     private final FamilyRepository familyRepository;
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
+    private final RecipeRepository recipeRepository;
 
     public FamilyService(
             FamilyMemberRepository familyMemberRepository,
             FamilyRepository familyRepository,
             UserRepository userRepository,
-            RefreshTokenService refreshTokenService
+            RefreshTokenService refreshTokenService,
+            RecipeRepository recipeRepository
     ) {
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
         this.userRepository = userRepository;
         this.refreshTokenService = refreshTokenService;
+        this.recipeRepository = recipeRepository;
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +107,17 @@ public class FamilyService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
             familyMemberRepository.save(new FamilyMemberEntity(family, invitedUser, role));
         });
+    }
+
+    @Transactional(readOnly = true)
+    public FamilyStatsResponse getFamilyStats(String familyId, String userId) {
+        requireMembership(familyId, userId);
+        long total = recipeRepository.countByFamily_IdAndDeletedFalse(familyId);
+        Instant lastActivity = recipeRepository
+                .findFirstByFamily_IdAndDeletedFalseOrderByUpdatedAtDesc(familyId)
+                .map(RecipeEntity::getUpdatedAt)
+                .orElse(null);
+        return new FamilyStatsResponse(total, lastActivity);
     }
 
     private void requireMembership(String familyId, String userId) {

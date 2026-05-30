@@ -2,6 +2,10 @@ package org.gipsybuho.recetasfamiliares.stock
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -109,9 +113,7 @@ fun StockScreen(repository: StockRepository, syncRepo: SyncRepository) {
                         },
                         onCancel = { editingItem = null }
                     )
-                    loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    loading -> StockSkeletonList()
                     error != null && items.isEmpty() -> Box(
                         Modifier.fillMaxSize(), contentAlignment = Alignment.Center
                     ) {
@@ -152,6 +154,52 @@ fun StockScreen(repository: StockRepository, syncRepo: SyncRepository) {
                 onClick  = { showCreate = true; error = null },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.xl)
             ) { Icon(Icons.Filled.Add, contentDescription = "Nuevo artículo") }
+        }
+    }
+}
+
+@Composable
+private fun StockSkeletonList() {
+    val transition = rememberInfiniteTransition(label = "stock_shimmer")
+    val alpha by transition.animateFloat(
+        initialValue  = 0.35f,
+        targetValue   = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer_alpha"
+    )
+    val shimmer = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        repeat(5) { StockSkeletonItem(shimmer) }
+    }
+}
+
+@Composable
+private fun StockSkeletonItem(shimmer: Color) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier          = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier            = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(0.55f)
+                        .height(14.dp)
+                        .background(shimmer, MaterialTheme.shapes.small)
+                )
+                Box(
+                    Modifier
+                        .fillMaxWidth(0.35f)
+                        .height(11.dp)
+                        .background(shimmer, MaterialTheme.shapes.small)
+                )
+            }
         }
     }
 }

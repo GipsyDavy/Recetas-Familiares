@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -182,191 +183,380 @@ internal fun CookingScreen(
         color = MaterialTheme.colorScheme.background
     ) {
         Box(Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(
-                horizontal = Spacing.xxl,
-                vertical   = if (isLandscape) Spacing.sm else Spacing.xxl
-            ),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                TextButton(onClick = onExit) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text("Salir")
-                }
-                Text(
-                    recipe.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f, fill = false).padding(start = Spacing.md)
-                )
-            }
-
-            if (steps.isNotEmpty()) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        if (finished) "¡Receta completada!" else "Paso ${currentIndex + 1} de ${steps.size}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.padding(top = Spacing.md))
-                    LinearProgressIndicator(
-                        progress = { minOf(1f, (currentIndex + 1).toFloat() / steps.size) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            Box(
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = Spacing.xxl),
-                contentAlignment = Alignment.Center
-            ) {
-                when {
-                    steps.isEmpty() -> Text(
-                        "Esta receta no tiene pasos registrados",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        textAlign = TextAlign.Center
-                    )
-                    finished -> Text(
-                        "¡Buen provecho!",
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center
-                    )
-                    else -> Text(
-                        currentStep!!.instruction,
-                        style = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Center,
-                        lineHeight = MaterialTheme.typography.headlineMedium.lineHeight
-                    )
-                }
-            }
-
-            if (currentStep?.timerMinutes != null && !finished) {
-                val totalSeconds = currentStep.timerMinutes * 60
-                val secs = timerSecondsLeft ?: totalSeconds
-                val mm = secs / 60
-                val ss = secs % 60
-                val timerDone = secs == 0
-                val progress = if (totalSeconds > 0) secs.toFloat() / totalSeconds else 0f
-                val timerColor = when {
-                    timerDone    -> MaterialTheme.colorScheme.error
-                    timerRunning -> MaterialTheme.colorScheme.primary
-                    else         -> MaterialTheme.colorScheme.outline
-                }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.xl)
+            if (isLandscape) {
+                // ── Landscape: paso izquierda, controles derecha ──────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = Spacing.xl, vertical = Spacing.sm)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            progress    = { progress },
-                            modifier    = Modifier.size(96.dp),
-                            strokeWidth = 6.dp,
-                            color       = timerColor,
-                            trackColor  = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            AnimatedContent(
-                                targetState = if (timerDone) "done" else "%02d:%02d".format(mm, ss),
-                                transitionSpec = {
-                                    slideInVertically { -it } + fadeIn() togetherWith
-                                    slideOutVertically { it } + fadeOut()
-                                },
-                                label = "timer"
-                            ) { state ->
-                                Text(
-                                    if (state == "done") "¡Listo!" else state,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = timerColor
+                    // Left column — header + step text
+                    Column(
+                        modifier            = Modifier
+                            .weight(1.5f)
+                            .fillMaxHeight()
+                            .padding(end = Spacing.xl),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment     = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier              = Modifier.fillMaxWidth()
+                        ) {
+                            TextButton(onClick = onExit) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                                Spacer(Modifier.width(Spacing.xs))
+                                Text("Salir")
+                            }
+                            Text(
+                                recipe.title,
+                                style    = MaterialTheme.typography.titleMedium,
+                                color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f, fill = false).padding(start = Spacing.md)
+                            )
+                        }
+                        Box(
+                            modifier         = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.lg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when {
+                                steps.isEmpty() -> Text(
+                                    "Esta receta no tiene pasos registrados",
+                                    style     = MaterialTheme.typography.headlineSmall,
+                                    color     = MaterialTheme.colorScheme.outline,
+                                    textAlign = TextAlign.Center
+                                )
+                                finished -> Text(
+                                    "¡Buen provecho!",
+                                    style     = MaterialTheme.typography.displaySmall,
+                                    color     = MaterialTheme.colorScheme.primary,
+                                    textAlign = TextAlign.Center
+                                )
+                                else -> Text(
+                                    currentStep!!.instruction,
+                                    style      = MaterialTheme.typography.headlineMedium,
+                                    textAlign  = TextAlign.Center,
+                                    lineHeight = MaterialTheme.typography.headlineMedium.lineHeight
                                 )
                             }
                         }
                     }
-                    IconButton(onClick = {
-                        if (timerDone) {
-                            timerSecondsLeft = totalSeconds
-                            timerRunning = false
-                        } else {
-                            timerRunning = !timerRunning
+
+                    // Right column — progress + timer + nav buttons
+                    Column(
+                        modifier            = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        if (steps.isNotEmpty()) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier            = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (finished) "¡Receta completada!" else "Paso ${currentIndex + 1} de ${steps.size}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.padding(top = Spacing.md))
+                                LinearProgressIndicator(
+                                    progress = { minOf(1f, (currentIndex + 1).toFloat() / steps.size) },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
-                    }) {
-                        Icon(
-                            imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (timerRunning) "Pausar" else "Iniciar temporizador"
+
+                        Box(
+                            modifier         = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (currentStep?.timerMinutes != null && !finished) {
+                                val totalSeconds = currentStep.timerMinutes * 60
+                                val secs         = timerSecondsLeft ?: totalSeconds
+                                val mm           = secs / 60
+                                val ss           = secs % 60
+                                val timerDone    = secs == 0
+                                val progress     = if (totalSeconds > 0) secs.toFloat() / totalSeconds else 0f
+                                val timerColor   = when {
+                                    timerDone    -> MaterialTheme.colorScheme.error
+                                    timerRunning -> MaterialTheme.colorScheme.primary
+                                    else         -> MaterialTheme.colorScheme.outline
+                                }
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier            = Modifier.fillMaxWidth()
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(
+                                            progress    = { progress },
+                                            modifier    = Modifier.size(96.dp),
+                                            strokeWidth = 6.dp,
+                                            color       = timerColor,
+                                            trackColor  = MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            AnimatedContent(
+                                                targetState    = if (timerDone) "done" else "%02d:%02d".format(mm, ss),
+                                                transitionSpec = {
+                                                    slideInVertically { -it } + fadeIn() togetherWith
+                                                    slideOutVertically { it } + fadeOut()
+                                                },
+                                                label = "timer"
+                                            ) { state ->
+                                                Text(
+                                                    if (state == "done") "¡Listo!" else state,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = timerColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                    IconButton(onClick = {
+                                        if (timerDone) {
+                                            timerSecondsLeft = totalSeconds
+                                            timerRunning = false
+                                        } else {
+                                            timerRunning = !timerRunning
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector        = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                            contentDescription = if (timerRunning) "Pausar" else "Iniciar temporizador"
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+                            modifier              = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    if (currentIndex > 0) {
+                                        if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        currentIndex--; timerRunning = false
+                                    }
+                                },
+                                enabled  = currentIndex > 0,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("← Anterior") }
+                            if (finished) {
+                                Button(onClick = onExit, modifier = Modifier.weight(1f)) { Text("Cerrar") }
+                            } else if (currentIndex < steps.size - 1) {
+                                Button(
+                                    onClick = {
+                                        if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        currentIndex++; timerRunning = false
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("Siguiente →") }
+                            } else {
+                                Button(
+                                    onClick = {
+                                        if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        currentIndex = steps.size
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("¡Finalizar!") }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // ── Portrait: layout original ──────────────────────────────
+                Column(
+                    modifier            = Modifier.fillMaxSize().padding(
+                        horizontal = Spacing.xxl,
+                        vertical   = Spacing.xxl
+                    ),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier              = Modifier.fillMaxWidth()
+                    ) {
+                        TextButton(onClick = onExit) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text("Salir")
+                        }
+                        Text(
+                            recipe.title,
+                            style    = MaterialTheme.typography.titleMedium,
+                            color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false).padding(start = Spacing.md)
                         )
+                    }
+
+                    if (steps.isNotEmpty()) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                if (finished) "¡Receta completada!" else "Paso ${currentIndex + 1} de ${steps.size}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.padding(top = Spacing.md))
+                            LinearProgressIndicator(
+                                progress = { minOf(1f, (currentIndex + 1).toFloat() / steps.size) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier         = Modifier.weight(1f).fillMaxWidth().padding(vertical = Spacing.xxl),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when {
+                            steps.isEmpty() -> Text(
+                                "Esta receta no tiene pasos registrados",
+                                style     = MaterialTheme.typography.headlineSmall,
+                                color     = MaterialTheme.colorScheme.outline,
+                                textAlign = TextAlign.Center
+                            )
+                            finished -> Text(
+                                "¡Buen provecho!",
+                                style     = MaterialTheme.typography.displaySmall,
+                                color     = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center
+                            )
+                            else -> Text(
+                                currentStep!!.instruction,
+                                style      = MaterialTheme.typography.headlineMedium,
+                                textAlign  = TextAlign.Center,
+                                lineHeight = MaterialTheme.typography.headlineMedium.lineHeight
+                            )
+                        }
+                    }
+
+                    if (currentStep?.timerMinutes != null && !finished) {
+                        val totalSeconds = currentStep.timerMinutes * 60
+                        val secs         = timerSecondsLeft ?: totalSeconds
+                        val mm           = secs / 60
+                        val ss           = secs % 60
+                        val timerDone    = secs == 0
+                        val progress     = if (totalSeconds > 0) secs.toFloat() / totalSeconds else 0f
+                        val timerColor   = when {
+                            timerDone    -> MaterialTheme.colorScheme.error
+                            timerRunning -> MaterialTheme.colorScheme.primary
+                            else         -> MaterialTheme.colorScheme.outline
+                        }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier            = Modifier.fillMaxWidth().padding(bottom = Spacing.xl)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(
+                                    progress    = { progress },
+                                    modifier    = Modifier.size(96.dp),
+                                    strokeWidth = 6.dp,
+                                    color       = timerColor,
+                                    trackColor  = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    AnimatedContent(
+                                        targetState    = if (timerDone) "done" else "%02d:%02d".format(mm, ss),
+                                        transitionSpec = {
+                                            slideInVertically { -it } + fadeIn() togetherWith
+                                            slideOutVertically { it } + fadeOut()
+                                        },
+                                        label = "timer"
+                                    ) { state ->
+                                        Text(
+                                            if (state == "done") "¡Listo!" else state,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = timerColor
+                                        )
+                                    }
+                                }
+                            }
+                            IconButton(onClick = {
+                                if (timerDone) {
+                                    timerSecondsLeft = totalSeconds
+                                    timerRunning = false
+                                } else {
+                                    timerRunning = !timerRunning
+                                }
+                            }) {
+                                Icon(
+                                    imageVector        = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = if (timerRunning) "Pausar" else "Iniciar temporizador"
+                                )
+                            }
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = {
+                                if (currentIndex > 0) {
+                                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    currentIndex--; timerRunning = false
+                                }
+                            },
+                            enabled  = currentIndex > 0,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("← Anterior") }
+
+                        if (finished) {
+                            Button(onClick = onExit, modifier = Modifier.weight(1f)) { Text("Cerrar") }
+                        } else if (currentIndex < steps.size - 1) {
+                            Button(
+                                onClick = {
+                                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    currentIndex++; timerRunning = false
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Siguiente →") }
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    currentIndex = steps.size
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("¡Finalizar!") }
+                        }
                     }
                 }
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = {
-                        if (currentIndex > 0) {
-                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            currentIndex--; timerRunning = false
-                        }
-                    },
-                    enabled = currentIndex > 0,
-                    modifier = Modifier.weight(1f)
-                ) { Text("← Anterior") }
-
-                if (finished) {
-                    Button(onClick = onExit, modifier = Modifier.weight(1f)) { Text("Cerrar") }
-                } else if (currentIndex < steps.size - 1) {
-                    Button(
-                        onClick = {
-                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            currentIndex++; timerRunning = false
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Siguiente →") }
-                } else {
-                    Button(
-                        onClick = {
-                            if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            currentIndex = steps.size
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("¡Finalizar!") }
-                }
-            }
-        }
-        AnimatedVisibility(
-            visible  = showHint,
-            enter    = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 2 },
-            exit     = fadeOut(tween(500)) + slideOutVertically(tween(500)) { it / 2 },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp)
-        ) {
-            Surface(
-                shape          = MaterialTheme.shapes.large,
-                color          = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                tonalElevation = 2.dp
+            AnimatedVisibility(
+                visible  = showHint,
+                enter    = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 2 },
+                exit     = fadeOut(tween(500)) + slideOutVertically(tween(500)) { it / 2 },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp)
             ) {
-                Row(
-                    modifier              = Modifier.padding(horizontal = 28.dp, vertical = Spacing.lg),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
-                    verticalAlignment     = Alignment.CenterVertically
+                Surface(
+                    shape          = MaterialTheme.shapes.large,
+                    color          = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                    tonalElevation = 2.dp
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary)
-                    Text(
-                        "Desliza para navegar",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary)
+                    Row(
+                        modifier              = Modifier.padding(horizontal = 28.dp, vertical = Spacing.lg),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary)
+                        Text(
+                            "Desliza para navegar",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
-        }
         }
     }
 }
