@@ -55,7 +55,7 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 - Navegacion nativa iOS (TabView NavigationBar 5 tabs).
 - Offline-first con SQLDelight 2.0.2 y Ktor.
 - UI coherente con Android, adaptada a las convenciones iOS.
-- Sprint 19 completado: SQLDelight cache offline + hápticos UIKit + SwipeToReveal (commit 8853bd0).
+- Sprint 41.B completado: RecipeDetailSkeleton shimmer reemplaza spinner; SharedTransitionLayout lista→detalle activo desde Sprint 38.A.
 
 ## Estilo Visual y UX
 
@@ -76,7 +76,7 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 
 ## Estado del Proyecto por Modulo
 
-### Backend Spring Boot (SPRINT 36 COMPLETO)
+### Backend Spring Boot (SPRINT 41.C COMPLETO)
 
 - Spring Boot 3.5.14 + Java 21 + MySQL + Flyway.
 - Auth JWT + refresh tokens + rate limiting.
@@ -84,6 +84,7 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 - Sync pull/push con tombstones, LWW y deteccion de conflictos.
 - Gestión miembros familia: listMembers, updateMemberRole, removeMember (Sprint 33) + inviteMember con anti-enumeración completa OWASP (Sprint 34+36).
 - Revocación refresh tokens al expulsar miembro. Validación magic bytes JPEG/PNG/WebP en uploads.
+- `GET /api/v1/families/{id}/stats` (Sprint 40.C+41.C): `totalRecipes`, `totalMembers`, `totalStockItems`, `lastActivityAt`.
 - **76 tests, 0 fallos**.
 - Hardening HTTP: CSP, HSTS, CORS deny-by-default. Fix SSRF en validateHttpsUrl.
 - OpenAPI/Swagger desactivado en produccion.
@@ -109,7 +110,7 @@ Contratos API criticos (no cambiar sin revisar Android y Desktop):
 - RecipeIngredientResponse: `position`, `name`, `quantity` (BigDecimal), `note`
 - RecipeStepResponse: `position`, `instruction`, `timerMinutes`
 
-### Android Kotlin + Compose (SPRINT 34 COMPLETO — 2026-05-30)
+### Android Kotlin + Compose (SPRINT 41.A COMPLETO — 2026-05-30)
 
 Stack completo verificado:
 - AGP 9.2.0 + Kotlin 2.3.20 + KSP 2.3.7
@@ -128,9 +129,9 @@ Pantallas implementadas (Sprint 1-15 + UI):
 - **LoginScreen** rediseñada — ícono brand circular, tipografía centrada, botón "Entrar →"
 - TopAppBar con búsqueda global unificada (Recetas + Stock + Notas)
 - **RecipeListScreen** — **tarjetas visuales** con gradiente + placeholder + chips (⏱ tiempo, dificultad, porciones); paginación; búsqueda; FilterChips dificultad + **"Con mi stock"** (filtro reactivo vs stock Room); pull-to-refresh; **FAB "+"**
-- **RecipeDetailScreen** — `←` IconButton back; ❤️ favorito; ⋮ menú; fotos carrusel; valoraciones; **ExtendedFAB "▶ Cocinar"** visible
+- **RecipeDetailScreen** — `←` IconButton back; ❤️ favorito; ⋮ menú; **CoverPhotoHeader hero 220dp** (Crossfade placeholder→foto + overlay gradiente + botón ✏ galería); fotos carrusel; valoraciones; **ExtendedFAB "▶ Cocinar"** visible
 - RecipeForm (SegmentedButton dificultad, filas dinámicas ingredientes/pasos)
-- CookingScreen (paso a paso, temporizador countdown, keep screen on, **volumen ↑↓ cambia paso**)
+- CookingScreen (paso a paso, temporizador countdown, keep screen on, **volumen ↑↓ cambia paso**; **two-column landscape** peso 1.5/1 desde Sprint 40.A)
 - **StockScreen** — badges bajo stock, colores caducidad, Sort toggle, FAB crear, CRUD inline, notificaciones caducidad; **`←` IconButton back; botones ✏ Editar / 🗑 Eliminar con ícono**
 - **ShoppingListScreen** — `←` IconButton back; check offline-resilient; **tachado en ítems marcados**; botón "Compartir"
 - **NotesScreen** — `←` IconButton back; botones ✏ Editar / 🗑 Eliminar con ícono; CRUD completo; búsqueda; empty states
@@ -154,7 +155,7 @@ SDK: C:\Users\GipsyDavy\AndroidSDK
 AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-### Desktop JavaFX (SPRINT 36 COMPLETO — 2026-05-30)
+### Desktop JavaFX (SPRINT 39.C COMPLETO — 2026-05-30)
 
 JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
@@ -183,7 +184,7 @@ Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de 
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-### iOS KMP + Compose Multiplatform (SPRINT 35.C COMPLETADO — 2026-05-30)
+### iOS KMP + Compose Multiplatform (SPRINT 41.B COMPLETO — 2026-05-30)
 
 Stack implementado:
 - Kotlin Multiplatform + Compose Multiplatform (Kotlin 2.0.21, Compose 1.7.0)
@@ -194,7 +195,8 @@ Stack implementado:
 
 Pantallas implementadas (Sprint 16-20):
 - `LoginScreen` (Compose M3, coroutines, error handling)
-- `RecipeListScreen` (LazyColumn, paginado Ktor, haptic.selection() al tocar)
+- `RecipeListScreen` (LazyColumn, paginado Ktor, haptic.selection(), **SharedTransitionLayout lista→detalle** desde Sprint 38.A)
+- `RecipeDetailScreen` (**RecipeDetailSkeleton** shimmer 5 secciones reemplaza spinner desde Sprint 41.B; sharedBounds hero transition)
 - `StockScreen` (SwipeToReveal por item con Animatable, badge bajo stock)
 - `NotesScreen` (preview 80 chars, pin emoji, haptic.selection() al tocar)
 - `ShoppingListScreen` (Sprint 20 — 2 niveles: lista de listas → items drill-down, tachado read-only)
@@ -336,6 +338,20 @@ Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + 
 | 35-Backend+Android+iOS | 2026-05-30 | Anti-enumeración inviteMember (email inexistente → 201 silencioso); tests revocación refreshToken; isAdmin reactivo StateFlow Android+iOS; VibeSec: 76 tests, 0 fallos. |
 | 36-Backend+Desktop | 2026-05-30 | Anti-enumeración completa (CONFLICT 409 → 201 silencioso); Desktop avatar upload (FileChooser + postMultipart + AppSession.avatarUrl + circular clip); 76 tests, 0 fallos. |
 | Instalador-v1.1 | 2026-05-30 | Instalador Windows .exe generado con NSIS 3.x + jpackage app-image; build-installer.ps1 corregido; pom.xml a v1.1; proceso documentado en CONTINUAR.md. Artefacto: RecetasFamiliares-Instalador-v1.1.exe (~52 MB, JRE embebido). |
+| 37.A-Android | 2026-05-30 | RecipeWidget mejorado: foto portada async HttpURLConnection desde Room + PendingIntent "▶ Cocinar" → MainActivity con EXTRA_RECIPE_ID |
+| 37.B-iOS | 2026-05-30 | ExpiryNotificationScheduler expect/actual (UNUserNotificationCenter): notificaciones HOY + esta semana; LaunchedEffect en StockScreen |
+| 38.A-iOS | 2026-05-30 | SharedTransitionLayout lista→detalle: RecipeListScreen AnimatedContent(selectedRecipe); RecipeCard+RecipeDetailScreen sharedBounds "recipe_bounds_{id}" |
+| 38.B-Android | 2026-05-30 | ProfileScreen: FamilyStatsSection + StatItem — total recetas + fecha última actualización desde Room |
+| 38.C-Desktop | 2026-05-30 | WeeklyMenuView: botón "💾 Exportar" → FileChooser + Files.writeString UTF-8 (Codex) |
+| 39.A-iOS | 2026-05-30 | OnboardingScreen reescrita: IllustrationCard gradiente+círculos decorativos+emojis, transición direction-aware, dots animados animateDpAsState, swipe gesture, botón Omitir |
+| 39.B-Android | 2026-05-30 | CookingScreen: fullscreen immersivo (WindowInsetsController), hint mejorado BottomCenter con slideIn+fadeIn, padding landscape adaptativo |
+| 39.C-Desktop | 2026-05-30 | MainWindow: FadeTransition 180ms+220ms en showAvatarUploadChooser() y showEditNameDialog() (Codex) |
+| 40.A-Android | 2026-05-30 | CookingScreen two-column landscape: if(isLandscape) Row {} else Column {}; izquierda paso (weight 1.5f), derecha controles (weight 1f) |
+| 40.B-iOS | 2026-05-30 | StockScreen skeleton shimmer: InfiniteTransition alpha 0.35→0.85 (LinearEasing, 900ms, Reverse) + 5 StockSkeletonItem |
+| 40.C-Backend | 2026-05-30 | GET /api/v1/families/{id}/stats: FamilyStatsResponse (totalRecipes+lastActivityAt), 2 derived queries RecipeRepository, requireMembership() |
+| 41.A-Android | 2026-05-30 | RecipeDetailScreen: CoverPhotoHeader 220dp — Crossfade placeholder→foto, overlay gradiente, IconButton Edit circular BottomEnd → galería |
+| 41.B-iOS | 2026-05-30 | RecipeDetailScreen: RecipeDetailSkeleton reemplaza CircularProgressIndicator; 5 secciones shimmer (meta chips, descripción, ingredientes×4, pasos×3) |
+| 41.C-Backend | 2026-05-30 | FamilyStatsResponse +totalMembers +totalStockItems; countBy en FamilyMemberRepo+StockItemRepo; FamilyService inyecta StockItemRepository. 76 tests, 0 fallos |
 
 ## Sprint 25B/C/D — COMPLETADOS (2026-05-29)
 
@@ -362,17 +378,8 @@ Build: `mvn compile` — BUILD SUCCESS
 - **D-5** `DayMenuCard(isToday: Boolean)` — `primaryContainer` + chip "Hoy"
 - **D-6** `PullToRefreshBox` en RecipeListScreen y StockScreen iOS
 
-## Sprint 34 — Candidatos
+## Sprint 42 — Candidatos
 
-### Prioridad Alta
-1. **Backend + Android + iOS:** Invitar miembro a familia — `POST /api/v1/families/{id}/members` (email + rol); formulario en Android ProfileScreen + iOS SettingsScreen; flujo join-by-invite
-2. **Backend + clientes:** Validar magic bytes en upload imágenes (avatar + fotos receta) — deuda VibeSec Sprint 31
-3. **Backend + Desktop:** Token revocation al expulsar miembro — `RefreshTokenService.revokeAllForUser(userId)` — deuda VibeSec Sprint 33
-
-### Prioridad Media
-4. **Android:** Widget receta del día mejorado (foto + acción "Cocinar desde widget")
-5. **iOS:** Notificaciones caducidad stock (iOS Background Tasks + UserNotifications)
-6. **Desktop:** Avatar upload desde Desktop (paridad completa con Android/iOS)
-
-### Prioridad Baja
-7. **iOS:** SharedElementTransition lista→detalle RecipeListScreen (paridad con Android Sprint 23)
+1. **Android:** ProfileScreen — integrar `GET /api/v1/families/{id}/stats` para mostrar `totalMembers` + `totalStockItems` en la tarjeta de familia.
+2. **iOS:** RecipeListScreen — skeleton shimmer (paridad con Android `SkeletonRecipeCard` de Sprint 19).
+3. **Desktop:** DashboardView — mostrar stats de familia desde el nuevo endpoint (`totalRecipes`, `totalMembers`, `totalStockItems`).

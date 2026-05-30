@@ -1781,10 +1781,53 @@ Para que las notificaciones se entreguen en background, en Xcode añadir:
 - Patrón: fadeOut(180ms) oldCard → set newCard → fadeIn(220ms) newCard. Todo en `Platform.runLater()`.
 - Build: `mvn compile` → BUILD SUCCESS.
 
-## Sprint 40 — Candidatos (próxima sesión)
-1. **Android:** CookingScreen — layout two-column landscape (paso a la izquierda, controles a la derecha).
-2. **iOS:** StockScreen — skeleton loading shimmer (paridad con Android/Desktop).
-3. **Backend:** Endpoint de estadísticas familia (`GET /api/v1/families/{id}/stats`: total recetas, última actividad).
+## Sprint 40 — COMPLETADO (2026-05-30) — commit 8ea4272
+
+### 40.A — Android: CookingScreen two-column landscape ✅ (Claude Code)
+- **`CookingScreen.kt`**: layout condicional `if (isLandscape) Row {} else Column {}`.
+- Landscape: columna izquierda (weight 1.5f) = header + texto del paso; columna derecha (weight 1f) = progreso + temporizador + botones navegación.
+- Portrait: layout original sin cambios.
+- Import añadido: `fillMaxHeight`.
+- Build: `gradle assembleDebug` → **BUILD SUCCESSFUL (2s)**.
+
+### 40.B — iOS: StockScreen skeleton shimmer ✅ (Claude Code)
+- **`StockScreen.kt`**: reemplaza `CircularProgressIndicator()` por `StockSkeletonList()`.
+- `StockSkeletonList`: `InfiniteTransition` alpha 0.35→0.85 (`LinearEasing`, `RepeatMode.Reverse`, 900ms) → color shimmer aplicado a 5 `StockSkeletonItem`.
+- `StockSkeletonItem`: `Card` con dos `Box` rectangulares (55% / 35% ancho, 14dp / 11dp alto) con `background(shimmer, shapes.small)`.
+- Imports añadidos: `rememberInfiniteTransition`, `infiniteRepeatable`, `LinearEasing`, `RepeatMode`.
+
+### 40.C — Backend: GET /api/v1/families/{id}/stats ✅ (Claude Code)
+- **`FamilyStatsResponse.java`** (nuevo record): `long totalRecipes`, `Instant lastActivityAt`.
+- **`RecipeRepository.java`**: `countByFamily_IdAndDeletedFalse()` + `findFirstByFamily_IdAndDeletedFalseOrderByUpdatedAtDesc()`.
+- **`FamilyService.java`**: inyección `RecipeRepository`, método `getFamilyStats()` con `requireMembership()`.
+- **`FamilyController.java`**: `@GetMapping("/{familyId}/stats")` → `getFamilyStats(familyId, auth)`.
+- Tests: **76 tests, 0 fallos**.
+
+## Sprint 41 — COMPLETADO (2026-05-30) — commit f71f8a7
+
+### 41.A — Android: CoverPhotoHeader en RecipeDetail ✅ (Claude Code)
+- **`RecipeScreens.kt`**: nuevo composable privado `CoverPhotoHeader` (220dp, `clip(shapes.medium)`).
+- `Crossfade(coverUrl)`: si hay foto → `AsyncImage` + overlay `verticalGradient` transparente→negro 32%; sin foto → placeholder `secondaryContainer` + ícono `Restaurant` 64dp.
+- `IconButton` circular (`surface 85% alpha`, `CircleShape`) en `BottomEnd` con `Icons.Filled.Edit` → lanza `photoPicker`.
+- Añadido como primer item del `LazyColumn` de `RecipeDetail`, antes del carrusel existente.
+- Build: `gradle assembleDebug` → **BUILD SUCCESSFUL (5s)**.
+
+### 41.B — iOS: RecipeDetailSkeleton ✅ (Claude Code)
+- **`RecipeDetailScreen.kt`** (commonMain): 7 imports nuevos (`LinearEasing`, `RepeatMode`, `animateFloat`, `infiniteRepeatable`, `rememberInfiniteTransition`, `tween`, `background`).
+- `RecipeDetailSkeleton`: `InfiniteTransition` alpha 0.30→0.80 (950ms, `LinearEasing`, `RepeatMode.Reverse`). 5 secciones shimmer: meta chips (3 Boxes 72dp), descripción (2 líneas), sección ingredientes (4 filas 55%+48dp), sección pasos (3 filas círculo+texto).
+- Reemplaza `CircularProgressIndicator()` en la rama `loading` de `RecipeDetailScreen`.
+
+### 41.C — Backend: GET /api/v1/families/{id}/stats expandido ✅ (Claude Code)
+- **`FamilyStatsResponse.java`**: record expandido con `totalMembers` y `totalStockItems`.
+- **`FamilyMemberRepository.java`**: `countByFamily_IdAndDeletedFalse(String familyId)` añadido.
+- **`StockItemRepository.java`**: `countByFamily_IdAndDeletedFalse(String familyId)` añadido.
+- **`FamilyService.java`**: inyecta `StockItemRepository`; `getFamilyStats()` calcula los 3 totales + `lastActivityAt`.
+- Tests: **76 tests, 0 fallos**.
+
+## Sprint 42 — Candidatos (próxima sesión)
+1. **Android:** `ProfileScreen` — integrar `GET /api/v1/families/{id}/stats` para mostrar totalMembers + totalStockItems en la tarjeta de familia.
+2. **iOS:** `RecipeListScreen` — skeleton shimmer (paridad con Android `SkeletonRecipeCard`).
+3. **Desktop:** `DashboardView` — mostrar stats de familia desde el nuevo endpoint (`totalRecipes`, `totalMembers`, `totalStockItems`).
 
 ---
 
