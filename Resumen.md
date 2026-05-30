@@ -76,15 +76,15 @@ Crear un espacio digital familiar donde se puedan guardar, descubrir, planificar
 
 ## Estado del Proyecto por Modulo
 
-### Backend Spring Boot (SPRINT 34 COMPLETO)
+### Backend Spring Boot (SPRINT 36 COMPLETO)
 
 - Spring Boot 3.5.14 + Java 21 + MySQL + Flyway.
 - Auth JWT + refresh tokens + rate limiting.
 - CRUD completo: recetas, ingredientes, pasos, stock, menus, listas de compra, favoritos, notas, fotos, valoraciones.
 - Sync pull/push con tombstones, LWW y deteccion de conflictos.
-- Gestión miembros familia: listMembers, updateMemberRole, removeMember (Sprint 33) + inviteMember (Sprint 34).
+- Gestión miembros familia: listMembers, updateMemberRole, removeMember (Sprint 33) + inviteMember con anti-enumeración completa OWASP (Sprint 34+36).
 - Revocación refresh tokens al expulsar miembro. Validación magic bytes JPEG/PNG/WebP en uploads.
-- **73 tests, 0 fallos**.
+- **76 tests, 0 fallos**.
 - Hardening HTTP: CSP, HSTS, CORS deny-by-default. Fix SSRF en validateHttpsUrl.
 - OpenAPI/Swagger desactivado en produccion.
 - Seed de desarrollo: demo@recetas.local / Demo1234!Familia
@@ -154,7 +154,7 @@ SDK: C:\Users\GipsyDavy\AndroidSDK
 AVD: Pixel_9_Pro (API 36)
 API base URL en emulador: http://10.0.2.2:8080/
 
-### Desktop JavaFX (SPRINT 25A COMPLETO — 2026-05-29)
+### Desktop JavaFX (SPRINT 36 COMPLETO — 2026-05-30)
 
 JavaFX 21 + OkHttp 4.12.0 + Gson. Compila y genera fat JAR (13.3 MB).
 mvn compile — EXITOSO.
@@ -183,7 +183,7 @@ Sidebar: Búsqueda global | Inicio | Recetas | Stock | Menú semanal | Lista de 
 
 Ejecutar: `mvn javafx:run -Dapi.base.url=http://localhost:8080/`
 
-### iOS KMP + Compose Multiplatform (SPRINT 34.E COMPLETADO — 2026-05-30)
+### iOS KMP + Compose Multiplatform (SPRINT 35.C COMPLETADO — 2026-05-30)
 
 Stack implementado:
 - Kotlin Multiplatform + Compose Multiplatform (Kotlin 2.0.21, Compose 1.7.0)
@@ -332,7 +332,9 @@ Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + 
 | Desktop-Diagnostico-v1.1 | 2026-05-30 | Pestaña Diagnostico ajustada para aprovechar todo el alto disponible: sin altura fija en el ScrollPane, crecimiento vertical con VBox.setVgrow y panel lateral de logo estirable; instalador v1.1 reescrito |
 | 32-Desktop | 2026-05-30 | Auth/Roles Desktop: LoginView UX premium (card+animación+toggle password), FamilyRole enum (OWNER/ADMIN/MEMBER), AppSession.isAdmin(), FamilyRepository.detectAndSaveRole() desde GET /api/v1/families, sidebar permission-gated (ADMIN ve Ajustes+Miembros; MIEMBRO solo módulos diarios), FamilyMembersView read-only. VibeSec: BUILD SUCCESS |
 | 33-Backend+Desktop | 2026-05-30 | Gestión miembros familia: GET/PUT/DELETE /api/v1/families/{id}/members; FamilyMemberResponse DTO; FamilyService listMembers/updateMemberRole/removeMember con ownership+admin checks+protección OWNER; 5 tests (67 total, 0 fallos). Desktop FamilyMembersView CRUD real: TableView API, Cambiar rol (ChoiceDialog), Expulsar (confirm), isSelf por email, botones permission-gated. VibeSec: sin críticos/altos |
-| 34-Backend+Android+iOS | 2026-05-30 | Invitar miembro (POST /families/{id}/members); revocar refresh tokens al expulsar; magic bytes JPEG/PNG/WebP; Android ProfileScreen invite dialog; iOS SettingsScreen invite dialog; SessionStore familyRole; 6 tests nuevos (73 total, 0 fallos). Fixes UX: feedback invitación Android, reset inviteMessage iOS, KeyboardType.Email Android. Pendiente commit. |
+| 34-Backend+Android+iOS | 2026-05-30 | Invitar miembro (POST /families/{id}/members); revocar refresh tokens al expulsar; magic bytes JPEG/PNG/WebP; Android ProfileScreen invite dialog; iOS SettingsScreen invite dialog; SessionStore familyRole; 6 tests nuevos (73 total, 0 fallos). Fixes UX: feedback invitación Android, reset inviteMessage iOS, KeyboardType.Email Android. |
+| 35-Backend+Android+iOS | 2026-05-30 | Anti-enumeración inviteMember (email inexistente → 201 silencioso); tests revocación refreshToken; isAdmin reactivo StateFlow Android+iOS; VibeSec: 76 tests, 0 fallos. |
+| 36-Backend+Desktop | 2026-05-30 | Anti-enumeración completa (CONFLICT 409 → 201 silencioso); Desktop avatar upload (FileChooser + postMultipart + AppSession.avatarUrl + circular clip); 76 tests, 0 fallos. |
 
 ## Sprint 25B/C/D — COMPLETADOS (2026-05-29)
 

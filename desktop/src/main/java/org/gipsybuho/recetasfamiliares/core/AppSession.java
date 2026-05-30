@@ -20,6 +20,7 @@ public class AppSession {
     private static final String KEY_DISPLAY_NAME = "displayName";
     private static final String KEY_EMAIL        = "email";
     private static final String KEY_FAMILY_ROLE  = "familyRole";
+    private static final String KEY_AVATAR_URL   = "avatarUrl";
 
     private final Preferences prefs = Preferences.userRoot().node(PREF_NODE);
 
@@ -30,6 +31,7 @@ public class AppSession {
     private String displayName;
     private String email;
     private FamilyRole familyRole;
+    private String avatarUrl;
 
     public AppSession() {
         this.accessToken  = prefs.get(KEY_ACCESS,        null);
@@ -38,6 +40,7 @@ public class AppSession {
         this.lastSyncTime = prefs.get(KEY_LAST_SYNC,     null);
         this.displayName  = prefs.get(KEY_DISPLAY_NAME,  null);
         this.email        = prefs.get(KEY_EMAIL,         null);
+        this.avatarUrl    = prefs.get(KEY_AVATAR_URL,    null);
         String roleStr    = prefs.get(KEY_FAMILY_ROLE,   null);
         this.familyRole   = parseFamilyRole(roleStr);
     }
@@ -52,6 +55,7 @@ public class AppSession {
     public String getLastSyncTime() { return lastSyncTime; }
     public String getDisplayName()  { return displayName; }
     public String getEmail()        { return email; }
+    public String getAvatarUrl()    { return avatarUrl; }
     public FamilyRole getFamilyRole() { return familyRole; }
 
     /** Returns true when the user has OWNER or ADMIN role in their family. */
@@ -91,6 +95,12 @@ public class AppSession {
         else prefs.remove(KEY_FAMILY_ROLE);
     }
 
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+        if (avatarUrl != null) prefs.put(KEY_AVATAR_URL, avatarUrl);
+        else prefs.remove(KEY_AVATAR_URL);
+    }
+
     public void clear() {
         accessToken  = null;
         refreshToken = null;
@@ -99,6 +109,7 @@ public class AppSession {
         displayName  = null;
         email        = null;
         familyRole   = null;
+        avatarUrl    = null;
         prefs.remove(KEY_ACCESS);
         prefs.remove(KEY_REFRESH);
         prefs.remove(KEY_FAMILY_ID);
@@ -106,6 +117,7 @@ public class AppSession {
         prefs.remove(KEY_DISPLAY_NAME);
         prefs.remove(KEY_EMAIL);
         prefs.remove(KEY_FAMILY_ROLE);
+        prefs.remove(KEY_AVATAR_URL);
     }
 
     private static FamilyRole parseFamilyRole(String str) {

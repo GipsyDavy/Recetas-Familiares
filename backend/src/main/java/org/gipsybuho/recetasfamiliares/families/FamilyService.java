@@ -93,10 +93,9 @@ public class FamilyService {
         if (role == FamilyRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot assign OWNER role");
         }
-        // Anti-enumeration: silently no-op when the email is not registered
         userRepository.findByEmailIgnoreCaseAndDeletedFalse(request.email()).ifPresent(invitedUser -> {
             if (familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, invitedUser.getId())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "User is already a member of this family");
+                return; // Already a member — silent no-op (OWASP A01: full anti-enumeration)
             }
             FamilyEntity family = familyRepository.findById(familyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));

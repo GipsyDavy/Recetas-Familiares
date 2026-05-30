@@ -20,6 +20,15 @@ public class UserRepository {
                 new UserDtos.UpdateDisplayNameRequest(newName.trim()),
                 UserDtos.UserResponse.class);
         session.setUserInfo(response.displayName(), response.email());
+        session.setAvatarUrl(response.avatarUrl());
+        return response;
+    }
+
+    public UserDtos.UserResponse uploadAvatar(java.io.File file) throws ApiException {
+        UserDtos.UserResponse response = api.postMultipart(
+                "api/v1/users/me/avatar", file, "file", UserDtos.UserResponse.class);
+        session.setUserInfo(response.displayName(), response.email());
+        session.setAvatarUrl(response.avatarUrl());
         return response;
     }
 }

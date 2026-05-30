@@ -10,6 +10,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.shape.Circle;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
@@ -18,11 +19,13 @@ import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 import java.net.HttpURLConnection;
@@ -204,18 +207,17 @@ public class MainWindow {
         String email = context.getSession().getEmail();
         String cleanName = displayName != null ? displayName.trim() : "";
 
-        Label avatar = new Label(cleanName.isBlank() ? "👤" : initials(cleanName));
-        avatar.getStyleClass().add("avatar-circle");
-        avatar.setTextFill(javafx.scene.paint.Color.WHITE);
-        avatar.setFont(Font.font("System", FontWeight.BOLD, 18));
-        avatar.setAlignment(javafx.geometry.Pos.CENTER);
+        Node avatarNode = buildAvatarNode(context.getSession().getAvatarUrl(), cleanName);
+        Tooltip.install(avatarNode, new Tooltip("Cambiar foto de perfil"));
+        avatarNode.setStyle("-fx-cursor: hand;");
+        avatarNode.setOnMouseClicked(e -> showAvatarUploadChooser());
 
         HBox userCard = new HBox(10);
         userCard.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         userCard.setPadding(new Insets(8, 16, 10, 16));
 
         if (cleanName.isBlank()) {
-            userCard.getChildren().add(avatar);
+            userCard.getChildren().add(avatarNode);
         } else {
             Label nameLabel = new Label(cleanName);
             nameLabel.getStyleClass().add("sidebar-user-name");
@@ -231,10 +233,59 @@ public class MainWindow {
             Tooltip.install(editBtn, new Tooltip("Editar nombre"));
             editBtn.setOnAction(e -> showEditNameDialog());
 
-            userCard.getChildren().addAll(avatar, textBox, editBtn);
+            userCard.getChildren().addAll(avatarNode, textBox, editBtn);
         }
 
         return userCard;
+    }
+
+    private Node buildAvatarNode(String avatarUrl, String displayName) {
+        if (avatarUrl != null && !avatarUrl.isBlank()) {
+            ImageView imageView = new ImageView(new Image(avatarUrl, 40, 40, true, true, true));
+            imageView.setFitWidth(40);
+            imageView.setFitHeight(40);
+            imageView.setPreserveRatio(false);
+            StackPane pane = new StackPane(imageView);
+            pane.setPrefSize(40, 40);
+            pane.setMinSize(40, 40);
+            pane.setMaxSize(40, 40);
+            pane.setClip(new Circle(20, 20, 20));
+            return pane;
+        }
+        String text = (displayName != null && !displayName.isBlank()) ? initials(displayName) : "👤";
+        Label label = new Label(text);
+        label.getStyleClass().add("avatar-circle");
+        label.setTextFill(javafx.scene.paint.Color.WHITE);
+        label.setFont(Font.font("System", FontWeight.BOLD, 18));
+        label.setAlignment(javafx.geometry.Pos.CENTER);
+        return label;
+    }
+
+    private void showAvatarUploadChooser() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Seleccionar foto de perfil");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Imágenes (JPG, PNG, WebP)", "*.jpg", "*.jpeg", "*.png", "*.webp"));
+        File file = chooser.showOpenDialog(stage);
+        if (file == null) return;
+        if (file.length() > 8L * 1024 * 1024) {
+            showAlert("Archivo demasiado grande", "El tamaño máximo permitido es 8 MB.");
+            return;
+        }
+        Thread.ofVirtual().start(() -> {
+            try {
+                context.getUserRepository().uploadAvatar(file);
+                Platform.runLater(() -> {
+                    VBox sidebar = (VBox) root.getLeft();
+                    if (sidebar != null) {
+                        sidebar.getChildren().set(2, buildUserCard());
+                    }
+                    setStatus("Foto de perfil actualizada");
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> setStatus("Error al subir la foto: " + ex.getMessage()));
+            }
+        });
     }
 
     private void showEditNameDialog() {

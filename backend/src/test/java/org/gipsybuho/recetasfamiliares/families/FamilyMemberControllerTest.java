@@ -184,11 +184,11 @@ class FamilyMemberControllerTest {
     }
 
     @Test
-    void inviteDuplicateMemberReturnsConflict() throws Exception {
+    void inviteDuplicateMemberReturns201Silently() throws Exception {
         RegisteredUser owner = register("invite-dup-owner@example.com", "Familia InviteDup");
         register("invite-dup-guest@example.com", "Familia Guest2");
 
-        // first invite
+        // first invite — adds guest to family
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -197,14 +197,20 @@ class FamilyMemberControllerTest {
                                 """))
                 .andExpect(status().isCreated());
 
-        // second invite — same user, same family
+        // second invite — same user, same family: anti-enumeration, must be 201 silent no-op
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email": "invite-dup-guest@example.com", "role": "MEMBER"}
                                 """))
-                .andExpect(status().isConflict());
+                .andExpect(status().isCreated());
+
+        // member list must still be exactly 2 (no duplicate row created)
+        mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test

@@ -93,6 +93,27 @@ public class ApiClient {
         executeVoid(request);
     }
 
+    public <T> T postMultipart(String path, java.io.File file, String partName, Class<T> responseType) throws ApiException {
+        RequestBody fileBody = RequestBody.create(file, mediaTypeForImage(file.getName()));
+        MultipartBody multipart = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart(partName, file.getName(), fileBody)
+                .build();
+        Request request = new Request.Builder()
+                .url(BASE_URL + path)
+                .header("Authorization", "Bearer " + session.getAccessToken())
+                .post(multipart)
+                .build();
+        return execute(request, responseType);
+    }
+
+    private static MediaType mediaTypeForImage(String fileName) {
+        String lower = fileName.toLowerCase();
+        if (lower.endsWith(".png"))  return MediaType.get("image/png");
+        if (lower.endsWith(".webp")) return MediaType.get("image/webp");
+        return MediaType.get("image/jpeg");
+    }
+
     public void shutdown() {
         client.dispatcher().executorService().shutdown();
         client.connectionPool().evictAll();

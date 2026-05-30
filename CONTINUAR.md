@@ -41,9 +41,27 @@ Plataformas objetivo:
 
 ## Reglas obligatorias
 
+### PERFIL DE TRABAJO PERMANENTE (máxima prioridad)
+
+Claude Code opera **siempre y simultáneamente** con los cuatro perfiles expertos siguientes, sin excepción:
+
+1. **Desarrollador de software senior experto** — código correcto, mínimo viable, limpio, mantenible y robusto.
+2. **Diseñador gráfico e interfaces senior experto** — visual premium, coherente y alineado con la identidad del producto.
+3. **Experto en UI/UX senior** — experiencia fluida, intuitiva, emocional y sin fricción en todas las plataformas.
+4. **Experto en seguridad y ciberseguridad** — revisión activa y corrección de vulnerabilidades, errores de código, ruido, suciedad, puertas traseras y cualquier problema de seguridad en todo código que se toque.
+
+**Implicaciones obligatorias:**
+- En todo código que se lea, escriba o modifique: revisar y corregir vulnerabilidades de forma quirúrgica.
+- Ningún cambio se da por terminado si contiene código inseguro, sucio o con puertas traseras detectables.
+- La calidad visual y la UX se evalúan en cada pantalla o componente que se cree o edite.
+- El rol de seguridad NO es opcional: aplica siempre, en todo sprint, en toda plataforma.
+
+---
+
 Antes de continuar, leer y cumplir:
 
 - `CLAUDE.md`
+- `Interfaz.md`
 - `Resumen.md`
 - `MACRO-PROMPT-RECETAS-FAMILIA.md`
 - este `CONTINUAR.md`
@@ -1594,22 +1612,36 @@ Alcance real actual: MVP "añadir usuario existente por email". No hay todavía 
 
 ---
 
-## Sprint 36 — Candidatos
+## Sprint 36 — COMPLETADO (2026-05-30)
 
-### Prioridad Alta (deuda técnica de seguridad/calidad)
-1. **Backend:** Anti-enumeración en `inviteMember()` — respuesta uniforme 201 independientemente de si el email existe; el body indica "solicitud registrada" sin revelar si el usuario existe. Sin infraestructura de email: solo respuesta neutral.
-2. **Backend:** Tests faltantes — happy path `removeMember()` con verificación de revocación de tokens; happy path `updateMemberRole()`; verificar que el refresh token queda revocado al expulsar (flujo completo con captura de refreshToken real y posterior intento de uso → 401).
-3. **Android + iOS:** `isAdmin` reactivo — exponer `familyRole` como `StateFlow<String?>` desde `SessionStore` (commonMain `expect`) en lugar de `get()` property no-reactivo; el rol puede cambiar en sesión.
+### 36.A — Backend: Anti-enumeración completa en inviteMember ✅
+- **`FamilyService.java`**: caso CONFLICT (email ya es miembro) cambiado de `throw ResponseStatusException(CONFLICT)` a `return` silencioso. Todos los code paths de `inviteMember()` devuelven 201 sin body — OWASP A01 cumplido al 100%.
+- **`FamilyMemberControllerTest.java`**: `inviteDuplicateMemberReturnsConflict` → `inviteDuplicateMemberReturns201Silently`; expectativa 409 → isCreated(); verificación añadida: lista de miembros permanece en 2 (sin duplicado).
 
-### Prioridad Alta (deuda post-Sprint 35)
-4. **Backend:** Anti-enumeración completa en `inviteMember()` — el CONFLICT 409 actual revela que un email pertenece a un usuario registrado (aunque requiere ser ADMIN autenticado). Hacer el caso CONFLICT también silencioso (201) para uniformidad total OWASP. Impacto UX: el ADMIN pierde el feedback "ya es miembro" y debe verificarlo en la lista. Analizado por Gemini Sprint 35.
+### 36.B — Desktop: Avatar upload ✅
+- **`AppSession.java`**: campo `avatarUrl` con `KEY_AVATAR_URL`, getter, setter (persiste en java.util.prefs), `clear()` limpia.
+- **`ApiClient.java`**: método `postMultipart(path, file, partName, responseType)` + `mediaTypeForImage()` que detecta Content-Type desde extensión (image/jpeg, image/png, image/webp) — necesario para pasar validación MIME del backend.
+- **`UserRepository.java`** (Desktop): `uploadAvatar(File)` llama `POST /api/v1/users/me/avatar`; `updateDisplayName()` también guarda `avatarUrl` en sesión.
+- **`MainWindow.java`**: `buildUserCard()` delega en `buildAvatarNode()` — imagen circular si `avatarUrl` disponible (clip Circle 20px), iniciales como fallback; avatar siempre clickable → `showAvatarUploadChooser()` con FileChooser (JPG/PNG/WebP, 8 MB, extensión validada).
+
+### Verificación Sprint 36
+- Backend: `mvn test` → **76 tests, 0 fallos**.
+- Desktop: `mvn -q -DskipTests package` → **BUILD SUCCESS**.
+- VibeSec: sin críticos/altos. Defense-in-depth: extensión+tamaño client-side + magic bytes backend. `return` en lambda `ifPresent` correcto — sale del consumer sin afectar al método enclosing.
+
+---
+
+## Sprint 37 — Candidatos
+
+### Prioridad Alta
+1. **Android + iOS:** Avatar upload — botón "Cambiar foto" en ProfileScreen (Android) y SettingsScreen (iOS); paridad con Desktop (Sprint 36).
 
 ### Prioridad Media
-5. **Android:** Widget receta del día mejorado (foto + acción "Cocinar desde widget").
-6. **iOS:** Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
+2. **Android:** Widget receta del día mejorado (foto + acción "Cocinar desde widget").
+3. **iOS:** Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
 
 ### Prioridad Baja
-7. **Desktop:** Avatar upload desde Desktop (paridad completa con Android/iOS).
+4. **iOS:** SharedElementTransition RecipeList→RecipeDetail (paridad con Android Sprint 23.2).
 
 ---
 
@@ -1639,95 +1671,3 @@ Alcance real actual: MVP "añadir usuario existente por email". No hay todavía 
 
 VibeSec: sin vulnerabilidades críticas/altas. `mvn -q -DskipTests package` — BUILD SUCCESS.
 
----
-
-## Sprint 32 (legacy candidatos) — Ahora completo. Ver arriba.
-
-### Prioridad Máxima — Auth/Roles Desktop (Grupo A, solo Desktop, sin backend)
-
-Sistema de autenticación, roles y permisos para la aplicación Desktop, inspirado en el sistema de
-Graficas Mulberry pero adaptado a la arquitectura JWT/API de Recetas Familiares.
-
-**Análisis completo en sesión 2026-05-30. Autorizado por el usuario.**
-
-Tareas concretas:
-
-1. **32.A — LoginView UX premium** (`LoginView.java`):
-   - Toggle mostrar/ocultar password (como Mulberry).
-   - Animación de entrada (FadeTransition + ligero ScaleTransition desde 0.97).
-   - Mensaje de bienvenida contextual.
-   - Campo email con `promptText` y icono inline.
-   - Sin cambios de lógica — solo UX.
-
-2. **32.B — Sistema FamilyRole** (`AppSession.java` + nuevo `FamilyRole.java`):
-   - Enum `FamilyRole { ADMIN, MIEMBRO }`.
-   - Campo `familyRole` en `AppSession` (persistido en Java Preferences).
-   - Derivado de la respuesta del backend: si el usuario es creador de la familia → ADMIN; resto → MIEMBRO.
-   - Llamada a `GET /api/v1/users/me` o a `GET /api/v1/families/{id}` al hacer login para determinar el rol.
-   - `AppSession.isAdmin()` helper para uso en UI.
-
-3. **32.C — Sidebar permission-gated** (`MainWindow.java`):
-   - Adaptar patrón `addIfPermiso()` de Graficas Mulberry.
-   - Ocultar al MIEMBRO: botón de ajustes avanzados, gestión de familia, otras acciones admin.
-   - ADMIN ve todo. MIEMBRO solo ve módulos de uso diario (recetas, stock, menú, lista, notas).
-   - Sin cambios en lógica de API — solo visibilidad de botones.
-
-4. **32.D — FamilyMembersView** (`FamilyMembersView.java`, nuevo, solo lectura):
-   - Panel accesible solo para ADMIN.
-   - TableView con miembros de la familia (nombre, email, rol) — datos de `GET /api/v1/families/{id}/members` (endpoint ya existente o derivado de la API actual).
-   - Vista read-only por ahora. CRUD completo en Grupo B (Sprint 33+).
-
-**Restricciones Grupo A:**
-- Cero cambios en backend.
-- Cero cambios en Android ni iOS.
-- Solo Desktop JavaFX.
-- VibeSec al cerrar Sprint 32.
-
-### Prioridad Alta
-1. **Android**: Widget de receta del día mejorado (foto si existe, acción "Cocinar desde widget").
-2. **iOS**: Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
-3. **Backend + clientes**: Validar magic bytes en upload de imágenes (avatar + fotos receta) — deuda VibeSec Sprint 31.
-
-### Prioridad Media
-1. **iOS**: SharedElementTransition lista→detalle en RecipeListScreen (paridad con Android Sprint 23).
-2. **Desktop**: Vista de perfil con avatar URL (mostrar `avatarUrl` en user card si existe).
-3. **Android + iOS**: Rate limiting cliente en upload de avatar (debounce).
-
-### Prioridad Baja
-1. **Desktop**: Avatar upload desde Desktop (paridad completa con Android/iOS).
-
----
-
-## Sprint 33 — Candidatos (Grupo B Auth Desktop — sprint posterior a Sprint 32)
-
-Sistema completo de gestión de usuarios familiares: roles en backend + CRUD Desktop.
-**Prerrequisito: Sprint 32 Grupo A completado.**
-
-### Tareas Grupo B
-
-1. **33.A — Backend: campo `role` en usuarios** (Backend, quirúrgico):
-   - Flyway `V12__add_role_to_users.sql`: columna `role VARCHAR(20) DEFAULT 'MIEMBRO'` en tabla `users`.
-   - `UserEntity.java`: campo `role` + getter + setter.
-   - `UserResponse.java`: record ampliado con `String role`.
-   - `UserService.java`: lógica para asignar ADMIN al creador de la familia.
-   - Sin romper contratos existentes (campo nuevo, opcional hacia atrás).
-   - VibeSec obligatorio al tocar contratos de auth.
-
-2. **33.B — Backend: endpoints gestión miembros familia**:
-   - `GET /api/v1/families/{id}/members` — lista miembros con rol.
-   - `PUT /api/v1/families/{id}/members/{userId}/role` — cambiar rol (solo ADMIN).
-   - `DELETE /api/v1/families/{id}/members/{userId}` — expulsar miembro (solo ADMIN, no self-delete).
-   - Validación ownership: solo ADMIN de esa familia puede invocarlos.
-
-3. **33.C — Desktop: FamilyMemberView CRUD completo**:
-   - Evolución de la vista read-only de Sprint 32.D.
-   - Botones Invitar / Cambiar rol / Eliminar miembro (solo visibles para ADMIN).
-   - `InviteMemberDialog` — input email + ComboBox rol.
-   - Confirmación en eliminación (patrón `confirmarSalida()`).
-   - `FamilyMemberRepository.java` — llamadas a los nuevos endpoints.
-
-4. **33.D — Desktop + Android + iOS: consumir campo `role` del backend**:
-   - `AppSession` Desktop: leer `role` del `UserResponse` al hacer login.
-   - Android `SessionStore`: guardar rol si se añade al `AuthResponse`.
-   - iOS `SessionStore`: ídem via Keychain.
-   - Unificar lógica de rol en las tres plataformas.
