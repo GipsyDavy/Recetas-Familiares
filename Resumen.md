@@ -328,6 +328,8 @@ Nota: build Gradle falla en Windows por issue pre-existente SQLDelight plugin + 
 | 28.C-Android | 2026-05-29 | Filtro "Con mi stock": RecipeIngredientDao.observeAllIngredients(); filteredRecipes combine 4 flows con LOWER(TRIM) matching; FilterChip tertiaryContainer en RecipeList |
 | Desktop-Ajustes-v1.1 | 2026-05-30 | Ajustes Desktop pasa de Dialog emergente a vista central navegable; pestañas Apariencia/Acerca de/Diagnostico estilo Nemeterial; tarjetas previsualizan cada tema real; Diagnostico usa logo real de la app; instalador v1.1 regenerado |
 | Desktop-Diagnostico-v1.1 | 2026-05-30 | Pestaña Diagnostico ajustada para aprovechar todo el alto disponible: sin altura fija en el ScrollPane, crecimiento vertical con VBox.setVgrow y panel lateral de logo estirable; instalador v1.1 reescrito |
+| 32-Desktop | 2026-05-30 | Auth/Roles Desktop: LoginView UX premium (card+animación+toggle password), FamilyRole enum (OWNER/ADMIN/MEMBER), AppSession.isAdmin(), FamilyRepository.detectAndSaveRole() desde GET /api/v1/families, sidebar permission-gated (ADMIN ve Ajustes+Miembros; MIEMBRO solo módulos diarios), FamilyMembersView read-only. VibeSec: BUILD SUCCESS |
+| 33-Backend+Desktop | 2026-05-30 | Gestión miembros familia: GET/PUT/DELETE /api/v1/families/{id}/members; FamilyMemberResponse DTO; FamilyService listMembers/updateMemberRole/removeMember con ownership+admin checks+protección OWNER; 5 tests (67 total, 0 fallos). Desktop FamilyMembersView CRUD real: TableView API, Cambiar rol (ChoiceDialog), Expulsar (confirm), isSelf por email, botones permission-gated. VibeSec: sin críticos/altos |
 
 ## Sprint 25B/C/D — COMPLETADOS (2026-05-29)
 
@@ -354,14 +356,17 @@ Build: `mvn compile` — BUILD SUCCESS
 - **D-5** `DayMenuCard(isToday: Boolean)` — `primaryContainer` + chip "Hoy"
 - **D-6** `PullToRefreshBox` en RecipeListScreen y StockScreen iOS
 
-## Sprint 29 — Candidatos
+## Sprint 34 — Candidatos
 
 ### Prioridad Alta
-1. **Backend + Android + iOS:** Editar displayName desde perfil — `UserController` (`GET/PUT /api/v1/users/me`) + form edición en `ProfileScreen` / `SettingsScreen`
-2. **Desktop:** Exportar receta como PDF (Apache PDFBox, Apache 2.0)
-3. **Android + iOS:** Foto de avatar — upload multipart `/api/v1/users/me/avatar`, mostrar en perfil
+1. **Backend + Android + iOS:** Invitar miembro a familia — `POST /api/v1/families/{id}/members` (email + rol); formulario en Android ProfileScreen + iOS SettingsScreen; flujo join-by-invite
+2. **Backend + clientes:** Validar magic bytes en upload imágenes (avatar + fotos receta) — deuda VibeSec Sprint 31
+3. **Backend + Desktop:** Token revocation al expulsar miembro — `RefreshTokenService.revokeAllForUser(userId)` — deuda VibeSec Sprint 33
 
 ### Prioridad Media
-4. **Android:** Widget receta del día mejorado (con foto, acción "Cocinar")
-5. **iOS:** StockScreen pull-to-refresh + notificaciones caducidad (Background Tasks)
-6. **Desktop:** Menú semanal — vista mes completo (calendar grid 7×5)
+4. **Android:** Widget receta del día mejorado (foto + acción "Cocinar desde widget")
+5. **iOS:** Notificaciones caducidad stock (iOS Background Tasks + UserNotifications)
+6. **Desktop:** Avatar upload desde Desktop (paridad completa con Android/iOS)
+
+### Prioridad Baja
+7. **iOS:** SharedElementTransition lista→detalle RecipeListScreen (paridad con Android Sprint 23)

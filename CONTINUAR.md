@@ -392,7 +392,7 @@ Build SUCCESSFUL.
    ```
    Nota: actuator esta protegido en dev, respuesta 401 = backend corriendo.
 
-6. Continuar con Sprint 32 (ver candidatos al final de este documento).
+6. Continuar con Sprint 34 (ver candidatos al final de este documento).
 
 ---
 
@@ -1465,7 +1465,63 @@ Build: Android **BUILD SUCCESSFUL** · Backend `mvn compile` limpio
 
 ---
 
-## Sprint 32 — Candidatos
+## Sprint 33 — COMPLETADO (2026-05-30) — commit 621e23b
+
+### 33.A+33.B — Backend: endpoints gestión miembros ✅
+
+- **`FamilyMemberEntity.java`**: añadidos `getId()`, `getUser()`, `setRole()`, `softDelete()`
+- **`FamilyMemberRepository.java`**: `findMembersWithUserByFamilyId()` (JOIN FETCH), `findMemberWithUserByFamilyIdAndUserId()`
+- **`FamilyMemberResponse.java`** (nuevo): `{userId, displayName, email, avatarUrl, role}`
+- **`UpdateMemberRoleRequest.java`** (nuevo): `{role @NotBlank}`
+- **`FamilyService.java`**: `listMembers()`, `updateMemberRole()`, `removeMember()` con checks:
+  - Ownership: `requireMembership` y `requireAdminOrAbove` con `familyId` en ambas queries
+  - No se puede asignar/cambiar/expulsar OWNER
+  - Auto-modificación bloqueada antes de tocar BD
+  - `parseRole()` → 400 para strings inválidos
+- **`FamilyController.java`**: `GET /api/v1/families/{familyId}/members`, `PUT .../members/{userId}/role`, `DELETE .../members/{userId}`
+- **`FamilyMemberControllerTest.java`** (nuevo): 5 tests → total **67 tests, 0 fallos**
+
+### 33.C — Desktop: FamilyMembersView CRUD completo ✅
+
+- **`FamilyDtos.java`**: `FamilyMemberResponse` record añadido
+- **`FamilyRepository.java`** (Desktop): `loadMembers()`, `updateMemberRole()` (Map.of body), `removeMember()`
+- **`FamilyMembersView.java`** (reescrito): TableView con datos reales de API; toolbar con "Cambiar rol" (ChoiceDialog) y "Expulsar" (confirm Alert); solo visible para ADMIN/OWNER; botones deshabilitados para filas OWNER y self; self detectado por email
+
+### VibeSec Sprint 33
+- Sin vulnerabilidades críticas/altas
+- Deuda MVP documentada: token revocation al expulsar miembro (ventana 15 min JWT) → Sprint 34
+
+---
+
+## Sprint 32 — COMPLETADO (2026-05-30) — commit 3ac21a7
+
+### 32.A — LoginView UX premium ✅
+- Card centrado 420px, FadeTransition(400ms)+ScaleTransition(0.97→1.0) de entrada.
+- Toggle mostrar/ocultar contraseña (PasswordField + TextField sincronizados, botón 👁/🔒).
+- Logo circular "RF" 72dp con primaryContainer. Email con promptText contextual.
+- Error con prefijo ⚠ + fondo `recetas-error-bg` y borde redondeado.
+
+### 32.B — FamilyRole + AppSession ✅
+- `FamilyRole.java` (OWNER/ADMIN/MEMBER) con `isAdminOrAbove()` y `displayName()`.
+- `AppSession`: campo `familyRole` persistido en java.util.prefs; `isAdmin()` helper.
+- `FamilyDtos.java` + `FamilyRepository.detectAndSaveRole()` — llama `GET /api/v1/families`.
+- Fail-safe a MEMBER ante rol desconocido o error de red. Llamado en hilo de login.
+
+### 32.C — Sidebar permission-gated ✅
+- ADMIN: ve Miembros + Ajustes (separados por Separator visual). MIEMBRO: solo módulos diarios.
+- Ctrl+, y `navigateTo("settings")` guardados por `isAdmin()`.
+- Rol detectado al retomar sesión existente sin rol persistido.
+
+### 32.D — FamilyMembersView (read-only) ✅
+- TableView (Nombre / Email / Rol) con datos del usuario actual + nombre de familia desde API.
+- Solo instanciada y accesible si `isAdmin()`. Botón Actualizar llama `GET /api/v1/families`.
+- Mensaje informativo sobre gestión completa en Sprint 33.
+
+VibeSec: sin vulnerabilidades críticas/altas. `mvn -q -DskipTests package` — BUILD SUCCESS.
+
+---
+
+## Sprint 32 (legacy candidatos) — Ahora completo. Ver arriba.
 
 ### Prioridad Máxima — Auth/Roles Desktop (Grupo A, solo Desktop, sin backend)
 
