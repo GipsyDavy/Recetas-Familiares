@@ -29,6 +29,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.until
 import kotlinx.datetime.DateTimeUnit
 import org.gipsybuho.recetasfamiliares.Spacing
+import org.gipsybuho.recetasfamiliares.core.ExpiryNotificationScheduler
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.StockItemDto
 import org.gipsybuho.recetasfamiliares.recipes.AnimatedEmptyState
@@ -46,6 +47,7 @@ fun StockScreen(repository: StockRepository, syncRepo: SyncRepository) {
     var showCreate   by remember { mutableStateOf(false) }
     val haptic       = rememberHapticFeedback()
     val scope        = rememberCoroutineScope()
+    val scheduler    = remember { ExpiryNotificationScheduler() }
 
     suspend fun reload() {
         runCatching { items = repository.loadStockItems() }
@@ -55,6 +57,11 @@ fun StockScreen(repository: StockRepository, syncRepo: SyncRepository) {
     LaunchedEffect(Unit) {
         reload()
         loading = false
+    }
+
+    // Programar notificaciones locales de caducidad tras cada carga
+    LaunchedEffect(items) {
+        if (items.isNotEmpty()) scheduler.schedule(items)
     }
 
     fun onRefresh() {

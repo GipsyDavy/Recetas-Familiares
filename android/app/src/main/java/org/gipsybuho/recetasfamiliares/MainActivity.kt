@@ -16,6 +16,10 @@ import org.gipsybuho.recetasfamiliares.ui.theme.RecetasTheme
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val EXTRA_RECIPE_ID = "extra_recipe_id"
+    }
+
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op */ }
 
@@ -25,12 +29,13 @@ class MainActivity : ComponentActivity() {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         val container = (application as RecetasApplication).container
+        val initialRecipeId = intent?.getStringExtra(EXTRA_RECIPE_ID)
         setContent {
             val viewModel: RecetasViewModel = viewModel(factory = RecetasViewModelFactory(container))
             val appTheme  by viewModel.selectedTheme.collectAsState()
             val themeMode by viewModel.themeMode.collectAsState()
             RecetasTheme(appTheme = appTheme, themeMode = themeMode) {
-                RecetasApp(viewModel)
+                RecetasApp(viewModel, initialRecipeId = initialRecipeId)
             }
         }
     }

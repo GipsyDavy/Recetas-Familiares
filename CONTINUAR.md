@@ -1688,17 +1688,57 @@ Alcance real actual: MVP "añadir usuario existente por email". No hay todavía 
 
 ---
 
-## Sprint 37 — Candidatos
+## Sprint 37 — COMPLETADO (2026-05-30)
 
-### Prioridad Alta
-1. **Android + iOS:** Avatar upload — botón "Cambiar foto" en ProfileScreen (Android) y SettingsScreen (iOS); paridad con Desktop (Sprint 36).
+### 37.A — Android: Widget receta del día mejorado ✅
+
+- **`Daos.kt`**: `RecipePhotoDao.findFirstByRecipeId(recipeId: String): RecipePhotoEntity?` — consulta suspend LIMIT 1.
+- **`widget_recipe.xml`** (rediseño): `FrameLayout` raíz; `ImageView` para foto (`centerCrop`); overlay oscuro `#B3000000` para legibilidad; `LinearLayout` con label "RECETA DEL DÍA", título grande, fila subtítulo + botón "▶ Cocinar" con drawable `widget_cook_button_bg` (terracota redondeado).
+- **`drawable/widget_cook_button_bg.xml`** (nuevo): shape rectangle #C17D52, corners 12dp.
+- **`RecipeWidget.kt`** (reescrito):
+  - Carga primera foto del receta desde `RecipePhotoDao.findFirstByRecipeId`.
+  - Descarga bitmap vía `HttpURLConnection` (connectTimeout 5s, readTimeout 10s) en `Dispatchers.IO`.
+  - Si hay foto: `ImageView` + overlay visibles; texto blanco (label #CCFFFFFF, título #FFFFFFFF).
+  - Sin foto: background cálido #F6E7D8, texto marrón existente.
+  - `PendingIntent` raíz (requestCode 0): abre `MainActivity`.
+  - `PendingIntent` botón Cocinar (requestCode 1): abre `MainActivity` con `EXTRA_RECIPE_ID = recipe.id` → navega directo al detalle de la receta.
+- **`MainActivity.kt`**: `companion object { const val EXTRA_RECIPE_ID = "extra_recipe_id" }`; lee extra en `onCreate`; pasa `initialRecipeId` a `RecetasApp`.
+- **`RecetasApp.kt`**: `RecetasApp` y `MainShell` aceptan `initialRecipeId: String? = null`; `LaunchedEffect(Unit)` en `MainShell` cambia tab a RECIPES y activa `navigateToRecipeId` si no es null.
+- Build: `gradle assembleDebug` — **BUILD SUCCESSFUL**.
+
+### 37.B — iOS: Notificaciones locales caducidad stock ✅
+
+- **`core/ExpiryNotificationScheduler.kt`** (nuevo, commonMain): `expect class ExpiryNotificationScheduler()` con `fun schedule(items: List<StockItemDto>)`.
+- **`core/ExpiryNotificationScheduler.ios.kt`** (nuevo, iosMain actual):
+  - `UNUserNotificationCenter.currentNotificationCenter()` como singleton.
+  - `requestAuthorizationWithOptions` (Alert + Sound + Badge) en primer uso.
+  - Calcula caducados HOY (== 0 días) y ESTA SEMANA (1–7 días) vía `kotlinx.datetime`.
+  - `removePendingNotificationRequestsWithIdentifiers` antes de reprogramar — idempotente.
+  - `UNTimeIntervalNotificationTrigger` (delay 1s hoy / 2s semana).
+  - Identificadores `recetas_expiry_today` y `recetas_expiry_week`.
+- **`stock/StockScreen.kt`** (modificado): añadido `val scheduler = remember { ExpiryNotificationScheduler() }` + `LaunchedEffect(items) { if (items.isNotEmpty()) scheduler.schedule(items) }` — se ejecuta tras cada carga/refresh.
+- iOS build requiere macOS+Xcode (limitación pre-existente). Edición Kotlin verificada en Windows.
+
+### Nota Xcode (para cuando tengas Mac)
+Para que las notificaciones se entreguen en background, en Xcode añadir:
+- `Info.plist` → `NSUserNotificationUsageDescription` (descripción del uso).
+- Capabilities → Background Modes → "Background fetch" (para BGAppRefreshTask futuro).
+- Las notificaciones locales programadas en `StockScreen` ya funcionan sin background tasks mientras la app esté activa o en foreground.
+
+### VibeSec Sprint 37
+- `EXTRA_RECIPE_ID` del widget: PendingIntent interno, no input externo. Solo usado para navegación UI. ✓
+- `downloadBitmap`: URL desde Room (validada por backend). Sin input del usuario. ✓
+- `ExpiryNotificationScheduler`: datos propios del usuario en notificaciones locales. ✓
+- Sin vulnerabilidades críticas ni altas.
+
+---
+
+## Sprint 38 — Candidatos
 
 ### Prioridad Media
-2. **Android:** Widget receta del día mejorado (foto + acción "Cocinar desde widget").
-3. **iOS:** Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
-
-### Prioridad Baja
-4. **iOS:** SharedElementTransition RecipeList→RecipeDetail (paridad con Android Sprint 23.2).
+1. **iOS:** SharedElementTransition RecipeList→RecipeDetail (paridad con Android Sprint 23.2) — `sharedElement()` + `SharedTransitionLayout` (Compose 1.7+).
+2. **Android:** Improve ProfileScreen — mostrar stats de la familia (total recetas, miembros, últimas actividades).
+3. **Desktop:** Exportar menú semanal a PDF o .txt.
 
 ---
 

@@ -87,7 +87,7 @@ internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES, MENU, PROFILE }
 internal val LocalHapticsEnabled = androidx.compose.runtime.staticCompositionLocalOf { true }
 
 @Composable
-fun RecetasApp(viewModel: RecetasViewModel) {
+fun RecetasApp(viewModel: RecetasViewModel, initialRecipeId: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val isLoggedIn     by viewModel.isLoggedIn.collectAsState()
     val onboardingDone by viewModel.onboardingDone.collectAsState()
@@ -106,7 +106,7 @@ fun RecetasApp(viewModel: RecetasViewModel) {
         } else if (!isLoggedIn) {
             LoginScreen(viewModel)
         } else {
-            MainShell(viewModel)
+            MainShell(viewModel, initialRecipeId = initialRecipeId)
         }
     }
 }
@@ -180,7 +180,7 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainShell(viewModel: RecetasViewModel) {
+private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = null) {
     var tab by remember { mutableStateOf(MainTab.RECIPES) }
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -201,6 +201,13 @@ private fun MainShell(viewModel: RecetasViewModel) {
 
     LaunchedEffect(Unit) {
         viewModel.userMessage.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
+
+    LaunchedEffect(Unit) {
+        if (initialRecipeId != null) {
+            tab = MainTab.RECIPES
+            navigateToRecipeId = initialRecipeId
+        }
     }
 
     Scaffold(

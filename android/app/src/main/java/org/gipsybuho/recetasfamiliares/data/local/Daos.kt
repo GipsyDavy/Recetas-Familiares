@@ -150,6 +150,9 @@ interface RecipePhotoDao {
     @Query("SELECT * FROM recipe_photos WHERE recipeId = :recipeId AND deleted = 0 ORDER BY position ASC")
     fun observePhotos(recipeId: String): Flow<List<RecipePhotoEntity>>
 
+    @Query("SELECT * FROM recipe_photos WHERE recipeId = :recipeId AND deleted = 0 ORDER BY position ASC LIMIT 1")
+    suspend fun findFirstByRecipeId(recipeId: String): RecipePhotoEntity?
+
     @Upsert
     suspend fun upsertAll(photos: List<RecipePhotoEntity>)
 }
