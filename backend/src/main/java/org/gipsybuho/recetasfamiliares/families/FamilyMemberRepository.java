@@ -22,6 +22,8 @@ public interface FamilyMemberRepository extends JpaRepository<FamilyMemberEntity
             Collection<FamilyRole> roles
     );
 
+    long countByFamily_IdAndDeletedFalse(String familyId);
+
     @Query("SELECT m FROM FamilyMemberEntity m JOIN FETCH m.user WHERE m.family.id = :familyId AND m.deleted = false ORDER BY m.createdAt ASC")
     List<FamilyMemberEntity> findMembersWithUserByFamilyId(@Param("familyId") String familyId);
 

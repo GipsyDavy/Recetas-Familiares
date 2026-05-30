@@ -17,4 +17,6 @@ public interface StockItemRepository extends JpaRepository<StockItemEntity, Stri
     Optional<StockItemEntity> findByIdAndFamily_Id(String id, String familyId);
 
     List<StockItemEntity> findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(String familyId, Instant since);
+
+    long countByFamily_IdAndDeletedFalse(String familyId);
 }

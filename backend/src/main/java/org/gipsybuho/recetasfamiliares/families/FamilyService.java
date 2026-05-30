@@ -7,6 +7,7 @@ import java.util.Locale;
 import org.gipsybuho.recetasfamiliares.auth.RefreshTokenService;
 import org.gipsybuho.recetasfamiliares.recipes.RecipeEntity;
 import org.gipsybuho.recetasfamiliares.recipes.RecipeRepository;
+import org.gipsybuho.recetasfamiliares.stock.StockItemRepository;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -22,19 +23,22 @@ public class FamilyService {
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
     private final RecipeRepository recipeRepository;
+    private final StockItemRepository stockItemRepository;
 
     public FamilyService(
             FamilyMemberRepository familyMemberRepository,
             FamilyRepository familyRepository,
             UserRepository userRepository,
             RefreshTokenService refreshTokenService,
-            RecipeRepository recipeRepository
+            RecipeRepository recipeRepository,
+            StockItemRepository stockItemRepository
     ) {
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
         this.userRepository = userRepository;
         this.refreshTokenService = refreshTokenService;
         this.recipeRepository = recipeRepository;
+        this.stockItemRepository = stockItemRepository;
     }
 
     @Transactional(readOnly = true)
@@ -112,12 +116,14 @@ public class FamilyService {
     @Transactional(readOnly = true)
     public FamilyStatsResponse getFamilyStats(String familyId, String userId) {
         requireMembership(familyId, userId);
-        long total = recipeRepository.countByFamily_IdAndDeletedFalse(familyId);
+        long totalRecipes    = recipeRepository.countByFamily_IdAndDeletedFalse(familyId);
+        long totalMembers    = familyMemberRepository.countByFamily_IdAndDeletedFalse(familyId);
+        long totalStockItems = stockItemRepository.countByFamily_IdAndDeletedFalse(familyId);
         Instant lastActivity = recipeRepository
                 .findFirstByFamily_IdAndDeletedFalseOrderByUpdatedAtDesc(familyId)
                 .map(RecipeEntity::getUpdatedAt)
                 .orElse(null);
-        return new FamilyStatsResponse(total, lastActivity);
+        return new FamilyStatsResponse(totalRecipes, totalMembers, totalStockItems, lastActivity);
     }
 
     private void requireMembership(String familyId, String userId) {

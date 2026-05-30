@@ -6,8 +6,15 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -108,9 +115,7 @@ fun RecipeDetailScreen(
         HorizontalDivider()
 
         if (loading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            RecipeDetailSkeleton()
         } else {
             LazyColumn(
                 contentPadding      = PaddingValues(16.dp),
@@ -246,6 +251,54 @@ fun RecipeDetailScreen(
                 icon     = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
                 text     = { Text("Cocinar") }
             )
+        }
+    }
+}
+
+@Composable
+private fun RecipeDetailSkeleton() {
+    val transition = rememberInfiniteTransition(label = "detail_shimmer")
+    val alpha by transition.animateFloat(
+        initialValue  = 0.30f,
+        targetValue   = 0.80f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(950, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer_alpha"
+    )
+    val shimmer = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+    Column(
+        modifier            = Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(3) {
+                Box(Modifier.width(72.dp).height(20.dp).background(shimmer, MaterialTheme.shapes.small))
+            }
+        }
+        repeat(2) { i ->
+            Box(Modifier.fillMaxWidth(if (i == 1) 0.70f else 1f).height(14.dp).background(shimmer, MaterialTheme.shapes.small))
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.fillMaxWidth(0.45f).height(16.dp).background(shimmer, MaterialTheme.shapes.small))
+        repeat(4) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Box(Modifier.fillMaxWidth(0.55f).height(13.dp).background(shimmer, MaterialTheme.shapes.small))
+                Box(Modifier.width(48.dp).height(13.dp).background(shimmer, MaterialTheme.shapes.small))
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.fillMaxWidth(0.40f).height(16.dp).background(shimmer, MaterialTheme.shapes.small))
+        repeat(3) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(28.dp).background(shimmer, CircleShape))
+                Box(Modifier.weight(1f).height(13.dp).background(shimmer, MaterialTheme.shapes.small))
+            }
         }
     }
 }

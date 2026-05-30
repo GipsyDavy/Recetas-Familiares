@@ -512,6 +512,15 @@ internal fun RecipeDetail(
                 }
             }
         }
+        item {
+            CoverPhotoHeader(
+                coverUrl    = photos.firstOrNull()?.let { it.thumbnailUrl ?: it.url },
+                onEditCover = {
+                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    photoPicker.launch("image/*")
+                }
+            )
+        }
         if (photos.isNotEmpty()) {
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.md), contentPadding = PaddingValues(vertical = Spacing.xs)) {
@@ -598,6 +607,62 @@ internal fun StepRow(step: RecipeStepEntity) {
             step.timerMinutes?.let {
                 Text("⏱ $it min", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
             }
+        }
+    }
+}
+
+@Composable
+private fun CoverPhotoHeader(coverUrl: String?, onEditCover: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .clip(MaterialTheme.shapes.medium)
+    ) {
+        Crossfade(targetState = coverUrl, label = "coverPhoto") { url ->
+            if (url != null) {
+                Box(Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        model              = url,
+                        contentDescription = "Foto de portada",
+                        modifier           = Modifier.fillMaxSize(),
+                        contentScale       = ContentScale.Crop
+                    )
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.32f)),
+                                startY = 100f
+                            )
+                        )
+                    )
+                }
+            } else {
+                Box(
+                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Restaurant, contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.25f)
+                    )
+                }
+            }
+        }
+        IconButton(
+            onClick  = onEditCover,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(Spacing.md)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), CircleShape)
+        ) {
+            Icon(
+                Icons.Filled.Edit,
+                contentDescription = "Cambiar foto de portada",
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
