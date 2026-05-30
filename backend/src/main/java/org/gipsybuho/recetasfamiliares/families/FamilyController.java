@@ -33,12 +33,12 @@ public class FamilyController {
 
     @PostMapping("/{familyId}/members")
     @ResponseStatus(HttpStatus.CREATED)
-    public FamilyMemberResponse inviteMember(
+    public void inviteMember(
             @PathVariable String familyId,
             @Valid @RequestBody InviteMemberRequest request,
             Authentication authentication
     ) {
-        return familyService.inviteMember(familyId, authentication.getName(), request);
+        familyService.inviteMember(familyId, authentication.getName(), request);
     }
 
     @GetMapping("/{familyId}/members")

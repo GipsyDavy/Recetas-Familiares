@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class SessionStore(context: Context) {
 
@@ -18,6 +21,9 @@ class SessionStore(context: Context) {
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
+
+    private val _familyRole = MutableStateFlow(preferences.getString("family_role", null))
+    val familyRoleFlow: StateFlow<String?> = _familyRole.asStateFlow()
 
     var accessToken: String?
         get() = preferences.getString("access_token", null)
@@ -49,7 +55,10 @@ class SessionStore(context: Context) {
 
     var familyRole: String?
         get() = preferences.getString("family_role", null)
-        set(value) = preferences.edit { putString("family_role", value) }
+        set(value) {
+            preferences.edit { putString("family_role", value) }
+            _familyRole.value = value
+        }
 
     var lastSyncTime: String?
         get() = preferences.getString("last_sync_time", null)
@@ -57,5 +66,6 @@ class SessionStore(context: Context) {
 
     fun clear() {
         preferences.edit { clear() }
+        _familyRole.value = null
     }
 }

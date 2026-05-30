@@ -87,21 +87,21 @@ public class FamilyService {
     }
 
     @Transactional
-    public FamilyMemberResponse inviteMember(String familyId, String callerUserId, InviteMemberRequest request) {
+    public void inviteMember(String familyId, String callerUserId, InviteMemberRequest request) {
         requireAdminOrAbove(familyId, callerUserId);
         FamilyRole role = parseRole(request.role());
         if (role == FamilyRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot assign OWNER role");
         }
-        UserEntity invitedUser = userRepository.findByEmailIgnoreCaseAndDeletedFalse(request.email())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        if (familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, invitedUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "User is already a member of this family");
-        }
-        FamilyEntity family = familyRepository.findById(familyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
-        FamilyMemberEntity newMember = new FamilyMemberEntity(family, invitedUser, role);
-        return toMemberResponse(familyMemberRepository.save(newMember));
+        // Anti-enumeration: silently no-op when the email is not registered
+        userRepository.findByEmailIgnoreCaseAndDeletedFalse(request.email()).ifPresent(invitedUser -> {
+            if (familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, invitedUser.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User is already a member of this family");
+            }
+            FamilyEntity family = familyRepository.findById(familyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
+            familyMemberRepository.save(new FamilyMemberEntity(family, invitedUser, role));
+        });
     }
 
     private void requireMembership(String familyId, String userId) {

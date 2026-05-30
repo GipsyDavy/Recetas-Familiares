@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -61,7 +62,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     val onboardingDone: StateFlow<Boolean> = _onboardingDone.asStateFlow()
 
     val myUserId: String? get() = container.sessionStore.userId
-    val isAdmin: Boolean get() = container.sessionStore.familyRole.let { it == "ADMIN" || it == "OWNER" }
+    val isAdmin: StateFlow<Boolean> = container.sessionStore.familyRoleFlow
+        .map { it == "ADMIN" || it == "OWNER" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val _displayName = MutableStateFlow(container.sessionStore.displayName)
     val displayName: StateFlow<String?> = _displayName.asStateFlow()

@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.core.rememberImagePickerLauncher
@@ -68,7 +70,8 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var showInviteDialog by androidx.compose.runtime.remember { mutableStateOf(false) }
     var inviteMessage by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
-    val isAdmin = session?.familyRole == "ADMIN" || session?.familyRole == "OWNER"
+    val familyRole by (session?.familyRoleFlow ?: flowOf(null)).collectAsState(initial = session?.familyRole)
+    val isAdmin = familyRole == "ADMIN" || familyRole == "OWNER"
 
     val imagePicker = rememberImagePickerLauncher { bytes ->
         if (bytes != null && userRepository != null) {

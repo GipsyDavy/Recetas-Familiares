@@ -1,5 +1,7 @@
 package org.gipsybuho.recetasfamiliares.core
 
+import kotlinx.coroutines.flow.StateFlow
+
 expect class SessionStore() {
     var accessToken: String?
     var refreshToken: String?
@@ -9,6 +11,7 @@ expect class SessionStore() {
     var email: String?
     var avatarUrl: String?
     var familyRole: String?
+    val familyRoleFlow: StateFlow<String?>
     val isLoggedIn: Boolean
     fun clear()
 }

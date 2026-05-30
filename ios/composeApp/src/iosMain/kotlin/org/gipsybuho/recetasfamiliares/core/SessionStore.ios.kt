@@ -6,6 +6,9 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import platform.Foundation.NSMutableDictionary
 import platform.Foundation.NSNumber
 import platform.Foundation.NSString
@@ -30,6 +33,7 @@ import platform.Security.kSecValueData
 actual class SessionStore {
 
     private val SERVICE = "com.gipsybuho.recetasfamiliares"
+    private val _familyRole: MutableStateFlow<String?> by lazy { MutableStateFlow(kcRead(KEY_FAMILY_ROLE)) }
 
     actual var accessToken: String?
         get()  = kcRead(KEY_ACCESS)
@@ -61,13 +65,19 @@ actual class SessionStore {
 
     actual var familyRole: String?
         get()  = kcRead(KEY_FAMILY_ROLE)
-        set(v) = if (v != null) kcWrite(KEY_FAMILY_ROLE, v) else kcDelete(KEY_FAMILY_ROLE)
+        set(v) {
+            if (v != null) kcWrite(KEY_FAMILY_ROLE, v) else kcDelete(KEY_FAMILY_ROLE)
+            _familyRole.value = v
+        }
+
+    actual val familyRoleFlow: StateFlow<String?> = _familyRole.asStateFlow()
 
     actual val isLoggedIn: Boolean
         get() = !accessToken.isNullOrBlank() && !familyId.isNullOrBlank()
 
     actual fun clear() {
         listOf(KEY_ACCESS, KEY_REFRESH, KEY_FAMILY, KEY_USER, KEY_DISPLAY_NAME, KEY_EMAIL, KEY_AVATAR_URL, KEY_FAMILY_ROLE).forEach { kcDelete(it) }
+        _familyRole.value = null
     }
 
     // ── Keychain helpers ──────────────────────────────────────────────────────

@@ -1559,15 +1559,52 @@ Alcance real actual: MVP "añadir usuario existente por email". No hay todavía 
 
 ---
 
-## Sprint 35 — Candidatos
+## Sprint 35 — COMPLETADO (2026-05-30)
+
+### 35.A — Backend: Anti-enumeración inviteMember ✅
+- **`FamilyService.java`**: `inviteMember()` devuelve `void`; usa `ifPresent()` — email no registrado es no-op silencioso.
+- **`FamilyController.java`**: método void, `@ResponseStatus(CREATED)` devuelve 201 sin body siempre.
+- **`RecetasApi.kt`** (Android): return type cambiado a `Unit`.
+- **`FamilyMemberRepository.kt`** (iOS): consume 201 sin body.
+
+### 35.B — Backend: Tests faltantes ✅
+- **`FamilyMemberControllerTest.java`**:
+  - `RegisteredUser` record ampliado con `refreshToken`.
+  - `inviteMemberAddsUserToFamily`: eliminadas aserciones de body (ahora vacío).
+  - `inviteNonExistentUserReturns201Silently`: verifica que el email inexistente no revela información + lista de miembros no cambia.
+  - `removeMemberHappyPath`: invite + delete + verificar solo el owner en lista.
+  - `updateMemberRoleHappyPath`: invite + promote ADMIN + verificar rol en respuesta.
+  - `removeMemberRevokesRefreshToken`: secuencia completa invite → remove → refresh → 401.
+- Total: **76 tests, 0 fallos**.
+
+### 35.C — isAdmin reactivo Android + iOS ✅
+- **`SessionStore.kt`** (Android): `_familyRole: MutableStateFlow`, `familyRoleFlow: StateFlow<String?>`; setter actualiza flow; `clear()` resetea flow a null.
+- **`RecetasViewModel.kt`**: `isAdmin: StateFlow<Boolean>` derivado de `familyRoleFlow.map { ... }.stateIn(...)`.
+- **`ProfileScreen.kt`**: `val isAdmin by viewModel.isAdmin.collectAsState()`.
+- **`SessionStore.kt`** (iOS commonMain expect): `val familyRoleFlow: StateFlow<String?>`.
+- **`SessionStore.ios.kt`** (actual): `_familyRole` lazy + setter reactivo + `clear()` resetea flow.
+- **`SettingsScreen.kt`** (iOS): `val familyRole by (session?.familyRoleFlow ?: flowOf(null)).collectAsState(...)`.
+
+### Verificaciones Sprint 35
+- Backend: `mvn test` → **76 tests, 0 fallos**.
+- Android: `gradlew assembleDebug` → **BUILD SUCCESSFUL**.
+- iOS: build iOS requiere macOS; edición Kotlin verificada en Windows.
+- VibeSec: sin críticos/altos. Fix `clear()` aplicado post-revisión en ambas plataformas.
+- Gemini: confirmó MutableStateFlow correcto; señaló 409 CONFLICT como refinamiento para Sprint 36.
+
+---
+
+## Sprint 36 — Candidatos
 
 ### Prioridad Alta (deuda técnica de seguridad/calidad)
 1. **Backend:** Anti-enumeración en `inviteMember()` — respuesta uniforme 201 independientemente de si el email existe; el body indica "solicitud registrada" sin revelar si el usuario existe. Sin infraestructura de email: solo respuesta neutral.
 2. **Backend:** Tests faltantes — happy path `removeMember()` con verificación de revocación de tokens; happy path `updateMemberRole()`; verificar que el refresh token queda revocado al expulsar (flujo completo con captura de refreshToken real y posterior intento de uso → 401).
 3. **Android + iOS:** `isAdmin` reactivo — exponer `familyRole` como `StateFlow<String?>` desde `SessionStore` (commonMain `expect`) en lugar de `get()` property no-reactivo; el rol puede cambiar en sesión.
 
+### Prioridad Alta (deuda post-Sprint 35)
+4. **Backend:** Anti-enumeración completa en `inviteMember()` — el CONFLICT 409 actual revela que un email pertenece a un usuario registrado (aunque requiere ser ADMIN autenticado). Hacer el caso CONFLICT también silencioso (201) para uniformidad total OWASP. Impacto UX: el ADMIN pierde el feedback "ya es miembro" y debe verificarlo en la lista. Analizado por Gemini Sprint 35.
+
 ### Prioridad Media
-4. **Backend:** Verificar unique constraint `(family_id, user_id)` en Flyway para la tabla `family_members` — actualmente la lógica en `FamilyService` previene duplicados pero sin constraint a nivel BD.
 5. **Android:** Widget receta del día mejorado (foto + acción "Cocinar desde widget").
 6. **iOS:** Notificaciones caducidad stock (iOS Background Tasks + UserNotifications).
 

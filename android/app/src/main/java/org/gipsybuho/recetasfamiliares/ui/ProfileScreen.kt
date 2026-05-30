@@ -56,6 +56,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     val displayName by viewModel.displayName.collectAsState()
     val email       by viewModel.email.collectAsState()
     val avatarUrl   by viewModel.avatarUrl.collectAsState()
+    val isAdmin     by viewModel.isAdmin.collectAsState()
     var editing     by remember { mutableStateOf(false) }
     var editName    by remember { mutableStateOf("") }
     var showInvite  by remember { mutableStateOf(false) }
@@ -194,7 +195,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             }
         }
 
-        if (viewModel.isAdmin) {
+        if (isAdmin) {
             Spacer(Modifier.height(Spacing.lg))
             OutlinedButton(
                 onClick  = { showInvite = true },

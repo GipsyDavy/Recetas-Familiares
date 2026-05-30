@@ -96,15 +96,91 @@ class FamilyMemberControllerTest {
                         .content("""
                                 {"email": "invite-guest@example.com", "role": "MEMBER"}
                                 """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.email").value("invite-guest@example.com"))
-                .andExpect(jsonPath("$.role").value("MEMBER"));
+                .andExpect(status().isCreated());
 
-        // guest now sees the owner's family in the members list
+        // guest now in the owner's family — members list must have 2 entries
         mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + guest.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void removeMemberHappyPath() throws Exception {
+        RegisteredUser owner = register("remove-happy-owner@example.com", "Familia RemoveHappy");
+        RegisteredUser guest = register("remove-happy-guest@example.com", "Familia RemoveHappyGuest");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "remove-happy-guest@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(delete("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), guest.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isNoContent());
+
+        // only the owner remains
+        mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void updateMemberRoleHappyPath() throws Exception {
+        RegisteredUser owner = register("role-happy-owner@example.com", "Familia RoleHappy");
+        RegisteredUser guest = register("role-happy-guest@example.com", "Familia RoleHappyGuest");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "role-happy-guest@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}/role",
+                        owner.familyId(), guest.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role": "ADMIN"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    void removeMemberRevokesRefreshToken() throws Exception {
+        RegisteredUser owner = register("revoke-owner@example.com", "Familia Revoke");
+        RegisteredUser guest = register("revoke-guest@example.com", "Familia RevokeGuest");
+
+        // invite guest to owner's family
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "revoke-guest@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isCreated());
+
+        // expel guest — triggers bulk token revocation
+        mockMvc.perform(delete("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), guest.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isNoContent());
+
+        // guest's refresh token issued at registration must now be rejected
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken": "%s"}
+                                """.formatted(guest.refreshToken())))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -132,16 +208,23 @@ class FamilyMemberControllerTest {
     }
 
     @Test
-    void inviteNonExistentUserReturnsNotFound() throws Exception {
+    void inviteNonExistentUserReturns201Silently() throws Exception {
         RegisteredUser owner = register("invite-notfound-owner@example.com", "Familia NotFound");
 
+        // Anti-enumeration: unregistered email must not reveal itself via 404
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email": "nobody@example.com", "role": "MEMBER"}
                                 """))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isCreated());
+
+        // family membership must remain unchanged (only owner)
+        mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
     }
 
     @Test
@@ -171,7 +254,7 @@ class FamilyMemberControllerTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private record RegisteredUser(String accessToken, String familyId, String userId) {}
+    private record RegisteredUser(String accessToken, String refreshToken, String familyId, String userId) {}
 
     private RegisteredUser register(String email, String familyName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
@@ -190,6 +273,7 @@ class FamilyMemberControllerTest {
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         return new RegisteredUser(
                 response.get("accessToken").asText(),
+                response.get("refreshToken").asText(),
                 response.get("family").get("id").asText(),
                 response.get("user").get("id").asText()
         );
