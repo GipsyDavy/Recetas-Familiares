@@ -53,14 +53,37 @@
     -fx-background-color: recetas-bg;
 }
 
+.login-card {
+    -fx-background-color: recetas-surface;
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: recetas-border;
+    -fx-border-width: 1;
+    -fx-padding: 36 32 32 32;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.10), 24, 0, 0, 6);
+}
+
+.login-logo {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: recetas-primary-fg;
+    -fx-background-color: recetas-primary;
+    -fx-background-radius: 50;
+    -fx-min-width: 72;
+    -fx-min-height: 72;
+    -fx-max-width: 72;
+    -fx-max-height: 72;
+    -fx-alignment: center;
+}
+
 .login-title {
-    -fx-font-size: 32px;
+    -fx-font-size: 26px;
     -fx-font-weight: bold;
     -fx-fill: recetas-text-primary;
 }
 
 .login-subtitle {
-    -fx-font-size: 15px;
+    -fx-font-size: 14px;
     -fx-fill: recetas-text-second;
 }
 
@@ -69,12 +92,29 @@
     -fx-border-color: recetas-border;
     -fx-border-radius: 8;
     -fx-background-radius: 8;
-    -fx-padding: 10 14;
+    -fx-padding: 10 42 10 14;
     -fx-font-size: 14px;
 }
 
 .login-field:focused {
     -fx-border-color: recetas-focus-border;
+}
+
+.login-password-stack {
+    -fx-max-width: Double.MAX_VALUE;
+}
+
+.login-toggle-btn {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-font-size: 16px;
+    -fx-cursor: hand;
+    -fx-padding: 4 8;
+}
+
+.login-toggle-btn:hover {
+    -fx-background-color: recetas-surface-var;
+    -fx-background-radius: 6;
 }
 
 .login-button {
@@ -94,6 +134,9 @@
 .login-error {
     -fx-text-fill: recetas-error;
     -fx-font-size: 13px;
+    -fx-background-color: recetas-error-bg;
+    -fx-background-radius: 6;
+    -fx-padding: 8 12;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────────── */

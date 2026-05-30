@@ -9,6 +9,7 @@ import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.ShoppingListRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.SyncRepository;
+import org.gipsybuho.recetasfamiliares.data.repository.FamilyRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.UserRepository;
 
 /** Singleton dependency container — no DI framework, intentionally simple. */
@@ -27,12 +28,14 @@ public final class AppContext {
     private final FavoriteRepository favoriteRepository;
     private final NoteRepository noteRepository;
     private final UserRepository userRepository;
+    private final FamilyRepository familyRepository;
 
     private AppContext() {
         session = new AppSession();
         apiClient = new ApiClient(session);
         authRepository = new AuthRepository(apiClient, session);
         userRepository = new UserRepository(apiClient, session);
+        familyRepository = new FamilyRepository(apiClient, session);
         recipeRepository = new RecipeRepository(apiClient, session);
         stockRepository = new StockRepository(apiClient, session);
         menuRepository = new MenuRepository(apiClient, session);
@@ -59,6 +62,7 @@ public final class AppContext {
     public FavoriteRepository getFavoriteRepository() { return favoriteRepository; }
     public NoteRepository getNoteRepository() { return noteRepository; }
     public UserRepository getUserRepository() { return userRepository; }
+    public FamilyRepository getFamilyRepository() { return familyRepository; }
 
     public void shutdown() {
         recipeRepository.shutdown();

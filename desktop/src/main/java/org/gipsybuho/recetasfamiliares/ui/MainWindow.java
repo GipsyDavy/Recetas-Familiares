@@ -48,9 +48,10 @@ public class MainWindow {
     private ShoppingListView shoppingListView;
     private NotesView notesView;
     private GlobalSearchView searchResultsView;
+    private FamilyMembersView familyMembersView;
     private String activeView = "dashboard";
     private boolean navigating = false;
-    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnSettings;
+    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnSettings, btnMembers;
     private final TextField globalSearch = new TextField();
     private final Label statusBar = new Label("");
 
@@ -76,13 +77,18 @@ public class MainWindow {
             if (e.isControlDown() && e.getCode() == KeyCode.F) {
                 globalSearch.requestFocus();
                 e.consume();
-            } else if (e.isControlDown() && e.getCode() == KeyCode.COMMA) {
+            } else if (e.isControlDown() && e.getCode() == KeyCode.COMMA
+                    && context.getSession().isAdmin()) {
                 navigateTo("settings");
                 e.consume();
             }
         });
 
         if (context.getSession().isLoggedIn()) {
+            // Role may already be persisted from a previous session — ensure it's loaded
+            if (context.getSession().getFamilyRole() == null) {
+                Thread.ofVirtual().start(() -> context.getFamilyRepository().detectAndSaveRole());
+            }
             showMain();
         } else {
             showLogin();
@@ -112,6 +118,9 @@ public class MainWindow {
         weeklyMenuView = new WeeklyMenuView(context, this::triggerSync);
         shoppingListView = new ShoppingListView(context, this::triggerSync);
         notesView = new NotesView(context, this::triggerSync);
+        if (context.getSession().isAdmin()) {
+            familyMembersView = new FamilyMembersView(context);
+        }
 
         VBox sidebar = buildSidebar();
         root.setLeft(sidebar);
@@ -151,8 +160,6 @@ public class MainWindow {
         btnMenu      = sidebarButton("📅  Menú semanal", "menu");
         btnShopping  = sidebarButton("🛒  Lista de la compra", "shopping");
         btnNotes     = sidebarButton("📝  Notas familiares", "notes");
-        btnSettings = sidebarButton("⚙ Ajustes", "settings");
-        Tooltip.install(btnSettings, new Tooltip("Ajustes (Ctrl+,)"));
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -172,7 +179,23 @@ public class MainWindow {
 
         HBox userCard = buildUserCard();
 
-        sidebar.getChildren().addAll(header, globalSearch, userCard, btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnSettings, spacer, bottom);
+        // ── Common buttons ────────────────────────────────────────────────────
+        sidebar.getChildren().addAll(header, globalSearch, userCard,
+                btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes);
+
+        // ── Admin-only buttons ────────────────────────────────────────────────
+        if (context.getSession().isAdmin()) {
+            Separator adminSep = new Separator();
+            VBox.setMargin(adminSep, new Insets(4, 16, 4, 16));
+
+            btnMembers  = sidebarButton("👨‍👩‍👧  Miembros", "members");
+            btnSettings = sidebarButton("⚙  Ajustes", "settings");
+            Tooltip.install(btnSettings, new Tooltip("Ajustes (Ctrl+,)"));
+
+            sidebar.getChildren().addAll(adminSep, btnMembers, btnSettings);
+        }
+
+        sidebar.getChildren().addAll(spacer, bottom);
         return sidebar;
     }
 
@@ -316,7 +339,15 @@ public class MainWindow {
                 setCenterWithFade(notesView);
                 notesView.refresh();
             }
-            case "settings" -> setCenterWithFade(buildSettingsView());
+            case "members" -> {
+                if (context.getSession().isAdmin() && familyMembersView != null) {
+                    setCenterWithFade(familyMembersView);
+                    familyMembersView.refresh();
+                }
+            }
+            case "settings" -> {
+                if (context.getSession().isAdmin()) setCenterWithFade(buildSettingsView());
+            }
         }
     }
 
@@ -383,7 +414,7 @@ public class MainWindow {
     // ── Logout ───────────────────────────────────────────────────────────────
 
     private void updateActiveSidebarButton(String view) {
-        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnSettings};
+        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnSettings, btnMembers};
         for (Button btn : navButtons) {
             if (btn != null) btn.getStyleClass().remove("sidebar-nav-button-active");
         }
@@ -395,6 +426,7 @@ public class MainWindow {
             case "shopping"  -> btnShopping;
             case "notes"     -> btnNotes;
             case "settings"  -> btnSettings;
+            case "members"   -> btnMembers;
             default          -> null;
         };
         if (active != null) active.getStyleClass().add("sidebar-nav-button-active");

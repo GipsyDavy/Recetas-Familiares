@@ -19,6 +19,7 @@ public class AppSession {
     private static final String KEY_LAST_SYNC    = "lastSyncTime";
     private static final String KEY_DISPLAY_NAME = "displayName";
     private static final String KEY_EMAIL        = "email";
+    private static final String KEY_FAMILY_ROLE  = "familyRole";
 
     private final Preferences prefs = Preferences.userRoot().node(PREF_NODE);
 
@@ -28,6 +29,7 @@ public class AppSession {
     private String lastSyncTime;
     private String displayName;
     private String email;
+    private FamilyRole familyRole;
 
     public AppSession() {
         this.accessToken  = prefs.get(KEY_ACCESS,        null);
@@ -36,6 +38,8 @@ public class AppSession {
         this.lastSyncTime = prefs.get(KEY_LAST_SYNC,     null);
         this.displayName  = prefs.get(KEY_DISPLAY_NAME,  null);
         this.email        = prefs.get(KEY_EMAIL,         null);
+        String roleStr    = prefs.get(KEY_FAMILY_ROLE,   null);
+        this.familyRole   = parseFamilyRole(roleStr);
     }
 
     public boolean isLoggedIn() {
@@ -48,6 +52,12 @@ public class AppSession {
     public String getLastSyncTime() { return lastSyncTime; }
     public String getDisplayName()  { return displayName; }
     public String getEmail()        { return email; }
+    public FamilyRole getFamilyRole() { return familyRole; }
+
+    /** Returns true when the user has OWNER or ADMIN role in their family. */
+    public boolean isAdmin() {
+        return familyRole != null && familyRole.isAdminOrAbove();
+    }
 
     public void setTokens(String accessToken, String refreshToken) {
         this.accessToken  = accessToken;
@@ -75,6 +85,12 @@ public class AppSession {
         if (email       != null) prefs.put(KEY_EMAIL,        email);       else prefs.remove(KEY_EMAIL);
     }
 
+    public void setFamilyRole(FamilyRole role) {
+        this.familyRole = role;
+        if (role != null) prefs.put(KEY_FAMILY_ROLE, role.name());
+        else prefs.remove(KEY_FAMILY_ROLE);
+    }
+
     public void clear() {
         accessToken  = null;
         refreshToken = null;
@@ -82,11 +98,18 @@ public class AppSession {
         lastSyncTime = null;
         displayName  = null;
         email        = null;
+        familyRole   = null;
         prefs.remove(KEY_ACCESS);
         prefs.remove(KEY_REFRESH);
         prefs.remove(KEY_FAMILY_ID);
         prefs.remove(KEY_LAST_SYNC);
         prefs.remove(KEY_DISPLAY_NAME);
         prefs.remove(KEY_EMAIL);
+        prefs.remove(KEY_FAMILY_ROLE);
+    }
+
+    private static FamilyRole parseFamilyRole(String str) {
+        if (str == null || str.isBlank()) return null;
+        try { return FamilyRole.valueOf(str); } catch (IllegalArgumentException e) { return FamilyRole.MEMBER; }
     }
 }
