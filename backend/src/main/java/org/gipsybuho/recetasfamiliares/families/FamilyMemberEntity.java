@@ -77,11 +77,28 @@ public class FamilyMemberEntity {
         syncVersion++;
     }
 
+    public String getId() {
+        return id;
+    }
+
     public FamilyEntity getFamily() {
         return family;
     }
 
+    public org.gipsybuho.recetasfamiliares.users.UserEntity getUser() {
+        return user;
+    }
+
     public FamilyRole getRole() {
         return role;
+    }
+
+    public void setRole(FamilyRole role) {
+        this.role = role;
+    }
+
+    public void softDelete() {
+        this.deleted = true;
+        this.deletedAt = java.time.Instant.now();
     }
 }

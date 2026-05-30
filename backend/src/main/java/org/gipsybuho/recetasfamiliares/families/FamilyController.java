@@ -2,9 +2,17 @@ package org.gipsybuho.recetasfamiliares.families;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -20,5 +28,33 @@ public class FamilyController {
     @GetMapping
     public List<FamilyResponse> listMyFamilies(Authentication authentication) {
         return familyService.findFamiliesForUser(authentication.getName());
+    }
+
+    @GetMapping("/{familyId}/members")
+    public List<FamilyMemberResponse> listMembers(
+            @PathVariable String familyId,
+            Authentication authentication
+    ) {
+        return familyService.listMembers(familyId, authentication.getName());
+    }
+
+    @PutMapping("/{familyId}/members/{userId}/role")
+    public FamilyMemberResponse updateMemberRole(
+            @PathVariable String familyId,
+            @PathVariable String userId,
+            @Valid @RequestBody UpdateMemberRoleRequest request,
+            Authentication authentication
+    ) {
+        return familyService.updateMemberRole(familyId, userId, authentication.getName(), request);
+    }
+
+    @DeleteMapping("/{familyId}/members/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeMember(
+            @PathVariable String familyId,
+            @PathVariable String userId,
+            Authentication authentication
+    ) {
+        familyService.removeMember(familyId, userId, authentication.getName());
     }
 }

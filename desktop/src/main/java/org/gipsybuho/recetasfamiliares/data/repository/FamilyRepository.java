@@ -22,6 +22,25 @@ public class FamilyRepository {
         return result != null ? result : new FamilyDtos.FamilyResponse[0];
     }
 
+    /** Returns all members of the given family. */
+    public FamilyDtos.FamilyMemberResponse[] loadMembers(String familyId) throws ApiException {
+        FamilyDtos.FamilyMemberResponse[] result = api.get(
+                "api/v1/families/" + familyId + "/members",
+                FamilyDtos.FamilyMemberResponse[].class);
+        return result != null ? result : new FamilyDtos.FamilyMemberResponse[0];
+    }
+
+    /** Changes the role of a family member (OWNER/ADMIN only). */
+    public FamilyDtos.FamilyMemberResponse updateMemberRole(String familyId, String userId, String newRole) throws ApiException {
+        return api.put("api/v1/families/" + familyId + "/members/" + userId + "/role",
+                java.util.Map.of("role", newRole), FamilyDtos.FamilyMemberResponse.class);
+    }
+
+    /** Removes (soft-deletes) a member from the family (OWNER/ADMIN only). */
+    public void removeMember(String familyId, String userId) throws ApiException {
+        api.delete("api/v1/families/" + familyId + "/members/" + userId);
+    }
+
     /**
      * Calls GET /api/v1/families, reads the role from the first family in the list,
      * and persists it in the session. Defaults to MEMBER on any error (fail-safe).

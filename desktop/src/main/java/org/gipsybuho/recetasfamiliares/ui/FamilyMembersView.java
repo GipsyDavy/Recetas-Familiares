@@ -7,16 +7,23 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
+import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 import org.gipsybuho.recetasfamiliares.core.FamilyRole;
 
+import java.util.List;
+import java.util.Optional;
+
 public class FamilyMembersView extends VBox {
 
     private final AppContext context;
-    private final Label statusLabel = new Label();
-    private final Label familyNameLabel = new Label("—");
-    private final Label roleLabel       = new Label("—");
+    private final Label statusLabel  = new Label();
+    private final Label familyLabel  = new Label("—");
+    private final Label roleLabel    = new Label("—");
+    private final TableView<MemberRow> table = buildTable();
+    private final Button changeRoleBtn = new Button("Cambiar rol");
+    private final Button removeBtn     = new Button("Expulsar");
 
     public FamilyMembersView(AppContext context) {
         this.context = context;
@@ -36,6 +43,7 @@ public class FamilyMembersView extends VBox {
         Button refreshBtn = new Button("Actualizar");
         refreshBtn.getStyleClass().add("action-button-secondary");
         refreshBtn.setOnAction(e -> refresh());
+        Tooltip.install(refreshBtn, new Tooltip("Recargar lista de miembros"));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -43,63 +51,60 @@ public class FamilyMembersView extends VBox {
         HBox header = new HBox(12, title, spacer, refreshBtn);
         header.setAlignment(Pos.CENTER_LEFT);
 
-        // ── Family info card ─────────────────────────────────────────────────
-        familyNameLabel.getStyleClass().add("recipe-title");
+        // ── Info card ─────────────────────────────────────────────────────────
+        familyLabel.getStyleClass().add("recipe-title");
         roleLabel.getStyleClass().add("recipe-meta");
 
         GridPane infoGrid = new GridPane();
         infoGrid.setHgap(12);
         infoGrid.setVgap(8);
-        infoGrid.add(metaKey("Familia:"),    0, 0);
-        infoGrid.add(familyNameLabel,        1, 0);
-        infoGrid.add(metaKey("Tu rol:"),     0, 1);
-        infoGrid.add(roleLabel,              1, 1);
+        infoGrid.add(metaKey("Familia:"), 0, 0);
+        infoGrid.add(familyLabel,         1, 0);
+        infoGrid.add(metaKey("Tu rol:"),  0, 1);
+        infoGrid.add(roleLabel,           1, 1);
 
         VBox infoCard = new VBox(8, infoGrid);
         infoCard.getStyleClass().add("detail-card");
         infoCard.setPadding(new Insets(16));
 
-        // ── Current user row ─────────────────────────────────────────────────
-        String displayName = context.getSession().getDisplayName();
-        String email       = context.getSession().getEmail();
-        FamilyRole role    = context.getSession().getFamilyRole();
+        // ── Action toolbar (only visible to ADMIN/OWNER) ──────────────────────
+        changeRoleBtn.getStyleClass().add("action-button-secondary");
+        changeRoleBtn.setDisable(true);
+        changeRoleBtn.setOnAction(e -> onChangeRole());
+        Tooltip.install(changeRoleBtn, new Tooltip("Cambiar rol del miembro seleccionado"));
 
-        TableView<MemberRow> table = buildTable();
+        removeBtn.getStyleClass().add("action-button-danger");
+        removeBtn.setDisable(true);
+        removeBtn.setOnAction(e -> onRemoveMember());
+        Tooltip.install(removeBtn, new Tooltip("Expulsar miembro seleccionado de la familia"));
 
-        if (displayName != null || email != null) {
-            String roleName = role != null ? role.displayName() : "Miembro";
-            table.getItems().add(new MemberRow(
-                    displayName != null ? displayName : "—",
-                    email != null ? email : "—",
-                    roleName
-            ));
-        }
+        HBox toolbar = new HBox(8, changeRoleBtn, removeBtn);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
 
-        // ── Coming soon notice ───────────────────────────────────────────────
-        Label notice = new Label("📋  La lista completa de miembros y la gestión de invitaciones estarán disponibles en la próxima actualización.");
-        notice.getStyleClass().add("empty-state-text");
-        notice.setWrapText(true);
-        notice.setMaxWidth(Double.MAX_VALUE);
+        boolean isAdmin = context.getSession().isAdmin();
+        toolbar.setVisible(isAdmin);
+        toolbar.setManaged(isAdmin);
 
-        VBox noticeBox = new VBox(notice);
-        noticeBox.getStyleClass().add("detail-card");
-        noticeBox.setPadding(new Insets(14, 16, 14, 16));
+        // Update button states when selection changes
+        table.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) ->
+                updateButtonStates(selected));
 
-        // ── Status bar ───────────────────────────────────────────────────────
+        // ── Status bar ────────────────────────────────────────────────────────
         statusLabel.getStyleClass().add("status-label");
 
-        getChildren().addAll(header, infoCard, table, noticeBox, statusLabel);
+        getChildren().addAll(header, infoCard, toolbar, table, statusLabel);
         VBox.setVgrow(table, Priority.ALWAYS);
     }
 
     private TableView<MemberRow> buildTable() {
-        TableView<MemberRow> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        table.getStyleClass().add("data-table");
-        table.setPlaceholder(new Label("Sin datos de miembros"));
+        TableView<MemberRow> tv = new TableView<>();
+        tv.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        tv.getStyleClass().add("data-table");
+        tv.setPlaceholder(new Label("Sin miembros"));
+        tv.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
         TableColumn<MemberRow, String> nameCol = new TableColumn<>("Nombre");
-        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("displayName"));
         nameCol.setMinWidth(160);
 
         TableColumn<MemberRow, String> emailCol = new TableColumn<>("Correo electrónico");
@@ -107,31 +112,120 @@ public class FamilyMembersView extends VBox {
         emailCol.setMinWidth(200);
 
         TableColumn<MemberRow, String> roleCol = new TableColumn<>("Rol");
-        roleCol.setCellValueFactory(new PropertyValueFactory<>("role"));
+        roleCol.setCellValueFactory(new PropertyValueFactory<>("roleLabel"));
         roleCol.setMinWidth(120);
 
-        table.getColumns().addAll(nameCol, emailCol, roleCol);
-        return table;
+        tv.getColumns().addAll(nameCol, emailCol, roleCol);
+        return tv;
     }
 
     public void refresh() {
-        statusLabel.setText("Cargando información de familia...");
+        statusLabel.setText("Cargando miembros...");
+        table.getItems().clear();
+        String familyId = context.getSession().getFamilyId();
+        if (familyId == null || familyId.isBlank()) {
+            Platform.runLater(() -> statusLabel.setText("Sin sesión de familia activa."));
+            return;
+        }
         Thread.ofVirtual().start(() -> {
             try {
+                // Load family name
                 FamilyDtos.FamilyResponse[] families = context.getFamilyRepository().loadMyFamilies();
+                // Load members
+                FamilyDtos.FamilyMemberResponse[] members = context.getFamilyRepository().loadMembers(familyId);
                 Platform.runLater(() -> {
                     if (families.length > 0) {
-                        FamilyDtos.FamilyResponse fam = families[0];
-                        familyNameLabel.setText(fam.name() != null ? fam.name() : "—");
-                        FamilyRole role = context.getSession().getFamilyRole();
-                        roleLabel.setText(role != null ? role.displayName() : "—");
+                        familyLabel.setText(families[0].name() != null ? families[0].name() : "—");
                     }
-                    statusLabel.setText("");
+                    FamilyRole myRole = context.getSession().getFamilyRole();
+                    roleLabel.setText(myRole != null ? myRole.displayName() : "—");
+
+                    table.getItems().clear();
+                    String myEmail = context.getSession().getEmail();
+                    for (FamilyDtos.FamilyMemberResponse m : members) {
+                        boolean isSelf = myEmail != null && myEmail.equalsIgnoreCase(m.email());
+                        table.getItems().add(new MemberRow(
+                                m.userId(), m.displayName(), m.email(), m.role(), isSelf));
+                    }
+                    statusLabel.setText(members.length + " miembro(s)");
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> statusLabel.setText("Error al cargar: " + ex.getMessage()));
             }
         });
+    }
+
+    private void onChangeRole() {
+        MemberRow selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        ChoiceDialog<String> dialog = new ChoiceDialog<>("ADMIN", List.of("ADMIN", "MEMBER"));
+        dialog.setTitle("Cambiar rol");
+        dialog.setHeaderText("Cambiar rol de " + selected.getDisplayName());
+        dialog.setContentText("Nuevo rol:");
+        DialogStyler.apply(dialog);
+
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(newRole -> {
+            String familyId = context.getSession().getFamilyId();
+            statusLabel.setText("Cambiando rol...");
+            changeRoleBtn.setDisable(true);
+            removeBtn.setDisable(true);
+            Thread.ofVirtual().start(() -> {
+                try {
+                    context.getFamilyRepository().updateMemberRole(familyId, selected.getUserId(), newRole);
+                    Platform.runLater(() -> {
+                        statusLabel.setText("Rol actualizado correctamente.");
+                        refresh();
+                    });
+                } catch (ApiException ex) {
+                    Platform.runLater(() -> statusLabel.setText("Error: " + ex.getMessage()));
+                }
+            });
+        });
+    }
+
+    private void onRemoveMember() {
+        MemberRow selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Expulsar miembro");
+        confirm.setHeaderText("¿Expulsar a " + selected.getDisplayName() + " de la familia?");
+        confirm.setContentText("Esta acción no se puede deshacer.");
+        DialogStyler.apply(confirm);
+
+        Optional<ButtonType> result = confirm.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            String familyId = context.getSession().getFamilyId();
+            statusLabel.setText("Eliminando miembro...");
+            changeRoleBtn.setDisable(true);
+            removeBtn.setDisable(true);
+            Thread.ofVirtual().start(() -> {
+                try {
+                    context.getFamilyRepository().removeMember(familyId, selected.getUserId());
+                    Platform.runLater(() -> {
+                        statusLabel.setText("Miembro eliminado.");
+                        refresh();
+                    });
+                } catch (ApiException ex) {
+                    Platform.runLater(() -> statusLabel.setText("Error: " + ex.getMessage()));
+                }
+            });
+        }
+    }
+
+    private void updateButtonStates(MemberRow selected) {
+        if (selected == null || !context.getSession().isAdmin()) {
+            changeRoleBtn.setDisable(true);
+            removeBtn.setDisable(true);
+            return;
+        }
+        // Cannot modify self or OWNER
+        boolean isOwner = "OWNER".equalsIgnoreCase(selected.getRole());
+        boolean isSelf  = selected.isSelf();
+        changeRoleBtn.setDisable(isOwner || isSelf);
+        removeBtn.setDisable(isOwner || isSelf);
     }
 
     private Label metaKey(String text) {
@@ -143,18 +237,34 @@ public class FamilyMembersView extends VBox {
     // ── Row model ─────────────────────────────────────────────────────────────
 
     public static final class MemberRow {
-        private final String name;
+        private final String userId;
+        private final String displayName;
         private final String email;
         private final String role;
+        private final boolean self;
 
-        public MemberRow(String name, String email, String role) {
-            this.name  = name;
-            this.email = email;
-            this.role  = role;
+        public MemberRow(String userId, String displayName, String email, String role, boolean self) {
+            this.userId      = userId;
+            this.displayName = displayName != null ? displayName : "—";
+            this.email       = email != null ? email : "—";
+            this.role        = role != null ? role : "MEMBER";
+            this.self        = self;
         }
 
-        public String getName()  { return name; }
-        public String getEmail() { return email; }
-        public String getRole()  { return role; }
+        public String getUserId()      { return userId; }
+        public String getDisplayName() { return displayName; }
+        public String getEmail()       { return email; }
+        public String getRole()        { return role; }
+        public boolean isSelf()        { return self; }
+
+        /** Label shown in the table — includes "(Tú)" marker for self. */
+        public String getRoleLabel() {
+            String label = switch (role.toUpperCase()) {
+                case "OWNER"  -> "Propietario";
+                case "ADMIN"  -> "Administrador";
+                default       -> "Miembro";
+            };
+            return self ? label + " (Tú)" : label;
+        }
     }
 }
