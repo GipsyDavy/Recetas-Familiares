@@ -118,6 +118,54 @@ Reglas tecnicas clave:
 - Base de datos: `recetas_familiares`
 - Root: password desconocido (no es "root")
 
+### Desktop Windows — Compilar instalador .exe
+
+**Herramientas requeridas (ya instaladas en este equipo):**
+- NSIS 3.x: `C:\Program Files (x86)\NSIS\makensis.exe`
+- JDK con jpackage: `C:\Program Files\Java\jdk-24\bin\jpackage.exe` (o jdk-25)
+- Maven: disponible en PATH vía NetBeans
+
+**Script de build (ejecutar desde `desktop/`):**
+```powershell
+# URL del backend embebida en el instalador (por defecto localhost):
+.\build-installer.ps1
+
+# Para empaquetar contra un servidor concreto:
+.\build-installer.ps1 -ApiUrl "http://192.168.1.100:8080/"
+```
+
+**Qué hace el script (7 pasos automáticos):**
+1. Valida JDK, Maven y NSIS.
+2. Crea el directorio `desktop/installer/` con ICO y BMPs de marca.
+3. `mvn clean package -Ppackage-windows` → fat JAR con DLLs JavaFX Windows.
+4. Copia el fat JAR a `target/jpackage-input/` y los JARs nativos a `mods/`.
+5. `jpackage --type app-image` → carpeta `output/RecetasFamiliares/` con JRE embebido.
+6. NSIS compila `installer.nsi` → `output/RecetasFamiliares-Instalador-v1.1.exe`.
+7. Imprime las rutas de salida.
+
+**Artefactos generados:**
+```text
+desktop/output/RecetasFamiliares-Instalador-v1.1.exe   ← instalador NSIS (~52 MB)
+desktop/output/RecetasFamiliares/RecetasFamiliares.exe  ← app-image portable (178 MB carpeta)
+```
+
+**Instalador NSIS incluye:**
+- Pantalla de bienvenida con identidad visual de la app (colores tierra).
+- Selector de directorio de instalación (`$LOCALAPPDATA\RecetasFamiliares` por defecto).
+- Acceso directo en escritorio y menú Inicio → grupo "Recetas Familiares".
+- Desinstalador registrado en Programas y características.
+- Detección de versión anterior → desinstalación automática antes de instalar.
+- JRE embebido: **no requiere Java instalado en el PC destino**.
+- Compresión LZMA solid (187 MB → 52 MB, reducción del 72%).
+
+**Para actualizar la versión al compilar:**
+1. `desktop/pom.xml` → cambiar `<version>1.1</version>` a la nueva.
+2. `desktop/build-installer.ps1` → cambiar `$AppVersion = "1.1"` a la nueva.
+3. `desktop/installer.nsi` → cambiar `VIProductVersion`, `VIAddVersionKey "ProductVersion"` y `OutFile`.
+4. Ejecutar `.\build-installer.ps1`.
+
+**Nota:** el MSI generado anteriormente (`Recetas Familiares-1.1.msi`) es un artefacto alternativo de jpackage+WiX y puede ignorarse. El flujo oficial es NSIS.
+
 ---
 
 ## Arranque del entorno dev

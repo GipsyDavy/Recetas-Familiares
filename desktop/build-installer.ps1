@@ -33,7 +33,7 @@ $ModsDir        = "$InputDir\mods"
 $OutputDir      = "$ProjectDir\output"
 $IcoPath        = "$ProjectDir\installer\recetas.ico"
 $PngPath        = "$ProjectDir\src\main\resources\brand\gipsy-buho-logo.png"
-$ShadedJar      = "$TargetDir\recetas-familiares-desktop-1.0-SNAPSHOT.jar"
+$ShadedJar      = "$TargetDir\recetas-familiares-desktop-1.1.jar"
 
 # ── Rutas de herramientas ─────────────────────────────────────────────────────
 $NSIS      = "C:\Program Files (x86)\NSIS\makensis.exe"
