@@ -1,0 +1,369 @@
+codex:
+Voy a empezar por las instrucciones locales: leeré los `.md` de la raíz y el skill de seguridad aplicable, y después auditaré el código sin tocar archivos.
+
+He cargado la guía de seguridad aplicable. Ahora voy a leer todos los `.md` de la raíz para fijar las reglas del proyecto antes de mirar implementación.
+
+Las reglas raíz confirman dos límites importantes para esta auditoría: no modificar archivos y revisar seguridad, UI/UX, arquitectura, sincronización y contratos multiplataforma. También he detectado que algunos `.md` están desactualizados entre sí, así que contrastaré documentación contra el código real.
+
+`rg` no está disponible en este entorno, así que usaré `git ls-files` y búsquedas PowerShell. El árbol está sucio antes de mi auditoría (`desktop/dependency-reduced-pom.xml`, `auditoria.txt`, `desktop/src/main/resources/brand/app.ico`); no tocaré nada de eso.
+
+Ya tengo el mapa del repositorio. Ahora voy a revisar por capas: configuración/secretos, backend y seguridad de endpoints, clientes Android/Desktop/iOS, sincronización offline y superficies de UI.
+
+La primera lectura muestra buen trabajo en backend: DTOs explícitos, `ddl-auto=validate`, JWT con TTL corto, refresh token opaco hasheado, ownership por familia y validación de imágenes por magic bytes. Los riesgos más claros empiezan a aparecer en almacenamiento de tokens de Desktop, URLs/HTTP por defecto y paridad de sincronización iOS.
+
+**1. Resumen De Lo Que He Hecho**
+
+He auditado el proyecto sin modificar ningún archivo. Leí primero los `.md` de la raíz (`CLAUDE.md`, `CONTINUAR.md`, `Interfaz.md`, `Resumen.md`, `README.md`, `MACRO-PROMPT-RECETAS-FAMILIA.md`) y después revisé configuración, backend, Android, Desktop, iOS, sincronización, seguridad, UI/UX, base de datos y estado Git.
+
+No he ejecutado builds ni tests porque generarían o modificarían artefactos en `target/`, `build/` o similares, y tu instrucción fue no modificar nada.
+
+**2. Análisis**
+
+Estado general: el proyecto está avanzado y bastante bien estructurado, especialmente en backend y Android. No está listo para producción real todavía. Está en estado de MVP avanzado / beta técnica.
+
+El backend es la parte más sólida: usa Spring Boot, DTOs explícitos, Flyway, `ddl-auto=validate`, JWT, refresh tokens opacos hasheados, ownership familiar y tests backend amplios. Android está funcional y bastante completo. Desktop tiene buena cobertura funcional, pero arrastra una deuda de seguridad importante. iOS está bastante por detrás en sincronización, robustez de auth y paridad offline.
+
+Hay además inconsistencias documentales: `README.md` todavía habla de “62 tests”, mientras `CONTINUAR.md` y `Resumen.md` hablan de 76 tests. También la documentación mezcla estados de sprint ya superados con secciones antiguas.
+
+**3. Design System**
+
+El sistema visual está bien encaminado: 10 temas, claro/oscuro, Android/Desktop/iOS, skeletons, microanimaciones y pantallas más cuidadas. Aun así quedan problemas:
+
+- Falta validación WCAG AA real de contraste en los 20 esquemas.
+- Las fuentes premium Nunito/Lato están descritas, pero no hay evidencia clara de que estén integradas como TTF reales en Android/iOS.
+- iOS sigue siendo menos maduro visualmente que Android/Desktop en varias pantallas.
+- Desktop depende de CSS y JavaFX manual, lo que funciona, pero deja riesgo de incoherencias si no se centralizan más tokens de spacing/tipografía.
+- Los hápticos siguen sin tener una preferencia global clara y obligatoria en todas las plataformas, aunque los `.md` lo exigen.
+
+Solución propuesta: cerrar un sprint solo de design-system QA: contraste, tipografía real embebida, toggle hápticos, revisión responsive y paridad Android/iOS/Desktop pantalla por pantalla.
+
+**4. Arquitectura**
+
+Fortalezas:
+
+- Backend por capas correcto: controllers ligeros, services con lógica, repositorios, DTOs.
+- API bajo `/api/v1`.
+- Flyway activo y `ddl-auto=validate` en [application.yml](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/backend/src/main/resources/application.yml:10>).
+- Entidades backend sincronizables con UUID, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
+- Android usa Room, WorkManager, Retrofit, repositorios y `EncryptedSharedPreferences`.
+- Desktop tiene repositorios HTTP y separación razonable UI/API.
+
+Problemas:
+
+- No existe todavía módulo `shared/`, aunque la arquitectura objetivo lo pide para lógica común KMP.
+- iOS duplica mucha lógica y su base SQLDelight es parcial: solo recetas, stock, ingredientes y metadata; faltan notas, menús, listas, favoritos, fotos y pasos completos.
+- Android envía `baseSyncVersion = null` en múltiples pushes offline ([Repositories.kt](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/repository/Repositories.kt:315>)), lo que en la práctica reduce la detección de conflictos.
+- iOS solo hace `pullIncremental()` y no implementa push offline equivalente ([SyncRepository.kt](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/sync/SyncRepository.kt:19>)).
+
+Solución propuesta: priorizar un sprint de sincronización: `baseSyncVersion` real en Android, push iOS, esquema SQLDelight completo y extracción progresiva a `shared/`.
+
+**5. UX/UI**
+
+Android está en buen estado: navegación, widgets, modo cocina, skeletons, filtros, favoritos, tema y perfil. Desktop también está bastante completo: dashboard, ajustes, diagnóstico, exportaciones, sidebar, miembros, avatar y modo cocina.
+
+Problemas UI/UX detectados:
+
+- iOS no alcanza paridad: sincronización limitada, varias pantallas no tienen el mismo nivel de acciones, filtros y offline que Android.
+- Desktop almacena sesión local persistente sin cifrado, lo que impacta UX de “recordarme” pero es inseguro.
+- Faltan tests visuales o capturas verificadas en móviles/tablet/desktop.
+- No hay evidencia de pruebas de accesibilidad reales: TalkBack, VoiceOver, focus order y contraste.
+
+Solución propuesta: auditar UI con checklist por pantalla, añadir pruebas manuales documentadas y crear una matriz de paridad por plataforma.
+
+**6. Seguridad**
+
+Hallazgos principales:
+
+1. Alto: Desktop guarda access token y refresh token en `java.util.prefs`, no cifrado. El propio código lo reconoce en [AppSession.java](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/desktop/src/main/java/org/gipsybuho/recetasfamiliares/core/AppSession.java:8>) y persiste tokens en [AppSession.java](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/desktop/src/main/java/org/gipsybuho/recetasfamiliares/core/AppSession.java:69>).  
+   Solución: Windows Credential Manager, macOS Keychain y libsecret/Linux Secret Service.
+
+2. Alto: clientes usan HTTP por defecto. Android hardcodea `http://10.0.2.2:8080/` en [build.gradle.kts](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/android/app/build.gradle.kts:18>), iOS usa `http://localhost:8080/` en [ApiClient.kt](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/network/ApiClient.kt:16>) y Desktop `http://localhost:8080/` en [ApiClient.java](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/desktop/src/main/java/org/gipsybuho/recetasfamiliares/api/ApiClient.java:15>).  
+   Solución: perfiles dev/prod separados, HTTPS obligatorio en prod y bloqueo de cleartext fuera de debug.
+
+3. Medio/alto: `/uploads/**` es público en [SecurityConfig.java](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/backend/src/main/java/org/gipsybuho/recetasfamiliares/security/SecurityConfig.java:71>) y servido desde disco en [WebMvcConfig.java](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/backend/src/main/java/org/gipsybuho/recetasfamiliares/common/config/WebMvcConfig.java:19>). Las URLs son UUID, pero cualquier URL filtrada expone fotos familiares sin autorización.  
+   Solución: servir imágenes mediante endpoint autenticado con ownership o usar URLs firmadas de corta duración.
+
+4. Medio: validación de URLs de fotos permite `http://` y usa regex manual para hosts privados ([RecipePhotoService.java](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/backend/src/main/java/org/gipsybuho/recetasfamiliares/photos/RecipePhotoService.java:210>)). No es SSRF backend directo porque el backend no descarga esas URLs, pero los clientes sí pueden cargar imágenes remotas.  
+   Solución: usar `URI`, normalización, allowlist o solo URLs propias generadas por upload.
+
+5. Medio: iOS no tiene flujo de refresh automático. Guarda refresh token, pero `ApiClient` solo añade access token en `defaultRequest` ([ApiClient.kt](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/network/ApiClient.kt:25>)).  
+   Solución: plugin Ktor que intercepte 401, rote refresh token y reintente una vez.
+
+6. Bajo/medio: CSRF está desactivado ([SecurityConfig.java](</C:/Users/GipsyDavy/MAVEN/Recetas Familiares/backend/src/main/java/org/gipsybuho/recetasfamiliares/security/SecurityConfig.java:47>)). Es aceptable mientras solo se usen Bearer tokens en headers y no cookies, pero debe documentarse como decisión consciente. Si en futuro hay cookies, habrá que activar CSRF.
+
+**7. Recomendaciones**
+
+Prioridad 1: cifrar tokens Desktop y separar configuración dev/prod con HTTPS obligatorio.
+
+Prioridad 2: cerrar sincronización real: Android con `baseSyncVersion`, iOS con push offline y esquema SQLDelight completo.
+
+Prioridad 3: proteger imágenes familiares: eliminar `/uploads/**` público o sustituir por URLs firmadas/autorizadas.
+
+Prioridad 4: implementar refresh automático iOS y endurecer manejo de errores de red.
+
+Prioridad 5: limpiar documentación para que `README.md`, `CONTINUAR.md`, `Resumen.md` e `Interfaz.md` reflejen un único estado real.
+
+Prioridad 6: añadir tests Android/Desktop/iOS. Ahora mismo el backend tiene tests, pero no encontré tests de cliente relevantes.
+
+**8. Próximos Pasos**
+
+Estado final: backend sólido, Android avanzado, Desktop funcional pero con deuda crítica de almacenamiento de tokens, iOS todavía incompleto para el estándar offline-first descrito. No hay indicios de puertas traseras ni secretos productivos hardcodeados críticos, pero sí configuración dev insegura que no debe llegar a producción.
+
+¿Qué te gustaría hacer ahora?
+
+A) Continuar con arquitectura  
+B) Generar Design System completo  
+C) Diseñar pantallas  
+D) Modelar base de datos  
+E) Diseñar sincronización offline  
+F) Revisar seguridad  
+G) Planificar MVP  
+H) Otra cosa
+
+
+
+
+
+Gemini:
+Auditoría Completa del Proyecto "Recetas Familia"
+1. Visión General del Proyecto
+"Recetas Familia" es una aplicación premium multiplataforma (Android, Desktop, iOS) diseñada para la gestión familiar de recetas, ingredientes, menús y memoria culinaria compartida. El proyecto busca ofrecer una experiencia cálida, moderna, premium, fluida y emocional, diferenciándose de aplicaciones corporativas o simples colecciones de recetas.
+El ecosistema distribuido incluye:
+•
+Backend: Spring Boot (Java 21, MySQL, JWT, Spring Security).
+•
+Android: Nativo (Kotlin, Compose, Material You 3, Room, WorkManager).
+•
+Desktop: JavaFX (Maven).
+•
+iOS: Kotlin Multiplatform (KMP) + Compose Multiplatform (Ktor, SQLDelight, Keychain).
+•
+Base de Datos: MySQL principal, con sincronización multiplataforma y offline.
+El proyecto se rige por principios de código mínimo viable, cambios quirúrgicos, priorización de UX, y una revisión constante de seguridad, calidad visual y experiencia de usuario.
+2. Metodología de Auditoría
+La auditoría se ha realizado siguiendo estrictamente las reglas y directrices establecidas en los documentos CLAUDE.md, README.md, Resumen.md e Interfaz.md. Se ha adoptado una perspectiva multidisciplinar, operando simultáneamente con los perfiles de:
+1.
+Desarrollador de software senior experto: Evaluando la corrección, limpieza, mantenibilidad y robustez del código.
+2.
+Diseñador gráfico e interfaces senior experto: Analizando la coherencia visual, el cuidado estético y la alineación con la identidad del producto.
+3.
+Experto en UI/UX senior: Revisando la fluidez, intuición, emocionalidad y ausencia de fricción en la experiencia de usuario.
+4.
+Experto en seguridad y ciberseguridad: Identificando vulnerabilidades, errores de seguridad y malas prácticas.
+El objetivo es presentar un diagnóstico detallado y proponer soluciones sin modificar ningún archivo del proyecto.
+3. Hallazgos de la Auditoría
+3.1. Seguridad y Ciberseguridad
+Estado General: El proyecto demuestra una fuerte conciencia de seguridad, con directrices explícitas y herramientas activas. Los sprints completados (Resumen.md) mencionan auditorías de seguridad y la invocación de VibeSec, con resultados de "BUILD SUCCESS" y "sin críticos/altos".
+Puntos Fuertes:
+•
+Reglas Claras: CLAUDE.md establece reglas obligatorias para la revisión activa de vulnerabilidades en todo código tocado.
+•
+Herramientas Activas: El plugin security-guidance y las skills /VibeSec y /security-review se invocan automáticamente bajo condiciones específicas (autenticación, lógica de datos sensibles, APIs, etc.).
+•
+Autenticación Robusta: Uso de JWT, Refresh Tokens obligatorios, validación de ownership en todos los endpoints, y protección contra hardcoded secrets.
+•
+Anti-enumeración: Implementación de anti-enumeración en la invitación de miembros (Sprint 34+36 en Resumen.md).
+•
+Validación de Entradas: Validación de magic bytes para imágenes (JPEG/PNG/WebP) y sanitización de nombres de archivo.
+•
+OWASP Top 10: Mención explícita de aplicación de OWASP Top 10 en backend y seguridad general.
+•
+Mínimo Privilegio: Aplicación del principio de mínimo privilegio.
+•
+HSTS, CSP, CORS: Hardening HTTP en el backend.
+Problemas Detectados / Áreas de Mejora:
+•
+Auditoría de Dependencias: Aunque no se menciona explícitamente, es crucial realizar auditorías periódicas de las dependencias de terceros (librerías, frameworks) para detectar vulnerabilidades conocidas (CVEs).
+•
+Secret Management: Aunque se prohíbe hardcoding, no se detalla la estrategia de gestión de secretos en producción (e.g., HashiCorp Vault, AWS Secrets Manager, Kubernetes Secrets). Se menciona variables de entorno obligatorias para credenciales de DB, lo cual es un buen inicio.
+•
+Logging y Monitorización: No se menciona una estrategia de logging de seguridad o monitorización de anomalías, lo cual es vital para detectar ataques en tiempo real.
+•
+Pruebas de Penetración: No se especifica si se realizan pruebas de penetración o auditorías de seguridad externas.
+•
+Seguridad en iOS/Desktop: Aunque se menciona Keychain para iOS y Windows Registry para Desktop, una revisión más profunda de las prácticas de seguridad específicas de cada plataforma (e.g., sandboxing, permisos de archivos, protección de datos en tránsito/reposo) sería beneficiosa.
+Soluciones Propuestas:
+•
+Integrar Snyk/Dependabot: Para auditoría continua de dependencias.
+•
+Documentar Estrategia de Secretos: Detallar cómo se gestionan los secretos en entornos de producción.
+•
+Implementar Logging de Seguridad: Configurar logs de auditoría y alertas para eventos de seguridad.
+•
+Considerar Pruebas de Penetración: Realizar pruebas de penetración periódicas.
+•
+Revisión de Seguridad Específica por Plataforma: Asegurar que las mejores prácticas de seguridad para Android, Desktop e iOS se aplican consistentemente.
+3.2. Interfaz de Usuario (UI/UX)
+Estado General: El proyecto tiene una visión UI/UX muy clara y ambiciosa ("cálida, moderna, premium, emocional"). Se ha realizado un esfuerzo considerable en la implementación de un sistema de temas y en el pulido de la interfaz en todas las plataformas, con un Interfaz.md muy detallado que sirve como guía.
+Puntos Fuertes:
+•
+Visión Clara: CLAUDE.md e Interfaz.md definen una filosofía de producto y un estilo visual muy específicos (Notion, Material You, Apple Design).
+•
+Sistema de Temas Completo: Sprint 25A ha implementado un sistema de 10 temas con modos claro/oscuro/sistema en las tres plataformas, con paletas Material3 completas.
+•
+Tipografía Definida: Se ha seleccionado Nunito y Lato para una experiencia tipográfica premium y legible.
+•
+Sistema de Espaciado Android: AppTokens.kt define un sistema de espaciado coherente en Android.
+•
+Micro-interacciones y Animaciones: Se han implementado micro-animaciones suaves, hápticos y feedback visual en varias interacciones.
+•
+Skeleton Loading: Uso de skeleton loading en lugar de spinners en varias listas.
+•
+Accesibilidad: Mención de contentDescription, semantics, accessibilityLabel y TooltipBox.
+Problemas Detectados / Áreas de Mejora (basado en Interfaz.md y Resumen.md):
+3.2.1. Problemas Críticos (🔴)
+•
+UI-1 (Android - Tipografía): Nunito y Lato definidos en la escala tipográfica pero no implementados con TTF, usando FontFamily.Default y FontFamily.SansSerif. Esto hace que la app se sienta genérica y no premium.
+◦
+Solución: Añadir archivos TTF a res/font/ y actualizar FontFamily en AppTheme.kt.
+•
+UI-2 (Android - NavigationBar): NavigationBarItem usa Icons.Outlined.* siempre. Material3 exige Filled para activo y Outlined para inactivo.
+◦
+Solución: Pasar selectedIcon = { Icon(Icons.Filled.X) } e icon = { Icon(Icons.Outlined.X) }.
+3.2.2. Problemas Altos (🟠)
+•
+UI-3 (Android - ProfileScreen): Información duplicada (nombre/email) en el header y en ListItems.
+◦
+Solución: Eliminar ListItems duplicados.
+•
+UI-4 (Android + iOS - Avatar): Iniciales del avatar displayName.take(2).uppercase() no sigue el estándar de primera+última inicial.
+◦
+Solución: Cambiar a displayName!!.split(" ").filter { it.isNotBlank() }.take(2).map { it.first().uppercaseChar() }.joinToString("").
+•
+UI-5 (iOS - CookingScreen): detectHorizontalDragGestures funcional pero sin pista visual. Android tiene un pill animado.
+◦
+Solución: Añadir AnimatedVisibility con un pill Surface centrado en la parte inferior, con LaunchedEffect para auto-ocultar.
+•
+UI-6 (iOS - RecipeListScreen): Ausencia de buscador y filtros (dificultad, "Con mi stock"). La pantalla más visitada carece de funcionalidad básica.
+◦
+Solución: Añadir OutlinedTextField para búsqueda y FilterChips para dificultad y "Con mi stock", replicando la lógica de Android.
+3.2.3. Problemas Medios (🟡)
+•
+UI-7 (Desktop - Sidebar): El sidebar no muestra quién está logueado.
+◦
+Solución: Añadir HBox en la cabecera del sidebar con avatar (iniciales) y displayName.
+•
+UI-8 (Android + iOS - Onboarding): Páginas de onboarding con emoji sobre fondo plano, lo que da una primera impresión pobre.
+◦
+Solución: Añadir Box con Brush.verticalGradient como fondo de cada página para un efecto más premium.
+•
+UI-9 (Android - RecipeListScreen): Título "Recetas" duplicado en TopAppBar y dentro del contenido del tab.
+◦
+Solución: Eliminar el título interno o reemplazarlo por un subtítulo contextual (e.g., "N recetas").
+•
+UI-10 (Android + iOS - CookingScreen): El timer countdown es texto plano, difícil de leer rápidamente.
+◦
+Solución: Envolver el texto MM:SS en un Box con CircularProgressIndicator para un anillo visual.
+3.2.4. Problemas Bajos (🟢 - Polish)
+•
+UI-11 (iOS - StockScreen): Fechas de caducidad muestran "YYYY-MM-DD" raw, sin indicador de urgencia.
+◦
+Solución: Calcular daysLeft y mostrar "Caduca en N días" con colores contextuales (terciario, error).
+•
+UI-12 (Android + iOS - Haptics): Los hápticos están activos siempre, sin un toggle en preferencias.
+◦
+Solución: Añadir un hapticsEnabled: Boolean a ThemePreference/OnboardingPreference y un Switch en SettingsScreen (iOS) y ThemePickerDialog (Android).
+•
+UI-13 (iOS - RecipeListScreen): Falta el filtro "Con mi stock" presente en Android.
+◦
+Solución: Replicar la lógica de filtrado de Android en iOS, pasando StockRepository.
+3.2.5. Spacing y Tipografía (General)
+•
+Desktop Spacing: Sigue usando Insets hardcoded en Java, lo que lleva a inconsistencias.
+◦
+Solución: Crear constantes de espaciado y aplicarlas consistentemente.
+•
+iOS Spacing: Usa padding(16.dp) hardcoded.
+◦
+Solución: Crear un objeto Spacing.kt (commonMain) y aplicarlo. (Nota: Interfaz.md indica que esto ya se hizo en Sprint 25D, pero se mantiene como punto de verificación).
+•
+WCAG Contraste: Pendiente de verificación WCAG AA 4.5:1 en cada tema.
+◦
+Solución: Realizar pruebas visuales con herramientas externas.
+3.3. Prácticas de Codificación y Arquitectura
+Estado General: El proyecto sigue arquitecturas modernas (MVVM, Repository Pattern) y principios de desarrollo sólido. La sincronización multiplataforma y offline son pilares fundamentales, con reglas bien definidas.
+Puntos Fuertes:
+•
+Arquitectura Clara: MVVM en Android/iOS, MVVM ligero en Desktop. Repository Pattern.
+•
+Multiplataforma: Uso de KMP para iOS y lógica compartida, Ktor para red cross-platform, SQLDelight para DB cross-platform.
+•
+Sincronización Offline: Reglas claras para soft delete, Last Write Wins, syncVersion, sincronización incremental.
+•
+Contratos API: Uso de DTOs explícitos, JSON camelCase, API versionada (/api/v1/), paginación, manejo de errores consistente.
+•
+Gestión de Imágenes: Almacenamiento de URLs/metadata en backend, lazy loading, compresión, caché en clientes.
+•
+Rendimiento: Directrices para evitar bloquear UI Threads, lazy loading, paginación, optimización de queries.
+•
+Base de Datos: Uso de Flyway para migraciones, credenciales vía variables de entorno.
+•
+Principios Generales: Adherencia a "código mínimo viable", "cambios quirúrgicos", "evitar overengineering", "YAGNI".
+•
+Testing: Mención de 76 tests, 0 fallos en el backend, y directrices para validar compilación, imports y tests relevantes.
+Problemas Detectados / Áreas de Mejora:
+•
+DI en Android: Uso de AppContainer (DI manual). Aunque funcional, una librería de DI (Hilt/Koin) podría simplificar la gestión de dependencias en un proyecto de este tamaño y complejidad.
+•
+Estado de KMP: El build Gradle de iOS falla en Windows por un issue pre-existente SQLDelight plugin + Gradle 9.5.1. Esto ralentiza el desarrollo multiplataforma si no se tiene un entorno macOS.
+•
+Consistencia de DTOs: Aunque se enfatiza la sincronización multiplataforma, se han detectado 8 bugs contratos DTO Desktop + URLs endpoints en un sprint anterior (fix en Resumen.md), lo que indica que la validación cruzada es crítica y debe ser rigurosa.
+•
+Documentación de Decisiones: Aunque CLAUDE.md es exhaustivo, algunas decisiones de diseño (e.g., por qué se eligió JavaFX sobre Compose Desktop, o por qué KMP no se extiende a Desktop) podrían beneficiarse de una documentación más explícita.
+•
+Manejo de Errores Global: Aunque se menciona "manejo de errores consistente" en APIs, no se detalla cómo se gestionan los errores a nivel de UI en cada plataforma (e.g., Snackbar en Android, Toast en Desktop, alertas en iOS).
+Soluciones Propuestas:
+•
+Considerar Hilt/Koin: Evaluar la migración a una librería de DI en Android para mejorar la mantenibilidad.
+•
+Resolver Problema de Build KMP: Priorizar la resolución del problema de SQLDelight + Gradle para facilitar el desarrollo en Windows o asegurar un entorno macOS dedicado.
+•
+Automatizar Validación de Contratos: Implementar pruebas de integración o herramientas de validación de esquemas para DTOs y APIs para prevenir regresiones.
+•
+Documentar Decisiones Arquitectónicas: Añadir una sección en docs/ para justificar decisiones clave de stack y arquitectura.
+•
+Estandarizar Manejo de Errores UI: Documentar y aplicar un patrón consistente para mostrar errores al usuario en cada plataforma.
+4. Exposición Final del Estado del Proyecto y Problemas Detectados
+El proyecto "Recetas Familia" se encuentra en un estado de desarrollo avanzado y bien estructurado, con una visión clara y una implementación sólida en muchos aspectos. La documentación proporcionada (CLAUDE.md, README.md, Resumen.md, Interfaz.md) es excepcionalmente detallada y sirve como una guía robusta para el desarrollo.
+Estado General:
+•
+Funcionalidad: Gran parte de la funcionalidad principal (gestión de recetas, stock, menús, notas, autenticación, sincronización) está implementada y operativa en al menos una plataforma, y a menudo en varias.
+•
+Arquitectura: Las arquitecturas son modernas y adecuadas para un proyecto multiplataforma.
+•
+Seguridad: Existe una fuerte cultura de seguridad, con herramientas y directrices claras, y auditorías periódicas.
+•
+UI/UX: Se ha invertido mucho en la experiencia visual, con un sistema de temas completo y un plan de pulido detallado.
+Problemas Principales Detectados (Priorizados):
+1.
+Coherencia Visual Crítica (UI/UX): La falta de implementación de las fuentes Nunito/Lato en Android (UI-1) y la inconsistencia en los iconos de la NavigationBar (UI-2) son problemas críticos que afectan directamente la percepción "premium" de la aplicación.
+◦
+Impacto: La app no transmite la identidad visual deseada, pareciendo genérica.
+◦
+Solución Propuesta: Implementar las fuentes personalizadas y corregir los iconos de la NavigationBar de inmediato.
+2.
+Paridad de Funcionalidad UI/UX en iOS (UI/UX): iOS carece de funcionalidades básicas de interacción como el buscador y filtros en RecipeListScreen (UI-6) y pistas visuales en CookingScreen (UI-5), lo que degrada significativamente la experiencia de usuario en comparación con Android.
+◦
+Impacto: Experiencia inconsistente y menos funcional en iOS, una plataforma clave.
+◦
+Solución Propuesta: Priorizar la implementación de estas funcionalidades en iOS para lograr paridad con Android.
+3.
+Refinamiento de Detalles UI/UX (UI/UX): Varios problemas de nivel alto y medio (UI-3, UI-4, UI-7, UI-8, UI-9, UI-10) indican que, aunque la base visual es fuerte, el pulido final en detalles específicos aún es necesario para alcanzar la experiencia "premium" deseada.
+◦
+Impacto: Pequeñas fricciones que restan a la experiencia general.
+◦
+Solución Propuesta: Seguir el "Orden de ejecución recomendado" en Interfaz.md para abordar estos puntos de pulido.
+4.
+Desafíos de Build en KMP (Codificación): El problema de SQLDelight + Gradle en Windows para iOS (mencionado en Resumen.md) es un impedimento técnico que puede ralentizar el desarrollo multiplataforma.
+◦
+Impacto: Dificulta el desarrollo y la colaboración en entornos Windows para la plataforma iOS.
+◦
+Solución Propuesta: Investigar y resolver este problema técnico, o establecer un entorno de desarrollo macOS dedicado para iOS.
+5.
+Auditoría de Seguridad Continua (Seguridad): Aunque la seguridad es una prioridad, la falta de mención de auditorías de dependencias, estrategias de secret management en producción, y logging/monitoring de seguridad son áreas donde se puede fortalecer aún más la postura de seguridad.
+◦
+Impacto: Riesgo potencial de vulnerabilidades no detectadas en dependencias o en producción.
+◦
+Solución Propuesta: Implementar herramientas de auditoría de dependencias, documentar la estrategia de secretos y establecer un sistema de logging y monitorización de seguridad.
+Conclusión:
+El proyecto "Recetas Familia" está en una excelente trayectoria. Los problemas identificados son principalmente de refinamiento y paridad entre plataformas, lo cual es común en proyectos multiplataforma en esta fase. La base de código es sólida y las directrices de desarrollo son claras. Abordar los puntos críticos de UI/UX y los desafíos técnicos de KMP, junto con la mejora continua de la seguridad, permitirá que el proyecto alcance su visión de una aplicación familiar premium y excepcional.
