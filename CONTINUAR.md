@@ -219,7 +219,7 @@ mvn javafx:run -Dapi.base.url=http://localhost:8080/
 
 Stack: Spring Boot 3.5.14 + Java 21 + MySQL + Flyway + JWT.
 
-Estado: **73 tests, 0 fallos.**
+Estado: **76 tests, 0 fallos.**
 
 Modulos implementados:
 - auth (register, login, refresh, logout)
@@ -599,6 +599,43 @@ RecipeListScreen con carga incremental. PageResponse<T> ya soportado en el backe
   produccion real: migrar a Windows Credential Manager / macOS Keychain.
 - RecetasViewModel.compressImage: logica de imagen en ViewModel (MVP aceptable, Dispatchers.IO).
   Para produccion: mover a use case o repositorio.
+
+### Deuda tecnica detectada en auditoria triple (2026-05-31) — PENDIENTE
+
+**BLOQUEANTES para produccion publica (no MVP familiar privado):**
+
+- **SEC-1** `application-dev.yml` linea 19: `jwt.secret` tiene fallback hardcodeado en git
+  (`dev-only-change-this-secret-32-bytes-minimum`). Si `JWT_SECRET` env var no esta definida al arrancar
+  en perfil dev, el backend usa un secreto conocido publicamente. Eliminar el default; fallar en arranque
+  si no esta definida la variable.
+- **SEC-3** `/uploads/**` es publico sin autenticacion. Fotos de recetas y avatares accesibles por
+  cualquiera que conozca la URL (UUIDs dificultan enumeracion, no la eliminan). Para produccion: añadir
+  HandlerInterceptor con validacion JWT y ownership de familia.
+- **SEC-4** `AuthRateLimitFilter.java`: usa `getRemoteAddr()` directamente. Detras de proxy inverso
+  (nginx, Cloudflare) el rate limit deja de funcionar — todos los usuarios comparten la IP del proxy.
+  Implementar extraccion proxy-aware con `X-Forwarded-For` y lista blanca de proxies de confianza.
+
+**Pendientes de sprint:**
+
+- **SEC-7** `TokenRefreshAuthenticator.kt` Android (linea ~21): crea `OkHttpClient()` sin timeouts.
+  El cliente principal de Android tiene timeouts correctos desde la auditoria de Sprint 6, pero el
+  autenticador tiene su propio cliente bare. Añadir connectTimeout 10s + readTimeout 15s.
+- **SEC-6** iOS no tiene interceptor Ktor para refresh automatico en 401. La sesion expira sin
+  renovacion automatica. Implementar plugin Ktor que intercepte 401, rote token y reintente una vez.
+- **COD-3** `Repositories.kt` Android: `baseSyncVersion = null` enviado en el push. Reduce la
+  capacidad de deteccion de conflictos (servidor siempre gana sin comparar versiones).
+- **COD-4** `FamilyService.getFamilyStats()`: `lastActivityAt` solo consulta `RecipeRepository`.
+  Notas, stock, menus y shopping no actualizan este campo. Dato incorrecto en ProfileScreen.
+  Calcular el maximo entre todos los repositorios de entidades sincronizables.
+- **COD-7** `Repositories.kt` Android linea ~78: bloque `catch (_: Exception)` en la obtencion de
+  familias tras login swallows `CancellationException` de coroutines. Re-throw explicito necesario.
+- **COD-12** Instalador Desktop v1.1 empaquetado con JDK-24 (no LTS, soporte 6 meses). Para
+  produccion: recompilar con JDK-21 LTS (soporte hasta 2028). JDK-24 path: `C:\Program Files\Java\jdk-24`.
+- **COD-8** Sin tests de cliente: Android (ViewModel/Repository), Desktop (Repository), iOS (Repository).
+  Backend tiene 76 tests; clientes tienen cero. Añadir tests de los flujos criticos.
+- iOS push sync no implementado (read-only): ver limitacion documentada arriba en Sprint 20.
+- iOS Keychain `SecItemDelete` en logout: resultado `OSStatus` no verificado. Si falla silenciosamente,
+  el usuario puede quedar con tokens activos en Keychain pese a que la UI lo considere deslogueado.
 
 ## Auditoria completada (2026-05-28)
 
@@ -1825,9 +1862,23 @@ Para que las notificaciones se entreguen en background, en Xcode añadir:
 - Tests: **76 tests, 0 fallos**.
 
 ## Sprint 42 — Candidatos (próxima sesión)
-1. **Android:** `ProfileScreen` — integrar `GET /api/v1/families/{id}/stats` para mostrar totalMembers + totalStockItems en la tarjeta de familia.
-2. **iOS:** `RecipeListScreen` — skeleton shimmer (paridad con Android `SkeletonRecipeCard`).
-3. **Desktop:** `DashboardView` — mostrar stats de familia desde el nuevo endpoint (`totalRecipes`, `totalMembers`, `totalStockItems`).
+
+### Bloqueantes de seguridad (resolver antes de despliegue publico)
+1. **Backend** `application-dev.yml`: eliminar fallback JWT secret hardcodeado (SEC-1). Cambio de 1 linea, 15 min.
+2. **Backend** `SecurityConfig.java` + `WebMvcConfig.java`: autenticar `/uploads/**` con HandlerInterceptor + validacion ownership de familia (SEC-3).
+3. **Backend** `AuthRateLimitFilter.java`: extraccion IP proxy-aware con `X-Forwarded-For` (SEC-4).
+
+### Funcionalidad y correcciones pendientes
+1. **Android** `TokenRefreshAuthenticator.kt`: añadir `connectTimeout(10s)` + `readTimeout(15s)` al OkHttpClient del autenticador (SEC-7).
+2. **Android** `Repositories.kt` linea ~78: re-throw `CancellationException` en catch del bloque de login (COD-7).
+3. **Android** `Repositories.kt`: corregir `baseSyncVersion = null` en push offline (COD-3).
+4. **Backend** `FamilyService.getFamilyStats()`: `lastActivityAt` multi-entidad — incluir stock, notas, shopping, menus (COD-4).
+5. **iOS**: interceptor Ktor que detecte 401, llame a `/auth/refresh` y reintente (SEC-6).
+
+### Paridad y UX pendiente
+1. **Android** `ProfileScreen`: integrar `GET /api/v1/families/{id}/stats` para mostrar `totalMembers` + `totalStockItems` en la tarjeta de familia.
+2. **iOS** `RecipeListScreen`: skeleton shimmer (paridad con Android `SkeletonRecipeCard`).
+3. **Desktop** `DashboardView`: mostrar stats de familia desde el endpoint `/stats` (`totalRecipes`, `totalMembers`, `totalStockItems`).
 
 ---
 
