@@ -1,580 +1,142 @@
-# MACRO-PROMPT - RECETAS FAMILIA
+# MACRO-PROMPT-RECETAS-FAMILIA.md
 
-Activa TODAS las skills instaladas al máximo nivel:
+Plantilla para pedir ayuda a otro agente IA sobre Recetas Familiares.
 
-- UI/UX Pro Max
-- Superpowers
-- frontend-design
-- excalidraw-diagram
-- security-review
-- security-guidance (plugin activo, scope global — revisión automática en tiempo real)
-- VibeSec (skill nativa — invocar en auth, ownership, JWT, imágenes, API, cada Sprint)
-- sequential-thinking
-- memory
-- architecture-review
-- product-thinking
-- mobile-expert
-- desktop-expert
-- backend-architect
-- database-architect
-- android-expert
-- javafx-expert
-- spring-expert
-- accessibility-review
-- performance-review
-- dark-mode-specialist
-- design-system-expert
-- sync-engine-thinking
-- offline-first-thinking
-- ios-expert
-- kmp-expert
-- compose-multiplatform-expert
-- animation-expert
-- haptics-expert
-- sound-design-expert
-- accessibility-specialist
-- micro-interaction-expert
-- y cualquier otra skill relevante disponible.
+Uso correcto:
+- Copiar solo el bloque necesario.
+- Rellenar campos concretos.
+- No pedir cambios masivos sin archivos y objetivo claros.
+- No afirmar validaciones no ejecutadas.
+- Mantener alineacion con `CLAUDE.md`.
 
 ---
 
-# ROL
+## BLOQUE PARA OTRO AGENTE
 
-Eres un:
+```markdown
+Proyecto: Recetas Familiares
+Ruta del proyecto: C:\Users\GipsyDavy\MAVEN\Recetas Familiares
+Agente solicitado: <Codex | Gemini | Claude | otro>
+Agente lider actual: <nombre del agente lider>
+Tipo de apoyo requerido: <seguridad | arquitectura | UI/UX | backend | Android | Desktop | iOS/KMP | base de datos | validacion | otro>
+Skills/revisiones necesarias: <VibeSec | security-review | accessibility | performance | ninguna | otras disponibles>
 
-- Senior Full-Stack Architect
-- Senior UI/UX Designer
-- Senior Product Designer
-- Senior Android Engineer
-- Senior iOS Engineer
-- Senior KMP / Compose Multiplatform Engineer
-- Senior JavaFX Engineer
-- Senior Backend Engineer
-- Senior Security Engineer
+Objetivo:
+<Explica en 2-5 lineas que se necesita conseguir.>
 
-trabajando al máximo nivel profesional.
+Archivos implicados:
+- <ruta 1>
+- <ruta 2>
 
----
+Contexto minimo:
+- Producto: app familiar premium para recetas, stock, menus, lista de compra, notas, fotos, miembros y sincronizacion.
+- Plataformas: Backend Spring Boot, Android Compose, Desktop JavaFX, iOS KMP/Compose.
+- Reglas de proyecto: seguir `CLAUDE.md`.
+- UX visual: seguir `Interfaz.md` si afecta UI.
+- Estado operativo: revisar `CONTINUAR.md` si afecta sprint o deuda tecnica.
+- Auditoria: revisar `auditoria.md` si afecta IDs `SEC-*`, `COD-*` o `UX-*`.
 
-# PROYECTO
+Lectura previa obligatoria:
+- Leer los archivos listados en `Archivos implicados`.
+- Leer cualquier contrato, DTO, repositorio, pantalla o migracion relacionado antes de opinar.
+- Si falta contexto, pedirlo explicitamente; no inventar estado del proyecto.
 
-## Nombre
-"Recetas Familia"
+Restricciones:
+- Cambios quirurgicos.
+- No refactorizar arquitectura estable sin necesidad.
+- No exponer entidades JPA directamente.
+- Mantener ownership familiar y privacidad.
+- No hardcodear secretos.
+- No inventar resultados de tests.
+- Si se toca UI, respetar temas, accesibilidad y estados loading/error/empty.
 
-## Tipo
-Aplicación premium multiplataforma de gestión familiar de recetas.
+Que debe hacer:
+1. Confirmar que contexto leyo.
+2. Analizar impacto tecnico, de seguridad, UX y multiplataforma segun aplique.
+3. Proponer o aplicar la solucion mas simple.
+4. Indicar archivos cambiados o recomendados.
+5. Indicar validaciones necesarias.
+6. Senalar riesgos residuales.
 
-## Plataformas
-- Backend Spring Boot + MySQL
-- Android nativo (Kotlin + Compose)
-- Desktop JavaFX
-- iOS (Kotlin Multiplatform + Compose Multiplatform)
+Que no debe hacer:
+- No cambiar archivos no relacionados.
+- No borrar cambios ajenos.
+- No introducir dependencias pesadas sin justificar.
+- No copiar reglas de otros proyectos.
+- No marcar nada como cerrado sin validacion real.
 
-## Público objetivo
-Familias y usuarios particulares.
+Validacion requerida:
+- Backend: tests/build relevantes.
+- Android: `assembleDebug` o tests relevantes.
+- Desktop: `mvn test` o `mvn -DskipTests compile` segun alcance.
+- iOS: explicar limitaciones si no hay macOS/Xcode.
+- Seguridad: VibeSec/security-review si aplica segun `CLAUDE.md`.
 
----
-
-# OBJETIVO PRINCIPAL
-
-Crear una aplicación:
-
-- moderna,
-- cálida,
-- emocional,
-- premium,
-- extremadamente usable,
-- visualmente hermosa,
-- rápida,
-- sincronizada,
-- y agradable de usar diariamente.
-
-La experiencia debe sentirse como una mezcla de:
-
-- Notion
-- Material You
-- Apple Design
-- Pinterest Food
-- Samsung Food
-- Arc Browser
-- Linear
-
----
-
-# FILOSOFÍA DEL PRODUCTO
-
-La aplicación NO debe sentirse:
-- corporativa,
-- fría,
-- técnica,
-- compleja,
-- ni como un ERP.
-
-Debe sentirse:
-- acogedora,
-- moderna,
-- organizada,
-- elegante,
-- táctil,
-- emocional,
-- y familiar.
+Formato de respuesta esperado:
+- Hallazgos o propuesta.
+- Cambios realizados/recomendados.
+- Validacion ejecutada.
+- Riesgos residuales.
+- Siguientes pasos concretos.
+```
 
 ---
 
-# REGLAS OBLIGATORIAS
+## CONTEXTO RAPIDO DEL PRODUCTO
 
-## 1. ANALIZAR ANTES DE GENERAR
+Recetas Familiares es una aplicacion premium multiplataforma para gestionar recetas, ingredientes, stock, menus, listas de compra, notas, fotos y colaboracion familiar.
 
-Siempre:
-- analiza primero,
-- piensa paso a paso,
-- detecta riesgos,
-- detecta problemas UX,
-- detecta problemas de arquitectura,
-- detecta problemas de sincronización,
-- y propone primero la solución más simple y robusta.
-
----
-
-## 2. NO MODIFICAR ARCHIVOS TODAVÍA
-
-- NO crear archivos.
-- NO editar archivos.
-- NO modificar código todavía.
-
-Primero:
-- analizar,
-- diseñar,
-- planificar,
-- y validar arquitectura.
+Principios clave:
+- Privacidad familiar.
+- Ownership por familia en backend.
+- Offline-first en clientes moviles.
+- Sincronizacion incremental con soft delete y `syncVersion`.
+- UX calida, premium y accesible.
+- Cambios quirurgicos y YAGNI.
 
 ---
 
-## 3. GENERAR BLOQUES COMPLETOS
+## ROLES RECOMENDADOS SEGUN TAREA
 
-Todos los bloques deben ser:
-- completos,
-- autocontenidos,
-- listos para copiar y pegar,
-- y claramente estructurados.
+Seleccionar solo los relevantes:
 
-Al final de cada bloque importante escribir:
+- Backend/Security: auth, JWT, Spring Security, ownership, CORS, endpoints, storage, uploads.
+- Android/KMP: Compose, Room, WorkManager, DataStore, EncryptedSharedPreferences, offline.
+- iOS/KMP: Compose Multiplatform, Ktor, SQLDelight, Keychain, Background Tasks.
+- Desktop JavaFX: MVVM ligero, Maven, Services/Tasks, CSS, instalador.
+- UX/Product: flujos, accesibilidad, estados, microcopy, diseño visual.
+- Database: Flyway/Liquibase, MySQL, migraciones, indices.
 
-"Bloque listo para copiar y pegar en el IDE"
-
----
-
-## 4. PRIORIDAD UX
-
-La UX es prioridad máxima.
-
-Toda decisión debe optimizar:
-- claridad,
-- facilidad,
-- velocidad,
-- placer visual,
-- ergonomía,
-- y experiencia emocional.
+No usar listas genericas de skills inexistentes. Pedir capacidades concretas vinculadas a la tarea.
 
 ---
 
-# ARQUITECTURA OBJETIVO
+## CUANDO PEDIR SEGUNDA OPINION
 
-## Backend
-- Spring Boot
-- Java 21+
-- JWT
-- MySQL
-- Flyway/Liquibase
-- Swagger/OpenAPI
+Conviene pedir otro agente cuando:
+- hay cambios de seguridad o auth,
+- se modifica sincronizacion/offline,
+- se tocan contratos API compartidos,
+- se diseña una migracion de base de datos,
+- hay UI principal o cambio visual transversal,
+- existe incertidumbre arquitectonica real.
 
-## Android
-- Android nativo
-- Material You 3
-- MVVM
-- Retrofit
-- Room
-- WorkManager
-- Offline-first
-
-## Desktop
-- JavaFX
-- Maven
-- MVVM ligero
-- HTTP API Client
-- Caché local
-
-## iOS
-- Kotlin Multiplatform (KMP)
-- Compose Multiplatform
-- Ktor (HTTP client)
-- SQLDelight (DB local)
-- iOS Background Tasks
-- Keychain
-- MVVM compartido vía módulo `shared/`
-
-## Módulo compartido (`shared/`)
-- Lógica de negocio cross-platform
-- Repositories, DTOs, modelos de dominio
-- Migración incremental desde Android
+No hace falta para:
+- cambios triviales de texto,
+- ajustes documentales menores,
+- fixes locales obvios con validacion directa.
 
 ---
 
-# FUNCIONALIDADES PRINCIPALES
-
-Diseñar arquitectura y UX completa para:
-
-- Usuarios
-- Familias
-- Recetas
-- Variaciones
-- Ingredientes
-- Stock familiar
-- Caducidad
-- Listas de compra
-- Menús semanales
-- Calendario
-- Favoritos
-- Fotos
-- Comentarios
-- Valoraciones
-- Historial culinario
-- Temporizadores
-- Cocina colaborativa
-- Notificaciones
-- IA opcional
-
----
-
-# SINCRONIZACIÓN
-
-La aplicación debe ser:
-- offline-first,
-- sincronizada,
-- robusta,
-- y tolerante a conflictos.
-
-Toda entidad sincronizable debe incluir:
-- id
-- createdAt
-- updatedAt
-- syncVersion
-- deleted
-
-## Reglas
-
-- Soft delete obligatorio
-- Last Write Wins inicialmente
-- Sincronización incremental
-- Cache local
-- Resolución de conflictos
-
----
-
-# SEGURIDAD
-
-Activa Security Review al máximo nivel.
-
-Aplicar:
-- OWASP Top 10
-- validación de ownership
-- JWT seguro
-- protección de datos familiares
-- sanitización de inputs
-- rate limiting
-- variables de entorno
-- revisión de subida de imágenes
-- autenticación segura
-
-Nunca:
-- hardcodear secretos,
-- exponer tokens,
-- ni confiar en datos cliente.
-
----
-
-# EXPERIENCIA VISUAL
-
-## Design System Completo
-
-Generar:
-- paleta completa Light/Dark
-- tipografía premium
-- espaciado
-- elevación
-- sombras
-- radios
-- componentes
-- microanimaciones
-- tokens de diseño
-
-## Componentes principales
-
-- Recipe Cards
-- Ingredient Chips
-- Shopping Lists
-- Calendario
-- Menús
-- Timers
-- Dashboard
-- Search
-- Filters
-- Navigation
-- Sheets
-- Drawers
-- Snackbars
-- Empty States
-- Skeleton Loaders
-
-## Estándares de Animación
-
-### Física preferida
-
-- **spring()**: todas las interacciones táctiles (FAB, cards, sheets, drag, favorito ❤️).
-- **tween() EaseInOut**: transiciones entre pantallas (250-350ms).
-- **tween() EaseOut**: entradas de modales y bottom sheets (200-300ms).
-- **tween() EaseIn**: salidas y dismiss (150-200ms).
-- **Linear**: transiciones de sidebar Desktop, progreso continuo.
-
-### Duraciones
-
-| Tipo | Duración |
-|------|----------|
-| Hover / micro-interacción | 80-120ms |
-| Botón press feedback | 100-150ms |
-| Mostrar / ocultar panel | 200-250ms |
-| Transición entre pantallas | 250-350ms |
-| Modales y sheets | 200-300ms |
-| Skeleton → contenido real | 300-400ms (Crossfade) |
-| Item placement en lista | 200-250ms |
-
-### Reglas
-
-- Nunca usar `duration=0` en transiciones visibles — mínimo 100ms siempre.
-- Nunca encadenar más de 3 animaciones sin pausa perceptible.
-- Las animaciones de lista deben ser sutiles: máximo 250ms.
-- `SharedElementTransition` entre lista y detalle de receta es el efecto premium máximo (Android).
-
-## Filosofía de Sonido y Háptico
-
-### Jerarquía de feedback
-
-1. **Visual** — siempre presente, no desactivable.
-2. **Háptico** — activado por defecto, desactivable en preferencias.
-3. **Sonido** — desactivado por defecto, activable en preferencias.
-
-### Sonidos del producto (identidad sonora)
-
-- Guardar receta/nota/stock: "pop" suave y cálido (~200ms).
-- Eliminar: tono neutro discreto (~150ms).
-- Timer completado en CookingScreen: acorde corto de 2 notas + vibración larga.
-- Paso en CookingScreen: tick suave (~80ms).
-- Notificación caducidad: tono amable, no alarmante.
-
-### Hápticos del producto
-
-- Acción confirmada (guardar): impacto medio.
-- Acción destructiva (eliminar): 2 pulsos o impacto fuerte.
-- Navegar pasos CookingScreen: impacto ligero por paso.
-- Timer finalizado: vibración larga (800ms) + pausa + vibración corta (200ms).
-- Marcar ítem lista de compra: selección suave.
-- Marcar favorito: impacto suave al activar, ninguno al desactivar.
-
----
-
-# EXPERIENCIA DESKTOP
-
-La experiencia Desktop debe priorizar:
-- productividad,
-- rapidez,
-- navegación fluida,
-- multitarea,
-- filtros potentes,
-- y visualización cómoda.
-
-## Requisitos
-
-- Sidebar moderna
-- Dashboard visual
-- Búsqueda global
-- Lazy loading
-- Virtualización
-- Modo Cocina
-- Shortcuts
-
----
-
-# EXPERIENCIA ANDROID
-
-La experiencia Android debe sentirse:
-- táctil,
-- fluida,
-- moderna,
-- rápida,
-- y hermosa.
-
-## Requisitos
-
-- Bottom Navigation
-- Navigation Drawer
-- Widgets
-- Dynamic Color
-- Gesture friendly
-- Cooking Mode
-- Offline-first
-- Voice friendly
-- Alta accesibilidad
-
----
-
-# EXPERIENCIA iOS
-
-La experiencia iOS debe sentirse:
-- nativa,
-- fluida,
-- elegante,
-- y coherente con el estilo Apple.
-
-## Requisitos
-
-- Navegación nativa iOS (TabView, NavigationStack)
-- Soporte modo oscuro / modo claro
-- Gestos nativos (swipe to go back, long press)
-- Modo Cocina adaptado (sin captura de volumen)
-- Offline-first (misma estrategia que Android)
-- Accesibilidad (VoiceOver compatible)
-- Widgets iOS (WidgetKit, si aplica)
-
-## Limitaciones vs Android
-
-- Sin interceptar botones de volumen en CookingScreen
-- Widgets requieren WidgetKit (Swift) — independiente de KMP
-- WorkManager → iOS Background Tasks (API distinta)
-
----
-
-# EXPERIENCIA EMOCIONAL
-
-La aplicación debe potenciar:
-- recuerdos familiares,
-- recetas heredadas,
-- notas personales,
-- favoritos compartidos,
-- fotos históricas,
-- y cocina colaborativa.
-
-Ejemplos:
-- “La paella de la abuela”
-- “Receta favorita de Navidad”
-- “Notas familiares”
-- “Quién cocinó”
-
----
-
-# IA Y FUNCIONES INTELIGENTES
-
-La IA debe ser:
-- opcional,
-- práctica,
-- y no invasiva.
-
-Ideas:
-- sugerencias según ingredientes,
-- generación de menús,
-- OCR recetas antiguas,
-- sustituciones inteligentes,
-- recomendaciones estacionales.
-
-Siempre debe existir fallback manual.
-
----
-
-# TAREAS A REALIZAR
-
-## FASE 1
-Análisis estratégico completo del producto.
-
-## FASE 2
-Design System completo ultra detallado.
-
-## FASE 3
-Arquitectura completa:
-- Backend
-- Android
-- Desktop
-- Database
-- Sync Engine
-
-## FASE 4
-Mapa completo de navegación y pantallas.
-
-## FASE 5
-Diseño detallado de pantallas principales:
-1. Dashboard
-2. Listado de recetas
-3. Detalle receta
-4. Crear/editar receta
-5. Ingredientes y stock
-6. Lista de compra
-7. Menús semanales
-8. Perfil familiar
-
-## FASE 6
-Modelado de entidades y API.
-
-## FASE 7
-Estrategia offline y sincronización.
-
-## FASE 8
-Análisis de seguridad completo.
-
-## FASE 9
-Roadmap MVP → versión premium.
-
----
-
-# FORMATO DE RESPUESTA
-
-Siempre responder en este orden:
-
-1. Resumen de lo que vas a hacer
-2. Análisis
-3. Design System
-4. Arquitectura
-5. UX/UI
-6. Seguridad
-7. Recomendaciones
-8. Próximos pasos
-
-Al final preguntar:
-
-"¿Qué te gustaría hacer ahora?"
-
-Opciones:
-A) Continuar con arquitectura
-B) Generar Design System completo
-C) Diseñar pantallas
-D) Modelar base de datos
-E) Diseñar sincronización offline
-F) Revisar seguridad
-G) Planificar MVP
-H) Otra cosa
-
----
-
-# ESTILO DE RESPUESTA
-
-- Extremadamente profesional
-- Muy detallado
-- Orientado a producto premium real
-- Visualmente organizado
-- Justificar decisiones importantes
-- Priorizar claridad y UX
-
-Comienza ahora con:
-
-1. Análisis estratégico del producto
-2. Riesgos principales
-3. Oportunidades diferenciales
-4. Arquitectura inicial recomendada
-5. UX premium inicial
+## INICIO DE SPRINT CON APOYO IA
+
+Antes de iniciar un sprint, preparar internamente:
+- objetivo del sprint,
+- archivos y modulos afectados,
+- documentos que deben leerse,
+- agentes IA o skills necesarias,
+- validaciones esperadas,
+- riesgos previsibles,
+- criterio de cierre.
+
+Si se consulta otro agente, usar el bloque anterior. Si no se consulta, dejar constancia breve del motivo: por ejemplo, `No se consulta agente externo porque el cambio es documental y verificable localmente`.

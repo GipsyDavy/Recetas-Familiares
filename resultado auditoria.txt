@@ -1,4 +1,5 @@
 codex:
+
 Voy a empezar por las instrucciones locales: leeré los `.md` de la raíz y el skill de seguridad aplicable, y después auditaré el código sin tocar archivos.
 
 He cargado la guía de seguridad aplicable. Ahora voy a leer todos los `.md` de la raíz para fijar las reglas del proyecto antes de mirar implementación.
@@ -120,11 +121,8 @@ F) Revisar seguridad
 G) Planificar MVP  
 H) Otra cosa
 
-
-
-
-
 Gemini:
+
 Auditoría Completa del Proyecto "Recetas Familia"
 1. Visión General del Proyecto
 "Recetas Familia" es una aplicación premium multiplataforma (Android, Desktop, iOS) diseñada para la gestión familiar de recetas, ingredientes, menús y memoria culinaria compartida. El proyecto busca ofrecer una experiencia cálida, moderna, premium, fluida y emocional, diferenciándose de aplicaciones corporativas o simples colecciones de recetas.
@@ -367,3 +365,854 @@ Impacto: Riesgo potencial de vulnerabilidades no detectadas en dependencias o en
 Solución Propuesta: Implementar herramientas de auditoría de dependencias, documentar la estrategia de secretos y establecer un sistema de logging y monitorización de seguridad.
 Conclusión:
 El proyecto "Recetas Familia" está en una excelente trayectoria. Los problemas identificados son principalmente de refinamiento y paridad entre plataformas, lo cual es común en proyectos multiplataforma en esta fase. La base de código es sólida y las directrices de desarrollo son claras. Abordar los puntos críticos de UI/UX y los desafíos técnicos de KMP, junto con la mejora continua de la seguridad, permitirá que el proyecto alcance su visión de una aplicación familiar premium y excepcional.
+
+
+
+Claude code:
+
+ AUDITORÍA COMPLETA — RECETAS FAMILIARES
+
+  Fecha: 2026-05-31 | Sprint auditado: hasta Sprint
+  41 (HEAD: v1.1)
+
+  ---
+  1. ESTADO GENERAL DEL PROYECTO
+
+  El proyecto se encuentra en un estado avanzado y
+  funcional para MVP. La arquitectura es correcta,
+  el código es limpio y se cumple el principio de
+  cambios quirúrgicos a lo largo de todos los
+  sprints. Los cuatro módulos principales (Backend,
+  Android, Desktop, iOS) están interconectados y los
+  contratos API son estables.
+
+  Métricas actuales:
+  - Backend: 76 tests, 0 fallos
+  - Android: BUILD SUCCESSFUL (Kotlin 2.3.20 + AGP
+  9.2.0)
+  - Desktop: BUILD SUCCESS (Java 21 + JavaFX 21.0.2)
+  - iOS: código Kotlin completo, compilación binaria
+  solo en macOS
+
+  Estructura validada:
+  - 11 migraciones Flyway (V1–V11), sin gaps
+  - JWT + refresh tokens rotantes con SHA-256
+  - Soft delete en todas las entidades
+  sincronizables
+  - syncVersion presente en todas las entidades
+  offline-first
+
+  ---
+  2. PROBLEMAS DE SEGURIDAD
+
+  🔴 ALTO — S-1: JWT secret con fallback hardcodeado
+  en git
+
+  Archivo:
+  backend/src/main/resources/application-dev.yml,
+  línea 19
+  secret: ${JWT_SECRET:dev-only-change-this-secret-3
+  2-bytes-minimum}
+
+  Problema: Si la variable de entorno JWT_SECRET no
+  está definida al arrancar en perfil dev, el
+  backend usa un secreto conocido y público
+  almacenado en el repositorio git. Cualquier
+  persona con acceso al repositorio puede forjar
+  tokens JWT válidos para ese entorno.
+
+  Riesgo: JWT forgery completo en cualquier entorno
+  dev/CI/CD donde no se defina JWT_SECRET.
+
+  Solución propuesta: Eliminar el valor por defecto.
+  Si JWT_SECRET no está definido, el backend debe
+  fallar en el arranque con un mensaje claro.
+  Alternativamente, generar un valor aleatorio por
+  arranque (solo aceptable si el backend no tiene
+  sesiones activas entre reinicios, que es el caso
+  con JWT stateless).
+
+  ---
+  🔴 ALTO — S-2: Rate Limiter bypassable detrás de
+  proxy inverso
+
+  Archivo: backend/src/main/java/.../security/AuthRa
+  teLimitFilter.java, línea 73
+  String key = request.getRemoteAddr() + ":" +
+  request.getRequestURI();
+
+  Problema: El limitador de peticiones de auth usa
+  getRemoteAddr() directamente. Si el backend se
+  despliega detrás de un proxy inverso (nginx,
+  Cloudflare, AWS ALB), getRemoteAddr() devolverá
+  siempre la IP del proxy — no la IP del cliente
+  real. Resultado: todos los usuarios comparten el
+  mismo contador y el rate limit es trivialmente
+  inefectivo para ataques de fuerza bruta.
+
+  Riesgo: Brute force sin restricciones sobre
+  /api/v1/auth/login y /api/v1/auth/register.
+
+  Solución propuesta: Implementar extracción
+  proxy-aware:
+  String ip = Optional.ofNullable(request.getHeader(
+  "X-Forwarded-For"))
+      .map(h -> h.split(",")[0].trim())
+      .orElse(request.getRemoteAddr());
+  Con validación de que el proxy sea de confianza
+  (lista blanca de IPs de proxy). Alternativamente,
+  usar ForwardedHeaderFilter de Spring con
+  configuración explícita de trusted proxies.
+
+  ---
+  🟠 MEDIO — S-3: Fotos y avatares accesibles
+  públicamente sin autenticación
+
+  Archivos: SecurityConfig.java línea 72,
+  WebMvcConfig.java
+
+  .requestMatchers("/uploads/**").permitAll()
+
+  Problema: Todas las imágenes subidas (fotos de
+  recetas, avatares de usuario) son accesibles sin
+  ningún tipo de autenticación desde cualquier
+  cliente que conozca la URL. Las URLs tienen nombre
+  UUID aleatorio, lo que dificulta la enumeración,
+  pero no la elimina: los IDs aparecen en las
+  respuestas API, en logs, en el portapapeles si el
+  usuario copia textos de receta, y potencialmente
+  en logs de proxies.
+
+  Riesgo: Fotos de recetas familiares privadas
+  accesibles sin login. Para un proyecto con
+  filosofía de "privacidad y control total de datos
+  familiares", esto contradice el propósito del
+  producto.
+
+  Solución propuesta (escalonada):
+  1. MVP mínimo: Añadir autenticación JWT al
+  endpoint /uploads/** mediante un
+  HandlerInterceptor. No requiere cambiar el
+  almacenamiento.
+  2. Producción: Mover a un bucket S3/MinIO con URLs
+  prefirmadas de corta duración.
+
+  ---
+  🟠 MEDIO — S-4: Desktop — Tokens en Windows
+  Registry sin cifrar
+
+  Archivo:
+  desktop/src/main/java/.../core/AppSession.java,
+  líneas 25-46
+
+  private final Preferences prefs =
+  Preferences.userRoot().node(PREF_NODE);
+  // ...
+  prefs.put(KEY_ACCESS, accessToken);
+  prefs.put(KEY_REFRESH, refreshToken);
+
+  Problema: java.util.prefs en Windows escribe
+  directamente en el Registro de Windows
+  (HKEY_CURRENT_USER\Software\JavaSoft\Prefs\recetas
+  -familiares). El access token JWT y el refresh
+  token quedan almacenados en texto plano, legibles
+  por cualquier proceso del usuario o por alguien
+  con acceso físico al PC.
+
+  Riesgo: Robo de tokens de sesión. Si el PC es
+  compartido o tiene malware, la sesión queda
+  comprometida.
+
+  Estado documentado: La propia clase tiene un
+  comentario que lo documenta como deuda técnica
+  MVP.
+
+  Solución propuesta: Migrar a Windows Credential
+  Manager usando ICryptProtectData (DPAPI) vía JNA,
+  o usar java.security.Keystore con el proveedor
+  Windows-MY. En macOS/Linux: SecKeychainAdd o
+  libsecret.
+
+  ---
+  🟠 MEDIO — S-5: Android —
+  TokenRefreshAuthenticator sin timeouts
+
+  Archivo: android/app/src/main/java/.../data/remote
+  /TokenRefreshAuthenticator.kt, línea 21
+
+  private val client = OkHttpClient()
+
+  Problema: El OkHttpClient creado en el
+  autenticador de refresh token no tiene
+  configurados connectTimeout, readTimeout ni
+  callTimeout. Si el servidor no responde durante un
+  refresh, el hilo del autenticador queda bloqueado
+  indefinidamente.
+
+  Riesgo: La aplicación Android puede congelarse en
+  situaciones de conectividad degradada durante la
+  renovación automática del token.
+
+  Solución propuesta:
+  private val client = OkHttpClient.Builder()
+      .connectTimeout(10, TimeUnit.SECONDS)
+      .readTimeout(15, TimeUnit.SECONDS)
+      .build()
+
+  ---
+  🟡 BAJO — S-6: JWT carece de claims iss y aud
+
+  Archivo: backend/src/main/java/.../security/JwtSer
+  vice.java, líneas 36-47
+
+  Problema: Los tokens JWT emitidos no incluyen
+  issuer ni audience. Si se despliegan múltiples
+  instancias del backend con el mismo JWT_SECRET
+  (ej. prod y staging comparten secreto por error),
+  un token de staging sería aceptado en prod.
+
+  Solución propuesta: Añadir .issuer("recetas-famili
+  ares").audience().add("recetas-api") en el builder
+  y validarlos en validateAndGetUserId.
+
+  ---
+  🟡 BAJO — S-7: Error de FamilyService echo del
+  input del usuario
+
+  Archivo: backend/src/main/java/.../families/Family
+  Service.java, línea 149
+
+  throw new
+  ResponseStatusException(HttpStatus.BAD_REQUEST,
+  "Invalid role: " + roleStr);
+
+  Problema: El valor enviado por el cliente se
+  refleja directamente en el mensaje de error.
+  Aunque el riesgo de XSS en una API JSON es muy
+  bajo, es mala práctica echar el input sin
+  sanitizar.
+
+  Solución propuesta: Cambiar a "Invalid role value"
+  sin incluir roleStr.
+
+  ---
+  🟡 BAJO — S-8: Logout no invalida el JWT de acceso
+
+  Problema: AuthService.logout() revoca el refresh
+  token pero el JWT de acceso sigue siendo válido
+  hasta su expiración (15 minutos). Tras un logout,
+  el token puede reutilizarse.
+
+  Estado: Tradeoff conocido de JWT stateless.
+  Mitigado por el TTL de 15 minutos.
+
+  Solución propuesta (para producción): Implementar
+  una blocklist en Redis de tokens revocados hasta
+  su TTL. Alternativa lightweight: reducir TTL a 5
+  minutos.
+
+  ---
+  🟡 BAJO — S-9: Endpoint de sync/pull sin límite de
+  tamaño de respuesta
+
+  Archivo:
+  backend/src/main/java/.../sync/SyncService.java
+
+  Problema: GET /api/v1/families/{familyId}/sync/pul
+  l?since=<epoch> devuelve todos los registros
+  modificados desde la fecha indicada. En el primer
+  sync o tras un período largo sin conexión, puede
+  devolver miles de registros en un solo JSON. No
+  hay paginación ni límite de items por respuesta.
+
+  Riesgo: Consumo excesivo de memoria en backend y
+  cliente; potencial de abuso.
+
+  Solución propuesta: Añadir paginación incremental
+  al sync pull (?since=X&page=0&size=100) y devolver
+  hasMore: true/false en la respuesta.
+
+  ---
+  🟡 BAJO — S-10: OpenAPI/Swagger en permitAll 
+  aunque deshabilitado en prod
+
+  Archivo: SecurityConfig.java, líneas 74-78
+
+  "/v3/api-docs/**",
+  "/swagger-ui/**",
+  "/swagger-ui.html"
+
+  Problema: Estos paths están en la lista de acceso
+  público en SecurityConfig. En producción,
+  application-prod.yml deshabilita Swagger
+  (devuelven 404), pero si Swagger se re-habilitara
+  accidentalmente, estaría inmediatamente público
+  sin ninguna autenticación.
+
+  Solución propuesta: Mover estos paths a un grupo
+  condicional según perfil, o añadir autenticación
+  básica al swagger en staging.
+
+  ---
+  3. PROBLEMAS DE CODIFICACIÓN
+
+  Backend
+
+  C-1: FamilyStats.lastActivityAt solo considera
+  recetas
+
+  Archivo: FamilyService.java, líneas 119-126
+
+  Instant lastActivity = recipeRepository
+      .findFirstByFamily_IdAndDeletedFalseOrderByUpd
+  atedAtDesc(familyId)
+      .map(RecipeEntity::getUpdatedAt)
+      .orElse(null);
+
+  Problema: lastActivityAt solo refleja la última
+  modificación de recetas. Crear/editar stock items,
+  notas, shopping lists o menús no actualiza este
+  campo. El dato que se muestra al usuario en la
+  ProfileScreen Android es incorrecto.
+
+  Solución: Calcular el máximo entre todos los
+  repositories: max(recipeUpdatedAt, stockUpdatedAt,
+  noteUpdatedAt, ...).
+
+  ---
+  C-2: AuthService.requirePrimaryFamily no
+  determinista con múltiples familias
+
+  Archivo: AuthService.java, líneas 109-113
+
+  return familyMemberRepository.findFirstByUser_IdAn
+  dDeletedFalse(user.getId())
+      .map(FamilyMemberEntity::getFamily)
+      .orElseThrow(...)
+
+  Problema: Si un usuario pertenece a más de una
+  familia (invitado a una segunda), el login siempre
+  elige la primera en orden de base de datos (no
+  determinista). El usuario no puede seleccionar la
+  familia activa.
+
+  Estado: Documentado como limitación MVP.
+
+  Solución: Para producción, devolver la familia con
+  rol OWNER primero, o implementar selección de
+  familia activa post-login.
+
+  ---
+  C-3: SyncService — constructor con 12 dependencias
+  inyectadas
+
+  Archivo: SyncService.java
+
+  Problema: El constructor inyecta 12 repositorios
+  distintos. Este service tiene acoplamiento extremo
+  y se convertirá en un punto de fallo único a
+  medida que crezca.
+
+  Solución: Dividir en sub-servicios por dominio
+  (RecipeSyncService, StockSyncService, etc.) que
+  SyncService orqueste.
+
+  ---
+  Android
+
+  C-4: RecetasViewModel contiene lógica de
+  compresión de imagen
+
+  Archivo: RecetasViewModel.kt
+
+  Problema: La compresión de bitmap, lectura de URI
+  y codificación JPEG están en el ViewModel. Esto
+  viola la separación de responsabilidades del
+  patrón MVVM.
+
+  Estado: Documentado como MVP-aceptable en
+  CONTINUAR.md.
+
+  Solución: Mover a UserRepository.uploadAvatar() o
+  a un ImageProcessor de capa de datos.
+
+  ---
+  C-5: Sentinel syncVersion=0 ambiguo en el sync
+  offline
+
+  Archivos: Repositories.kt, SyncWorker.kt
+
+  Problema: syncVersion=0 se usa como flag de
+  "pendiente de push". Sin embargo, en un pull
+  inicial, los registros recibidos del servidor
+  también podrían tener syncVersion=0 (si el backend
+  los generó con ese valor inicial). Esto podría
+  causar falsos positivos en
+  findPendingCreate/Delete().
+
+  Solución: Usar un campo booleano explícito
+  pendingSync: Boolean o una columna localOnly:
+  Boolean en Room para distinguir registros creados
+  offline de los sincronizados.
+
+  ---
+  C-6: Login en Repositories.kt swallows FamilyRole
+  fetch exception silently
+
+  Archivo: Repositories.kt, línea 78
+
+  try {
+      val families = api.families()
+      sessionStore.familyRole = families.firstOrNull
+  { it.id == response.family.id }?.role
+  } catch (_: Exception) { }
+
+  Problema: Si la petición de familias falla,
+  familyRole queda como null. El usuario aparece
+  como MEMBER incluso si es OWNER/ADMIN. La
+  excepción se descarta silenciosamente incluyendo
+  posibles CancellationException de coroutines
+  (aunque el _ captura todo en Kotlin).
+
+  Solución: Re-throw CancellationException
+  explícitamente:
+  } catch (e: Exception) {
+      if (e is CancellationException) throw e
+  }
+
+  ---
+  Desktop
+
+  C-7: SoundPlayer silencia todas las excepciones
+  sin log
+
+  Archivo:
+  desktop/src/main/java/.../ui/SoundPlayer.java,
+  líneas 56-58
+
+  } catch (Exception ignored) {
+      // Sound is optional UX feedback.
+  }
+
+  Problema: No se registra ningún log cuando el
+  sistema de audio falla. En sistemas sin
+  dispositivo de audio (servidores, algunos entornos
+  Windows), los errores se pierden silenciosamente,
+  haciendo imposible el diagnóstico.
+
+  Solución: Logger.getLogger(SoundPlayer.class.getNa
+  me()).fine("Audio unavailable: " +
+  e.getMessage());
+
+  ---
+  C-8: Desktop GlobalSearchView opera sobre datos en
+  caché sin indicador de actualización
+
+  Archivos: GlobalSearchView.java, MainWindow.java
+
+  Problema: La búsqueda global de Desktop filtra
+  sobre los caches en memoria. Si el usuario busca
+  algo que existe en el servidor pero no se ha
+  sincronizado localmente, no lo encontrará. No hay
+  ningún indicador visual de cuándo se actualizaron
+  los datos.
+
+  Solución: Mostrar "Datos de hace Xm · Actualizar"
+  en el header del GlobalSearchView.
+
+  ---
+  C-9: Desktop carece de interceptor de logging para
+  HTTP en dev
+
+  Archivo: ApiClient.java
+
+  Problema: No hay ningún OkHttp Interceptor de
+  logging configurado para el cliente Desktop. En
+  desarrollo, esto hace que la depuración de
+  llamadas API sea muy difícil.
+
+  Solución: Añadir HttpLoggingInterceptor (ya es
+  dependencia de OkHttp) condicionado a una
+  propiedad de sistema app.debug=true.
+
+  ---
+  iOS
+
+  C-10: Build iOS roto en Windows (SQLDelight +
+  Gradle 9.5.1)
+
+  Archivo: ios/composeApp/build.gradle.kts
+
+  Problema: El build de iOS falla en Windows con
+  DefaultArtifactPublicationSet. Este error está
+  presente desde Sprint 19 y no se ha resuelto. Si
+  bien iOS requiere macOS para compilar el binario,
+  el error impide incluso la validación del código
+  Kotlin multiplataforma en el entorno de desarrollo
+  actual.
+
+  Solución propuesta: Actualizar SQLDelight a 2.1.x
+  (compatible con Gradle 9.x) o fijar Gradle a 8.x
+  para el proyecto iOS.
+
+  ---
+  C-11: iOS Keychain SecItemDelete en clear() falla
+  silenciosamente
+
+  Archivo: ios/composeApp/src/iosMain/.../core/Sessi
+  onStore.ios.kt
+
+  Problema: El logout en iOS llama a SecItemDelete
+  para eliminar tokens del Keychain, pero el
+  resultado (OSStatus) no se verifica. Si la
+  operación falla (Keychain locked, item not found),
+  el usuario queda con tokens potencialmente
+  activos en Keychain aunque la UI lo considere
+  deslogueado.
+
+  Solución: Verificar el OSStatus y registrar
+  errores cuando status != errSecSuccess && status
+  != errSecItemNotFound.
+
+  ---
+  C-12: iOS SyncRepository solo implementa pull, no
+  push
+
+  Estado: Documentado como limitación MVP.
+
+  Problema real: Si un usuario iOS crea o edita
+  datos en la app, esos cambios se quedan en
+  SQLDelight local pero nunca se envían al servidor.
+  Cuando otro miembro de la familia abre la app
+  (Android/Desktop), no verá los cambios del miembro
+  iOS.
+
+  Solución: Implementar el push sync para iOS usando
+  el mismo endpoint
+  /api/v1/families/{id}/sync/push.
+
+  ---
+  4. PROBLEMAS DE INTERFAZ Y UX
+
+  U-1: Paleta de colores inconsistente entre
+  plataformas
+
+  Documentado en Interfaz.md sección 1.2:
+  - Android: color primario #3E5F45 (verde bosque)
+  - Desktop: color primario de acción #C17D52
+  (terracota)
+
+  Aunque el sistema de 10 temas del Sprint 25A
+  define paletas comunes, el tema por defecto no
+  está alineado entre plataformas. Un usuario que
+  use Android y Desktop verá colores de acción
+  diferentes.
+
+  Solución: Verificar que Bosque (o el tema elegido
+  como default) se aplique como tema inicial en
+  ambas plataformas al primer arranque, antes de que
+  el usuario elija tema.
+
+  ---
+  U-2: Desktop carece de pantalla de Perfil
+
+  Android tiene 6 tabs incluyendo Perfil completo
+  (avatar, nombre, email, stats familia, invitar
+  miembro, logout). Desktop solo muestra
+  nombre/avatar en el sidebar, pero no hay vista de
+  Perfil con:
+  - Estadísticas de la familia (totalRecipes,
+  totalMembers, totalStockItems del endpoint ya
+  implementado)
+  - Invitar miembro (solo visible para ADMIN/OWNER)
+  - Opción de logout visible y accesible
+
+  ---
+  U-3: Desktop carece de onboarding
+
+  El onboarding de primera vez (Sprint 27) fue
+  implementado para Android e iOS. En Desktop no
+  existe ninguna pantalla de bienvenida o
+  introducción a las funcionalidades. Un usuario
+  nuevo que instala
+  RecetasFamiliares-Instalador-v1.1.exe llega
+  directamente al login sin contexto.
+
+  ---
+  U-4: Widget Android — RecipeWidget no maneja error
+  de red gracefully
+
+  Archivo: android/app/src/main/java/.../widget/Reci
+  peWidget.kt
+
+  El widget descarga la foto de la receta del día
+  vía HttpURLConnection directamente. Si falla la
+  descarga (timeout, red caída), el widget puede
+  quedarse en estado de carga indefinido o mostrar
+  un estado inconsistente.
+
+  Solución: Timeout ya está configurado
+  (connectTimeout 5s, readTimeout 10s), pero el
+  catch debería actualizarse para mostrar el
+  placeholder visual sin foto en caso de error,
+  evitando un estado visual incoherente.
+
+  ---
+  U-5: CookingScreen Desktop — navegación con
+  teclado parcialmente implementada
+
+  Archivo:
+  desktop/src/main/java/.../ui/CookingView.java
+
+  Se implementaron los atajos ←/→ para navegar pasos
+  (Sprint 17). Sin embargo:
+  - Escape no cierra el modo cocina (la ventana se
+  maximiza y no hay forma de salir sin cerrar el
+  Stage)
+  - Space no hace play/pause del temporizador
+  - No hay indicador visual de los atajos de teclado
+  en la pantalla
+
+  Solución: Añadir Escape → stage.close(), Space →
+  toggleTimer(), y una ayuda visual con atajos en la
+  pantalla.
+
+  ---
+  U-6: ProfileScreen Android — FamilyStatsSection
+  usa datos Room locales, no el endpoint /stats
+
+  Archivo:
+  android/app/src/main/java/.../ui/ProfileScreen.kt
+
+  La tarjeta de estadísticas del ProfileScreen
+  muestra totalRecipes (contado desde Room local) y
+  lastActivityAt (desde el registro más reciente en
+  Room). El endpoint GET /api/v1/families/{id}/stats
+  ya devuelve totalRecipes + totalMembers +
+  totalStockItems + lastActivityAt correctamente
+  calculados por el servidor. Android no está
+  integrando este endpoint.
+
+  Resultado: totalMembers y totalStockItems no se
+  muestran en el perfil, y lastActivityAt solo
+  refleja recetas, no toda la actividad.
+
+  Estado: Identificado como candidato Sprint 42 en
+  Resumen.md.
+
+  ---
+  U-7: Animación FadeTransition en sidebar Desktop
+  con duración inconsistente
+
+  Archivo: MainWindow.java
+
+  La transición de sidebar usa 180ms para
+  showAvatarUploadChooser() y showEditNameDialog()
+  (Sprint 39.C), pero el setCenterWithFade() general
+  usa 200ms. La regla del CLAUDE.md especifica
+  250ms para cambios de vista en sidebar. Hay tres
+  valores distintos de duración para el mismo tipo
+  de transición.
+
+  ---
+  U-8: iOS RecipeListScreen sin skeleton shimmer
+  (gap de paridad)
+
+  Android tiene SkeletonRecipeCard shimmer (Sprint
+  19) para la carga inicial de recetas. iOS todavía
+  usa CircularProgressIndicator para
+  RecipeListScreen (solo RecipeDetailScreen y
+  StockScreen tienen skeleton en iOS). Hay falta de
+  paridad visual.
+
+  Estado: Identificado como candidato Sprint 42 en
+  Resumen.md.
+
+  ---
+  U-9: NotesScreen iOS — haptic.error() en delete
+  debería ser haptic.warning()
+
+  Archivo: ios/composeApp/src/commonMain/.../notes/N
+  otesScreen.kt
+
+  Al eliminar una nota en iOS se dispara
+  haptic.error(). La especificación de
+  UINotificationFeedbackGenerator define error para
+  errores (operación fallida), success para éxito, y
+  warning para acciones destructivas. Eliminar es
+  una acción destructiva correcta = warning, no
+  error.
+
+  ---
+  5. PROBLEMAS ARQUITECTÓNICOS
+
+  A-1: Instalador Desktop empaquetado con JDK-24 (no
+  LTS)
+
+  Archivo: CONTINUAR.md, sección Desktop v1.1
+
+  El instalador fue compilado con C:\Program
+  Files\Java\jdk-24 porque JDK-21 no estaba
+  disponible. JDK-24 es una versión de soporte
+  estándar (6 meses), no LTS. Para producción, el
+  JRE embebido en el instalador debería ser JDK-21
+  LTS (soporte hasta 2028).
+
+  ---
+  A-2: Rate limiter in-memory no escala
+  horizontalmente
+
+  Archivo: AuthRateLimitFilter.java
+
+  El ConcurrentHashMap es local a la instancia JVM.
+  Si se despliegan múltiples instancias del backend
+  (o si la app se reinicia), los contadores se
+  pierden. Para producción con más de 1 instancia:
+  Redis como store compartido.
+
+  ---
+  A-3: No existe endpoint para que el usuario
+  abandone voluntariamente una familia
+
+  Un usuario puede ser expulsado por un ADMIN/OWNER,
+  pero no puede abandonar una familia por su
+  cuenta. No hay DELETE
+  /api/v1/families/{id}/members/me.
+
+  ---
+  A-4: DevDataSeeder no actualiza password si el
+  usuario ya existe
+
+  Archivo: DevDataSeeder.java
+
+  Si el usuario demo ya existe en la BD con un
+  password diferente y se lanza el seeder, el seeder
+  detecta que el usuario existe y no hace nada.
+  Esto puede causar confusión en desarrollo si el
+  password fue cambiado.
+
+  Estado: Documentado en CONTINUAR.md.
+
+  ---
+  6. DEUDA TÉCNICA DOCUMENTADA (confirmada en
+  auditoría)
+
+  Estas son deudas ya conocidas en los archivos .md,
+  confirmadas como reales:
+
+  ┌─────┬────────────────┬───────────┬────────┐
+  │ ID  │     Deuda      │ Plataform │ Impact │
+  │     │                │     a     │   o    │
+  ├─────┼────────────────┼───────────┼────────┤
+  │ DT- │ Sync pull sin  │ Backend   │ Medio  │
+  │ 1   │ paginación     │           │        │
+  ├─────┼────────────────┼───────────┼────────┤
+  │     │ Login devuelve │           │        │
+  │ DT- │  primera       │ Backend   │ Bajo   │
+  │ 2   │ familia (no    │           │        │
+  │     │ determinista)  │           │        │
+  ├─────┼────────────────┼───────────┼────────┤
+  │     │ Desktop tokens │           │        │
+  │ DT- │  en Windows    │ Desktop   │ Alto   │
+  │ 3   │ Registry sin   │           │        │
+  │     │ cifrar         │           │        │
+  ├─────┼────────────────┼───────────┼────────┤
+  │ DT- │ iOS push sync  │           │        │
+  │ 4   │ no             │ iOS       │ Alto   │
+  │     │ implementado   │           │        │
+  ├─────┼────────────────┼───────────┼────────┤
+  │     │ security-crypt │           │        │
+  │ DT- │ o              │ Android   │ Bajo   │
+  │ 5   │ 1.1.0-alpha06  │           │        │
+  │     │ en Android     │           │        │
+  ├─────┼────────────────┼───────────┼────────┤
+  │ DT- │ iOS build roto │ iOS       │ Alto   │
+  │ 6   │  en Windows    │           │ (dev)  │
+  ├─────┼────────────────┼───────────┼────────┤
+  │ DT- │ compressImage  │ Android   │ Bajo   │
+  │ 7   │ en ViewModel   │           │        │
+  ├─────┼────────────────┼───────────┼────────┤
+  │     │ lastActivityAt │           │        │
+  │ DT- │  solo          │ Backend   │ Medio  │
+  │ 8   │ contempla      │           │        │
+  │     │ recetas        │           │        │
+  └─────┴────────────────┴───────────┴────────┘
+
+  ---
+  7. RESUMEN EJECUTIVO DE PRIORIDADES
+
+  Para resolver antes de producción pública:
+
+  ┌───────────┬──────┬──────────────────────────┐
+  │ Prioridad │  ID  │       Descripción        │
+  ├───────────┼──────┼──────────────────────────┤
+  │ 🔴        │ S-1  │ JWT secret con fallback  │
+  │ Crítico   │      │ hardcodeado en git       │
+  ├───────────┼──────┼──────────────────────────┤
+  │ 🔴        │ S-2  │ Rate limiter bypassable  │
+  │ Crítico   │      │ detrás de proxy          │
+  ├───────────┼──────┼──────────────────────────┤
+  │ 🔴        │      │ Fotos familiares         │
+  │ Crítico   │ S-3  │ públicas sin             │
+  │           │      │ autenticación            │
+  ├───────────┼──────┼──────────────────────────┤
+  │           │      │ Desktop tokens en        │
+  │ 🟠 Alto   │ S-4  │ Windows Registry sin     │
+  │           │      │ cifrar                   │
+  ├───────────┼──────┼──────────────────────────┤
+  │ 🟠 Alto   │ S-5  │ Android refresh client   │
+  │           │      │ sin timeouts             │
+  ├───────────┼──────┼──────────────────────────┤
+  │ 🟠 Alto   │ C-1  │ lastActivityAt solo      │
+  │           │      │ cuenta recetas           │
+  ├───────────┼──────┼──────────────────────────┤
+  │ 🟠 Alto   │ A-4  │ Instalador con JDK-24 no │
+  │           │      │  LTS                     │
+  ├───────────┼──────┼──────────────────────────┤
+  │ 🟠 Alto   │ C-10 │ iOS build roto en        │
+  │           │      │ Windows (SQLDelight)     │
+  └───────────┴──────┴──────────────────────────┘
+  ├────────────┼──────┼───────────────────────────────────────────────┤
+  │ 🔴 Crítico │ S-2  │ Rate limiter bypassable detrás de proxy       │
+  ├────────────┼──────┼───────────────────────────────────────────────┤
+  │ 🔴 Crítico │ S-3  │ Fotos familiares públicas sin autenticación   │
+  ├────────────┼──────┼───────────────────────────────────────────────┤
+  │ 🟠 Alto    │ S-4  │ Desktop tokens en Windows Registry sin cifrar │
+  ├────────────┼──────┼───────────────────────────────────────────────┤
+  │ 🟠 Alto    │ S-5  │ Android refresh client sin timeouts           │
+  ├────────────┼──────┼───────────────────────────────────────────────┤
+  │ 🟠 Alto    │ C-1  │ lastActivityAt solo cuenta recetas            │
+  ├────────────┼──────┼───────────────────────────────────────────────┤
+  │ 🟠 Alto    │ A-4  │ Instalador con JDK-24 no LTS                  │
+  ├────────────┼──────┼───────────────────────────────────────────────┤
+  │ 🟠 Alto    │ C-10 │ iOS build roto en Windows (SQLDelight)        │
+  └────────────┴──────┴───────────────────────────────────────────────┘
+
+  Para próximo sprint (Sprint 42):
+
+  ┌───────────┬─────┬──────────────────────────────────────────────────┐
+  │ Prioridad │ ID  │                   Descripción                    │
+  ├───────────┼─────┼──────────────────────────────────────────────────┤
+  │ 🟡 Medio  │ U-6 │ ProfileScreen Android: integrar endpoint /stats  │
+  ├───────────┼─────┼──────────────────────────────────────────────────┤
+  │ 🟡 Medio  │ U-8 │ iOS RecipeListScreen: skeleton shimmer (paridad) │
+  ├───────────┼─────┼──────────────────────────────────────────────────┤
+  │ 🟡 Medio  │ U-2 │ Desktop: pantalla de Perfil                      │
+  ├───────────┼─────┼──────────────────────────────────────────────────┤
+  │ 🟡 Medio  │ C-6 │ CancellationException swallowed en login         │
+  ├───────────┼─────┼──────────────────────────────────────────────────┤
+  │ 🟡 Medio  │ S-6 │ JWT: añadir claims iss y aud                     │
+  ├───────────┼─────┼──────────────────────────────────────────────────┤
+  │ 🟡 Medio  │ U-5 │ CookingScreen Desktop: Escape y Space shortcuts  │
+  └───────────┴─────┴──────────────────────────────────────────────────┘
+
+  Deuda técnica aceptable para producción inicial (con documentación):
+
+  - DT-4: iOS push sync (iOS es read-only en MVP)
+  - S-8: JWT no invalidado en logout (TTL 15 min mitiga)
+  - S-13: Rate limiter in-memory (instancia única inicial)
+
+  ---
+  La exposición ha concluido. El proyecto está en buen estado para MVP familiar privado, pero tiene 3 issues críticos de seguridad (S-1, S-2, S-3) que deben resolverse antes
+  de cualquier despliegue público o multi-familia en producción real.
+

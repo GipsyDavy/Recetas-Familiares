@@ -54,3 +54,16 @@
 - Stock familiar.
 - Fotos.
 - Dark mode.
+
+## Fase 7 - Ayuda integrada y documentacion de usuario
+
+- Centro de ayuda dentro de la aplicacion.
+- Manual de usuario integrado.
+- Ayuda contextual por pantalla.
+- Guias paso a paso y onboarding.
+- Tooltips avanzados.
+- Ejemplos, FAQ y glosario.
+- Documentacion offline.
+- Buscador de ayuda.
+- Enlaces desde errores a soluciones.
+- Modo principiante / avanzado.

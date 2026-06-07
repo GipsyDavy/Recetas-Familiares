@@ -1,51 +1,61 @@
 # Recetas Familiares
 
-Aplicacion premium multiplataforma para gestion familiar de recetas, ingredientes, menus, listas de compra y memoria culinaria compartida.
+Aplicacion premium multiplataforma para gestion familiar de recetas, ingredientes, stock, menus, listas de compra, notas, fotos y memoria culinaria compartida.
 
 ## Modulos
 
-- `backend/`: API Spring Boot 3.5 + Java 21 + MySQL + Flyway + JWT. 62 tests, 0 fallos.
-- `android/`: aplicacion Android nativa Kotlin + Compose Material3. Offline-first con Room + WorkManager.
-- `desktop/`: aplicacion JavaFX 21. Dashboard, modo cocina, exportacion, sincronizacion.
-- `ios/`: Kotlin Multiplatform + Compose Multiplatform. Cache offline SQLDelight + Ktor.
-- `database/`: migraciones Flyway V1-V9. 14 tablas con soft delete y syncVersion.
-- `docs/`: arquitectura, UX, contratos API, seguridad y roadmap.
+- `backend/`: API Spring Boot + Java 21 + MySQL + Flyway + JWT.
+- `android/`: Android nativo Kotlin + Compose, Room, WorkManager y offline-first.
+- `desktop/`: JavaFX + Maven, cliente HTTP, dashboard, modo cocina e instalador Windows.
+- `ios/`: Kotlin Multiplatform + Compose Multiplatform, Ktor, SQLDelight y Keychain.
+- `database/`: migraciones y scripts de base de datos.
+- `docs/`: documentacion tecnica, roadmap y decisiones.
 
-## Estado reciente Desktop (2026-05-30)
+## Estado Resumido
 
-- Instalador Windows actual: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe`.
-- Desktop Ajustes ya no abre ventana emergente: navega como vista central desde el sidebar.
-- Ajustes replica el sistema de pestañas de Nemeterial adaptado a Recetas: Apariencia, Acerca de y Diagnostico.
-- Las tarjetas de temas previsualizan los colores reales de cada tema de Recetas Familiares.
-- Diagnostico muestra bloques de equipo/CPU/RAM/discos/grafica/sistema y el logo real de la aplicacion.
-- La caja de Diagnostico aprovecha la altura disponible de la ventana y llega hasta la parte inferior util de la vista.
+Estado documentado mas reciente:
+- Backend: 76 tests, 0 fallos en la ultima validacion registrada.
+- Android: funcional con recetas, stock, menus, notas, perfil, widgets, temas y sincronizacion offline.
+- Desktop: funcional con dashboard, CRUD principal, busqueda, temas, ajustes, diagnostico e instalador v1.1.
+- iOS: en desarrollo avanzado, con deuda conocida de build/paridad/sincronizacion.
 
-## Estado (Sprint 25A — 2026-05-29)
+Antes de publicar o cerrar sprint, ejecutar validaciones reales y seguir `CLAUDE.md`.
 
-Sistema de 10 temas con modo Claro/Oscuro/Sistema implementado en las 3 plataformas cliente:
+## Arranque Rapido
 
-| Plataforma | Estado | Persistencia |
-|------------|--------|--------------|
-| Android | Compilado ✅ | DataStore Preferences |
-| Desktop | Compilado ✅ | Java Preferences API |
-| iOS | Codigo listo ✅ | NSUserDefaults (compilacion requiere macOS) |
-
-Temas disponibles: Bosque, Terracota, Ocaso, Mediterraneo, Lavanda, Oliva, Canela, Menta, Frambuesa, Noche de Verano.
-
-## Arranque rapido
+Backend:
 
 ```bash
-# Backend
 java -jar backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar \
-  --spring.profiles.active=dev "--spring.datasource.password=Recetas2024!"
-
-# Desktop
-cd desktop && mvn javafx:run -Dapi.base.url=http://localhost:8080/
-
-# Android
-cd android && ./gradlew assembleDebug
+  --spring.profiles.active=dev \
+  "--spring.datasource.password=<DB_PASSWORD>"
 ```
 
-Credenciales demo: `demo@recetas.local` / `Demo1234!Familia`
+Android:
 
-Ver `CONTINUAR.md` para el estado completo del proyecto y `Interfaz.md` para el plan visual.
+```powershell
+cd android
+.\gradlew assembleDebug
+```
+
+Desktop:
+
+```powershell
+cd desktop
+mvn javafx:run -Dapi.base.url=http://localhost:8080/
+```
+
+## Documentacion Principal
+
+- `CLAUDE.md`: reglas de trabajo, seguridad, cierre y trazabilidad.
+- `CONTINUAR.md`: estado operativo para retomar el proyecto.
+- `Resumen.md`: vision de producto y estado funcional consolidado.
+- `Interfaz.md`: sistema visual, UX, animaciones y ayuda contextual.
+- `auditoria.md`: auditoria historica con hallazgos `SEC-*`, `COD-*`, `UX-*`.
+- `MACRO-PROMPT-RECETAS-FAMILIA.md`: plantilla para consultar otros agentes.
+
+## Seguridad
+
+Este proyecto maneja datos familiares, fotos, notas, tokens y sincronizacion offline. Cualquier cambio en auth, ownership, imagenes, almacenamiento, API o sincronizacion debe revisarse segun `CLAUDE.md`.
+
+No documentar secretos reales en archivos versionables.
