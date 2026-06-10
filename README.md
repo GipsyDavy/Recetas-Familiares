@@ -1,6 +1,6 @@
 # Recetas Familiares
 
-Aplicacion premium multiplataforma para gestion familiar de recetas, ingredientes, stock, menus, listas de compra, notas, fotos y memoria culinaria compartida.
+Aplicacion premium multiplataforma para gestion familiar de recetas, ingredientes, stock, menus, listas de compra, notas, fotos y memoria culinaria compartida. El chat familiar esta documentado como funcionalidad futura.
 
 ## Modulos
 
@@ -18,6 +18,7 @@ Estado documentado mas reciente:
 - Android: funcional con recetas, stock, menus, notas, perfil, widgets, temas y sincronizacion offline.
 - Desktop: funcional con dashboard, CRUD principal, busqueda, temas, ajustes, diagnostico e instalador v1.1.
 - iOS: en desarrollo avanzado, con deuda conocida de build/paridad/sincronizacion.
+- Chat familiar: planificado, no implementado; objetivo por fases con texto/emojis en tiempo real, imagenes, videos, historial paginado, WebSocket y storage protegido.
 
 Antes de publicar o cerrar sprint, ejecutar validaciones reales y seguir `CLAUDE.md`.
 
@@ -56,6 +57,6 @@ mvn javafx:run -Dapi.base.url=http://localhost:8080/
 
 ## Seguridad
 
-Este proyecto maneja datos familiares, fotos, notas, tokens y sincronizacion offline. Cualquier cambio en auth, ownership, imagenes, almacenamiento, API o sincronizacion debe revisarse segun `CLAUDE.md`.
+Este proyecto maneja datos familiares, fotos, notas, mensajes de chat, videos, tokens y sincronizacion offline. Cualquier cambio en auth, ownership, imagenes, videos, almacenamiento, API, WebSocket o sincronizacion debe revisarse segun `CLAUDE.md`.
 
 No documentar secretos reales en archivos versionables.

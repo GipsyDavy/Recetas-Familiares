@@ -14,6 +14,22 @@ Este documento conserva la sintesis de una auditoria comparativa realizada por C
 
 No debe usarse como lista viva de tareas sin contrastar antes con el codigo actual y `CONTINUAR.md`, porque algunos hallazgos pueden haber sido resueltos en sprints posteriores.
 
+Protocolo para nuevas auditorias:
+- Claude Code actua siempre como agente principal.
+- Antes de iniciar una auditoria completa, Claude Code debe proponer apoyo paralelo de Codex y Gemini.
+- Si no puede invocarlos directamente, debe preparar bloques listos para copiar y pegar en cada agente.
+- Codex debe enfocarse en codigo, arquitectura, seguridad tecnica, tests, build, dependencias y consistencia entre plataformas.
+- Gemini debe enfocarse en producto, interfaz, UX, documentacion, duplicidades, ruido e inconsistencias funcionales.
+- Si la auditoria es solo lectura, todos los bloques deben indicar expresamente `solo lectura, no modificar archivos`.
+- Si el usuario no autoriza Codex o Gemini, Claude Code continuara solo y dejara constancia de esa limitacion en la conclusion.
+- Al finalizar, si se recomiendan cambios, Claude Code debe pedir autorizacion explicita antes de modificar archivos y ofrecer opciones de alcance: solo criticos, criticos mas limpieza documental, todos los recomendados, o solo informe sin cambios.
+
+Ejemplo de solicitud:
+
+```text
+Autoriza una auditoria paralela con agentes IA sobre seguridad, interfaz, build/dependencias y documentacion, sin hacer cambios.
+```
+
 Leyenda de convergencia:
 - `[3/3]`: los tres agentes coincidieron.
 - `[2/3]`: dos agentes coincidieron.

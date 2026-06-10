@@ -28,7 +28,7 @@ No abrir como proyecto principal:
 
 ## 2. Estado Actual Consolidado
 
-Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros y sincronizacion.
+Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros y sincronizacion. El chat familiar en tiempo real queda registrado como funcionalidad futura, no implementada todavia.
 
 Plataformas:
 - `backend/`: Spring Boot + MySQL + Flyway + JWT.
@@ -57,6 +57,14 @@ Antes de ejecutar un sprint:
 - Decidir que agentes IA, skills o revisiones hacen falta antes de editar.
 - Si no hacen falta agentes o skills, dejarlo justificado de forma breve.
 - Definir validaciones esperadas antes de implementar.
+
+Protocolo multiagente del IDE:
+- Claude Code es siempre el agente principal.
+- Codex se usa como apoyo tecnico para codigo, arquitectura, tests, build, dependencias, CI y consistencia tecnica.
+- Gemini se usa como apoyo transversal para producto, interfaz, UX, documentacion, duplicidades, ruido e inconsistencias globales.
+- Si Claude Code no puede invocarlos directamente, debe escribir bloques listos para copiar y pegar en Codex y Gemini.
+- En auditorias o revisiones sin cambios, los bloques deben indicar expresamente `solo lectura, no modificar archivos`.
+- Al finalizar una auditoria o revision, si hay cambios necesarios, Claude Code debe pedir autorizacion explicita y ofrecer opciones de alcance antes de editar.
 
 Apoyo IA recomendado:
 - Seguridad/auth/ownership: usar revision de seguridad y, si procede, segunda opinion.
@@ -143,6 +151,7 @@ No cambiar sin revisar Backend, Android, Desktop e iOS:
 - `RecipeStepResponse`: `position`, `instruction`, `timerMinutes`.
 - Entidades sincronizables: `id`, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
 - Ownership familiar obligatorio en backend aunque el cliente oculte acciones.
+- Chat familiar futuro: si se implementa, debe ser modulo independiente de notas, con ownership por familia, historial paginado, tiempo real, adjuntos protegidos y contrato estable antes de llevarlo a todos los clientes.
 
 ---
 
@@ -167,6 +176,14 @@ Riesgos pendientes a verificar:
 - Paginacion de `sync/pull`.
 - `lastActivityAt` multi-entidad.
 
+Funcionalidad futura documentada:
+- Chat familiar por fases: texto/emojis en tiempo real, imagenes, videos y push notifications.
+- REST para historial paginado, envio inicial/fallback y operaciones de lectura.
+- WebSocket/STOMP o equivalente para entrega en tiempo real con reconexion y fallback por polling.
+- Storage protegido para imagenes y videos; no guardar binarios pesados directamente en MySQL.
+- Requiere validar ownership familiar en cada operacion y aplicar limites de longitud, tamano, MIME, extension y rate limit.
+- Produccion seria deberia contemplar miniaturas/previews, limpieza de archivos huerfanos y analisis antivirus o servicio equivalente para adjuntos.
+
 ### Android
 
 Implementado/documentado:
@@ -185,6 +202,12 @@ Riesgos pendientes a verificar:
 - Consumo completo del endpoint `/stats` en perfil.
 - Fuentes TTF reales si se exige identidad premium completa.
 
+Funcionalidad futura documentada:
+- Primera pantalla candidata para chat familiar tras cerrar contrato backend.
+- Primera fase recomendada: historial paginado, envio de texto/emojis, indicador basico de nuevos mensajes y WebSocket con polling configurable como fallback.
+- Fases posteriores: selector de imagen/video, subida segura, previews y control de progreso.
+- Decidir antes de implementar si se permite envio offline con cola local.
+
 ### Desktop
 
 Implementado/documentado:
@@ -201,6 +224,11 @@ Riesgos pendientes a verificar:
 - Shortcuts completos en modo cocina.
 - Recompilar instalador con JDK 21 LTS antes de produccion.
 
+Funcionalidad futura documentada:
+- Chat familiar como segunda implantacion cliente despues de Android.
+- Mantener comportamiento coherente con el contrato backend y evitar logica divergente.
+- Soportar texto/emojis primero; imagenes/videos despues de cerrar storage protegido y limites de adjuntos.
+
 ### iOS
 
 Implementado/documentado:
@@ -215,6 +243,11 @@ Riesgos pendientes a verificar:
 - Push sync completo.
 - Interceptor Ktor de refresh ante 401.
 - Paridad con Android: busqueda, filtros, skeletons y UX de listas.
+
+Funcionalidad futura documentada:
+- Chat familiar despues de estabilizar backend y al menos un cliente.
+- Evitar abrir este frente antes de resolver refresh 401, push sync y paridad basica.
+- Tiempo real y adjuntos en iOS deben llegar despues de tener contrato backend estable, previews definidos y estrategia de push notifications.
 
 ---
 
@@ -232,6 +265,7 @@ Prioridad propuesta:
 8. iOS: interceptor Ktor 401 refresh + retry.
 9. Backend: paginar `sync/pull`.
 10. UX: completar stats familiares en Android/Desktop.
+11. Producto: especificar chat familiar por fases sin implementarlo todavia: texto/emojis en tiempo real, imagenes, videos y push notifications.
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 

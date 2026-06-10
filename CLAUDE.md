@@ -43,6 +43,13 @@ Checklist minimo antes de implementar:
 
 Cada sprint debe empezar con una decision explicita sobre apoyo externo y herramientas especializadas.
 
+En este proyecto, el agente principal sera siempre **Claude Code**. Claude Code coordina el trabajo, lee el contexto necesario, define el alcance, propone apoyo multiagente cuando aporte valor, integra conclusiones y solicita autorizacion explicita antes de modificar archivos cuando el proceso sea de auditoria, revision o analisis.
+
+Agentes IA disponibles en el IDE:
+- **Claude Code**: agente principal. Coordina, audita, integra resultados, mantiene coherencia tecnica y decide la secuencia de trabajo.
+- **Codex**: agente de apoyo tecnico. Revisa implementacion, codigo, arquitectura, tests, build, dependencias, CI, refactors y consistencia tecnica.
+- **Gemini**: agente de apoyo transversal. Revisa producto, interfaz, experiencia de usuario, documentacion, claridad funcional, duplicidades, ruido e inconsistencias globales.
+
 Usar apoyo de agentes IA cuando el sprint incluya:
 - seguridad, autenticacion, JWT, CORS, ownership o datos familiares sensibles;
 - sincronizacion offline, conflictos, `syncVersion`, cache local o cambios multiplataforma;
@@ -53,10 +60,49 @@ Usar apoyo de agentes IA cuando el sprint incluya:
 
 Reglas:
 - El agente lider sigue siendo responsable de la decision final y de integrar solo cambios verificados.
+- Si Claude Code no puede invocar directamente a Codex o Gemini, debe preparar bloques de instrucciones listos para que el usuario los copie y pegue en el agente IA correspondiente.
 - Los bloques para otros agentes deben ser concretos, autocontenidos y basados en `MACRO-PROMPT-RECETAS-FAMILIA.md`.
+- Cada bloque debe indicar agente destinatario, objetivo, alcance de archivos o areas, restriccion de solo lectura o con cambios, criterios de revision, formato esperado de respuesta y prohibicion expresa de modificar archivos si la tarea es solo auditoria.
 - Si una skill o agente no esta disponible, documentar el motivo y aplicar una validacion alternativa razonable.
 - No afirmar que un agente, skill o herramienta reviso algo si no ocurrio realmente en la sesion.
 - La trazabilidad del cierre debe indicar agentes consultados, skills usadas, motivo, resultado y riesgo residual.
+
+Ejemplo de solicitud al usuario:
+
+```text
+Autoriza una auditoria paralela con agentes IA sobre seguridad, interfaz, build/dependencias y documentacion, sin hacer cambios.
+```
+
+Ejemplo de bloque para Codex:
+
+```text
+Agente: Codex
+Objetivo: revisar codigo, build, dependencias, tests y riesgos tecnicos del proyecto.
+Alcance: backend, Android, iOS, Desktop, configuracion Gradle/Maven y scripts.
+Restriccion: solo lectura, no modificar archivos.
+Criterios: detectar bugs, deuda tecnica, fallos de build, riesgos de seguridad tecnica, inconsistencias entre plataformas y falta de tests.
+Formato esperado: hallazgos ordenados por severidad, archivo/linea si aplica, impacto y recomendacion concreta.
+```
+
+Ejemplo de bloque para Gemini:
+
+```text
+Agente: Gemini
+Objetivo: revisar producto, interfaz, UX, documentacion y coherencia funcional del proyecto.
+Alcance: README, CLAUDE.md, CONTINUAR.md, auditoria.md, Interfaz.md, Resumen.md, pantallas Android/iOS/Desktop y flujos principales.
+Restriccion: solo lectura, no modificar archivos.
+Criterios: detectar duplicidades, ruido, contradicciones, problemas de UX, inconsistencias funcionales y falta de claridad para continuar el proyecto.
+Formato esperado: hallazgos ordenados por impacto, archivo/pantalla afectada, explicacion breve y recomendacion concreta.
+```
+
+Al finalizar una auditoria o revision, Claude Code debe:
+- Integrar los resultados propios, de Codex y de Gemini si se han usado.
+- Separar hallazgos criticos, medios y menores.
+- Indicar que cambios recomienda hacer.
+- Solicitar autorizacion explicita antes de modificar archivos.
+- Ofrecer opciones claras: autorizar solo cambios criticos, autorizar cambios criticos y limpieza documental, autorizar todos los cambios recomendados, o no hacer cambios y dejar solo el informe.
+
+Si el usuario no autoriza el uso de Codex o Gemini, Claude Code continuara solo y debera dejar constancia de esa limitacion en la conclusion.
 
 ---
 

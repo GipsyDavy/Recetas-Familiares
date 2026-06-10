@@ -10,6 +10,7 @@ El producto combina:
 - planificacion de menus,
 - lista de compra,
 - notas familiares,
+- chat familiar,
 - fotos,
 - miembros y roles,
 - sincronizacion offline-first,
@@ -23,6 +24,7 @@ No debe sentirse como un ERP ni una base de datos de recetas. Debe sentirse como
 
 - Enfoque familiar real, no solo individual.
 - Memoria emocional: fotos, notas, recetas heredadas, favoritos.
+- Comunicacion contextual entre miembros mediante chat familiar futuro.
 - Cocina practica: modo cocina, temporizadores, stock y menus.
 - Sincronizacion entre Android, Desktop e iOS.
 - Privacidad y ownership por familia.
@@ -39,6 +41,7 @@ No debe sentirse como un ERP ni una base de datos de recetas. Debe sentirse como
 - iOS con KMP + Compose Multiplatform.
 - Logica compartida KMP como objetivo incremental.
 - Clientes con cache local y sincronizacion cuando aplique.
+- Chat familiar planteado como modulo independiente: REST para historial, WebSocket para tiempo real y storage protegido para imagenes/videos; implantacion por fases.
 
 ---
 
@@ -116,7 +119,42 @@ Riesgos importantes:
 
 ---
 
-## 5. Experiencia Visual
+## 5. Chat Familiar Futuro
+
+Objetivo:
+- Permitir que los miembros de una misma familia hablen dentro de la aplicacion.
+- Reforzar la idea de espacio familiar compartido sin convertir las notas en mensajeria.
+- Mantener privacidad, ownership familiar y trazabilidad clara de autores.
+
+Alcance MVP recomendado:
+- Un chat por familia.
+- Mensajes de texto y emojis con autor, fecha y pertenencia familiar.
+- Historial paginado.
+- Tiempo real mediante WebSocket cuando el contrato backend este cerrado; REST + polling queda como fallback.
+- Primera implantacion sugerida: backend y Android; despues Desktop; iOS cuando el contrato este estabilizado.
+
+Alcance objetivo por fases:
+- Fase 1: texto, emojis, historial paginado y tiempo real.
+- Fase 2: imagenes con storage protegido, validacion de tipo/tamano y miniaturas.
+- Fase 3: videos con limites estrictos, previews y politica de limpieza.
+- Fase 4: notificaciones push y mejoras avanzadas.
+
+Fuera del primer sprint de chat:
+- Notificaciones push.
+- Audio, reacciones, edicion avanzada o borrado complejo.
+- Chats privados entre dos usuarios.
+
+Riesgos y decisiones pendientes:
+- Definir si los mensajes se pueden enviar offline y sincronizar despues.
+- Definir politica de borrado, retencion y auditoria.
+- Evitar exposicion entre familias mediante validacion de ownership en backend.
+- Aplicar limites de longitud, paginacion y rate limiting.
+- Proteger imagenes y videos con autorizacion por familia, evitando URLs publicas sin control.
+- Validar MIME, extension, tamano maximo y contenido de adjuntos antes de servirlos.
+
+---
+
+## 6. Experiencia Visual
 
 Direccion:
 - calida,
@@ -139,12 +177,14 @@ La especificacion detallada vive en `Interfaz.md`.
 
 ---
 
-## 6. Seguridad y Privacidad
+## 7. Seguridad y Privacidad
 
 El producto maneja informacion familiar sensible:
 - recetas privadas,
 - fotos,
 - notas,
+- mensajes de chat familiar,
+- imagenes y videos enviados por chat,
 - miembros,
 - emails,
 - tokens,
@@ -163,7 +203,7 @@ La auditoria historica vive en `auditoria.md`. Las reglas operativas viven en `C
 
 ---
 
-## 7. Proximo Trabajo Recomendado
+## 8. Proximo Trabajo Recomendado
 
 Prioridad tecnica:
 1. Eliminar fallback JWT secret hardcodeado.
@@ -181,10 +221,11 @@ Prioridad UX/producto:
 3. Perfil Desktop completo.
 4. Onboarding Desktop.
 5. Ayuda contextual MVP.
+6. Definir especificacion funcional del chat familiar por fases: texto/emojis en tiempo real, imagenes, videos y push notifications.
 
 ---
 
-## 8. Documentos De Referencia
+## 9. Documentos De Referencia
 
 - `CLAUDE.md`: reglas obligatorias de trabajo.
 - `CONTINUAR.md`: estado operativo y siguiente sprint.
