@@ -21,6 +21,9 @@
         <java.version>21</java.version>
         <springdoc.version>2.8.17</springdoc.version>
         <jjwt.version>0.12.7</jjwt.version>
+        <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+        <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
+        <dependency-check.fail-build-on-cvss>7.0</dependency-check.fail-build-on-cvss>
     </properties>
 
     <dependencies>
@@ -101,4 +104,63 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Auditoria de dependencias bajo demanda: mvn verify -P security-audit
+             (requiere NVD_API_KEY). Fuera del perfil, los builds normales no
+             dependen de la red ni de la clave NVD. -->
+        <profile>
+            <id>security-audit</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <version>${maven-enforcer-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>require-nvd-api-key</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>enforce</goal>
+                                </goals>
+                                <configuration>
+                                    <rules>
+                                        <requireEnvironmentVariable>
+                                            <variableName>NVD_API_KEY</variableName>
+                                            <message>La variable de entorno NVD_API_KEY es obligatoria para ejecutar OWASP Dependency-Check.</message>
+                                        </requireEnvironmentVariable>
+                                    </rules>
+                                    <fail>true</fail>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>${dependency-check-maven.version}</version>
+                        <configuration>
+                            <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+                            <failBuildOnCVSS>${dependency-check.fail-build-on-cvss}</failBuildOnCVSS>
+                            <failOnError>true</failOnError>
+                            <formats>
+                                <format>HTML</format>
+                                <format>JSON</format>
+                            </formats>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>dependency-check-verify</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

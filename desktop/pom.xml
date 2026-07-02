@@ -16,6 +16,10 @@
         <okhttp.version>4.12.0</okhttp.version>
         <gson.version>2.10.1</gson.version>
         <junit.version>5.10.2</junit.version>
+        <jna.version>5.14.0</jna.version>
+        <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+        <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
+        <dependency-check.fail-build-on-cvss>7.0</dependency-check.fail-build-on-cvss>
         <main.class>org.gipsybuho.recetasfamiliares.DesktopApp</main.class>
     </properties>
 
@@ -44,6 +48,18 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>${gson.version}</version>
+        </dependency>
+
+        <!-- DPAPI para cifrar tokens en Windows (SEC-2) -->
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna-platform-jpms</artifactId>
+            <version>${jna.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna-jpms</artifactId>
+            <version>${jna.version}</version>
         </dependency>
 
         <!-- Tests -->
@@ -110,6 +126,62 @@
     </build>
 
     <profiles>
+        <!-- Auditoria de dependencias bajo demanda: mvn verify -P security-audit
+             (requiere NVD_API_KEY). Fuera del perfil, los builds normales no
+             dependen de la red ni de la clave NVD. -->
+        <profile>
+            <id>security-audit</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <version>${maven-enforcer-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>require-nvd-api-key</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>enforce</goal>
+                                </goals>
+                                <configuration>
+                                    <rules>
+                                        <requireEnvironmentVariable>
+                                            <variableName>NVD_API_KEY</variableName>
+                                            <message>La variable de entorno NVD_API_KEY es obligatoria para ejecutar OWASP Dependency-Check.</message>
+                                        </requireEnvironmentVariable>
+                                    </rules>
+                                    <fail>true</fail>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>${dependency-check-maven.version}</version>
+                        <configuration>
+                            <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+                            <failBuildOnCVSS>${dependency-check.fail-build-on-cvss}</failBuildOnCVSS>
+                            <failOnError>true</failOnError>
+                            <formats>
+                                <format>HTML</format>
+                                <format>JSON</format>
+                            </formats>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>dependency-check-verify</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>package-windows</id>
             <dependencies>

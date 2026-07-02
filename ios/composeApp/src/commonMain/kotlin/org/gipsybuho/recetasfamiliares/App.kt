@@ -3,6 +3,9 @@ package org.gipsybuho.recetasfamiliares
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.network.ktor3.KtorNetworkFetcherFactory
 import org.gipsybuho.recetasfamiliares.auth.AuthRepository
 import org.gipsybuho.recetasfamiliares.auth.LoginScreen
 import org.gipsybuho.recetasfamiliares.core.OnboardingPreference
@@ -28,6 +31,13 @@ fun App() {
     val syncRepo      = remember { SyncRepository(apiClient, session, driverFactory) }
     val themePref       = remember { ThemePreference() }
     val onboardingPref  = remember { OnboardingPreference() }
+
+    // Coil usa el HttpClient autenticado: /uploads/** requiere JWT (SEC-3)
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .components { add(KtorNetworkFetcherFactory(apiClient.http)) }
+            .build()
+    }
 
     var isLoggedIn     by remember { mutableStateOf(session.isLoggedIn) }
     var onboardingDone by remember { mutableStateOf(onboardingPref.onboardingDone) }
@@ -65,7 +75,7 @@ fun App() {
                 onThemeChange   = { t -> selectedTheme = t; themePref.selectedTheme = t },
                 onModeChange    = { m -> themeMode = m; themePref.themeMode = m },
                 onHapticsChange = { h -> hapticsEnabled = h; themePref.hapticsEnabled = h },
-                onLogout        = { session.clear(); isLoggedIn = false }
+                onLogout        = { authRepo.logout(); isLoggedIn = false }
             )
         }
     }

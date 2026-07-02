@@ -5,10 +5,10 @@ import java.util.prefs.Preferences;
 /**
  * In-memory session with optional persistence via java.util.prefs.
  *
- * SECURITY NOTE (MVP): Tokens are stored in java.util.prefs (Windows Registry /
- * ~/.java/.userPrefs on Linux). This storage is NOT encrypted. Acceptable for a
- * private family desktop app on a trusted device; for production use, replace with
- * OS credential store (Windows Credential Manager / macOS Keychain / libsecret).
+ * SECURITY (SEC-2): access y refresh token se cifran con Windows DPAPI
+ * (TokenVault) antes de persistirse en prefs. Valores legado en texto plano se
+ * migran a formato cifrado en el primer arranque. En plataformas sin DPAPI
+ * (Linux/macOS dev) se conserva el comportamiento previo en texto plano.
  */
 public class AppSession {
 
@@ -34,8 +34,8 @@ public class AppSession {
     private String avatarUrl;
 
     public AppSession() {
-        this.accessToken  = prefs.get(KEY_ACCESS,        null);
-        this.refreshToken = prefs.get(KEY_REFRESH,       null);
+        this.accessToken  = readToken(KEY_ACCESS);
+        this.refreshToken = readToken(KEY_REFRESH);
         this.familyId     = prefs.get(KEY_FAMILY_ID,     null);
         this.lastSyncTime = prefs.get(KEY_LAST_SYNC,     null);
         this.displayName  = prefs.get(KEY_DISPLAY_NAME,  null);
@@ -66,8 +66,27 @@ public class AppSession {
     public void setTokens(String accessToken, String refreshToken) {
         this.accessToken  = accessToken;
         this.refreshToken = refreshToken;
-        if (accessToken  != null) prefs.put(KEY_ACCESS,  accessToken);  else prefs.remove(KEY_ACCESS);
-        if (refreshToken != null) prefs.put(KEY_REFRESH, refreshToken); else prefs.remove(KEY_REFRESH);
+        if (accessToken  != null) prefs.put(KEY_ACCESS,  TokenVault.protect(accessToken));  else prefs.remove(KEY_ACCESS);
+        if (refreshToken != null) prefs.put(KEY_REFRESH, TokenVault.protect(refreshToken)); else prefs.remove(KEY_REFRESH);
+    }
+
+    /** Lee un token persistido, descifrandolo y migrando valores legado en texto plano. */
+    private String readToken(String key) {
+        String stored = prefs.get(key, null);
+        if (stored == null) {
+            return null;
+        }
+        String plain = TokenVault.unprotect(stored);
+        if (plain == null) {
+            // Cifrado no recuperable (otro usuario/maquina): limpiar y pedir login
+            prefs.remove(key);
+            return null;
+        }
+        if (!TokenVault.isProtected(stored)) {
+            // Migracion: re-persistir cifrado el valor legado en texto plano
+            prefs.put(key, TokenVault.protect(plain));
+        }
+        return plain;
     }
 
     public void setFamilyId(String familyId) {

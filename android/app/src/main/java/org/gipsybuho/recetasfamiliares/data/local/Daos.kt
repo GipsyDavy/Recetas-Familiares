@@ -16,10 +16,10 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE deleted = 0 ORDER BY updatedAt DESC")
     suspend fun findAll(): List<RecipeEntity>
 
-    @Query("SELECT * FROM recipes WHERE syncVersion = 0 AND deleted = 0")
+    @Query("SELECT * FROM recipes WHERE syncVersion <= 0 AND deleted = 0")
     suspend fun findPendingCreate(): List<RecipeEntity>
 
-    @Query("SELECT * FROM recipes WHERE syncVersion = 0 AND deleted = 1")
+    @Query("SELECT * FROM recipes WHERE syncVersion <= 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<RecipeEntity>
 
     @Upsert
@@ -58,10 +58,10 @@ interface StockDao {
     @Query("SELECT * FROM stock_items WHERE deleted = 0 ORDER BY name COLLATE NOCASE")
     fun observeStock(): Flow<List<StockItemEntity>>
 
-    @Query("SELECT * FROM stock_items WHERE syncVersion = 0 AND deleted = 0")
+    @Query("SELECT * FROM stock_items WHERE syncVersion <= 0 AND deleted = 0")
     suspend fun findPendingCreate(): List<StockItemEntity>
 
-    @Query("SELECT * FROM stock_items WHERE syncVersion = 0 AND deleted = 1")
+    @Query("SELECT * FROM stock_items WHERE syncVersion <= 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<StockItemEntity>
 
     @Query("SELECT * FROM stock_items WHERE deleted = 0 AND expiresAt IS NOT NULL")
@@ -105,7 +105,7 @@ interface ShoppingListItemDao {
     @Query("SELECT * FROM shopping_list_items WHERE shoppingListId = :shoppingListId AND deleted = 0 ORDER BY position ASC")
     fun observeItems(shoppingListId: String): Flow<List<ShoppingListItemEntity>>
 
-    @Query("SELECT * FROM shopping_list_items WHERE syncVersion = 0 AND deleted = 0")
+    @Query("SELECT * FROM shopping_list_items WHERE syncVersion <= 0 AND deleted = 0")
     suspend fun findPendingCheck(): List<ShoppingListItemEntity>
 
     @Upsert
@@ -120,10 +120,10 @@ interface FavoriteRecipeDao {
     @Query("SELECT * FROM favorite_recipes WHERE recipeId = :recipeId AND deleted = 0 LIMIT 1")
     suspend fun findByRecipeId(recipeId: String): FavoriteRecipeEntity?
 
-    @Query("SELECT * FROM favorite_recipes WHERE syncVersion = 0 AND deleted = 0")
+    @Query("SELECT * FROM favorite_recipes WHERE syncVersion <= 0 AND deleted = 0")
     suspend fun findPendingCreate(): List<FavoriteRecipeEntity>
 
-    @Query("SELECT * FROM favorite_recipes WHERE syncVersion = 0 AND deleted = 1")
+    @Query("SELECT * FROM favorite_recipes WHERE syncVersion <= 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<FavoriteRecipeEntity>
 
     @Upsert
@@ -135,10 +135,10 @@ interface FamilyNoteDao {
     @Query("SELECT * FROM family_notes WHERE deleted = 0 ORDER BY pinned DESC, updatedAt DESC")
     fun observeNotes(): Flow<List<FamilyNoteEntity>>
 
-    @Query("SELECT * FROM family_notes WHERE syncVersion = 0 AND deleted = 0")
+    @Query("SELECT * FROM family_notes WHERE syncVersion <= 0 AND deleted = 0")
     suspend fun findPendingCreate(): List<FamilyNoteEntity>
 
-    @Query("SELECT * FROM family_notes WHERE syncVersion = 0 AND deleted = 1")
+    @Query("SELECT * FROM family_notes WHERE syncVersion <= 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<FamilyNoteEntity>
 
     @Upsert

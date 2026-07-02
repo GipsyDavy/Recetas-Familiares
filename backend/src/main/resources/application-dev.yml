@@ -16,4 +16,5 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8080,http://localhost:3000}
   security:
     jwt:
-      secret: ${JWT_SECRET:dev-only-change-this-secret-32-bytes-minimum}
+      # Sin fallback: el arranque falla si JWT_SECRET no esta definido (SEC-1).
+      secret: ${JWT_SECRET}

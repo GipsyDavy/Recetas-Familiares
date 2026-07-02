@@ -241,10 +241,20 @@ public class MainWindow {
 
     private Node buildAvatarNode(String avatarUrl, String displayName) {
         if (avatarUrl != null && !avatarUrl.isBlank()) {
-            ImageView imageView = new ImageView(new Image(avatarUrl, 40, 40, true, true, true));
+            ImageView imageView = new ImageView();
             imageView.setFitWidth(40);
             imageView.setFitHeight(40);
             imageView.setPreserveRatio(false);
+            // Carga autenticada en segundo plano: /uploads/** requiere JWT (SEC-3)
+            Thread.ofVirtual().start(() -> {
+                try {
+                    byte[] bytes = context.getApiClient().fetchImage(avatarUrl);
+                    Image image = new Image(new java.io.ByteArrayInputStream(bytes), 40, 40, true, true);
+                    Platform.runLater(() -> imageView.setImage(image));
+                } catch (Exception ignored) {
+                    // Sin avatar remoto: queda el circulo vacio hasta recargar
+                }
+            });
             StackPane pane = new StackPane(imageView);
             pane.setPrefSize(40, 40);
             pane.setMinSize(40, 40);

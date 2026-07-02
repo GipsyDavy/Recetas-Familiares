@@ -114,6 +114,26 @@ public class ApiClient {
         return MediaType.get("image/jpeg");
     }
 
+    /**
+     * Descarga bytes de una imagen del backend adjuntando Authorization
+     * (SEC-3: /uploads/** requiere JWT). El token solo se envia a URLs del
+     * propio backend para no filtrarlo a otros hosts.
+     */
+    public byte[] fetchImage(String absoluteUrl) throws ApiException {
+        Request.Builder builder = new Request.Builder().url(absoluteUrl).get();
+        if (absoluteUrl.startsWith(BASE_URL)) {
+            builder.header("Authorization", "Bearer " + session.getAccessToken());
+        }
+        try (Response response = client.newCall(builder.build()).execute()) {
+            if (!response.isSuccessful() || response.body() == null) {
+                throw new ApiException(response.code(), "HTTP " + response.code());
+            }
+            return response.body().bytes();
+        } catch (IOException e) {
+            throw new ApiException(0, "Network error: " + e.getMessage());
+        }
+    }
+
     public void shutdown() {
         client.dispatcher().executorService().shutdown();
         client.connectionPool().evictAll();

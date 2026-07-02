@@ -1,9 +1,13 @@
 package org.gipsybuho.recetasfamiliares
 
 import android.app.Application
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import org.gipsybuho.recetasfamiliares.core.AppContainer
 
-class RecetasApplication : Application() {
+class RecetasApplication : Application(), SingletonImageLoader.Factory {
     lateinit var container: AppContainer
         private set
 
@@ -11,4 +15,12 @@ class RecetasApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
     }
+
+    // Coil usa el OkHttpClient autenticado: /uploads/** requiere JWT (SEC-3)
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
+        ImageLoader.Builder(context)
+            .components {
+                add(OkHttpNetworkFetcherFactory(callFactory = { container.httpClient }))
+            }
+            .build()
 }

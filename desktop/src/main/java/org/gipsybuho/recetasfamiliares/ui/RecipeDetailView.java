@@ -271,10 +271,20 @@ public class RecipeDetailView extends VBox {
     }
 
     private Node buildPhotoNode(RecipeDtos.RecipePhotoResponse photo) {
-        ImageView imageView = new ImageView(new Image(photo.url(), true));
+        ImageView imageView = new ImageView();
         imageView.setFitWidth(110);
         imageView.setFitHeight(80);
         imageView.setPreserveRatio(false);
+        // Carga autenticada en segundo plano: /uploads/** requiere JWT (SEC-3)
+        Thread.ofVirtual().start(() -> {
+            try {
+                byte[] bytes = context.getApiClient().fetchImage(photo.url());
+                Image image = new Image(new java.io.ByteArrayInputStream(bytes), 110, 80, false, true);
+                Platform.runLater(() -> imageView.setImage(image));
+            } catch (Exception ignored) {
+                // Se mantiene el hueco vacio; el usuario puede recargar la vista
+            }
+        });
         imageView.setStyle("-fx-background-color: #FAF7F2; -fx-border-color: #C17D52; -fx-border-radius: 4;");
 
         MenuItem deleteItem = new MenuItem("Eliminar foto");

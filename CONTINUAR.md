@@ -35,7 +35,7 @@ Plataformas:
 - `android/`: Kotlin + Compose + Room + WorkManager.
 - `desktop/`: JavaFX + Maven + HTTP API client.
 - `ios/`: KMP + Compose Multiplatform + Ktor + SQLDelight.
-- `shared/`: objetivo para logica compartida Android/iOS cuando aplique.
+- `shared/`: objetivo para logica compartida Android/iOS cuando aplique. Aun no existe como modulo en el repo; iOS mantiene su propia copia de DTOs y logica bajo `ios/composeApp/`.
 
 Estado conocido a partir de la documentacion previa:
 - Backend: 76 tests, 0 fallos en la ultima validacion documentada.
@@ -108,6 +108,7 @@ Ejemplo usando placeholders. Sustituir valores localmente sin escribir secretos 
 java -jar backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar \
   --spring.profiles.active=dev \
   "--spring.datasource.password=<DB_PASSWORD>" \
+  "--app.security.jwt.secret=<JWT_SECRET_32_BYTES_MINIMO>" \
   "--app.dev.seed-data.enabled=true" \
   "--app.dev.seed-data.email=demo@recetas.local" \
   "--app.dev.seed-data.password=<DEMO_PASSWORD>" \
@@ -169,12 +170,15 @@ Implementado/documentado:
 - `GET /api/v1/families/{id}/stats`: `totalRecipes`, `totalMembers`, `totalStockItems`, `lastActivityAt`.
 - Flyway y MySQL como base principal.
 
+Resuelto en Sprint 42 (2026-07-02):
+- Fallback de secreto JWT eliminado: dev exige `JWT_SECRET` (SEC-1).
+- `/uploads/**` requiere JWT; ownership fino por familia pendiente (SEC-3 parcial).
+- Rate limiter proxy-aware opt-in via `app.security.rate-limit.auth.trust-proxy` (SEC-4).
+
 Riesgos pendientes a verificar:
-- Fallback de secreto JWT.
-- Proteccion de `/uploads/**`.
-- Rate limiter detras de proxy.
-- Paginacion de `sync/pull`.
-- `lastActivityAt` multi-entidad.
+- Paginacion de `sync/pull` (COD-5).
+- `lastActivityAt` multi-entidad (COD-4).
+- Ownership por familia en `/uploads/**` (servir via controller con lookup).
 
 Funcionalidad futura documentada:
 - Chat familiar por fases: texto/emojis en tiempo real, imagenes, videos y push notifications.
@@ -195,12 +199,15 @@ Implementado/documentado:
 - Tema 10 variantes x claro/oscuro/sistema.
 - Modo cocina con temporizador, gestos y landscape.
 
+Resuelto en Sprint 42 (2026-07-02):
+- Timeouts en refresh authenticator (SEC-7).
+- `CancellationException` re-lanzada en login (COD-7).
+- `baseSyncVersion` real en push offline: dirty = syncVersion negativo conservando base (COD-3).
+- Coil configurado con OkHttpClient autenticado para `/uploads/**`.
+
 Riesgos pendientes a verificar:
-- Timeouts del refresh authenticator.
-- `CancellationException` en login.
-- `baseSyncVersion` en push offline.
-- Consumo completo del endpoint `/stats` en perfil.
-- Fuentes TTF reales si se exige identidad premium completa.
+- Consumo completo del endpoint `/stats` en perfil (UX-6).
+- Fuentes TTF reales si se exige identidad premium completa (UX-1).
 
 Funcionalidad futura documentada:
 - Primera pantalla candidata para chat familiar tras cerrar contrato backend.
@@ -217,12 +224,15 @@ Implementado/documentado:
 - Temas, ajustes como vista central, diagnostico e instalador Windows v1.1.
 - Gestion de miembros y avatar upload.
 
+Resuelto en Sprint 42 (2026-07-02):
+- Tokens cifrados con Windows DPAPI (`TokenVault`, JNA) con migracion automatica de valores legado (SEC-2).
+- Carga de imagenes `/uploads/**` con Authorization en segundo plano (fotos de receta y avatar).
+
 Riesgos pendientes a verificar:
-- Tokens en almacenamiento seguro del sistema.
 - Perfil completo y stats familiares.
 - Onboarding de primer arranque.
 - Shortcuts completos en modo cocina.
-- Recompilar instalador con JDK 21 LTS antes de produccion.
+- Recompilar instalador con JDK 21 LTS antes de produccion (incluira DLLs de JNA).
 
 Funcionalidad futura documentada:
 - Chat familiar como segunda implantacion cliente despues de Android.
@@ -238,10 +248,14 @@ Implementado/documentado:
 - Pull incremental.
 - Tema, ajustes, perfil, hapticos, onboarding y skeletons parciales.
 
+Implementado en Sprint 42 (2026-07-02), SIN COMPILAR (build iOS imposible en Windows):
+- Interceptor Ktor Auth bearer: refresh ante 401 + retry unico + `HttpTimeout` (SEC-6).
+- Coil con HttpClient autenticado para `/uploads/**`.
+- Validar compilacion y flujo real en macOS antes de dar por cerrado.
+
 Riesgos pendientes a verificar:
 - Build en Windows por SQLDelight/Gradle.
 - Push sync completo.
-- Interceptor Ktor de refresh ante 401.
 - Paridad con Android: busqueda, filtros, skeletons y UX de listas.
 
 Funcionalidad futura documentada:
@@ -253,19 +267,16 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Prioridad propuesta:
+Sprint 42 (2026-07-02) cerro los puntos 1-8 de la lista anterior (ver seccion 10).
 
-1. Backend: eliminar fallback JWT secret hardcodeado.
-2. Backend: proteger `/uploads/**` con autenticacion y ownership.
-3. Desktop: migrar tokens a almacenamiento seguro del sistema.
-4. Backend: rate limiter proxy-aware.
-5. Android: timeouts en refresh authenticator.
-6. Android: rethrow de `CancellationException`.
-7. Android: corregir `baseSyncVersion` en push offline.
-8. iOS: interceptor Ktor 401 refresh + retry.
-9. Backend: paginar `sync/pull`.
-10. UX: completar stats familiares en Android/Desktop.
-11. Producto: especificar chat familiar por fases sin implementarlo todavia: texto/emojis en tiempo real, imagenes, videos y push notifications.
+Prioridad propuesta para Sprint 43:
+
+1. Backend: paginar `sync/pull` (COD-5).
+2. Backend: ownership por familia en `/uploads/**` (hoy: solo autenticado; URLs UUID no adivinables).
+3. Backend: `lastActivityAt` multi-entidad (COD-4).
+4. UX: completar stats familiares en Android/Desktop (UX-6).
+5. iOS: validar en macOS interceptor 401 y Coil autenticado (implementados sin compilar).
+6. Producto: especificar chat familiar por fases sin implementarlo todavia: texto/emojis en tiempo real, imagenes, videos y push notifications.
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
@@ -319,6 +330,21 @@ Cuando se cierre un sprint, documentar aqui solo lo necesario:
 - riesgos residuales.
 
 No convertir este archivo en un historial completo de todos los sprints. Para cambios extensos usar commits, changelog o documentacion especifica.
+
+### Sprint 42 — Hardening pre-produccion (2026-07-02)
+
+- Objetivo: cerrar bloqueantes SEC-1/2/3/4/6/7 y COD-3/7; mover OWASP Dependency-Check a perfil Maven `security-audit`.
+- Agente lider: Claude Code, en solitario (usuario no solicito Codex/Gemini para este sprint).
+- Seguridad ejecutada: VibeSec y security-review invocados en la sesion.
+- Backend: `mvn test` 78 tests, 0 fallos (2 tests nuevos: uploads 401 y X-Forwarded-For no falsificable).
+- Android: `gradlew assembleDebug` OK; `gradlew test` sin fuentes de test (NO-SOURCE, deuda COD-8).
+- Desktop: `mvn compile` OK; sin tests unitarios existentes (deuda COD-8).
+- iOS: cambios aplicados sin compilar (Windows); validar en macOS. Riesgo residual.
+- Convencion sync offline Android: dirty = `syncVersion` negativo (base preservada); pendiente = `syncVersion <= 0`. Documentada en `Repositories.kt`.
+- Nueva dependencia Desktop: JNA (jna-jpms + jna-platform-jpms) para DPAPI.
+- `mvn verify -P security-audit` ejecuta Dependency-Check (requiere `NVD_API_KEY`); los builds normales ya no lo exigen.
+- Arranque dev backend ahora requiere `JWT_SECRET` definido (sin fallback).
+- Riesgo residual: `/uploads/**` autenticado pero sin ownership por familia (URLs UUID no adivinables); conflicto de push devuelve error de lote completo (server gana tras pull).
 
 ### Chequeo obligatorio de cierre
 

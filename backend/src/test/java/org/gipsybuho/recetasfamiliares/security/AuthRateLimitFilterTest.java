@@ -39,14 +39,38 @@ class AuthRateLimitFilterTest {
                 .andExpect(jsonPath("$.path").value("/api/v1/auth/login"));
     }
 
+    @Test
+    void spoofedForwardedForHeaderDoesNotBypassLimitWhenProxyNotTrusted() throws Exception {
+        // remoteAddr propia para no compartir ventana con el otro test (misma instancia de filtro)
+        performLoginAttempt("10.99.0.1", "1.1.1.1").andExpect(status().isUnauthorized());
+        performLoginAttempt("10.99.0.1", "2.2.2.2").andExpect(status().isUnauthorized());
+
+        performLoginAttempt("10.99.0.1", "3.3.3.3").andExpect(status().isTooManyRequests());
+    }
+
     private org.springframework.test.web.servlet.ResultActions performLoginAttempt() throws Exception {
-        return mockMvc.perform(post("/api/v1/auth/login")
+        return performLoginAttempt(null, null);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions performLoginAttempt(
+            String remoteAddr, String forwardedFor) throws Exception {
+        var request = post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
                           "email": "rate-limit@example.com",
                           "password": "wrong-password"
                         }
-                        """));
+                        """);
+        if (forwardedFor != null) {
+            request = request.header("X-Forwarded-For", forwardedFor);
+        }
+        if (remoteAddr != null) {
+            request = request.with(mockRequest -> {
+                mockRequest.setRemoteAddr(remoteAddr);
+                return mockRequest;
+            });
+        }
+        return mockMvc.perform(request);
     }
 }

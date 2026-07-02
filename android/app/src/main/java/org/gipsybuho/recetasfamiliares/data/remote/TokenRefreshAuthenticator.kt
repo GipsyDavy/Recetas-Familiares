@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.data.remote
 
 import com.google.gson.Gson
 import okhttp3.Authenticator
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -10,6 +11,7 @@ import okhttp3.Response
 import okhttp3.Route
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AuthResponseDto
+import java.util.concurrent.TimeUnit
 
 class TokenRefreshAuthenticator(
     private val sessionStore: SessionStore,
@@ -18,9 +20,19 @@ class TokenRefreshAuthenticator(
 
     private val gson = Gson()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .build()
+
+    private val apiHost = baseUrl.toHttpUrl().host
 
     override fun authenticate(route: Route?, response: Response): Request? {
+        // Nunca responder con credenciales a un 401 de un host ajeno al API
+        if (response.request.url.host != apiHost) {
+            return null
+        }
         if (responseCount(response) >= 2) {
             sessionStore.clear()
             return null

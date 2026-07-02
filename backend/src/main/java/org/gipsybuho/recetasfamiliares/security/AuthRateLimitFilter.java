@@ -38,6 +38,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final boolean enabled;
     private final int maxRequests;
     private final Duration window;
+    private final boolean trustProxy;
     private final ObjectMapper objectMapper;
 
     @Autowired
@@ -45,16 +46,19 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             @Value("${app.security.rate-limit.auth.enabled:true}") boolean enabled,
             @Value("${app.security.rate-limit.auth.max-requests:20}") int maxRequests,
             @Value("${app.security.rate-limit.auth.window-seconds:60}") long windowSeconds,
+            @Value("${app.security.rate-limit.auth.trust-proxy:false}") boolean trustProxy,
             ObjectMapper objectMapper
     ) {
-        this(Clock.systemUTC(), enabled, maxRequests, Duration.ofSeconds(windowSeconds), objectMapper);
+        this(Clock.systemUTC(), enabled, maxRequests, Duration.ofSeconds(windowSeconds), trustProxy, objectMapper);
     }
 
-    AuthRateLimitFilter(Clock clock, boolean enabled, int maxRequests, Duration window, ObjectMapper objectMapper) {
+    AuthRateLimitFilter(Clock clock, boolean enabled, int maxRequests, Duration window,
+                        boolean trustProxy, ObjectMapper objectMapper) {
         this.clock = clock;
         this.enabled = enabled;
         this.maxRequests = maxRequests;
         this.window = window;
+        this.trustProxy = trustProxy;
         this.objectMapper = objectMapper;
     }
 
@@ -70,7 +74,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         }
 
         Instant now = clock.instant();
-        String key = request.getRemoteAddr() + ":" + request.getRequestURI();
+        String key = clientAddress(request) + ":" + request.getRequestURI();
         AttemptWindow attemptWindow = attempts.compute(key, (ignored, current) -> nextWindow(current, now));
         cleanupExpiredWindows(now);
 
@@ -89,6 +93,25 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Solo se confia en X-Forwarded-For cuando la app corre detras de un proxy
+     * de confianza (trust-proxy=true). Se toma la ultima entrada, que es la IP
+     * anadida por el proxy propio; las anteriores son falsificables por el cliente.
+     */
+    private String clientAddress(HttpServletRequest request) {
+        if (trustProxy) {
+            String forwardedFor = request.getHeader("X-Forwarded-For");
+            if (forwardedFor != null && !forwardedFor.isBlank()) {
+                String[] hops = forwardedFor.split(",");
+                String candidate = hops[hops.length - 1].trim();
+                if (!candidate.isEmpty()) {
+                    return candidate;
+                }
+            }
+        }
+        return request.getRemoteAddr();
     }
 
     private boolean shouldLimit(HttpServletRequest request) {

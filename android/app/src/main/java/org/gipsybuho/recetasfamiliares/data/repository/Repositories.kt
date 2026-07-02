@@ -58,6 +58,25 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncShoppingListItemPushI
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStepPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStockItemPushItemDto
 
+/*
+ * Convencion de sincronizacion offline (COD-3):
+ *  - syncVersion > 0  -> entidad sincronizada con el servidor (version del servidor).
+ *  - syncVersion = 0  -> creada offline, aun no existe en el servidor.
+ *  - syncVersion < 0  -> editada/borrada offline; el valor absoluto conserva la
+ *                        ultima version conocida del servidor para deteccion de conflictos.
+ */
+
+/** Marca una entidad como pendiente de push conservando su version base del servidor. */
+private fun dirtyVersion(currentSyncVersion: Long): Long =
+    if (currentSyncVersion > 0) -currentSyncVersion else currentSyncVersion
+
+/** Version base a enviar en push: permite al backend detectar conflictos reales. */
+private fun pushBaseVersion(syncVersion: Long): Long? = when {
+    syncVersion < 0 -> -syncVersion
+    syncVersion > 0 -> syncVersion
+    else -> null
+}
+
 class AuthRepository(
     private val api: RecetasApi,
     private val sessionStore: SessionStore
@@ -76,6 +95,8 @@ class AuthRepository(
         try {
             val families = api.families()
             sessionStore.familyRole = families.firstOrNull { it.id == response.family.id }?.role
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) { }
     }
 
@@ -182,7 +203,7 @@ class RecipeRepository(
             database.recipeDao().upsertAll(listOf(
                 recipe.copy(title = title, description = description, servings = servings,
                     prepMinutes = prepMinutes, cookMinutes = cookMinutes, difficulty = difficulty,
-                    updatedAt = now, syncVersion = 0L)
+                    updatedAt = now, syncVersion = dirtyVersion(recipe.syncVersion))
             ))
         }
     }
@@ -195,7 +216,7 @@ class RecipeRepository(
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             // Offline: mark deleted locally, SyncWorker will push on next sync
-            database.recipeDao().upsertAll(listOf(recipe.copy(deleted = true, syncVersion = 0L)))
+            database.recipeDao().upsertAll(listOf(recipe.copy(deleted = true, syncVersion = dirtyVersion(recipe.syncVersion))))
         }
     }
 }
@@ -251,7 +272,7 @@ class StockRepository(
             stockDao.upsertAll(listOf(
                 item.copy(name = name, quantity = quantity, unit = unit,
                     lowStockThreshold = lowStockThreshold, expiresAt = expiresAt,
-                    note = note, updatedAt = now, syncVersion = 0L)
+                    note = note, updatedAt = now, syncVersion = dirtyVersion(item.syncVersion))
             ))
         }
     }
@@ -264,7 +285,7 @@ class StockRepository(
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             // Offline: mark deleted locally, SyncWorker will push on next sync
-            stockDao.upsertAll(listOf(item.copy(deleted = true, syncVersion = 0L)))
+            stockDao.upsertAll(listOf(item.copy(deleted = true, syncVersion = dirtyVersion(item.syncVersion))))
         }
     }
 }
@@ -312,55 +333,55 @@ class SyncRepository(
             database.recipeStepDao().findByRecipeIds(recipeIds) else emptyList()
 
         val recipePushItems = pendingRecipes.map {
-            SyncRecipePushItemDto(id = it.id, baseSyncVersion = null,
+            SyncRecipePushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion),
                 title = it.title, description = it.description, servings = it.servings,
                 prepMinutes = it.prepMinutes, cookMinutes = it.cookMinutes,
                 difficulty = it.difficulty, deleted = false)
         } + pendingRecipeDel.map {
-            SyncRecipePushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
+            SyncRecipePushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion), deleted = true)
         }
 
         val ingredientPushItems = pendingIngredients.map {
-            SyncIngredientPushItemDto(id = it.id, baseSyncVersion = null, recipeId = it.recipeId,
+            SyncIngredientPushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion), recipeId = it.recipeId,
                 position = it.position, name = it.name, quantity = it.quantity,
                 unit = it.unit, note = it.note, deleted = false)
         }
 
         val stepPushItems = pendingSteps.map {
-            SyncStepPushItemDto(id = it.id, baseSyncVersion = null, recipeId = it.recipeId,
+            SyncStepPushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion), recipeId = it.recipeId,
                 position = it.position, instruction = it.instruction,
                 timerMinutes = it.timerMinutes, deleted = false)
         }
 
         val stockPushItems = pendingStock.map {
-            SyncStockItemPushItemDto(id = it.id, baseSyncVersion = null,
+            SyncStockItemPushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion),
                 name = it.name, quantity = it.quantity, unit = it.unit,
                 lowStockThreshold = it.lowStockThreshold, expiresAt = it.expiresAt,
                 note = it.note, deleted = false)
         } + pendingStockDelete.map {
-            SyncStockItemPushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
+            SyncStockItemPushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion), deleted = true)
         }
 
         val notePushItems = pendingNotes.map {
-            SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null,
+            SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion),
                 recipeId = it.recipeId, title = it.title, body = it.body,
                 pinned = it.pinned, deleted = false)
         } + pendingNoteDelete.map {
-            SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
+            SyncFamilyNotePushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion), deleted = true)
         }
 
         val shoppingItemPushItems = pendingShoppingItems.map {
             SyncShoppingListItemPushItemDto(
-                id = it.id, baseSyncVersion = null, shoppingListId = it.shoppingListId,
+                id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion), shoppingListId = it.shoppingListId,
                 position = it.position, name = it.name, quantity = it.quantity,
                 unit = it.unit, checked = it.checked, note = it.note, deleted = false
             )
         }
 
         val favoritePushItems = pendingFavorites.map {
-            SyncFavoriteRecipePushItemDto(id = it.id, baseSyncVersion = null, recipeId = it.recipeId, deleted = false)
+            SyncFavoriteRecipePushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion), recipeId = it.recipeId, deleted = false)
         } + pendingFavoriteDel.map {
-            SyncFavoriteRecipePushItemDto(id = it.id, baseSyncVersion = null, deleted = true)
+            SyncFavoriteRecipePushItemDto(id = it.id, baseSyncVersion = pushBaseVersion(it.syncVersion), deleted = true)
         }
 
         val pushRequest = SyncPushRequestDto(
@@ -416,7 +437,7 @@ class ShoppingListRepository(
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             // Offline: save checked state locally, SyncWorker will push later
-            database.shoppingListItemDao().upsertAll(listOf(item.copy(checked = checked, syncVersion = 0L)))
+            database.shoppingListItemDao().upsertAll(listOf(item.copy(checked = checked, syncVersion = dirtyVersion(item.syncVersion))))
         }
     }
 }
@@ -440,7 +461,7 @@ class FavoriteRepository(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 // Offline: mark deleted locally, SyncWorker will push on next sync
-                database.favoriteRecipeDao().upsertAll(listOf(existing.copy(deleted = true, syncVersion = 0L)))
+                database.favoriteRecipeDao().upsertAll(listOf(existing.copy(deleted = true, syncVersion = dirtyVersion(existing.syncVersion))))
             }
         } else {
             try {
@@ -491,7 +512,7 @@ class FamilyNoteRepository(
             // Offline: apply update locally, SyncWorker will push on next sync
             val now = Instant.now().toString()
             database.familyNoteDao().upsertAll(listOf(
-                note.copy(title = title, body = body, pinned = pinned, updatedAt = now, syncVersion = 0L)
+                note.copy(title = title, body = body, pinned = pinned, updatedAt = now, syncVersion = dirtyVersion(note.syncVersion))
             ))
         }
     }
@@ -504,7 +525,7 @@ class FamilyNoteRepository(
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             // Offline: mark deleted locally, SyncWorker will push on next sync
-            database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true, syncVersion = 0L)))
+            database.familyNoteDao().upsertAll(listOf(note.copy(deleted = true, syncVersion = dirtyVersion(note.syncVersion))))
         }
     }
 }

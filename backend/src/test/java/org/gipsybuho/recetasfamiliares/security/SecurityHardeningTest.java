@@ -39,6 +39,14 @@ class SecurityHardeningTest {
     }
 
     @Test
+    void uploadsRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/uploads/some-file.jpg"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/uploads/avatars/some-avatar.png"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void corsOnlyAllowsConfiguredOrigins() throws Exception {
         mockMvc.perform(options("/api/v1/auth/login")
                         .header("Origin", "https://app.recetas.example")

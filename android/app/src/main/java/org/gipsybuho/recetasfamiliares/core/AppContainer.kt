@@ -42,10 +42,11 @@ class AppContainer(context: Context) {
 
     private val baseUrl = BuildConfig.DEFAULT_API_BASE_URL
 
-    private val httpClient = OkHttpClient.Builder()
+    // Expuesto para que Coil cargue imagenes de /uploads/** con Authorization (SEC-3)
+    val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .addInterceptor(AuthInterceptor(sessionStore))
+        .addInterceptor(AuthInterceptor(sessionStore, baseUrl))
         .authenticator(TokenRefreshAuthenticator(sessionStore, baseUrl))
         .addInterceptor(
             HttpLoggingInterceptor().apply {

@@ -3,6 +3,8 @@ module org.gipsybuho.recetasfamiliares {
     requires javafx.fxml;
     requires okhttp3;
     requires com.google.gson;
+    requires com.sun.jna;
+    requires com.sun.jna.platform;
     requires org.apache.pdfbox;
     requires java.prefs;
     requires java.desktop;
