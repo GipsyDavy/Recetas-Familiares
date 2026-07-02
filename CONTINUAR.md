@@ -276,7 +276,8 @@ Prioridad propuesta para Sprint 43:
 3. Backend: `lastActivityAt` multi-entidad (COD-4).
 4. UX: completar stats familiares en Android/Desktop (UX-6).
 5. iOS: validar en macOS interceptor 401 y Coil autenticado (implementados sin compilar).
-6. Producto: especificar chat familiar por fases sin implementarlo todavia: texto/emojis en tiempo real, imagenes, videos y push notifications.
+6. Branding: implementar `recetas.png` (raiz del repo) como nuevo icono/logo oficial en Android (adaptive icon/mipmap), Desktop (icono de ventana + instalador) e iOS (AppIcon), sustituyendo el actual.
+7. Producto: especificar chat familiar por fases sin implementarlo todavia: texto/emojis en tiempo real, imagenes, videos y push notifications.
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
