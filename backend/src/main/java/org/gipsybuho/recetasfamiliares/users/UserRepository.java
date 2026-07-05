@@ -15,6 +15,14 @@ public interface UserRepository extends JpaRepository<UserEntity, String> {
 
     Optional<UserEntity> findByIdAndDeletedFalse(String id);
 
-    @Query("SELECT u.id FROM UserEntity u WHERE u.deleted = false AND u.avatarUrl LIKE CONCAT('%', :suffix)")
-    List<String> findIdsByAvatarUrlSuffix(@Param("suffix") String suffix);
+    @Query("""
+            SELECT u.id
+            FROM UserEntity u
+            WHERE u.deleted = false
+              AND (u.avatarUrl = :absoluteUrl OR u.avatarUrl = :relativePath)
+            """)
+    List<String> findIdsByAvatarLocalUrl(
+            @Param("absoluteUrl") String absoluteUrl,
+            @Param("relativePath") String relativePath
+    );
 }

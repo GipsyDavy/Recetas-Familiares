@@ -18,7 +18,7 @@ class SyncRepository(
 
     suspend fun pullIncremental() {
         val familyId = session.familyId ?: return
-        var since = db.syncMetadataQueries.getMetadata(KEY).executeAsOneOrNull()
+        var since = db.appDatabaseQueries.getMetadata(KEY).executeAsOneOrNull()?.value_
         var pages = 0
         while (true) {
             val response: SyncPullResponseDto = try {
@@ -30,10 +30,15 @@ class SyncRepository(
                 return  // sin red — silencioso, los repos usarán el cache existente
             }
             applyPage(response)
-            if (!response.hasMore || response.nextSince == null || ++pages >= MAX_PULL_PAGES) {
+            val hasNextPage = response.hasMore && response.nextSince != null
+            if (!hasNextPage) {
                 // el cursor persistido solo avanza al completar el pull; si se
                 // interrumpe, la próxima sincronización repite páginas (upsert idempotente)
-                db.syncMetadataQueries.setMetadata(KEY, response.serverTime)
+                db.appDatabaseQueries.setMetadata(KEY, response.serverTime)
+                return
+            }
+            if (++pages >= MAX_PULL_PAGES) {
+                // Corte defensivo sin avanzar cursor: evita saltar filas pendientes.
                 return
             }
             since = response.nextSince
@@ -42,7 +47,7 @@ class SyncRepository(
 
     private fun applyPage(response: SyncPullResponseDto) {
         response.recipes.forEach { dto ->
-            db.recipesQueries.insertOrReplaceRecipe(
+            db.appDatabaseQueries.insertOrReplaceRecipe(
                 id          = dto.id,
                 familyId    = dto.familyId,
                 title       = dto.title,
@@ -58,16 +63,17 @@ class SyncRepository(
         }
 
         response.ingredients.forEach { dto ->
-            db.recipeIngredientsQueries.insertOrReplaceIngredient(
+            val recipeId = dto.recipeId ?: return@forEach
+            db.appDatabaseQueries.insertOrReplaceIngredient(
                 id       = dto.id,
-                recipeId = dto.recipeId,
+                recipeId = recipeId,
                 name     = dto.name,
                 deleted  = if (dto.deleted) 1L else 0L
             )
         }
 
         response.stockItems.forEach { dto ->
-            db.stockItemsQueries.insertOrReplaceStockItem(
+            db.appDatabaseQueries.insertOrReplaceStockItem(
                 id                = dto.id,
                 familyId          = dto.familyId,
                 name              = dto.name,

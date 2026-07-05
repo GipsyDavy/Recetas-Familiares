@@ -27,6 +27,11 @@ public interface RecipePhotoRepository extends JpaRepository<RecipePhotoEntity, 
 
     List<RecipePhotoEntity> findByRecipe_Family_IdAndUpdatedAtAfter(String familyId, Instant since, Pageable pageable);
 
-    @Query("SELECT p.recipe.family.id FROM RecipePhotoEntity p WHERE p.deleted = false AND p.url LIKE CONCAT('%', :suffix)")
-    List<String> findOwningFamilyIdsByUrlSuffix(@Param("suffix") String suffix);
+    @Query("""
+            SELECT p.recipe.family.id
+            FROM RecipePhotoEntity p
+            WHERE p.deleted = false
+              AND p.storagePath = :storagePath
+            """)
+    List<String> findOwningFamilyIdsByStoragePath(@Param("storagePath") String storagePath);
 }

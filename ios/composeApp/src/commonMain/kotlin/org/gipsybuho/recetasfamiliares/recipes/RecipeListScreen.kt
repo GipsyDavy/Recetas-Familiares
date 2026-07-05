@@ -216,7 +216,7 @@ private fun RecipeCard(
     } else Modifier
 
     Card(
-        modifier  = Modifier.fillMaxWidth().animateItem().then(sharedMod).clickable(onClick = onClick),
+        modifier  = Modifier.fillMaxWidth().then(sharedMod).clickable(onClick = onClick),
         shape     = MaterialTheme.shapes.large,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {

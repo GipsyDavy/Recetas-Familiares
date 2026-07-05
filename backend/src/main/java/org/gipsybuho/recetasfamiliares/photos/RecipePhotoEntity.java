@@ -45,6 +45,9 @@ public class RecipePhotoEntity {
     @Column(name = "size_bytes")
     private Long sizeBytes;
 
+    @Column(name = "storage_path", length = 255)
+    private String storagePath;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -72,6 +75,19 @@ public class RecipePhotoEntity {
             String contentType,
             Long sizeBytes
     ) {
+        this(recipe, position, url, thumbnailUrl, caption, contentType, sizeBytes, null);
+    }
+
+    public RecipePhotoEntity(
+            RecipeEntity recipe,
+            int position,
+            String url,
+            String thumbnailUrl,
+            String caption,
+            String contentType,
+            Long sizeBytes,
+            String storagePath
+    ) {
         this.recipe = recipe;
         this.position = position;
         this.url = url;
@@ -79,6 +95,7 @@ public class RecipePhotoEntity {
         this.caption = caption;
         this.contentType = contentType;
         this.sizeBytes = sizeBytes;
+        this.storagePath = storagePath;
     }
 
     public RecipePhotoEntity(
@@ -142,6 +159,10 @@ public class RecipePhotoEntity {
         return sizeBytes;
     }
 
+    public String getStoragePath() {
+        return storagePath;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -166,12 +187,16 @@ public class RecipePhotoEntity {
             String contentType,
             Long sizeBytes
     ) {
+        boolean urlChanged = this.url == null || !this.url.equals(url);
         this.position = position;
         this.url = url;
         this.thumbnailUrl = thumbnailUrl;
         this.caption = caption;
         this.contentType = contentType;
         this.sizeBytes = sizeBytes;
+        if (urlChanged) {
+            this.storagePath = null;
+        }
         this.deleted = false;
         this.deletedAt = null;
         touch();

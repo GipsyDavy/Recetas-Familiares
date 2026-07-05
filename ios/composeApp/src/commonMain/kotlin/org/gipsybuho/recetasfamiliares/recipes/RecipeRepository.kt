@@ -30,7 +30,7 @@ class RecipeRepository(
                 }.body()
             response.items.filter { !it.deleted }.also { items ->
                 items.forEach { dto ->
-                    db.recipesQueries.insertOrReplaceRecipe(
+                    db.appDatabaseQueries.insertOrReplaceRecipe(
                         id          = dto.id,
                         familyId    = dto.familyId,
                         title       = dto.title,
@@ -46,7 +46,7 @@ class RecipeRepository(
                 }
             }
         } catch (e: Exception) {
-            db.recipesQueries.selectAllRecipes().executeAsList().map { it.toDto() }
+            db.appDatabaseQueries.selectAllRecipes().executeAsList().map { it.toDto() }
         }
     }
 
@@ -90,7 +90,7 @@ class RecipeRepository(
     }
 
     fun loadLocalIngredients(): List<Pair<String, String>> =
-        db.recipeIngredientsQueries.selectAllIngredients().executeAsList()
+        db.appDatabaseQueries.selectAllIngredients().executeAsList()
             .map { it.recipeId to it.name.lowercase().trim() }
 
     private fun Recipes.toDto() = RecipeDto(

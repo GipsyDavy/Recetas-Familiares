@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.gipsybuho.recetasfamiliares.core.formatOneDecimal
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.core.shareText
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
@@ -174,7 +175,7 @@ fun RecipeDetailScreen(
                             Text("• ${ing.name}", style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f))
                             val qty = buildString {
-                                ing.quantity?.let { append("%.1f".format(it)) }
+                                ing.quantity?.let { append(it.formatOneDecimal()) }
                                 ing.unit?.takeIf { it.isNotBlank() }?.let { append(" $it") }
                             }
                             if (qty.isNotBlank()) {
@@ -323,7 +324,7 @@ private fun buildShareText(
         appendLine(); appendLine("🥗 Ingredientes:")
         ingredients.sortedBy { it.position }.forEach { ing ->
             val qty = buildString {
-                ing.quantity?.let { append("%.1f".format(it)) }
+                ing.quantity?.let { append(it.formatOneDecimal()) }
                 ing.unit?.takeIf { it.isNotBlank() }?.let { append(" $it") }
             }
             appendLine("• ${ing.name}${if (qty.isNotBlank()) " ($qty)" else ""}")

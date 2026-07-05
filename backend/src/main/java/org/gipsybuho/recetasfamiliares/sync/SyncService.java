@@ -107,11 +107,12 @@ public class SyncService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family access denied");
         }
         Instant effectiveSince = since == null ? DEFAULT_SINCE : since;
+        Instant serverTime = Instant.now();
         if (limit != null) {
-            return pagedPull(familyId, effectiveSince, normalizeLimit(limit));
+            return pagedPull(familyId, effectiveSince, normalizeLimit(limit), serverTime);
         }
         return new SyncPullResponse(
-                Instant.now(),
+                serverTime,
                 recipeRepository.findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
                         .stream()
                         .map(this::toRecipeResponse)
@@ -161,7 +162,7 @@ public class SyncService {
         );
     }
 
-    private SyncPullResponse pagedPull(String familyId, Instant since, int limit) {
+    private SyncPullResponse pagedPull(String familyId, Instant since, int limit, Instant serverTime) {
         Slice<RecipeResponse> recipes = fetchSlice(
                 p -> recipeRepository.findByFamily_IdAndUpdatedAtAfter(familyId, since, p),
                 RecipeEntity::getUpdatedAt, this::toRecipeResponse, limit);
@@ -206,7 +207,7 @@ public class SyncService {
                 .orElse(null);
 
         return new SyncPullResponse(
-                Instant.now(),
+                serverTime,
                 recipes.items(),
                 ingredients.items(),
                 steps.items(),

@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.sql.Timestamp;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -31,6 +34,9 @@ class SyncControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void pullsFamilyRecipeChangesWithDeletedContent() throws Exception {
@@ -743,6 +749,36 @@ class SyncControllerTest {
         }
         org.junit.jupiter.api.Assertions.assertEquals(expectedIds, seenIds);
         org.junit.jupiter.api.Assertions.assertTrue(pages >= 2, "limit=1 with 3 recipes should need several pages");
+    }
+
+    @Test
+    void pullWithLimitKeepsWholeUpdatedAtGroupWhenAllRowsShareTimestamp() throws Exception {
+        RegisteredUser user = register("sync-paged-same-time@example.com", "Familia Paged Same Time");
+        java.util.Set<String> expectedIds = new java.util.HashSet<>();
+        for (int i = 1; i <= 3; i++) {
+            MvcResult created = createRecipe(user, "Receta mismo timestamp " + i).andReturn();
+            expectedIds.add(read(created, "id"));
+        }
+        Instant boundary = Instant.parse("2026-07-05T10:15:30Z");
+        expectedIds.forEach(id -> jdbcTemplate.update(
+                "UPDATE recipes SET updated_at = ? WHERE id = ?",
+                Timestamp.from(boundary),
+                id
+        ));
+
+        MvcResult page = mockMvc.perform(get(
+                                "/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z&limit=1",
+                                user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipes.length()").value(3))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andReturn();
+
+        JsonNode body = objectMapper.readTree(page.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        java.util.Set<String> seenIds = new java.util.HashSet<>();
+        body.get("recipes").forEach(recipe -> seenIds.add(recipe.get("id").asText()));
+        org.junit.jupiter.api.Assertions.assertEquals(expectedIds, seenIds);
     }
 
     @Test

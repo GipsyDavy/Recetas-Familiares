@@ -14,10 +14,10 @@ Aplicacion premium multiplataforma para gestion familiar de recetas, ingrediente
 ## Estado Resumido
 
 Estado documentado mas reciente:
-- Backend: 78 tests, 0 fallos en la ultima validacion registrada.
+- Backend: 92 tests, 0 fallos en la ultima validacion registrada.
 - Android: funcional con recetas, stock, menus, notas, perfil, widgets, temas y sincronizacion offline.
 - Desktop: funcional con dashboard, CRUD principal, busqueda, temas, ajustes, diagnostico e instalador v1.1.
-- iOS: en desarrollo avanzado, con deuda conocida de build/paridad/sincronizacion.
+- iOS: en desarrollo avanzado; targets Kotlin/Native compilan en Windows, con deuda de validacion runtime/paridad/sincronizacion.
 - Chat familiar: planificado, no implementado; objetivo por fases con texto/emojis en tiempo real, imagenes, videos, historial paginado, WebSocket y storage protegido.
 
 Antes de publicar o cerrar sprint, ejecutar validaciones reales y seguir `CLAUDE.md`.

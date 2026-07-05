@@ -334,10 +334,15 @@ class SyncRepository(
         while (true) {
             val response = api.pullSync(familyId, since, PULL_PAGE_SIZE)
             applyPullPage(response)
-            if (response.hasMore != true || response.nextSince == null || ++pages >= MAX_PULL_PAGES) {
+            val hasNextPage = response.hasMore == true && response.nextSince != null
+            if (!hasNextPage) {
                 // lastSyncTime solo avanza al completar el pull: si se interrumpe,
                 // la proxima sincronizacion repite paginas (upsert idempotente)
                 sessionStore.lastSyncTime = response.serverTime
+                return
+            }
+            if (++pages >= MAX_PULL_PAGES) {
+                // Corte defensivo sin avanzar lastSyncTime: evita saltar filas pendientes.
                 return
             }
             since = response.nextSince

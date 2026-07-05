@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import org.gipsybuho.recetasfamiliares.core.formatOneDecimal
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.ShoppingListDto
 import org.gipsybuho.recetasfamiliares.network.ShoppingListItemDto
@@ -189,7 +190,7 @@ private fun ShoppingItemRow(item: ShoppingListItemDto) {
                 textDecoration = if (item.checked) TextDecoration.LineThrough else null
             )
             val qty = buildString {
-                item.quantity?.let { append("%.1f".format(it)) }
+                item.quantity?.let { append(it.formatOneDecimal()) }
                 item.unit?.let { append(" $it") }
             }
             if (qty.isNotBlank()) {

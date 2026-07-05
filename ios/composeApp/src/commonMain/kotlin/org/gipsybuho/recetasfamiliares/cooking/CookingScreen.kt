@@ -1,7 +1,6 @@
 package org.gipsybuho.recetasfamiliares.cooking
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -23,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.gipsybuho.recetasfamiliares.core.ScreenWakeLock
+import org.gipsybuho.recetasfamiliares.core.formatTimerMinutesSeconds
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
 import org.gipsybuho.recetasfamiliares.network.RecipeStepDto
@@ -170,16 +170,11 @@ fun CookingScreen(
                             lineHeight = MaterialTheme.typography.headlineMedium.lineHeight,
                             modifier = Modifier.padding(bottom = 40.dp)
                         )
-                        AnimatedVisibility(
-                            visible = showSwipeHint,
-                            enter   = fadeIn(tween(400)),
-                            exit    = fadeOut(tween(600)),
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        ) {
+                        if (showSwipeHint) {
                             Surface(
                                 shape = MaterialTheme.shapes.extraLarge,
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)
                             ) {
                                 Text(
                                     "← Desliza para navegar →",
@@ -220,7 +215,7 @@ fun CookingScreen(
                         )
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             AnimatedContent(
-                                targetState = if (timerDone) "done" else "%02d:%02d".format(mm, ss),
+                                targetState = if (timerDone) "done" else formatTimerMinutesSeconds(mm, ss),
                                 transitionSpec = {
                                     slideInVertically { -it } + fadeIn() togetherWith
                                     slideOutVertically { it } + fadeOut()

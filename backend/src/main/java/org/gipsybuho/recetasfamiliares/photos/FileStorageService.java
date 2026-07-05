@@ -31,7 +31,7 @@ public class FileStorageService {
         Files.createDirectories(this.uploadDir);
     }
 
-    public record StoredFile(String url, String contentType, long sizeBytes) {}
+    public record StoredFile(String url, String storagePath, String contentType, long sizeBytes) {}
 
     public StoredFile store(MultipartFile file) throws IOException {
         return store(file, null);
@@ -71,7 +71,7 @@ public class FileStorageService {
         String urlPath = (subdir != null && !subdir.isBlank())
                 ? "/uploads/" + subdir + "/" + filename
                 : "/uploads/" + filename;
-        return new StoredFile(baseUrl + urlPath, contentType, bytes.length);
+        return new StoredFile(baseUrl + urlPath, urlPath, contentType, bytes.length);
     }
 
     private void validateMagicBytes(byte[] bytes, String contentType) {

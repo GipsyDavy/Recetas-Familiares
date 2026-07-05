@@ -22,7 +22,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @ActiveProfiles("test")
-@SpringBootTest(properties = "app.upload.dir=target/test-uploads")
+@SpringBootTest(properties = {
+        "app.upload.dir=target/test-uploads",
+        "app.upload.base-url=https://cdn.recetas.test"
+})
 @AutoConfigureMockMvc
 class UploadControllerTest {
 
@@ -92,6 +95,25 @@ class UploadControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void externalPhotoUrlWithExactLocalUrlDoesNotGrantFileAccess() throws Exception {
+        RegisteredUser owner = register("uploads-real-owner@example.com", "Familia Real");
+        RegisteredUser attacker = register("uploads-suffix-attacker@example.com", "Familia Sufijo");
+
+        String ownerRecipeId = createRecipe(owner);
+        String photoPath = uploadRecipePhoto(owner, ownerRecipeId);
+
+        String attackerRecipeId = createRecipe(attacker);
+        createExternalPhotoMetadata(attacker, attackerRecipeId, "https://cdn.recetas.test" + photoPath);
+
+        mockMvc.perform(get(photoPath).header("Authorization", "Bearer " + attacker.accessToken()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get(photoPath).header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_JPEG));
+    }
+
     private String uploadRecipePhoto(RegisteredUser user, String recipeId) throws Exception {
         MvcResult result = mockMvc.perform(multipart(
                                 "/api/v1/families/{familyId}/recipes/{recipeId}/photos/upload",
@@ -102,6 +124,22 @@ class UploadControllerTest {
                 .andReturn();
         String url = read(result, "url");
         return URI.create(url).getPath();
+    }
+
+    private void createExternalPhotoMetadata(RegisteredUser user, String recipeId, String url) throws Exception {
+        mockMvc.perform(post("/api/v1/families/{familyId}/recipes/{recipeId}/photos", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "position": 1,
+                                  "url": "%s",
+                                  "thumbnailUrl": "%s",
+                                  "contentType": "image/jpeg",
+                                  "sizeBytes": 1024
+                                }
+                                """.formatted(url, url)))
+                .andExpect(status().isCreated());
     }
 
     private String uploadAvatar(RegisteredUser user) throws Exception {

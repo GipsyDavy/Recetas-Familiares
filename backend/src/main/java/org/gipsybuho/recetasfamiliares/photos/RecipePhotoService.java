@@ -126,7 +126,7 @@ public class RecipePhotoService {
         RecipePhotoEntity photo = new RecipePhotoEntity(
                 recipe, nextPosition,
                 stored.url(), stored.url(),  // same URL for thumbnail (no resize in MVP)
-                trimmedCaption, stored.contentType(), stored.sizeBytes()
+                trimmedCaption, stored.contentType(), stored.sizeBytes(), stored.storagePath()
         );
         recipe.markContentChanged();
         recipeRepository.save(recipe);

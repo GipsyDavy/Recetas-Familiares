@@ -5,12 +5,13 @@ import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.value
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import platform.Foundation.NSMutableDictionary
-import platform.Foundation.NSNumber
+import platform.Foundation.NSCopyingProtocol
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.create
@@ -86,14 +87,14 @@ actual class SessionStore {
         val data = (value as NSString).dataUsingEncoding(NSUTF8StringEncoding) ?: return
         kcDelete(key)                               // prevent duplicate-item error
         val q = baseQuery(key)
-        q.setObject(data, forKey = kSecValueData as NSCopying)
+        q.setObject(data, forKey = kSecValueData as NSCopyingProtocol)
         SecItemAdd(q as platform.CoreFoundation.CFDictionaryRef, null)
     }
 
     private fun kcRead(key: String): String? = memScoped {
         val q = baseQuery(key)
-        q.setObject(NSNumber.numberWithBool(true), forKey = kSecReturnData as NSCopying)
-        q.setObject(kSecMatchLimitOne, forKey = kSecMatchLimit as NSCopying)
+        q.setObject(true, forKey = kSecReturnData as NSCopyingProtocol)
+        q.setObject(kSecMatchLimitOne, forKey = kSecMatchLimit as NSCopyingProtocol)
         val out = alloc<ObjCObjectVar<Any?>>()
         val status = SecItemCopyMatching(
             q as platform.CoreFoundation.CFDictionaryRef,
@@ -111,9 +112,9 @@ actual class SessionStore {
 
     private fun baseQuery(key: String): NSMutableDictionary {
         val q = NSMutableDictionary()
-        q.setObject(kSecClassGenericPassword, forKey = kSecClass as NSCopying)
-        q.setObject(SERVICE as NSString, forKey = kSecAttrService as NSCopying)
-        q.setObject(key as NSString, forKey = kSecAttrAccount as NSCopying)
+        q.setObject(kSecClassGenericPassword, forKey = kSecClass as NSCopyingProtocol)
+        q.setObject(SERVICE as NSString, forKey = kSecAttrService as NSCopyingProtocol)
+        q.setObject(key as NSString, forKey = kSecAttrAccount as NSCopyingProtocol)
         return q
     }
 

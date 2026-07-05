@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -34,6 +35,7 @@ import kotlinx.datetime.until
 import kotlinx.datetime.DateTimeUnit
 import org.gipsybuho.recetasfamiliares.Spacing
 import org.gipsybuho.recetasfamiliares.core.ExpiryNotificationScheduler
+import org.gipsybuho.recetasfamiliares.core.formatOneDecimal
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.network.StockItemDto
 import org.gipsybuho.recetasfamiliares.recipes.AnimatedEmptyState
@@ -322,8 +324,7 @@ private fun SwipeToRevealItem(
                         }
                     },
                     onDragCancel = { scope.launch { offsetX.animateTo(0f, tween(200)) } },
-                    onDrag       = { change, delta ->
-                        change.consume()
+                    onHorizontalDrag = { _, delta ->
                         scope.launch {
                             offsetX.snapTo((offsetX.value + delta).coerceIn(-revealPx.toPx(), 0f))
                         }
@@ -368,19 +369,22 @@ private fun SwipeToRevealItem(
                             }
                         }.getOrNull()
                     }
+                    val errorColor = MaterialTheme.colorScheme.error
+                    val warningColor = MaterialTheme.colorScheme.tertiary
+                    val normalColor = MaterialTheme.colorScheme.onSurfaceVariant
                     val expiryColor = item.expiresAt?.take(10)?.let { raw ->
                         runCatching {
                             val expDate = LocalDate.parse(raw)
                             val days = today.until(expDate, DateTimeUnit.DAY)
                             when {
-                                days <= 2 -> MaterialTheme.colorScheme.error
-                                days <= 7 -> MaterialTheme.colorScheme.tertiary
-                                else      -> MaterialTheme.colorScheme.onSurfaceVariant
+                                days <= 2 -> errorColor
+                                days <= 7 -> warningColor
+                                else      -> normalColor
                             }
-                        }.getOrElse { MaterialTheme.colorScheme.onSurfaceVariant }
-                    } ?: MaterialTheme.colorScheme.onSurfaceVariant
+                        }.getOrElse { normalColor }
+                    } ?: normalColor
                     val qty = buildString {
-                        item.quantity?.let { append("%.1f".format(it)) }
+                        item.quantity?.let { append(it.formatOneDecimal()) }
                         item.unit?.let { append(" $it") }
                     }
                     Column {

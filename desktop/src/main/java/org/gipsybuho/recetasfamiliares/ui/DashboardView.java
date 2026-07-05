@@ -169,7 +169,7 @@ public class DashboardView extends ScrollPane {
         loadFamilyStats();
     }
 
-    /** UX-6: stats familiares del endpoint /stats. Si falla, la fila queda vacía. */
+    /** UX-6: stats familiares del endpoint /stats, con fallback local mínimo. */
     private void loadFamilyStats() {
         String familyId = context.getSession().getFamilyId();
         if (familyId == null) {
@@ -180,7 +180,7 @@ public class DashboardView extends ScrollPane {
                 var stats = context.getFamilyRepository().loadStats(familyId);
                 Platform.runLater(() -> renderFamilyStats(stats));
             } catch (Exception ex) {
-                Platform.runLater(() -> statsSection.getChildren().clear());
+                Platform.runLater(this::renderLocalFamilyStats);
             }
         });
     }
@@ -198,6 +198,27 @@ public class DashboardView extends ScrollPane {
         if (stats.lastActivityAt() != null && stats.lastActivityAt().length() >= 10) {
             statsSection.getChildren().add(statChip("Última actividad: " + stats.lastActivityAt().substring(0, 10)));
         }
+    }
+
+    private void renderLocalFamilyStats() {
+        statsSection.getChildren().clear();
+        List<RecipeDtos.RecipeDto> cachedRecipes = context.getRecipeRepository().getCache().getItems()
+                .stream()
+                .filter(recipe -> !recipe.deleted())
+                .toList();
+        if (cachedRecipes.isEmpty()) {
+            return;
+        }
+        statsSection.getChildren().add(
+                statChip(cachedRecipes.size() + (cachedRecipes.size() == 1 ? " receta" : " recetas"))
+        );
+        cachedRecipes.stream()
+                .map(RecipeDtos.RecipeDto::updatedAt)
+                .filter(value -> value != null && value.length() >= 10)
+                .max(String::compareTo)
+                .ifPresent(value -> statsSection.getChildren().add(
+                        statChip("Última actividad: " + value.substring(0, 10))
+                ));
     }
 
     private Label statChip(String text) {

@@ -3,7 +3,7 @@ package org.gipsybuho.recetasfamiliares.core
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 
-expect class HapticFeedback {
+expect class HapticFeedback() {
     fun impact()
     fun selection()
     fun success()

@@ -115,7 +115,19 @@ Sin binarios en MySQL: storage de archivos con la misma política que fotos de r
 
 ---
 
-## 6. Decisiones pendientes (resolver antes de implementar fase 1)
+## 6. Consideraciones UX antes de diseñar cada fase
+
+- Estado vacío fase 1: primer mensaje cálido y útil, sin explicar tecnología; debe invitar a coordinar cocina familiar y dejar claro que el hilo es privado.
+- Envío sin red: botón deshabilitado con feedback breve y recuperable; no cola offline hasta que se diseñe explícitamente.
+- Indicador de escritura: fuera de fase 1 salvo que se cierre privacidad y expiración corta; no persistir este estado.
+- Mensajes de sistema: entrada/salida de miembros, mensaje eliminado y adjuntos no disponibles deben tener microcopy sobrio, sin exponer emails ni datos internos.
+- Accesibilidad: TalkBack/VoiceOver con autor, hora y estado del mensaje; orden de foco estable; acciones de editar/borrar disponibles sin gestos ocultos.
+- Notificaciones: agrupar por familia, no incluir texto completo en payload, respetar silencio/no molestar y permitir desactivar avisos del chat.
+- Tono visual: conversación cálida y familiar, no corporativa; evitar saturación de badges, contadores o colores de alerta salvo errores reales.
+
+---
+
+## 7. Decisiones pendientes (resolver antes de implementar fase 1)
 
 1. ¿Retención ilimitada del historial o límite (p.ej. 2 años) con export?
 2. ¿Read-receipts por usuario en alguna fase? (privacidad vs utilidad familiar)
@@ -125,7 +137,7 @@ Sin binarios en MySQL: storage de archivos con la misma política que fotos de r
 
 ---
 
-## 7. Criterios de cierre de la fase 1 (cuando se implemente)
+## 8. Criterios de cierre de la fase 1 (cuando se implemente)
 
 - Tests backend: historial paginado, envío, ownership entre familias, rate limit, WS no autorizado rechazado.
 - VibeSec + security-review de la sesión de implementación.

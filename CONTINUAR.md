@@ -38,10 +38,10 @@ Plataformas:
 - `shared/`: objetivo para logica compartida Android/iOS cuando aplique. Aun no existe como modulo en el repo; iOS mantiene su propia copia de DTOs y logica bajo `ios/composeApp/`.
 
 Estado conocido a partir de la documentacion previa:
-- Backend: 88 tests, 0 fallos en la ultima validacion documentada.
+- Backend: 92 tests, 0 fallos en la ultima validacion documentada.
 - Android: funcional, con offline-first y UI avanzada.
 - Desktop: funcional, instalador Windows v1.1 generado, ajustes como vista central.
-- iOS: funcional parcialmente, pero con deuda de paridad y build en Windows.
+- iOS: funcional parcialmente; metadata KMP compila en Windows, pero el target iOS nativo sigue con deuda de compilacion/paridad.
 
 Antes de afirmar estado actual, ejecutar validaciones reales en la sesion.
 
@@ -181,6 +181,10 @@ Resuelto en Sprint 43 (2026-07-05):
 - Ownership por familia en `/uploads/**` via `UploadController` con lookup en BD (SEC-3 completo).
 - Bug corregido: `/users/me`, `PUT /me` y avatar upload buscaban por email con un principal userId (404 permanente).
 
+Endurecido tras revision Codex/Gemini post-Sprint 43 (2026-07-05):
+- `/uploads/**` ya no autoriza fotos por sufijo `LIKE` ni por URL publica exacta; las fotos locales se sirven solo si la fila tiene `storage_path` interno generado por `FileStorageService`.
+- `sync/pull` devuelve `serverTime` capturado antes de consultar para evitar saltos por cambios concurrentes.
+
 Funcionalidad futura documentada:
 - Chat familiar por fases: texto/emojis en tiempo real, imagenes, videos y push notifications.
 - REST para historial paginado, envio inicial/fallback y operaciones de lectura.
@@ -211,6 +215,9 @@ Resuelto en Sprint 43 (2026-07-05):
 - Pull paginado con `limit=200` y tope de 50 paginas.
 - Icono adaptive con `recetas.png` (mipmaps 5 dpis, fondo #F6E7D8).
 
+Endurecido tras revision Codex/Gemini post-Sprint 43 (2026-07-05):
+- Si se alcanza el tope de 50 paginas con `hasMore=true`, no avanza `lastSyncTime`; la siguiente sync reintenta sin perder filas.
+
 Riesgos pendientes a verificar:
 - Fuentes TTF reales si se exige identidad premium completa (UX-1).
 
@@ -237,6 +244,9 @@ Resuelto en Sprint 43 (2026-07-05):
 - Dashboard muestra stats familiares de `/stats` (UX-6 parcial Desktop).
 - Icono de ventana e instalador regenerados desde `recetas.png` (ICO multi-res 16-256).
 
+Endurecido tras revision Codex/Gemini post-Sprint 43 (2026-07-05):
+- Si falla `/stats`, el dashboard muestra fallback local minimo con recetas cacheadas y ultima actividad local cuando existe.
+
 Riesgos pendientes a verificar:
 - Perfil completo y stats familiares (UX-5/UX-6).
 - Onboarding de primer arranque (UX-8/UX-13).
@@ -262,8 +272,14 @@ Implementado en Sprint 42 (2026-07-02), SIN COMPILAR (build iOS imposible en Win
 - Coil con HttpClient autenticado para `/uploads/**`.
 - Validar compilacion y flujo real en macOS antes de dar por cerrado.
 
+Implementado en Sprint 43 y endurecido post-revision:
+- Pull paginado con tope defensivo que no avanza cursor si aun queda `hasMore=true`.
+- DTOs de pull ampliados para aceptar el contrato backend completo de forma aditiva.
+- Tooling actualizado a Kotlin `2.3.20` y SQLDelight `2.3.2`; `compileKotlinMetadata`, `compileKotlinIosX64`, `compileKotlinIosArm64` y `compileKotlinIosSimulatorArm64` compilan en Windows.
+- Persistencia local sigue limitada al esquema SQLDelight actual: recetas, ingredientes y stock; menus, listas, favoritos, notas, fotos y pasos quedan pendientes de paridad real.
+
 Riesgos pendientes a verificar:
-- Build en Windows por SQLDelight/Gradle (COD-2).
+- iOS ya compila los targets Kotlin/Native en Windows, pero falta validar runtime en macOS/dispositivo. `SessionStore.ios.kt` compila con warnings de casts Keychain (`NSCopyingProtocol`) que deben probarse y, si procede, reemplazarse por construccion CFDictionary mas idiomatica.
 - Push sync completo (COD-1).
 - Paridad con Android: busqueda, filtros, skeletons y UX de listas (UX-3).
 
@@ -280,7 +296,7 @@ Sprint 43 (2026-07-05) cerro los puntos 1-4, 6 (Android/Desktop) y 7 de la lista
 
 Prioridad propuesta para Sprint 44:
 
-1. iOS: validar en macOS todo lo implementado sin compilar (interceptor 401, Coil autenticado, pull paginado) y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2).
+1. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2).
 2. Desktop: recompilar instalador con JDK 21 LTS (incluira DLLs de JNA y el nuevo icono).
 3. Tests unitarios Android/Desktop para flujos de sync y repositorios (COD-8).
 4. UX: onboarding primer arranque Desktop (UX-8/UX-13), shortcuts modo cocina (UX-11), fuentes TTF (UX-1).
@@ -297,8 +313,9 @@ Ajustar comandos al modulo tocado y al build real del repositorio.
 Backend:
 
 ```bash
-./gradlew test
-./gradlew build
+cd backend
+mvn test
+mvn -DskipTests package
 ```
 
 Android:
@@ -364,7 +381,7 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Desktop: si DPAPI/JNA falla en Windows, los tokens no se persisten en claro.
 - Documentacion: README, `auditoria.md` y trazabilidad de `CONTINUAR.md` actualizadas con estado Sprint 42 y IDs historicos.
 - Validacion ejecutada: `git diff --check` OK; Android `gradlew assembleDebug` OK; Android `gradlew test` OK sin tests (`NO-SOURCE`); Desktop `mvn -DskipTests compile` OK; Desktop `mvn test` OK sin tests.
-- iOS: `gradlew :composeApp:compileKotlinMetadata` no validado; falla en Windows durante configuracion Gradle/SQLDelight (`DefaultArtifactPublicationSet`), antes de compilar el cambio Kotlin. Validar en macOS.
+- iOS: `gradlew :composeApp:compileKotlinMetadata` no validado en esa revision; se corrigio despues en la revision post-Sprint 43.
 - Riesgo residual: faltan tests unitarios Android/Desktop/iOS para estos flujos; `recetas.png` queda como asset pendiente de branding.
 
 ### Sprint 43 — Sync paginado, ownership uploads, stats y branding (2026-07-05)
@@ -382,6 +399,23 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Producto: `docs/chat-familiar-spec.md` creado (4 fases, contrato borrador, modelo de datos, seguridad, decisiones pendientes). Sin codigo de chat.
 - Validacion ejecutada: backend `mvn test` 88 tests 0 fallos (10 nuevos: paginacion sync, ownership uploads, users/me, stats multi-entidad); Android `gradlew assembleDebug` OK; Desktop `mvn -DskipTests compile` OK.
 - Riesgo residual: cambios iOS sin compilar; stats Android/Desktop validadas por compilacion y tests backend, sin prueba manual de UI en esta sesion; instalador Windows pendiente de recompilar para empaquetar el nuevo icono.
+
+### Revision post-Sprint 43 — Aplicacion hallazgos Codex/Gemini (2026-07-05)
+
+- Objetivo: integrar la revision tecnica de Codex y la revision UX/documental de Gemini tras Sprint 43.
+- Agente en esta sesion: Codex, retomando el cierre solicitado por Claude Code; el usuario autorizo proceder sin pedir autorizacion adicional.
+- Seguridad ejecutada: VibeSec aplicado para el endurecimiento de uploads/sync.
+- Backend: `UploadController` ya no usa lookup por sufijo con `LIKE`; ownership de fotos se valida por `recipe_photos.storage_path`, un identificador local interno que solo rellena el backend al subir archivo. Una metadata externa con la URL publica exacta de `/uploads/<uuid>.jpg` ya no autoriza el archivo local.
+- Backend: serving de uploads anade `X-Content-Type-Options: nosniff` y endurece resolucion de ruta contra symlinks finales y escapes fuera de `UPLOAD_DIR`.
+- Backend: `sync/pull` captura `serverTime` antes de consultar, reduciendo riesgo de saltar cambios concurrentes confirmados durante la respuesta.
+- Backend tests nuevos: bypass de sufijo en uploads, grupo degenerado de `updatedAt` en pull paginado, stats por stock/menu/shopping/favoritos.
+- Android/iOS: si el pull paginado alcanza `MAX_PULL_PAGES` con paginas pendientes, no avanza el cursor de sync; la siguiente ejecucion reintenta.
+- iOS: DTOs de `SyncPullResponse` ampliados para aceptar campos del contrato backend completo, tooling actualizado a Kotlin `2.3.20` + SQLDelight `2.3.2`, `.sq` movido al paquete requerido y repositorios ajustados a `appDatabaseQueries`.
+- Desktop: fallback offline minimo para stats del dashboard cuando `/stats` falla.
+- Producto/UX: `docs/chat-familiar-spec.md` ampliada con consideraciones de estados vacios, accesibilidad, notificaciones, mensajes de sistema y tono.
+- Validacion ejecutada: backend `mvn test` 92 tests 0 fallos; Android `.\gradlew.bat assembleDebug` OK; Desktop `mvn test` OK sin tests que ejecutar; iOS `.\gradlew.bat :composeApp:compileKotlinMetadata`, `:composeApp:compileKotlinIosX64`, `:composeApp:compileKotlinIosArm64` y `:composeApp:compileKotlinIosSimulatorArm64` OK; `git diff --check` OK.
+- iOS: ya no falla por `DefaultArtifactPublicationSet`, SQLDelight ni deuda commonMain de Compose. Persisten warnings de `expect/actual` beta y casts Keychain en `SessionStore.ios.kt`; validar login/refresh/Keychain en macOS/dispositivo antes de cerrar runtime iOS.
+- Riesgos residuales: full sync iOS sigue limitado por esquema local; icono/branding requiere revision visual en tamanos pequenos; instalador Windows pendiente de recompilar; uploads aun lee archivo completo en memoria, aceptable con limite actual de subida pero mejorable si se amplian tamanos; la migracion V12 no hace backfill automatico de fotos locales antiguas porque no hay marca historica fiable para distinguir uploads reales de metadata externa que imitara la URL.
 
 ### Chequeo obligatorio de cierre
 

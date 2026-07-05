@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.photos;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -35,14 +36,17 @@ public class UploadController {
     private final RecipePhotoRepository photoRepository;
     private final UserRepository userRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final String uploadBaseUrl;
 
     public UploadController(
             @Value("${app.upload.dir:./uploads}") String uploadDirPath,
+            @Value("${app.upload.base-url:http://localhost:8080}") String uploadBaseUrl,
             RecipePhotoRepository photoRepository,
             UserRepository userRepository,
             FamilyMemberRepository familyMemberRepository
     ) {
         this.uploadDir = Path.of(uploadDirPath).toAbsolutePath().normalize();
+        this.uploadBaseUrl = trimTrailingSlash(uploadBaseUrl);
         this.photoRepository = photoRepository;
         this.userRepository = userRepository;
         this.familyMemberRepository = familyMemberRepository;
@@ -52,7 +56,8 @@ public class UploadController {
     public ResponseEntity<byte[]> recipePhoto(@PathVariable String filename, Authentication authentication) {
         requireSafeFilename(filename);
         String userId = authentication.getName();
-        List<String> owningFamilyIds = photoRepository.findOwningFamilyIdsByUrlSuffix("/uploads/" + filename);
+        String localPath = "/uploads/" + filename;
+        List<String> owningFamilyIds = photoRepository.findOwningFamilyIdsByStoragePath(localPath);
         boolean allowed = owningFamilyIds.stream()
                 .anyMatch(familyId -> familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, userId));
         if (!allowed) {
@@ -65,7 +70,11 @@ public class UploadController {
     public ResponseEntity<byte[]> avatar(@PathVariable String filename, Authentication authentication) {
         requireSafeFilename(filename);
         String requesterId = authentication.getName();
-        List<String> ownerIds = userRepository.findIdsByAvatarUrlSuffix("/uploads/avatars/" + filename);
+        String localPath = "/uploads/avatars/" + filename;
+        List<String> ownerIds = userRepository.findIdsByAvatarLocalUrl(
+                localUrl(localPath),
+                localPath
+        );
         boolean allowed = ownerIds.contains(requesterId) || sharesFamilyWithAny(requesterId, ownerIds);
         if (!allowed) {
             throw notFound();
@@ -88,19 +97,41 @@ public class UploadController {
 
     private ResponseEntity<byte[]> serveFile(Path file, String filename) {
         Path normalized = file.normalize();
-        if (!normalized.startsWith(uploadDir) || !Files.isRegularFile(normalized)) {
+        Path resolved = resolveRegularFile(normalized);
+        if (resolved == null) {
             throw notFound();
         }
         byte[] bytes;
         try {
-            bytes = Files.readAllBytes(normalized);
+            bytes = Files.readAllBytes(resolved);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read file");
         }
         return ResponseEntity.ok()
                 .contentType(contentTypeFor(filename))
                 .header("Cache-Control", "private, max-age=86400")
+                .header("X-Content-Type-Options", "nosniff")
                 .body(bytes);
+    }
+
+    private Path resolveRegularFile(Path normalized) {
+        try {
+            if (!normalized.startsWith(uploadDir) || Files.isSymbolicLink(normalized)) {
+                return null;
+            }
+            Path baseReal = uploadDir.toRealPath();
+            Path fileReal = normalized.toRealPath(LinkOption.NOFOLLOW_LINKS);
+            if (!fileReal.startsWith(baseReal) || !Files.isRegularFile(fileReal, LinkOption.NOFOLLOW_LINKS)) {
+                return null;
+            }
+            return fileReal;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private String localUrl(String localPath) {
+        return uploadBaseUrl + localPath;
     }
 
     private static MediaType contentTypeFor(String filename) {
@@ -122,5 +153,12 @@ public class UploadController {
     private static ResponseStatusException notFound() {
         // 404 tambien en accesos no autorizados: no revela si el archivo existe
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found");
+    }
+
+    private static String trimTrailingSlash(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }

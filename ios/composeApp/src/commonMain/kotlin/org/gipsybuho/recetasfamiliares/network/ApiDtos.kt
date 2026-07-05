@@ -87,6 +87,8 @@ data class StockItemDto(
 data class FamilyNoteDto(
     val id: String,
     val familyId: String,
+    val recipeId: String? = null,
+    val recipeTitle: String? = null,
     val title: String,
     val body: String,
     val pinned: Boolean,
@@ -116,6 +118,8 @@ data class ShoppingListDto(
     val id: String,
     val familyId: String,
     val name: String,
+    val plannedFrom: String? = null,
+    val plannedTo: String? = null,
     val note: String? = null,
     val completed: Boolean,
     val createdAt: String,
@@ -143,26 +147,57 @@ data class ShoppingListItemDto(
 @Serializable
 data class RecipeIngredientDto(
     val id: String,
+    val recipeId: String? = null,
     val position: Int,
     val name: String,
     val quantity: Double? = null,
     val unit: String? = null,
-    val note: String? = null
+    val note: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val syncVersion: Long = 0,
+    val deleted: Boolean = false
 )
 
 @Serializable
 data class RecipeStepDto(
     val id: String,
+    val recipeId: String? = null,
     val position: Int,
     val instruction: String,
-    val timerMinutes: Int? = null
+    val timerMinutes: Int? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val syncVersion: Long = 0,
+    val deleted: Boolean = false
 )
 
 @Serializable
 data class FavoriteRecipeDto(
+    val id: String? = null,
+    val familyId: String? = null,
     val recipeId: String,
     val recipeTitle: String? = null,
-    val createdAt: String? = null
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val syncVersion: Long = 0,
+    val deleted: Boolean = false
+)
+
+@Serializable
+data class RecipePhotoDto(
+    val id: String,
+    val recipeId: String,
+    val position: Int = 0,
+    val url: String,
+    val thumbnailUrl: String? = null,
+    val caption: String? = null,
+    val contentType: String? = null,
+    val sizeBytes: Long? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val syncVersion: Long = 0,
+    val deleted: Boolean = false
 )
 
 @Serializable
@@ -183,8 +218,14 @@ data class SyncPullResponseDto(
     val serverTime: String,
     val recipes: List<RecipeDto> = emptyList(),
     val ingredients: List<RecipeIngredientDto> = emptyList(),
+    val steps: List<RecipeStepDto> = emptyList(),
     val stockItems: List<StockItemDto> = emptyList(),
+    val menuItems: List<MenuItemDto> = emptyList(),
+    val shoppingLists: List<ShoppingListDto> = emptyList(),
+    val shoppingListItems: List<ShoppingListItemDto> = emptyList(),
+    val favoriteRecipes: List<FavoriteRecipeDto> = emptyList(),
     val familyNotes: List<FamilyNoteDto> = emptyList(),
+    val recipePhotos: List<RecipePhotoDto> = emptyList(),
     val hasMore: Boolean = false,
     val nextSince: String? = null
 )

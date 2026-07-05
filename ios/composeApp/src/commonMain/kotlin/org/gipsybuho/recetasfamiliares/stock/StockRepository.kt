@@ -32,7 +32,7 @@ class StockRepository(
                 }.body()
             response.items.filter { !it.deleted }.also { items ->
                 items.forEach { dto ->
-                    db.stockItemsQueries.insertOrReplaceStockItem(
+                    db.appDatabaseQueries.insertOrReplaceStockItem(
                         id                = dto.id,
                         familyId          = dto.familyId,
                         name              = dto.name,
@@ -48,7 +48,7 @@ class StockRepository(
                 }
             }
         } catch (e: Exception) {
-            db.stockItemsQueries.selectAllStockItems().executeAsList().map { it.toDto() }
+            db.appDatabaseQueries.selectAllStockItems().executeAsList().map { it.toDto() }
         }
     }
 

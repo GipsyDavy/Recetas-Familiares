@@ -61,9 +61,9 @@ actual class ExpiryNotificationScheduler actual constructor() {
 
     private fun post(id: String, title: String, body: String, delay: Double) {
         val content = UNMutableNotificationContent()
-        content.title = title
-        content.body  = body
-        content.sound = UNNotificationSound.defaultSound()
+        content.setTitle(title)
+        content.setBody(body)
+        content.setSound(UNNotificationSound.defaultSound())
         val trigger = UNTimeIntervalNotificationTrigger.triggerWithTimeInterval(
             timeInterval = delay,
             repeats      = false
