@@ -22,7 +22,7 @@ public class AppSession {
     private static final String KEY_FAMILY_ROLE  = "familyRole";
     private static final String KEY_AVATAR_URL   = "avatarUrl";
 
-    private final Preferences prefs = Preferences.userRoot().node(PREF_NODE);
+    private final Preferences prefs;
 
     private String accessToken;
     private String refreshToken;
@@ -34,6 +34,11 @@ public class AppSession {
     private String avatarUrl;
 
     public AppSession() {
+        this(Preferences.userRoot().node(PREF_NODE));
+    }
+
+    AppSession(Preferences prefs) {
+        this.prefs = prefs;
         this.accessToken  = readToken(KEY_ACCESS);
         this.refreshToken = readToken(KEY_REFRESH);
         this.familyId     = prefs.get(KEY_FAMILY_ID,     null);

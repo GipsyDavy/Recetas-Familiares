@@ -223,6 +223,9 @@ Resuelto en Sprint 44 (2026-07-05):
 - Primeros tests unitarios (COD-8 parcial): `SyncRepositoryTest` (pull paginado, tope de paginas, filtrado de pendientes, baseSyncVersion en push) y `StockRepositoryOfflineTest` (convencion COD-3). 11 tests con mockk + coroutines-test.
 - `gradle.properties` incluye truststore Windows-ROOT (mismo fix que iOS) para resolver dependencias.
 
+Resuelto en Sprint 45 (2026-07-05):
+- COD-8 ampliado en Android con `RecipeRepositoryOfflineTest` y `FavoriteAndNoteRepositoryOfflineTest`: recetas, ingredientes, pasos, favoritos y notas cubren creado offline `syncVersion=0`, dirty negativo conservando version base, tombstones y borrado local de entidades creadas offline; tambien se cubre que `CancellationException` no haga fallback local silencioso.
+
 Funcionalidad futura documentada:
 - Primera pantalla candidata para chat familiar tras cerrar contrato backend.
 - Primera fase recomendada: historial paginado, envio de texto/emojis, indicador basico de nuevos mensajes y WebSocket con polling configurable como fallback.
@@ -254,6 +257,9 @@ Resuelto en Sprint 44 (2026-07-05):
 - Onboarding de primer arranque (UX-8/UX-13): `OnboardingDialog` de 4 pasos, se muestra una vez (Preferences `recetas/ui/onboardingSeen`).
 - Shortcuts completos en modo cocina (UX-11): ←/→/Enter navegar, Espacio temporizador, Esc salir, tooltips y barra de pistas.
 - Primeros tests unitarios (COD-8 parcial): `UpdateFromSyncTest` (filtrado de tombstones, semantica null, cache inmutable); surefire con `useModulePath=false`.
+
+Resuelto en Sprint 45 (2026-07-05):
+- COD-8 ampliado en Desktop con `AppSessionTest` y `AuthRepositoryTest`: persistencia/limpieza de sesion, rol desconocido sin privilegios admin, register/login contra `AuthRepository` con `ApiClient` falso y logout best-effort que limpia sesion aunque falle la API.
 
 Riesgos pendientes a verificar:
 - Perfil completo y stats familiares (UX-5).
@@ -297,12 +303,12 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Sprint 44 (2026-07-05) cerro los puntos 2, 3 (parcial) y 4 de la lista anterior; el punto 1 (iOS/macOS) sigue bloqueado en Windows (ver seccion 10).
+Sprint 45 (2026-07-05) redujo COD-8 con mas tests unitarios Android/Desktop. El runtime iOS/macOS sigue bloqueado en esta maquina Windows (ver seccion 10) y COD-8 sigue parcial: no hay pruebas iOS ni pruebas de UI/manuales.
 
-Prioridad propuesta para Sprint 45:
+Prioridad propuesta para Sprint 46:
 
 1. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
-2. COD-8 ampliacion: mas cobertura Android (RecipeRepository offline, favoritos, notas) y Desktop (AppSession, ApiClient con servidor fake si aporta).
+2. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop `ApiClient` refresh 401 y proteccion de imagenes con servidor HTTP fake si aporta valor sin fragilizar tests.
 3. UX Desktop: perfil completo (UX-5), ayuda contextual MVP.
 4. Producto: decidir cuestiones abiertas de `docs/chat-familiar-spec.md` y, si procede, abrir sprint de chat fase 1.
 5. Validacion manual de UI pendiente: onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador.
@@ -469,6 +475,19 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Herramientas confirmadas en esta sesion: Codex activo; `multi_agent_v1` disponible para subagentes si el usuario autoriza trabajo multiagente; VibeSec disponible como skill local; OWASP Dependency-Check disponible en perfiles Maven `security-audit` de backend/desktop; Browser/Documents/Presentations/Spreadsheets disponibles.
 - Herramientas no confirmadas como callables directas: Gemini (preparar bloque para pegar si se necesita), `security-review` (requerido por `CLAUDE.md` cuando aplique, pero no visible como herramienta), `claude-mem` (no disponible; usar `CONTINUAR.md`/`CLAUDE.md` como memoria operativa).
 - Si se retoma Sprint 45B COD-8: leer `CLAUDE.md`, `CONTINUAR.md`, `auditoria.md`; definir alcance exacto de tests; usar VibeSec si se toca auth/sync/datos; ejecutar como minimo tests afectados, build relevante y `git diff --check`.
+
+### Sprint 45 — Ampliacion COD-8 Android/Desktop (2026-07-05)
+
+- Objetivo: ejecutar el siguiente sprint viable en Windows: ampliar cobertura unitaria COD-8 en Android y Desktop sin abrir frentes iOS bloqueados por macOS.
+- Agente: Codex, en solitario. No se usaron subagentes/multi-IA porque el usuario autorizo continuar el sprint, pero no pidio auditoria paralela ni delegacion.
+- Skills/herramientas: VibeSec usado como checklist manual por tocar cobertura de auth/sesion y flujos offline; Browser/Gemini/Claude-mem no usados; `security-review` no esta disponible como herramienta callable en esta sesion.
+- Android: nuevos tests `RecipeRepositoryOfflineTest` (5) y `FavoriteAndNoteRepositoryOfflineTest` (7). Cobertura de COD-3 sobre recetas, ingredientes, pasos, favoritos y notas: creado offline `syncVersion=0`, dirty negativo preservando version base, tombstones, borrado local de entidades creadas offline y propagacion de `CancellationException`.
+- Desktop: nuevos tests `AppSessionTest` (2) y `AuthRepositoryTest` (3). Cobertura de persistencia/limpieza de sesion, rol desconocido sin privilegios admin, `register()`, `login()` con fallback `familyId` legacy y `logout()` best-effort.
+- Cambio de produccion minimo: `AppSession` acepta `Preferences` inyectadas mediante constructor package-private para aislar tests; el constructor publico mantiene el nodo real `recetas/session`.
+- Validacion ejecutada: `git diff --check` sin errores (solo aviso LF/CRLF de Windows en `AppSession.java`); Desktop `mvn test` 9 tests, 0 fallos; Android `.\gradlew.bat testDebugUnitTest` 23 tests, 0 fallos; Android `.\gradlew.bat assembleDebug` BUILD SUCCESSFUL.
+- Seguridad: no se cambiaron endpoints, autorizacion backend ni almacenamiento real de secretos. Revision VibeSec manual sin hallazgos nuevos; no se introdujeron secretos ni credenciales en documentacion.
+- Riesgos residuales: COD-8 sigue parcial (sin iOS, sin tests UI/manuales, sin fake HTTP para refresh de `ApiClient`); tests Android son unitarios con mocks y no sustituyen una prueba Room/WorkManager integrada; backend local seguia arrancado por peticion previa del usuario y no fue modificado.
+- Punto exacto tras Sprint 45: sprint cerrado con cambios commiteados; siguiente sprint recomendado es Sprint 46 segun seccion 8.
 
 ### Chequeo obligatorio de cierre
 
