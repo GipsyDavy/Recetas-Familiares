@@ -14,7 +14,7 @@ Aplicacion premium multiplataforma para gestion familiar de recetas, ingrediente
 ## Estado Resumido
 
 Estado documentado mas reciente:
-- Backend: 76 tests, 0 fallos en la ultima validacion registrada.
+- Backend: 78 tests, 0 fallos en la ultima validacion registrada.
 - Android: funcional con recetas, stock, menus, notas, perfil, widgets, temas y sincronizacion offline.
 - Desktop: funcional con dashboard, CRUD principal, busqueda, temas, ajustes, diagnostico e instalador v1.1.
 - iOS: en desarrollo avanzado, con deuda conocida de build/paridad/sincronizacion.
@@ -29,7 +29,8 @@ Backend:
 ```bash
 java -jar backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar \
   --spring.profiles.active=dev \
-  "--spring.datasource.password=<DB_PASSWORD>"
+  "--spring.datasource.password=<DB_PASSWORD>" \
+  "--app.security.jwt.secret=<JWT_SECRET_32_BYTES_MINIMO>"
 ```
 
 Android:

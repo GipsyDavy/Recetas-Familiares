@@ -24,7 +24,11 @@ final class TokenVault {
         return stored != null && stored.startsWith(PREFIX);
     }
 
-    /** Cifra el valor para persistencia. Devuelve el valor original si DPAPI no esta disponible. */
+    /**
+     * Cifra el valor para persistencia. En plataformas sin DPAPI (Linux/macOS dev)
+     * devuelve el valor original. En Windows, si DPAPI falla devuelve null: el
+     * llamante NO debe persistir el token en claro en ese caso.
+     */
     static String protect(String plain) {
         if (plain == null || !WINDOWS) {
             return plain;
@@ -33,7 +37,7 @@ final class TokenVault {
             byte[] cipher = Crypt32Util.cryptProtectData(plain.getBytes(StandardCharsets.UTF_8));
             return PREFIX + Base64.getEncoder().encodeToString(cipher);
         } catch (RuntimeException | LinkageError e) {
-            return plain;
+            return null;
         }
     }
 

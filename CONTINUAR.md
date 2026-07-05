@@ -38,7 +38,7 @@ Plataformas:
 - `shared/`: objetivo para logica compartida Android/iOS cuando aplique. Aun no existe como modulo en el repo; iOS mantiene su propia copia de DTOs y logica bajo `ios/composeApp/`.
 
 Estado conocido a partir de la documentacion previa:
-- Backend: 76 tests, 0 fallos en la ultima validacion documentada.
+- Backend: 78 tests, 0 fallos en la ultima validacion documentada.
 - Android: funcional, con offline-first y UI avanzada.
 - Desktop: funcional, instalador Windows v1.1 generado, ajustes como vista central.
 - iOS: funcional parcialmente, pero con deuda de paridad y build en Windows.
@@ -178,7 +178,7 @@ Resuelto en Sprint 42 (2026-07-02):
 Riesgos pendientes a verificar:
 - Paginacion de `sync/pull` (COD-5).
 - `lastActivityAt` multi-entidad (COD-4).
-- Ownership por familia en `/uploads/**` (servir via controller con lookup).
+- Ownership por familia en `/uploads/**` (SEC-3 parcial; servir via controller con lookup).
 
 Funcionalidad futura documentada:
 - Chat familiar por fases: texto/emojis en tiempo real, imagenes, videos y push notifications.
@@ -229,9 +229,9 @@ Resuelto en Sprint 42 (2026-07-02):
 - Carga de imagenes `/uploads/**` con Authorization en segundo plano (fotos de receta y avatar).
 
 Riesgos pendientes a verificar:
-- Perfil completo y stats familiares.
-- Onboarding de primer arranque.
-- Shortcuts completos en modo cocina.
+- Perfil completo y stats familiares (UX-5/UX-6).
+- Onboarding de primer arranque (UX-8/UX-13).
+- Shortcuts completos en modo cocina (UX-11).
 - Recompilar instalador con JDK 21 LTS antes de produccion (incluira DLLs de JNA).
 
 Funcionalidad futura documentada:
@@ -254,9 +254,9 @@ Implementado en Sprint 42 (2026-07-02), SIN COMPILAR (build iOS imposible en Win
 - Validar compilacion y flujo real en macOS antes de dar por cerrado.
 
 Riesgos pendientes a verificar:
-- Build en Windows por SQLDelight/Gradle.
-- Push sync completo.
-- Paridad con Android: busqueda, filtros, skeletons y UX de listas.
+- Build en Windows por SQLDelight/Gradle (COD-2).
+- Push sync completo (COD-1).
+- Paridad con Android: busqueda, filtros, skeletons y UX de listas (UX-3).
 
 Funcionalidad futura documentada:
 - Chat familiar despues de estabilizar backend y al menos un cliente.
@@ -272,7 +272,7 @@ Sprint 42 (2026-07-02) cerro los puntos 1-8 de la lista anterior (ver seccion 10
 Prioridad propuesta para Sprint 43:
 
 1. Backend: paginar `sync/pull` (COD-5).
-2. Backend: ownership por familia en `/uploads/**` (hoy: solo autenticado; URLs UUID no adivinables).
+2. Backend: ownership por familia en `/uploads/**` (SEC-3 parcial; hoy: solo autenticado; URLs UUID no adivinables).
 3. Backend: `lastActivityAt` multi-entidad (COD-4).
 4. UX: completar stats familiares en Android/Desktop (UX-6).
 5. iOS: validar en macOS interceptor 401 y Coil autenticado (implementados sin compilar).
@@ -346,6 +346,19 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - `mvn verify -P security-audit` ejecuta Dependency-Check (requiere `NVD_API_KEY`); los builds normales ya no lo exigen.
 - Arranque dev backend ahora requiere `JWT_SECRET` definido (sin fallback).
 - Riesgo residual: `/uploads/**` autenticado pero sin ownership por familia (URLs UUID no adivinables); conflicto de push devuelve error de lote completo (server gana tras pull).
+
+### Revision Sprint 42 — Aplicacion hallazgos Codex/Gemini (2026-07-02)
+
+- Objetivo: integrar hallazgos tecnicos/documentales reportados por Codex y Gemini tras Sprint 42.
+- Agente en esta sesion: Codex, retomando cambios parciales dejados por Claude Code a solicitud del usuario.
+- Seguridad ejecutada: VibeSec; no se invoco `security-review` porque no esta disponible como herramienta en esta sesion.
+- Android: `pullOnce()` y refresh de recetas/stock ya no pisan filas locales `syncVersion <= 0`; entidades creadas offline y borradas antes de sincronizar se eliminan localmente para evitar tombstones perpetuos.
+- Desktop/iOS: retries por 401 y refresh de token solo responden a URLs del mismo origen del API; imagenes externas no reciben Bearer.
+- Desktop: si DPAPI/JNA falla en Windows, los tokens no se persisten en claro.
+- Documentacion: README, `auditoria.md` y trazabilidad de `CONTINUAR.md` actualizadas con estado Sprint 42 y IDs historicos.
+- Validacion ejecutada: `git diff --check` OK; Android `gradlew assembleDebug` OK; Android `gradlew test` OK sin tests (`NO-SOURCE`); Desktop `mvn -DskipTests compile` OK; Desktop `mvn test` OK sin tests.
+- iOS: `gradlew :composeApp:compileKotlinMetadata` no validado; falla en Windows durante configuracion Gradle/SQLDelight (`DefaultArtifactPublicationSet`), antes de compilar el cambio Kotlin. Validar en macOS.
+- Riesgo residual: faltan tests unitarios Android/Desktop/iOS para estos flujos; `recetas.png` queda como asset pendiente de branding.
 
 ### Chequeo obligatorio de cierre
 

@@ -22,6 +22,12 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE syncVersion <= 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<RecipeEntity>
 
+    @Query("SELECT id FROM recipes WHERE syncVersion <= 0")
+    suspend fun findPendingIds(): List<String>
+
+    @Query("DELETE FROM recipes WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Upsert
     suspend fun upsertAll(recipes: List<RecipeEntity>)
 }
@@ -37,6 +43,12 @@ interface RecipeIngredientDao {
     @Query("SELECT * FROM recipe_ingredients WHERE deleted = 0")
     fun observeAllIngredients(): Flow<List<RecipeIngredientEntity>>
 
+    @Query("SELECT id FROM recipe_ingredients WHERE syncVersion <= 0")
+    suspend fun findPendingIds(): List<String>
+
+    @Query("DELETE FROM recipe_ingredients WHERE recipeId = :recipeId")
+    suspend fun deleteByRecipeId(recipeId: String)
+
     @Upsert
     suspend fun upsertAll(ingredients: List<RecipeIngredientEntity>)
 }
@@ -48,6 +60,12 @@ interface RecipeStepDao {
 
     @Query("SELECT * FROM recipe_steps WHERE recipeId IN (:recipeIds) AND deleted = 0 ORDER BY position ASC")
     suspend fun findByRecipeIds(recipeIds: List<String>): List<RecipeStepEntity>
+
+    @Query("SELECT id FROM recipe_steps WHERE syncVersion <= 0")
+    suspend fun findPendingIds(): List<String>
+
+    @Query("DELETE FROM recipe_steps WHERE recipeId = :recipeId")
+    suspend fun deleteByRecipeId(recipeId: String)
 
     @Upsert
     suspend fun upsertAll(steps: List<RecipeStepEntity>)
@@ -63,6 +81,12 @@ interface StockDao {
 
     @Query("SELECT * FROM stock_items WHERE syncVersion <= 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<StockItemEntity>
+
+    @Query("SELECT id FROM stock_items WHERE syncVersion <= 0")
+    suspend fun findPendingIds(): List<String>
+
+    @Query("DELETE FROM stock_items WHERE id = :id")
+    suspend fun deleteById(id: String)
 
     @Query("SELECT * FROM stock_items WHERE deleted = 0 AND expiresAt IS NOT NULL")
     suspend fun findExpiringItems(): List<StockItemEntity>
@@ -108,6 +132,9 @@ interface ShoppingListItemDao {
     @Query("SELECT * FROM shopping_list_items WHERE syncVersion <= 0 AND deleted = 0")
     suspend fun findPendingCheck(): List<ShoppingListItemEntity>
 
+    @Query("SELECT id FROM shopping_list_items WHERE syncVersion <= 0")
+    suspend fun findPendingIds(): List<String>
+
     @Upsert
     suspend fun upsertAll(items: List<ShoppingListItemEntity>)
 }
@@ -126,6 +153,12 @@ interface FavoriteRecipeDao {
     @Query("SELECT * FROM favorite_recipes WHERE syncVersion <= 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<FavoriteRecipeEntity>
 
+    @Query("SELECT id FROM favorite_recipes WHERE syncVersion <= 0")
+    suspend fun findPendingIds(): List<String>
+
+    @Query("DELETE FROM favorite_recipes WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Upsert
     suspend fun upsertAll(favorites: List<FavoriteRecipeEntity>)
 }
@@ -140,6 +173,12 @@ interface FamilyNoteDao {
 
     @Query("SELECT * FROM family_notes WHERE syncVersion <= 0 AND deleted = 1")
     suspend fun findPendingDelete(): List<FamilyNoteEntity>
+
+    @Query("SELECT id FROM family_notes WHERE syncVersion <= 0")
+    suspend fun findPendingIds(): List<String>
+
+    @Query("DELETE FROM family_notes WHERE id = :id")
+    suspend fun deleteById(id: String)
 
     @Upsert
     suspend fun upsertAll(notes: List<FamilyNoteEntity>)

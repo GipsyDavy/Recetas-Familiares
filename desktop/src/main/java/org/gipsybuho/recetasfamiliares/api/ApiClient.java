@@ -120,8 +120,9 @@ public class ApiClient {
      * propio backend para no filtrarlo a otros hosts.
      */
     public byte[] fetchImage(String absoluteUrl) throws ApiException {
+        HttpUrl requested = HttpUrl.parse(absoluteUrl);
         Request.Builder builder = new Request.Builder().url(absoluteUrl).get();
-        if (absoluteUrl.startsWith(BASE_URL)) {
+        if (requested != null && isApiOrigin(requested)) {
             builder.header("Authorization", "Bearer " + session.getAccessToken());
         }
         try (Response response = client.newCall(builder.build()).execute()) {
@@ -168,6 +169,10 @@ public class ApiClient {
 
     /** OkHttp Authenticator — called automatically on 401. */
     private Request authenticate(Route route, Response response) throws IOException {
+        // Nunca responder con credenciales a un 401 de un host ajeno al API
+        if (!isApiOrigin(response.request().url())) {
+            return null;
+        }
         // Prevent infinite retry loops
         if (responseCount(response) >= 2) {
             session.clear();
@@ -204,5 +209,13 @@ public class ApiClient {
         int count = 1;
         while ((response = response.priorResponse()) != null) count++;
         return count;
+    }
+
+    private static boolean isApiOrigin(HttpUrl requested) {
+        HttpUrl base = HttpUrl.parse(BASE_URL);
+        return base != null
+                && requested.scheme().equals(base.scheme())
+                && requested.host().equals(base.host())
+                && requested.port() == base.port();
     }
 }

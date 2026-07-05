@@ -77,6 +77,12 @@ private fun pushBaseVersion(syncVersion: Long): Long? = when {
     else -> null
 }
 
+/** Evita que un pull remoto pise cambios locales pendientes de sincronizar. */
+private fun <T> Iterable<T>.withoutPendingIds(
+    pendingIds: Set<String>,
+    idSelector: (T) -> String
+): List<T> = filterNot { idSelector(it) in pendingIds }
+
 class AuthRepository(
     private val api: RecetasApi,
     private val sessionStore: SessionStore
@@ -132,14 +138,20 @@ class RecipeRepository(
         val familyId = sessionStore.familyId ?: return
         val page = api.recipes(familyId, page = 0, size = 30)
         _totalPages = page.totalPages.coerceAtLeast(1)
-        database.recipeDao().upsertAll(page.items.map { it.toEntity() })
+        val pendingIds = database.recipeDao().findPendingIds().toSet()
+        database.recipeDao().upsertAll(
+            page.items.withoutPendingIds(pendingIds) { it.id }.map { it.toEntity() }
+        )
     }
 
     suspend fun loadPage(pageNum: Int) {
         val familyId = sessionStore.familyId ?: return
         val page = api.recipes(familyId, page = pageNum, size = 30)
         _totalPages = page.totalPages.coerceAtLeast(1)
-        database.recipeDao().upsertAll(page.items.map { it.toEntity() })
+        val pendingIds = database.recipeDao().findPendingIds().toSet()
+        database.recipeDao().upsertAll(
+            page.items.withoutPendingIds(pendingIds) { it.id }.map { it.toEntity() }
+        )
     }
 
     suspend fun create(
@@ -209,6 +221,12 @@ class RecipeRepository(
     }
 
     suspend fun delete(recipe: RecipeEntity) {
+        if (recipe.syncVersion == 0L) {
+            database.recipeIngredientDao().deleteByRecipeId(recipe.id)
+            database.recipeStepDao().deleteByRecipeId(recipe.id)
+            database.recipeDao().deleteById(recipe.id)
+            return
+        }
         val familyId = sessionStore.familyId ?: return
         try {
             api.deleteRecipe(familyId, recipe.id)
@@ -231,7 +249,10 @@ class StockRepository(
     suspend fun refresh() {
         val familyId = sessionStore.familyId ?: return
         val page = api.stockItems(familyId)
-        stockDao.upsertAll(page.items.map { it.toEntity() })
+        val pendingIds = stockDao.findPendingIds().toSet()
+        stockDao.upsertAll(
+            page.items.withoutPendingIds(pendingIds) { it.id }.map { it.toEntity() }
+        )
     }
 
     suspend fun create(
@@ -278,6 +299,10 @@ class StockRepository(
     }
 
     suspend fun delete(item: StockItemEntity) {
+        if (item.syncVersion == 0L) {
+            stockDao.deleteById(item.id)
+            return
+        }
         val familyId = sessionStore.familyId ?: return
         try {
             api.deleteStockItem(familyId, item.id)
@@ -299,15 +324,37 @@ class SyncRepository(
         val familyId = sessionStore.familyId ?: return
         val response = api.pullSync(familyId, sessionStore.lastSyncTime)
 
-        database.recipeDao().upsertAll(response.recipes.orEmpty().map { it.toEntity() })
-        database.recipeIngredientDao().upsertAll(response.ingredients.orEmpty().map { it.toEntity() })
-        database.recipeStepDao().upsertAll(response.steps.orEmpty().map { it.toEntity() })
-        database.stockDao().upsertAll(response.stockItems.orEmpty().map { it.toEntity() })
+        val pendingRecipeIds = database.recipeDao().findPendingIds().toSet()
+        val pendingIngredientIds = database.recipeIngredientDao().findPendingIds().toSet()
+        val pendingStepIds = database.recipeStepDao().findPendingIds().toSet()
+        val pendingStockIds = database.stockDao().findPendingIds().toSet()
+        val pendingShoppingItemIds = database.shoppingListItemDao().findPendingIds().toSet()
+        val pendingFavoriteIds = database.favoriteRecipeDao().findPendingIds().toSet()
+        val pendingNoteIds = database.familyNoteDao().findPendingIds().toSet()
+
+        database.recipeDao().upsertAll(
+            response.recipes.orEmpty().withoutPendingIds(pendingRecipeIds) { it.id }.map { it.toEntity() }
+        )
+        database.recipeIngredientDao().upsertAll(
+            response.ingredients.orEmpty().withoutPendingIds(pendingIngredientIds) { it.id }.map { it.toEntity() }
+        )
+        database.recipeStepDao().upsertAll(
+            response.steps.orEmpty().withoutPendingIds(pendingStepIds) { it.id }.map { it.toEntity() }
+        )
+        database.stockDao().upsertAll(
+            response.stockItems.orEmpty().withoutPendingIds(pendingStockIds) { it.id }.map { it.toEntity() }
+        )
         database.menuItemDao().upsertAll(response.menuItems.orEmpty().map { it.toEntity() })
         database.shoppingListDao().upsertAll(response.shoppingLists.orEmpty().map { it.toEntity() })
-        database.shoppingListItemDao().upsertAll(response.shoppingListItems.orEmpty().map { it.toEntity() })
-        database.favoriteRecipeDao().upsertAll(response.favoriteRecipes.orEmpty().map { it.toEntity() })
-        database.familyNoteDao().upsertAll(response.familyNotes.orEmpty().map { it.toEntity() })
+        database.shoppingListItemDao().upsertAll(
+            response.shoppingListItems.orEmpty().withoutPendingIds(pendingShoppingItemIds) { it.id }.map { it.toEntity() }
+        )
+        database.favoriteRecipeDao().upsertAll(
+            response.favoriteRecipes.orEmpty().withoutPendingIds(pendingFavoriteIds) { it.id }.map { it.toEntity() }
+        )
+        database.familyNoteDao().upsertAll(
+            response.familyNotes.orEmpty().withoutPendingIds(pendingNoteIds) { it.id }.map { it.toEntity() }
+        )
         database.recipePhotoDao().upsertAll(response.recipePhotos.orEmpty().map { it.toEntity() })
 
         sessionStore.lastSyncTime = response.serverTime
@@ -455,6 +502,10 @@ class FavoriteRepository(
         val familyId = sessionStore.familyId ?: return
         val existing = database.favoriteRecipeDao().findByRecipeId(recipeId)
         if (existing != null) {
+            if (existing.syncVersion == 0L) {
+                database.favoriteRecipeDao().deleteById(existing.id)
+                return
+            }
             try {
                 api.removeFavorite(familyId, existing.id)
                 database.favoriteRecipeDao().upsertAll(listOf(existing.copy(deleted = true)))
@@ -518,6 +569,10 @@ class FamilyNoteRepository(
     }
 
     suspend fun delete(note: FamilyNoteEntity) {
+        if (note.syncVersion == 0L) {
+            database.familyNoteDao().deleteById(note.id)
+            return
+        }
         val familyId = sessionStore.familyId ?: return
         try {
             api.deleteNote(familyId, note.id)

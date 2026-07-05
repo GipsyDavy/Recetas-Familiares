@@ -66,8 +66,23 @@ public class AppSession {
     public void setTokens(String accessToken, String refreshToken) {
         this.accessToken  = accessToken;
         this.refreshToken = refreshToken;
-        if (accessToken  != null) prefs.put(KEY_ACCESS,  TokenVault.protect(accessToken));  else prefs.remove(KEY_ACCESS);
-        if (refreshToken != null) prefs.put(KEY_REFRESH, TokenVault.protect(refreshToken)); else prefs.remove(KEY_REFRESH);
+        persistToken(KEY_ACCESS,  accessToken);
+        persistToken(KEY_REFRESH, refreshToken);
+    }
+
+    /** Persiste un token cifrado. Si DPAPI falla en Windows, no lo guarda en claro. */
+    private void persistToken(String key, String value) {
+        if (value == null) {
+            prefs.remove(key);
+            return;
+        }
+        String stored = TokenVault.protect(value);
+        if (stored == null) {
+            prefs.remove(key);
+            System.err.println("WARN: DPAPI no disponible; la sesion solo durara mientras la app este abierta");
+            return;
+        }
+        prefs.put(key, stored);
     }
 
     /** Lee un token persistido, descifrandolo y migrando valores legado en texto plano. */
@@ -84,7 +99,7 @@ public class AppSession {
         }
         if (!TokenVault.isProtected(stored)) {
             // Migracion: re-persistir cifrado el valor legado en texto plano
-            prefs.put(key, TokenVault.protect(plain));
+            persistToken(key, plain);
         }
         return plain;
     }

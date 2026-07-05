@@ -22,7 +22,10 @@ class ApiClient(private val session: SessionStore) {
     // Para dispositivo físico en la misma red usar: http://<IP-del-Mac>:8080/
     val baseUrl: String = "http://localhost:8080/"
 
-    private val apiHost: String = Url(baseUrl).host
+    private val apiUrl: Url = Url(baseUrl)
+    private val apiHost: String = apiUrl.host
+    private val apiProtocol = apiUrl.protocol
+    private val apiPort = apiUrl.port
 
     val http: HttpClient = HttpClient {
         install(ContentNegotiation) {
@@ -40,13 +43,26 @@ class ApiClient(private val session: SessionStore) {
             bearer {
                 // Enviar el Bearer proactivamente solo al host del API: evita el
                 // doble round-trip del challenge 401 y no filtra el token a otros hosts
-                sendWithoutRequest { request -> request.url.host == apiHost }
+                sendWithoutRequest { request ->
+                    request.url.host == apiHost &&
+                        request.url.protocol == apiProtocol &&
+                        request.url.port == apiPort
+                }
                 loadTokens {
                     session.accessToken?.let { access ->
                         BearerTokens(access, session.refreshToken)
                     }
                 }
                 refreshTokens {
+                    // No refrescar ni reintentar con credenciales ante 401 de hosts
+                    // ajenos al API (p.ej. una imagen externa cargada por Coil)
+                    val requestUrl = response.call.request.url
+                    if (requestUrl.host != apiHost ||
+                        requestUrl.protocol != apiProtocol ||
+                        requestUrl.port != apiPort
+                    ) {
+                        return@refreshTokens null
+                    }
                     val refresh = session.refreshToken
                     if (refresh.isNullOrBlank()) {
                         session.clear()
