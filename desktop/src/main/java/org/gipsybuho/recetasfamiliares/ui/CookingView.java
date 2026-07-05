@@ -221,6 +221,7 @@ public class CookingView {
 
         if (index >= steps.size()) {
             finished = true;
+            currentIndex = steps.size();
             progressLabel.setText("¡Receta completada!");
             progressBar.setProgress(1.0);
             instructionLabel.setStyle(
