@@ -13,7 +13,8 @@
 
 param(
     [string]$ApiUrl = "http://localhost:8080/",
-    [string]$JdkPath = ""
+    [string]$JdkPath = "",
+    [switch]$AllowNonLtsJdk
 )
 
 Set-StrictMode -Version Latest
@@ -250,8 +251,13 @@ $javaVersion = & "$JDK\bin\java.exe" -version 2>&1 | Select-Object -First 1
 Write-OK "JDK: $javaVersion"
 $jdkMajor = Get-JdkMajorVersion $JDK
 if ($jdkMajor -ne 21) {
-    Write-Warn "JDK 21 LTS no encontrado. Se usara $JDK para empaquetar."
-    Write-Warn "Para instaladores de distribucion, usa -JdkPath con un JDK 21."
+    if ($AllowNonLtsJdk) {
+        Write-Warn "JDK 21 LTS no encontrado. Se usara $JDK para empaquetar (permitido por -AllowNonLtsJdk)."
+    } else {
+        Write-Fail "El runtime empaquetado debe ser JDK 21 LTS y se encontro JDK $jdkMajor ($JDK)."
+        Write-Host "     Usa -JdkPath 'C:\Ruta\Al\jdk-21' o -AllowNonLtsJdk para forzar." -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 $MVN = Find-Maven

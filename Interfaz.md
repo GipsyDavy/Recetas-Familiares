@@ -310,19 +310,21 @@ MVP de ayuda:
 
 ## 12. Backlog UX Actual Recomendado
 
+Resuelto recientemente (no retomar sin motivo):
+- Fuentes reales empaquetadas: Nunito/Lato en `res/font` Android (Sprint 44). Desktop mantiene fallback del sistema segun seccion 4.
+- Stats familiares en perfil/dashboard: Android y Desktop (Sprint 43).
+- Onboarding Desktop de primer arranque, reabrible desde Ajustes > Acerca de (Sprint 44).
+- Shortcuts completos en modo cocina Desktop (Sprint 44).
+
 Prioridad alta:
-1. Proteger coherencia tipografica con fuentes reales empaquetadas.
-2. Completar paridad iOS en busqueda, filtros y skeletons.
-3. Integrar stats familiares en perfil/dashboard.
-4. Crear perfil Desktop completo.
-5. Toggle global para hapticos.
+1. Completar paridad iOS en busqueda, filtros y skeletons.
+2. Crear perfil Desktop completo.
+3. Toggle global para hapticos.
 
 Prioridad media:
-1. Onboarding Desktop.
-2. Ayuda contextual MVP.
-3. Shortcuts completos en modo cocina Desktop.
-4. Fechas de caducidad iOS en lenguaje humano.
-5. Mejorar algoritmo de iniciales.
+1. Ayuda contextual MVP.
+2. Fechas de caducidad iOS en lenguaje humano.
+3. Mejorar algoritmo de iniciales.
 
 Prioridad baja:
 1. Mas ilustraciones editoriales.

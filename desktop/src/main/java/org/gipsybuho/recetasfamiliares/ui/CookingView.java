@@ -28,6 +28,7 @@ public class CookingView {
     private Timeline countdownTimer;
     private int timerSecondsLeft = 0;
     private boolean timerRunning = false;
+    private boolean finished = false;
 
     private final Label progressLabel  = new Label();
     private final ProgressBar progressBar = new ProgressBar(0);
@@ -68,10 +69,15 @@ public class CookingView {
         stage.getScene().addEventFilter(KeyEvent.KEY_PRESSED, (KeyEvent e) -> {
             switch (e.getCode()) {
                 case LEFT -> { prevStep(); e.consume(); }
-                case RIGHT, ENTER -> { nextStep(); e.consume(); }
-                case SPACE -> {
-                    if (timerBox.isVisible()) onToggleTimer();
+                case RIGHT, ENTER -> {
+                    // En pantalla final o sin pasos, avanzar equivale a cerrar
+                    if (finished) { stopTimer(); stage.close(); } else nextStep();
                     e.consume();
+                }
+                case SPACE -> {
+                    // Solo interceptar si hay temporizador; si no, dejar que
+                    // Espacio active el boton enfocado (accesibilidad teclado)
+                    if (timerBox.isVisible()) { onToggleTimer(); e.consume(); }
                 }
                 case ESCAPE -> { stopTimer(); stage.close(); e.consume(); }
                 default -> {}
@@ -202,6 +208,7 @@ public class CookingView {
             "-fx-border-color: #E8C9A8; -fx-border-radius: 16; -fx-border-width: 1;");
 
         if (steps.isEmpty()) {
+            finished = true;
             progressLabel.setText("Sin pasos");
             progressBar.setProgress(1.0);
             instructionLabel.setText("Esta receta no tiene pasos registrados.");
@@ -213,6 +220,7 @@ public class CookingView {
         }
 
         if (index >= steps.size()) {
+            finished = true;
             progressLabel.setText("¡Receta completada!");
             progressBar.setProgress(1.0);
             instructionLabel.setStyle(
@@ -225,6 +233,7 @@ public class CookingView {
             return;
         }
 
+        finished = false;
         currentIndex = index;
         var step = steps.get(index);
 

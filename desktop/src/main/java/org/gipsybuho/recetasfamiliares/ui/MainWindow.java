@@ -802,7 +802,14 @@ public class MainWindow {
         HBox.setHgrow(cards.getChildren().get(0), Priority.ALWAYS);
         HBox.setHgrow(cards.getChildren().get(1), Priority.ALWAYS);
 
-        VBox content = new VBox(18, headerCard, cards);
+        Button onboardingBtn = new Button("Ver guía de bienvenida");
+        onboardingBtn.getStyleClass().add("action-button-secondary");
+        onboardingBtn.setOnAction(e -> OnboardingDialog.showAgain(stage));
+        HBox helpRow = new HBox(onboardingBtn);
+        helpRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox content = new VBox(18, headerCard, cards,
+                configPanel("Ayuda", "Vuelve a ver la guia de primeros pasos cuando quieras.", helpRow));
         content.getStyleClass().add("settings-tab-content");
         return settingsScroll(content);
     }

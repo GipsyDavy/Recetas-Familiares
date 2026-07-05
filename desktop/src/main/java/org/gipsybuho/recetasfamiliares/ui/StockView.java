@@ -177,7 +177,7 @@ public class StockView extends VBox {
 
     private void openCreateDialog() {
         StockFormDialog.forCreate(getScene().getWindow(), context, saved -> {
-            context.getStockRepository().getCache().getItems().add(saved);
+            context.getStockRepository().getCache().add(saved);
             refreshDisplay();
             statusLabel.setText("Item creado.");
         }).show();
@@ -187,13 +187,8 @@ public class StockView extends VBox {
         StockDtos.StockItemDto selected = table.getSelectionModel().getSelectedItem();
         if (selected == null) return;
         StockFormDialog.forEdit(getScene().getWindow(), context, selected, saved -> {
-            var items = context.getStockRepository().getCache().getItems();
-            int idx = -1;
-            for (int i = 0; i < items.size(); i++) {
-                if (items.get(i).id().equals(saved.id())) { idx = i; break; }
-            }
-            if (idx >= 0) items.set(idx, saved);
-            else items.add(saved);
+            context.getStockRepository().getCache()
+                    .replaceOrAdd(saved, item -> item.id().equals(saved.id()));
             refreshDisplay();
             statusLabel.setText("Item actualizado.");
         }).show();
@@ -261,7 +256,7 @@ public class StockView extends VBox {
             try {
                 context.getStockRepository().delete(selected.id());
                 Platform.runLater(() -> {
-                    context.getStockRepository().getCache().getItems().remove(selected);
+                    context.getStockRepository().getCache().remove(selected);
                     refreshDisplay();
                     statusLabel.setText("Item eliminado.");
                     onStatusUpdate.accept("Ítem eliminado");

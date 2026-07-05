@@ -49,7 +49,15 @@ final class OnboardingDialog {
 
     static void showIfFirstRun(Window owner) {
         if (PREFS.getBoolean(SEEN_KEY, false)) return;
+        show(owner);
+    }
 
+    /** Reabre la guia bajo demanda (Ajustes), aunque ya se haya visto. */
+    static void showAgain(Window owner) {
+        show(owner);
+    }
+
+    private static void show(Window owner) {
         Dialog<Void> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle("Bienvenida");

@@ -170,6 +170,8 @@ class SyncRepositoryTest {
         val pushed = slot<SyncPushRequestDto>()
         coEvery { api.pushSync(FAMILY_ID, capture(pushed)) } returns
             emptyPull(serverTime = "T-PUSH")
+        coEvery { api.pullSync(FAMILY_ID, null, any()) } returns
+            emptyPull(serverTime = "T-PULL")
 
         repository.pushThenPull()
 
@@ -180,7 +182,10 @@ class SyncRepositoryTest {
         assertEquals(2L, byId.getValue("r-deleted").baseSyncVersion)
         assertEquals(true, byId.getValue("r-deleted").deleted)
         assertTrue(pushed.captured.ingredients.isEmpty())
-        assertEquals("T-PUSH", savedLastSyncTime)
+        // El cursor NO debe avanzar con el serverTime del push (solo trae ACKs de lo
+        // empujado); avanza con el pull posterior, que si trae cambios de otros miembros.
+        assertEquals("T-PULL", savedLastSyncTime)
+        coVerify(exactly = 1) { api.pullSync(FAMILY_ID, null, any()) }
     }
 
     private companion object {

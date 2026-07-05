@@ -22,6 +22,27 @@ public class SimpleCache<T> {
         items.setAll(newItems);
     }
 
+    /** Add a single item. Must be called on the JavaFX Application Thread. */
+    public void add(T item) {
+        items.add(item);
+    }
+
+    /** Remove a single item. Must be called on the JavaFX Application Thread. */
+    public void remove(T item) {
+        items.remove(item);
+    }
+
+    /** Replace the first item matching {@code matcher}, or add if absent. FX thread only. */
+    public void replaceOrAdd(T item, java.util.function.Predicate<T> matcher) {
+        for (int i = 0; i < items.size(); i++) {
+            if (matcher.test(items.get(i))) {
+                items.set(i, item);
+                return;
+            }
+        }
+        items.add(item);
+    }
+
     public void clear() {
         items.clear();
     }

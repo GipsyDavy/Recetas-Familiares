@@ -467,6 +467,8 @@ class SyncRepository(
 
         val response = api.pushSync(familyId, pushRequest)
 
+        // La respuesta de push solo contiene ACKs de lo empujado, no los cambios de otros
+        // miembros: aplicar upserts SIN avanzar lastSyncTime y traer el resto con pullOnce().
         database.recipeDao().upsertAll(response.recipes.orEmpty().map { it.toEntity() })
         database.recipeIngredientDao().upsertAll(response.ingredients.orEmpty().map { it.toEntity() })
         database.recipeStepDao().upsertAll(response.steps.orEmpty().map { it.toEntity() })
@@ -478,7 +480,7 @@ class SyncRepository(
         database.familyNoteDao().upsertAll(response.familyNotes.orEmpty().map { it.toEntity() })
         database.recipePhotoDao().upsertAll(response.recipePhotos.orEmpty().map { it.toEntity() })
 
-        sessionStore.lastSyncTime = response.serverTime
+        pullOnce()
     }
 
     private companion object {

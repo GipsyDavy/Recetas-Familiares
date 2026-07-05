@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.data.repository;
 
+import javafx.application.Platform;
 import org.gipsybuho.recetasfamiliares.api.ApiClient;
 import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
@@ -43,13 +44,22 @@ public class SyncRepository {
 
         SyncDtos.SyncPullResponse response = api.get(path, SyncDtos.SyncPullResponse.class);
 
-        recipeRepo.updateFromSync(response.recipes(), response.ingredients(), response.steps());
-        stockRepo.updateFromSync(response.stockItems());
-        menuRepository.updateFromSync(response.menuItems());
-        shoppingListRepository.updateFromSync(response.shoppingLists());
-        favoriteRepository.getCache().replaceAll(response.favoriteRecipes() != null
-                ? response.favoriteRecipes().stream().filter(f -> !f.deleted()).toList()
-                : List.of());
+        // Las caches son ObservableList enlazadas a la UI: mutarlas solo en el FX thread.
+        // pull() se invoca desde hilos de fondo (MainWindow.triggerSync).
+        Runnable applyCaches = () -> {
+            recipeRepo.updateFromSync(response.recipes(), response.ingredients(), response.steps());
+            stockRepo.updateFromSync(response.stockItems());
+            menuRepository.updateFromSync(response.menuItems());
+            shoppingListRepository.updateFromSync(response.shoppingLists());
+            favoriteRepository.getCache().replaceAll(response.favoriteRecipes() != null
+                    ? response.favoriteRecipes().stream().filter(f -> !f.deleted()).toList()
+                    : List.of());
+        };
+        if (Platform.isFxApplicationThread()) {
+            applyCaches.run();
+        } else {
+            Platform.runLater(applyCaches);
+        }
         session.setLastSyncTime(response.serverTime());
     }
 
