@@ -6,6 +6,8 @@ public final class AuthDtos {
 
     public record LoginRequest(String email, String password) {}
 
+    public record RegisterRequest(String email, String displayName, String password, String familyName) {}
+
     public record RefreshRequest(String refreshToken) {}
 
     public record AuthUserInfo(String id, String email, String displayName) {}

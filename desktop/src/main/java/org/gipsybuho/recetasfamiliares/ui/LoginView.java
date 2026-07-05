@@ -11,6 +11,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.util.Duration;
+import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 public class LoginView extends VBox {
@@ -18,12 +19,16 @@ public class LoginView extends VBox {
     private final AppContext context;
     private final Runnable onLoginSuccess;
 
+    private final TextField displayNameField = new TextField();
     private final TextField emailField    = new TextField();
+    private final TextField familyNameField = new TextField();
     private final PasswordField passwordField   = new PasswordField();
     private final TextField passwordVisible     = new TextField();
     private final Button loginButton = new Button("Iniciar sesión");
+    private final Button modeSwitchButton = new Button("Crear cuenta");
     private final Label errorLabel   = new Label();
     private boolean showingPassword  = false;
+    private boolean registerMode = false;
 
     public LoginView(AppContext context, Runnable onLoginSuccess) {
         this.context = context;
@@ -48,23 +53,37 @@ public class LoginView extends VBox {
         subtitle.getStyleClass().add("login-subtitle");
 
         // ── Email field ───────────────────────────────────────────────────────
+        displayNameField.setPromptText("Tu nombre");
+        displayNameField.getStyleClass().add("login-field");
+        displayNameField.setMaxWidth(Double.MAX_VALUE);
+        displayNameField.setVisible(false);
+        displayNameField.setManaged(false);
+        displayNameField.setOnAction(e -> doSubmit());
+
         emailField.setPromptText("tucorreo@ejemplo.com");
         emailField.getStyleClass().add("login-field");
         emailField.setMaxWidth(Double.MAX_VALUE);
-        emailField.setOnAction(e -> doLogin());
+        emailField.setOnAction(e -> doSubmit());
+
+        familyNameField.setPromptText("Nombre de la familia");
+        familyNameField.getStyleClass().add("login-field");
+        familyNameField.setMaxWidth(Double.MAX_VALUE);
+        familyNameField.setVisible(false);
+        familyNameField.setManaged(false);
+        familyNameField.setOnAction(e -> doSubmit());
 
         // ── Password field with show/hide toggle ──────────────────────────────
         passwordField.setPromptText("Contraseña");
         passwordField.getStyleClass().add("login-field");
         passwordField.setMaxWidth(Double.MAX_VALUE);
-        passwordField.setOnAction(e -> doLogin());
+        passwordField.setOnAction(e -> doSubmit());
 
         passwordVisible.setPromptText("Contraseña");
         passwordVisible.getStyleClass().add("login-field");
         passwordVisible.setMaxWidth(Double.MAX_VALUE);
         passwordVisible.setVisible(false);
         passwordVisible.setManaged(false);
-        passwordVisible.setOnAction(e -> doLogin());
+        passwordVisible.setOnAction(e -> doSubmit());
 
         // Keep both fields in sync
         passwordField.textProperty().addListener((obs, old, val) -> {
@@ -90,7 +109,11 @@ public class LoginView extends VBox {
         loginButton.getStyleClass().add("login-button");
         loginButton.setMaxWidth(Double.MAX_VALUE);
         loginButton.setDefaultButton(true);
-        loginButton.setOnAction(e -> doLogin());
+        loginButton.setOnAction(e -> doSubmit());
+
+        modeSwitchButton.getStyleClass().add("login-mode-switch");
+        modeSwitchButton.setMaxWidth(Double.MAX_VALUE);
+        modeSwitchButton.setOnAction(e -> setRegisterMode(!registerMode));
 
         // ── Error label ───────────────────────────────────────────────────────
         errorLabel.getStyleClass().add("login-error");
@@ -100,7 +123,9 @@ public class LoginView extends VBox {
         errorLabel.setMaxWidth(Double.MAX_VALUE);
 
         // ── Card ──────────────────────────────────────────────────────────────
-        VBox card = new VBox(14, logo, title, subtitle, emailField, pwStack, loginButton, errorLabel);
+        VBox card = new VBox(14, logo, title, subtitle,
+                displayNameField, emailField, familyNameField, pwStack,
+                loginButton, modeSwitchButton, errorLabel);
         card.getStyleClass().add("login-card");
         card.setAlignment(Pos.TOP_CENTER);
         card.setMaxWidth(420);
@@ -127,6 +152,22 @@ public class LoginView extends VBox {
         new ParallelTransition(fade, scale).play();
     }
 
+    private void setRegisterMode(boolean enabled) {
+        registerMode = enabled;
+        displayNameField.setVisible(enabled);
+        displayNameField.setManaged(enabled);
+        familyNameField.setVisible(enabled);
+        familyNameField.setManaged(enabled);
+        loginButton.setText(enabled ? "Crear cuenta" : "Iniciar sesión");
+        modeSwitchButton.setText(enabled ? "Ya tengo cuenta" : "Crear cuenta");
+        hideError();
+        if (enabled) {
+            displayNameField.requestFocus();
+        } else {
+            emailField.requestFocus();
+        }
+    }
+
     private void togglePassword(Button btn) {
         showingPassword = !showingPassword;
         if (showingPassword) {
@@ -150,30 +191,64 @@ public class LoginView extends VBox {
         }
     }
 
-    private void doLogin() {
+    private void doSubmit() {
+        String displayName = displayNameField.getText().trim();
         String email    = emailField.getText().trim();
+        String familyName = familyNameField.getText().trim();
         String password = showingPassword ? passwordVisible.getText() : passwordField.getText();
 
         if (email.isBlank() || password.isBlank()) {
             showError("Por favor, introduce tu correo y contraseña.");
             return;
         }
+        if (registerMode && (displayName.isBlank() || familyName.isBlank())) {
+            showError("Completa tu nombre y el nombre de la familia.");
+            return;
+        }
+        if (registerMode && password.length() < 12) {
+            showError("La contraseña debe tener al menos 12 caracteres.");
+            return;
+        }
 
         loginButton.setDisable(true);
+        modeSwitchButton.setDisable(true);
         hideError();
+        boolean createAccount = registerMode;
 
         Thread.ofVirtual().start(() -> {
             try {
-                context.getAuthRepository().login(email, password);
+                if (createAccount) {
+                    context.getAuthRepository().register(email, displayName, password, familyName);
+                } else {
+                    context.getAuthRepository().login(email, password);
+                }
                 context.getFamilyRepository().detectAndSaveRole();
                 Platform.runLater(onLoginSuccess);
             } catch (Exception ex) {
                 Platform.runLater(() -> {
                     loginButton.setDisable(false);
-                    showError("No se pudo iniciar sesión. Verifica tus datos.");
+                    modeSwitchButton.setDisable(false);
+                    showError(errorMessage(ex, createAccount));
                 });
             }
         });
+    }
+
+    private String errorMessage(Exception ex, boolean createAccount) {
+        if (ex instanceof ApiException apiEx) {
+            if (apiEx.getHttpStatus() == 0) {
+                return "No se pudo conectar con el backend.";
+            }
+            if (apiEx.getHttpStatus() == 409) {
+                return "Ese correo ya está registrado.";
+            }
+            if (apiEx.getHttpStatus() == 400 && createAccount) {
+                return "Revisa los datos de la cuenta.";
+            }
+        }
+        return createAccount
+                ? "No se pudo crear la cuenta."
+                : "No se pudo iniciar sesión. Verifica tus datos.";
     }
 
     private void showError(String message) {

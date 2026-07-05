@@ -19,6 +19,17 @@ public class AuthRepository {
     public void login(String email, String password) throws ApiException {
         var request = new AuthDtos.LoginRequest(email, password);
         AuthDtos.AuthResponse response = api.postAuth("api/v1/auth/login", request, AuthDtos.AuthResponse.class);
+        applyAuthResponse(response);
+    }
+
+    /** Registers a new owner family account and stores tokens in session. */
+    public void register(String email, String displayName, String password, String familyName) throws ApiException {
+        var request = new AuthDtos.RegisterRequest(email, displayName, password, familyName);
+        AuthDtos.AuthResponse response = api.postAuth("api/v1/auth/register", request, AuthDtos.AuthResponse.class);
+        applyAuthResponse(response);
+    }
+
+    private void applyAuthResponse(AuthDtos.AuthResponse response) {
         session.setTokens(response.accessToken(), response.refreshToken());
         // prefer nested family.id; fall back to legacy flat familyId field
         String fid = (response.family() != null) ? response.family().id() : response.familyId();

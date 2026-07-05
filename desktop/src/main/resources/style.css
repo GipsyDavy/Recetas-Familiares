@@ -131,6 +131,19 @@
     -fx-background-color: recetas-primary-hover;
 }
 
+.login-mode-switch {
+    -fx-background-color: transparent;
+    -fx-text-fill: recetas-primary;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 0 0 0;
+    -fx-cursor: hand;
+}
+
+.login-mode-switch:hover {
+    -fx-text-fill: recetas-primary-hover;
+}
+
 .login-error {
     -fx-text-fill: recetas-error;
     -fx-font-size: 13px;
