@@ -458,6 +458,18 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Cambio: `LoginView` permite alternar entre "Iniciar sesion" y "Crear cuenta"; `AuthRepository` expone `register()` contra `/api/v1/auth/register` y guarda la sesion igual que login.
 - Validacion ejecutada: Desktop `mvn -DskipTests compile` OK; Desktop `mvn test` 4 tests 0 fallos; backend local `UP`; base local confirmada con `users=0` y `families=0` antes de que el usuario cree la cuenta.
 
+### Cierre de sesion Codex (2026-07-05 23:17)
+
+- Ultimo commit: `930d1ca fix: permitir registro inicial en desktop`; anteriores relevantes: `0da11fc` (navegacion final modo cocina) y `f4cf44b` (hallazgos Codex/Gemini post-Sprint 44).
+- Arbol Git comprobado limpio al iniciar cierre de sesion.
+- Backend local sigue arrancado a peticion del usuario: `http://localhost:8080`, health `UP`, proceso Java PID `26412`.
+- MySQL local `recetas_familiares` comprobado tras el hotfix: `users=1`, `families=1`, `refresh_tokens activos=1`. No documentar email ni password reales.
+- Punto exacto para retomar: no hay Sprint 45 autorizado todavia. El usuario pidio estado/herramientas y se respondio esperando autorizacion.
+- Sprint 45 recomendado por viabilidad en Windows: COD-8 ampliacion de tests Android/Desktop. Alternativas documentadas: iOS runtime en macOS/dispositivo (bloqueado sin macOS), UX Desktop perfil completo/ayuda contextual, o solo plan detallado.
+- Herramientas confirmadas en esta sesion: Codex activo; `multi_agent_v1` disponible para subagentes si el usuario autoriza trabajo multiagente; VibeSec disponible como skill local; OWASP Dependency-Check disponible en perfiles Maven `security-audit` de backend/desktop; Browser/Documents/Presentations/Spreadsheets disponibles.
+- Herramientas no confirmadas como callables directas: Gemini (preparar bloque para pegar si se necesita), `security-review` (requerido por `CLAUDE.md` cuando aplique, pero no visible como herramienta), `claude-mem` (no disponible; usar `CONTINUAR.md`/`CLAUDE.md` como memoria operativa).
+- Si se retoma Sprint 45B COD-8: leer `CLAUDE.md`, `CONTINUAR.md`, `auditoria.md`; definir alcance exacto de tests; usar VibeSec si se toca auth/sync/datos; ejecutar como minimo tests afectados, build relevante y `git diff --check`.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
