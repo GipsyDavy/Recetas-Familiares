@@ -711,6 +711,62 @@ class SyncControllerTest {
                 .andExpect(jsonPath("$.code").value("validation_error"));
     }
 
+    @Test
+    void pullWithLimitPaginatesWithoutLosingRows() throws Exception {
+        RegisteredUser user = register("sync-paged@example.com", "Familia Paged");
+        java.util.Set<String> expectedIds = new java.util.HashSet<>();
+        for (int i = 1; i <= 3; i++) {
+            MvcResult created = createRecipe(user, "Receta paginada " + i).andReturn();
+            expectedIds.add(read(created, "id"));
+        }
+
+        java.util.Set<String> seenIds = new java.util.HashSet<>();
+        String since = "1970-01-01T00:00:00Z";
+        boolean hasMore = true;
+        int pages = 0;
+        while (hasMore) {
+            if (++pages > 5) {
+                throw new AssertionError("Pagination did not terminate");
+            }
+            MvcResult page = mockMvc.perform(
+                            get("/api/v1/families/{familyId}/sync/pull?since={since}&limit=1", user.familyId(), since)
+                                    .header("Authorization", "Bearer " + user.accessToken()))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode body = objectMapper.readTree(page.getResponse().getContentAsString(StandardCharsets.UTF_8));
+            body.get("recipes").forEach(recipe -> seenIds.add(recipe.get("id").asText()));
+            hasMore = body.get("hasMore").asBoolean();
+            if (hasMore) {
+                org.junit.jupiter.api.Assertions.assertFalse(body.get("nextSince").isNull());
+                since = body.get("nextSince").asText();
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertEquals(expectedIds, seenIds);
+        org.junit.jupiter.api.Assertions.assertTrue(pages >= 2, "limit=1 with 3 recipes should need several pages");
+    }
+
+    @Test
+    void pullWithoutLimitKeepsFullResponseContract() throws Exception {
+        RegisteredUser user = register("sync-nolimit@example.com", "Familia NoLimit");
+        createRecipe(user, "Receta completa");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipes.length()").value(1))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.nextSince").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void rejectsNonPositivePullLimit() throws Exception {
+        RegisteredUser user = register("sync-badlimit@example.com", "Familia BadLimit");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z&limit=0", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isBadRequest());
+    }
+
     private RegisteredUser register(String email, String familyName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.Locale;
 
 import org.gipsybuho.recetasfamiliares.auth.RefreshTokenService;
-import org.gipsybuho.recetasfamiliares.recipes.RecipeEntity;
+import org.gipsybuho.recetasfamiliares.favorites.FavoriteRecipeRepository;
+import org.gipsybuho.recetasfamiliares.menus.MenuItemRepository;
+import org.gipsybuho.recetasfamiliares.notes.FamilyNoteRepository;
 import org.gipsybuho.recetasfamiliares.recipes.RecipeRepository;
+import org.gipsybuho.recetasfamiliares.shopping.ShoppingListRepository;
 import org.gipsybuho.recetasfamiliares.stock.StockItemRepository;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
@@ -24,6 +27,10 @@ public class FamilyService {
     private final RefreshTokenService refreshTokenService;
     private final RecipeRepository recipeRepository;
     private final StockItemRepository stockItemRepository;
+    private final MenuItemRepository menuItemRepository;
+    private final ShoppingListRepository shoppingListRepository;
+    private final FamilyNoteRepository familyNoteRepository;
+    private final FavoriteRecipeRepository favoriteRecipeRepository;
 
     public FamilyService(
             FamilyMemberRepository familyMemberRepository,
@@ -31,7 +38,11 @@ public class FamilyService {
             UserRepository userRepository,
             RefreshTokenService refreshTokenService,
             RecipeRepository recipeRepository,
-            StockItemRepository stockItemRepository
+            StockItemRepository stockItemRepository,
+            MenuItemRepository menuItemRepository,
+            ShoppingListRepository shoppingListRepository,
+            FamilyNoteRepository familyNoteRepository,
+            FavoriteRecipeRepository favoriteRecipeRepository
     ) {
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
@@ -39,6 +50,10 @@ public class FamilyService {
         this.refreshTokenService = refreshTokenService;
         this.recipeRepository = recipeRepository;
         this.stockItemRepository = stockItemRepository;
+        this.menuItemRepository = menuItemRepository;
+        this.shoppingListRepository = shoppingListRepository;
+        this.familyNoteRepository = familyNoteRepository;
+        this.favoriteRecipeRepository = favoriteRecipeRepository;
     }
 
     @Transactional(readOnly = true)
@@ -119,9 +134,17 @@ public class FamilyService {
         long totalRecipes    = recipeRepository.countByFamily_IdAndDeletedFalse(familyId);
         long totalMembers    = familyMemberRepository.countByFamily_IdAndDeletedFalse(familyId);
         long totalStockItems = stockItemRepository.countByFamily_IdAndDeletedFalse(familyId);
-        Instant lastActivity = recipeRepository
-                .findFirstByFamily_IdAndDeletedFalseOrderByUpdatedAtDesc(familyId)
-                .map(RecipeEntity::getUpdatedAt)
+        // COD-4: actividad real de la familia, no solo recetas. Ingredientes, pasos y
+        // fotos tocan la receta; los items de lista tocan su lista: quedan cubiertos.
+        Instant lastActivity = java.util.stream.Stream.of(
+                        recipeRepository.findLastActivityAt(familyId),
+                        stockItemRepository.findLastActivityAt(familyId),
+                        menuItemRepository.findLastActivityAt(familyId),
+                        shoppingListRepository.findLastActivityAt(familyId),
+                        familyNoteRepository.findLastActivityAt(familyId),
+                        favoriteRecipeRepository.findLastActivityAt(familyId))
+                .filter(java.util.Objects::nonNull)
+                .max(Instant::compareTo)
                 .orElse(null);
         return new FamilyStatsResponse(totalRecipes, totalMembers, totalStockItems, lastActivity);
     }

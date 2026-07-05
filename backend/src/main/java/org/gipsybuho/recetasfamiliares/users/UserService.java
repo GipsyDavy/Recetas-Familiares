@@ -20,21 +20,21 @@ public class UserService {
         this.fileStorageService = fileStorageService;
     }
 
-    public UserResponse getUser(String email) {
-        UserEntity user = findByEmail(email);
+    public UserResponse getUser(String userId) {
+        UserEntity user = findActiveUser(userId);
         return toResponse(user);
     }
 
     @Transactional
-    public UserResponse updateUser(String email, UpdateUserRequest request) {
-        UserEntity user = findByEmail(email);
+    public UserResponse updateUser(String userId, UpdateUserRequest request) {
+        UserEntity user = findActiveUser(userId);
         user.setDisplayName(request.displayName().trim());
         return toResponse(userRepository.save(user));
     }
 
     @Transactional
-    public UserResponse uploadAvatar(String email, MultipartFile file) {
-        UserEntity user = findByEmail(email);
+    public UserResponse uploadAvatar(String userId, MultipartFile file) {
+        UserEntity user = findActiveUser(userId);
         try {
             FileStorageService.StoredFile stored = fileStorageService.store(file, "avatars");
             user.setAvatarUrl(stored.url());
@@ -44,8 +44,9 @@ public class UserService {
         }
     }
 
-    private UserEntity findByEmail(String email) {
-        return userRepository.findByEmailIgnoreCaseAndDeletedFalse(email)
+    /** El principal JWT es el userId (subject), no el email. */
+    private UserEntity findActiveUser(String userId) {
+        return userRepository.findByIdAndDeletedFalse(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 

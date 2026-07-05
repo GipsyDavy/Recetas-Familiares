@@ -55,6 +55,47 @@ class FamilyControllerTest {
                 .andExpect(jsonPath("$[0].role").value("OWNER"));
     }
 
+    /** COD-4: lastActivityAt debe reflejar actividad de cualquier entidad, no solo recetas. */
+    @Test
+    void statsLastActivityCoversNonRecipeEntities() throws Exception {
+        MvcResult registered = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "familia-stats@example.com",
+                                  "displayName": "Test User",
+                                  "password": "very-secure-password",
+                                  "familyName": "Familia Stats"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        JsonNode auth = objectMapper.readTree(registered.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        String token = auth.get("accessToken").asText();
+        String familyId = auth.get("family").get("id").asText();
+
+        // Sin actividad: lastActivityAt null
+        mockMvc.perform(get("/api/v1/families/{familyId}/stats", familyId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRecipes").value(0))
+                .andExpect(jsonPath("$.lastActivityAt").value(org.hamcrest.Matchers.nullValue()));
+
+        // Una nota (sin recetas) ya cuenta como actividad
+        mockMvc.perform(post("/api/v1/families/{familyId}/notes", familyId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title": "Nota", "body": "Actividad familiar", "pinned": false}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/stats", familyId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastActivityAt").value(org.hamcrest.Matchers.notNullValue()));
+    }
+
     private String registerAndReadAccessToken(String email, String familyName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

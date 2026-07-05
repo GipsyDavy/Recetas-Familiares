@@ -5,7 +5,7 @@
 **Naturaleza del documento:** informe historico de auditoria, no estado operativo actual.
 
 Para continuar trabajo diario usar `CONTINUAR.md`. Para reglas de trabajo usar `CLAUDE.md`. Para vision consolidada usar `Resumen.md`.
-Sprint 42 resolvio varios hallazgos historicos de este informe (`SEC-1`, `SEC-2`, `SEC-3` parcial, `SEC-4`, `SEC-6`, `SEC-7`, `COD-3`, `COD-7`). Revisar `CONTINUAR.md` y el codigo actual antes de tratarlos como pendientes.
+Sprint 42 resolvio varios hallazgos historicos de este informe (`SEC-1`, `SEC-2`, `SEC-3` parcial, `SEC-4`, `SEC-6`, `SEC-7`, `COD-3`, `COD-7`). Sprint 43 resolvio `SEC-3` completo, `COD-4`, `COD-5` y `UX-6`. Revisar `CONTINUAR.md` y el codigo actual antes de tratarlos como pendientes.
 
 ---
 

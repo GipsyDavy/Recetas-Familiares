@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface RecipeIngredientRepository extends JpaRepository<RecipeIngredientEntity, String> {
@@ -17,5 +18,11 @@ public interface RecipeIngredientRepository extends JpaRepository<RecipeIngredie
     List<RecipeIngredientEntity> findByRecipe_Family_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(
             String familyId,
             Instant since
+    );
+
+    List<RecipeIngredientEntity> findByRecipe_Family_IdAndUpdatedAtAfter(
+            String familyId,
+            Instant since,
+            Pageable pageable
     );
 }

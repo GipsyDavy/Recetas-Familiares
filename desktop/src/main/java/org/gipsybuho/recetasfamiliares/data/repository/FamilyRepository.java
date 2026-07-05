@@ -30,6 +30,11 @@ public class FamilyRepository {
         return result != null ? result : new FamilyDtos.FamilyMemberResponse[0];
     }
 
+    /** Returns aggregated stats for the given family. */
+    public FamilyDtos.FamilyStatsResponse loadStats(String familyId) throws ApiException {
+        return api.get("api/v1/families/" + familyId + "/stats", FamilyDtos.FamilyStatsResponse.class);
+    }
+
     /** Changes the role of a family member (OWNER/ADMIN only). */
     public FamilyDtos.FamilyMemberResponse updateMemberRole(String familyId, String userId, String newRole) throws ApiException {
         return api.put("api/v1/families/" + familyId + "/members/" + userId + "/role",

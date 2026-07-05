@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import org.gipsybuho.recetasfamiliares.favorites.FavoriteRecipeEntity;
 import org.gipsybuho.recetasfamiliares.favorites.FavoriteRecipeRepository;
@@ -41,6 +43,9 @@ import org.gipsybuho.recetasfamiliares.shopping.ShoppingListResponse;
 import org.gipsybuho.recetasfamiliares.stock.StockItemEntity;
 import org.gipsybuho.recetasfamiliares.stock.StockItemRepository;
 import org.gipsybuho.recetasfamiliares.stock.StockItemResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +55,10 @@ import org.springframework.web.server.ResponseStatusException;
 public class SyncService {
 
     private static final Instant DEFAULT_SINCE = Instant.EPOCH;
+    static final int MAX_PULL_LIMIT = 500;
+
+    /** Orden total estable para paginacion por cursor de updatedAt. */
+    private static final Sort PULL_SORT = Sort.by(Sort.Order.asc("updatedAt"), Sort.Order.asc("id"));
 
     private final FamilyMemberRepository familyMemberRepository;
     private final FamilyRepository familyRepository;
@@ -93,11 +102,14 @@ public class SyncService {
     }
 
     @Transactional(readOnly = true)
-    public SyncPullResponse pull(String familyId, String userId, Instant since) {
+    public SyncPullResponse pull(String familyId, String userId, Instant since, Integer limit) {
         if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family access denied");
         }
         Instant effectiveSince = since == null ? DEFAULT_SINCE : since;
+        if (limit != null) {
+            return pagedPull(familyId, effectiveSince, normalizeLimit(limit));
+        }
         return new SyncPullResponse(
                 Instant.now(),
                 recipeRepository.findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
@@ -147,6 +159,119 @@ public class SyncService {
                         .map(this::toRecipePhotoResponse)
                         .toList()
         );
+    }
+
+    private SyncPullResponse pagedPull(String familyId, Instant since, int limit) {
+        Slice<RecipeResponse> recipes = fetchSlice(
+                p -> recipeRepository.findByFamily_IdAndUpdatedAtAfter(familyId, since, p),
+                RecipeEntity::getUpdatedAt, this::toRecipeResponse, limit);
+        Slice<RecipeIngredientResponse> ingredients = fetchSlice(
+                p -> ingredientRepository.findByRecipe_Family_IdAndUpdatedAtAfter(familyId, since, p),
+                RecipeIngredientEntity::getUpdatedAt, this::toIngredientResponse, limit);
+        Slice<RecipeStepResponse> steps = fetchSlice(
+                p -> stepRepository.findByRecipe_Family_IdAndUpdatedAtAfter(familyId, since, p),
+                RecipeStepEntity::getUpdatedAt, this::toStepResponse, limit);
+        Slice<StockItemResponse> stockItems = fetchSlice(
+                p -> stockItemRepository.findByFamily_IdAndUpdatedAtAfter(familyId, since, p),
+                StockItemEntity::getUpdatedAt, this::toStockItemResponse, limit);
+        Slice<MenuItemResponse> menuItems = fetchSlice(
+                p -> menuItemRepository.findByFamily_IdAndUpdatedAtAfter(familyId, since, p),
+                MenuItemEntity::getUpdatedAt, this::toMenuItemResponse, limit);
+        Slice<ShoppingListResponse> shoppingLists = fetchSlice(
+                p -> shoppingListRepository.findByFamily_IdAndUpdatedAtAfter(familyId, since, p),
+                ShoppingListEntity::getUpdatedAt, this::toShoppingListResponse, limit);
+        Slice<ShoppingListItemResponse> shoppingListItems = fetchSlice(
+                p -> shoppingListItemRepository.findByShoppingList_Family_IdAndUpdatedAtAfter(familyId, since, p),
+                ShoppingListItemEntity::getUpdatedAt, this::toShoppingListItemResponse, limit);
+        Slice<FavoriteRecipeResponse> favoriteRecipes = fetchSlice(
+                p -> favoriteRecipeRepository.findByFamily_IdAndUpdatedAtAfter(familyId, since, p),
+                FavoriteRecipeEntity::getUpdatedAt, this::toFavoriteRecipeResponse, limit);
+        Slice<FamilyNoteResponse> familyNotes = fetchSlice(
+                p -> familyNoteRepository.findByFamily_IdAndUpdatedAtAfter(familyId, since, p),
+                FamilyNoteEntity::getUpdatedAt, this::toFamilyNoteResponse, limit);
+        Slice<RecipePhotoResponse> recipePhotos = fetchSlice(
+                p -> photoRepository.findByRecipe_Family_IdAndUpdatedAtAfter(familyId, since, p),
+                RecipePhotoEntity::getUpdatedAt, this::toRecipePhotoResponse, limit);
+
+        // Cursor global: el minimo de los cursores de las listas truncadas. Las listas
+        // completas pueden reenviar filas en la pagina siguiente; el upsert idempotente
+        // de los clientes lo tolera. Nunca se pierde una fila.
+        Instant nextSince = Stream.of(
+                        recipes.nextSince(), ingredients.nextSince(), steps.nextSince(),
+                        stockItems.nextSince(), menuItems.nextSince(), shoppingLists.nextSince(),
+                        shoppingListItems.nextSince(), favoriteRecipes.nextSince(),
+                        familyNotes.nextSince(), recipePhotos.nextSince())
+                .filter(java.util.Objects::nonNull)
+                .min(Instant::compareTo)
+                .orElse(null);
+
+        return new SyncPullResponse(
+                Instant.now(),
+                recipes.items(),
+                ingredients.items(),
+                steps.items(),
+                stockItems.items(),
+                menuItems.items(),
+                shoppingLists.items(),
+                shoppingListItems.items(),
+                favoriteRecipes.items(),
+                familyNotes.items(),
+                recipePhotos.items(),
+                nextSince != null,
+                nextSince
+        );
+    }
+
+    /** Lista parcial de una entidad; nextSince null significa que no quedan filas pendientes. */
+    private record Slice<R>(List<R> items, Instant nextSince) {
+    }
+
+    /**
+     * Recorta la lista a un grupo completo de updatedAt: nunca parte un grupo de filas
+     * con el mismo timestamp, de modo que el cursor estricto (updatedAt > nextSince)
+     * no pierda filas y siempre avance. Si todo el bloque comparte timestamp, se
+     * entrega el grupo entero aunque supere el limite.
+     */
+    private <E, R> Slice<R> fetchSlice(
+            Function<Pageable, List<E>> query,
+            Function<E, Instant> updatedAt,
+            Function<E, R> mapper,
+            int limit
+    ) {
+        List<E> fetched = query.apply(PageRequest.of(0, limit + 1, PULL_SORT));
+        if (fetched.size() <= limit) {
+            return new Slice<>(fetched.stream().map(mapper).toList(), null);
+        }
+        List<E> page = fetched.subList(0, limit);
+        Instant boundary = updatedAt.apply(page.get(limit - 1));
+        int cut = limit;
+        while (cut > 0 && updatedAt.apply(page.get(cut - 1)).equals(boundary)) {
+            cut--;
+        }
+        if (cut > 0) {
+            List<R> items = page.subList(0, cut).stream().map(mapper).toList();
+            return new Slice<>(items, updatedAt.apply(page.get(cut - 1)));
+        }
+        // Caso degenerado: las `limit` primeras filas comparten updatedAt. Extender la
+        // lectura hasta cerrar el grupo para poder avanzar el cursor sin perder filas.
+        List<E> all = new ArrayList<>(fetched);
+        int pageNum = 1;
+        boolean exhausted = false;
+        while (!exhausted && !updatedAt.apply(all.get(all.size() - 1)).isAfter(boundary)) {
+            List<E> next = query.apply(PageRequest.of(pageNum++, limit + 1, PULL_SORT));
+            all.addAll(next);
+            exhausted = next.size() < limit + 1;
+        }
+        List<E> kept = all.stream().filter(e -> !updatedAt.apply(e).isAfter(boundary)).toList();
+        boolean more = all.size() > kept.size();
+        return new Slice<>(kept.stream().map(mapper).toList(), more ? boundary : null);
+    }
+
+    private static int normalizeLimit(int limit) {
+        if (limit < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be >= 1");
+        }
+        return Math.min(limit, MAX_PULL_LIMIT);
     }
 
     @Transactional

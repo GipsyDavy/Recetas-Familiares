@@ -238,7 +238,18 @@ data class SyncPullDto(
     val shoppingListItems: List<ShoppingListItemDto>?,
     val favoriteRecipes: List<FavoriteRecipeDto>?,
     val familyNotes: List<FamilyNoteDto>?,
-    val recipePhotos: List<RecipePhotoDto>?
+    val recipePhotos: List<RecipePhotoDto>?,
+    val hasMore: Boolean?,
+    val nextSince: String?
+)
+
+// ── Family stats ──────────────────────────────────────────────────────────────
+
+data class FamilyStatsDto(
+    val totalRecipes: Long,
+    val totalMembers: Long,
+    val totalStockItems: Long,
+    val lastActivityAt: String?
 )
 
 // ── Mutation request DTOs ─────────────────────────────────────────────────────

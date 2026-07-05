@@ -52,6 +52,8 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFamilyNotePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncFavoriteRecipePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncIngredientPushItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPullDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncRecipePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncShoppingListItemPushItemDto
@@ -120,6 +122,11 @@ class FamilyMemberRepository(
             sessionStore.familyId ?: error("No family session"),
             org.gipsybuho.recetasfamiliares.data.remote.dto.InviteMemberRequestDto(email.trim(), role)
         )
+
+    suspend fun stats(): FamilyStatsDto? {
+        val familyId = sessionStore.familyId ?: return null
+        return api.familyStats(familyId)
+    }
 }
 
 class RecipeRepository(
@@ -322,8 +329,22 @@ class SyncRepository(
 ) {
     suspend fun pullOnce() {
         val familyId = sessionStore.familyId ?: return
-        val response = api.pullSync(familyId, sessionStore.lastSyncTime)
+        var since = sessionStore.lastSyncTime
+        var pages = 0
+        while (true) {
+            val response = api.pullSync(familyId, since, PULL_PAGE_SIZE)
+            applyPullPage(response)
+            if (response.hasMore != true || response.nextSince == null || ++pages >= MAX_PULL_PAGES) {
+                // lastSyncTime solo avanza al completar el pull: si se interrumpe,
+                // la proxima sincronizacion repite paginas (upsert idempotente)
+                sessionStore.lastSyncTime = response.serverTime
+                return
+            }
+            since = response.nextSince
+        }
+    }
 
+    private suspend fun applyPullPage(response: SyncPullDto) {
         val pendingRecipeIds = database.recipeDao().findPendingIds().toSet()
         val pendingIngredientIds = database.recipeIngredientDao().findPendingIds().toSet()
         val pendingStepIds = database.recipeStepDao().findPendingIds().toSet()
@@ -356,8 +377,6 @@ class SyncRepository(
             response.familyNotes.orEmpty().withoutPendingIds(pendingNoteIds) { it.id }.map { it.toEntity() }
         )
         database.recipePhotoDao().upsertAll(response.recipePhotos.orEmpty().map { it.toEntity() })
-
-        sessionStore.lastSyncTime = response.serverTime
     }
 
     suspend fun pushThenPull() {
@@ -455,6 +474,13 @@ class SyncRepository(
         database.recipePhotoDao().upsertAll(response.recipePhotos.orEmpty().map { it.toEntity() })
 
         sessionStore.lastSyncTime = response.serverTime
+    }
+
+    private companion object {
+        const val PULL_PAGE_SIZE = 200
+
+        /** Corta el bucle ante un servidor que nunca deja de responder hasMore. */
+        const val MAX_PULL_PAGES = 50
     }
 }
 

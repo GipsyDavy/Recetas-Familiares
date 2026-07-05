@@ -184,5 +184,7 @@ data class SyncPullResponseDto(
     val recipes: List<RecipeDto> = emptyList(),
     val ingredients: List<RecipeIngredientDto> = emptyList(),
     val stockItems: List<StockItemDto> = emptyList(),
-    val familyNotes: List<FamilyNoteDto> = emptyList()
+    val familyNotes: List<FamilyNoteDto> = emptyList(),
+    val hasMore: Boolean = false,
+    val nextSince: String? = null
 )

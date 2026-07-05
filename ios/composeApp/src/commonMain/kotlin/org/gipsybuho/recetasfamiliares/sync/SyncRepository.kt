@@ -18,16 +18,29 @@ class SyncRepository(
 
     suspend fun pullIncremental() {
         val familyId = session.familyId ?: return
-        val since = db.syncMetadataQueries.getMetadata(KEY).executeAsOneOrNull()
-
-        val response: SyncPullResponseDto = try {
-            apiClient.http.get("api/v1/families/$familyId/sync/pull") {
-                since?.let { parameter("since", it) }
-            }.body()
-        } catch (e: Exception) {
-            return  // sin red — silencioso, los repos usarán el cache existente
+        var since = db.syncMetadataQueries.getMetadata(KEY).executeAsOneOrNull()
+        var pages = 0
+        while (true) {
+            val response: SyncPullResponseDto = try {
+                apiClient.http.get("api/v1/families/$familyId/sync/pull") {
+                    since?.let { parameter("since", it) }
+                    parameter("limit", PULL_PAGE_SIZE)
+                }.body()
+            } catch (e: Exception) {
+                return  // sin red — silencioso, los repos usarán el cache existente
+            }
+            applyPage(response)
+            if (!response.hasMore || response.nextSince == null || ++pages >= MAX_PULL_PAGES) {
+                // el cursor persistido solo avanza al completar el pull; si se
+                // interrumpe, la próxima sincronización repite páginas (upsert idempotente)
+                db.syncMetadataQueries.setMetadata(KEY, response.serverTime)
+                return
+            }
+            since = response.nextSince
         }
+    }
 
+    private fun applyPage(response: SyncPullResponseDto) {
         response.recipes.forEach { dto ->
             db.recipesQueries.insertOrReplaceRecipe(
                 id          = dto.id,
@@ -68,7 +81,12 @@ class SyncRepository(
                 deleted           = if (dto.deleted) 1L else 0L
             )
         }
+    }
 
-        db.syncMetadataQueries.setMetadata(KEY, response.serverTime)
+    private companion object {
+        const val PULL_PAGE_SIZE = 200
+
+        /** Corta el bucle ante un servidor que nunca deja de responder hasMore. */
+        const val MAX_PULL_PAGES = 50
     }
 }

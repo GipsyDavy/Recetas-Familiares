@@ -33,6 +33,7 @@ import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.MenuItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
@@ -74,6 +75,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _avatarUrl = MutableStateFlow(container.sessionStore.avatarUrl)
     val avatarUrl: StateFlow<String?> = _avatarUrl.asStateFlow()
+
+    private val _familyStats = MutableStateFlow<FamilyStatsDto?>(null)
+    val familyStats: StateFlow<FamilyStatsDto?> = _familyStats.asStateFlow()
 
     private val _filterByStock = MutableStateFlow(false)
     val filterByStock: StateFlow<Boolean> = _filterByStock.asStateFlow()
@@ -124,6 +128,15 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _displayName.value = null
         _email.value = null
         _avatarUrl.value = null
+        _familyStats.value = null
+    }
+
+    /** Carga las stats del servidor; si falla (offline) se mantiene el fallback local. */
+    fun loadFamilyStats() {
+        viewModelScope.launch {
+            runCatching { container.familyMemberRepository.stats() }
+                .onSuccess { _familyStats.value = it }
+        }
     }
 
     fun markOnboardingDone() {

@@ -23,6 +23,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,6 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -198,10 +200,12 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             }
         }
 
+        LaunchedEffect(Unit) { viewModel.loadFamilyStats() }
         val recipes by viewModel.recipes.collectAsState()
-        if (recipes.isNotEmpty()) {
+        val familyStats by viewModel.familyStats.collectAsState()
+        if (familyStats != null || recipes.isNotEmpty()) {
             Spacer(Modifier.height(Spacing.lg))
-            FamilyStatsSection(recipes = recipes)
+            FamilyStatsSection(recipes = recipes, stats = familyStats)
         }
 
         if (isAdmin) {
@@ -234,9 +238,14 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
 
 @Composable
 private fun FamilyStatsSection(
-    recipes: List<RecipeEntity>
+    recipes: List<RecipeEntity>,
+    stats: FamilyStatsDto?
 ) {
-    val lastActivity = recipes.maxByOrNull { it.updatedAt }?.updatedAt?.take(10) ?: "—"
+    // Con red usa /stats del servidor; offline cae al cache local de recetas
+    val totalRecipes = stats?.totalRecipes ?: recipes.size.toLong()
+    val lastActivity = stats?.lastActivityAt?.take(10)
+        ?: recipes.maxByOrNull { it.updatedAt }?.updatedAt?.take(10)
+        ?: "—"
     Card(
         modifier  = Modifier.fillMaxWidth(),
         colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -255,15 +264,28 @@ private fun FamilyStatsSection(
             ) {
                 StatItem(
                     modifier = Modifier.weight(1f),
-                    value    = "${recipes.size}",
-                    label    = if (recipes.size == 1) "receta" else "recetas"
+                    value    = "$totalRecipes",
+                    label    = if (totalRecipes == 1L) "receta" else "recetas"
                 )
-                StatItem(
-                    modifier = Modifier.weight(1f),
-                    value    = lastActivity,
-                    label    = "última actualización"
-                )
+                if (stats != null) {
+                    StatItem(
+                        modifier = Modifier.weight(1f),
+                        value    = "${stats.totalMembers}",
+                        label    = if (stats.totalMembers == 1L) "miembro" else "miembros"
+                    )
+                    StatItem(
+                        modifier = Modifier.weight(1f),
+                        value    = "${stats.totalStockItems}",
+                        label    = "en despensa"
+                    )
+                }
             }
+            Spacer(Modifier.height(Spacing.md))
+            StatItem(
+                modifier = Modifier.fillMaxWidth(),
+                value    = lastActivity,
+                label    = "última actividad"
+            )
         }
     }
 }

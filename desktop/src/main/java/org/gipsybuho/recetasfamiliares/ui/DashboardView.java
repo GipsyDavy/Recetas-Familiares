@@ -7,6 +7,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.util.Duration;
+import org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
@@ -29,6 +30,7 @@ public class DashboardView extends ScrollPane {
     private final VBox recipesSection  = new VBox(8);
     private final VBox stockSection    = new VBox(6);
     private final VBox menuTodaySection = new VBox(4);
+    private final HBox statsSection    = new HBox(16);
     private final Runnable onSyncRequested;
     private final Runnable onNavigateRecipes;
     private final Runnable onNavigateStock;
@@ -124,7 +126,8 @@ public class DashboardView extends ScrollPane {
         greeting.getStyleClass().add("dashboard-greeting");
         Text subtitle = new Text("¿Qué cocinamos hoy?");
         subtitle.getStyleClass().add("dashboard-subtitle");
-        VBox box = new VBox(4, greeting, subtitle, menuTodaySection);
+        statsSection.setPadding(new Insets(8, 0, 0, 0));
+        VBox box = new VBox(4, greeting, subtitle, statsSection, menuTodaySection);
         box.getStyleClass().add("dashboard-greeting-box");
         box.setPadding(new Insets(0, 0, 20, 0));
         return box;
@@ -163,6 +166,44 @@ public class DashboardView extends ScrollPane {
         loadRecentRecipes();
         loadExpiringStock();
         loadTodayMenu();
+        loadFamilyStats();
+    }
+
+    /** UX-6: stats familiares del endpoint /stats. Si falla, la fila queda vacía. */
+    private void loadFamilyStats() {
+        String familyId = context.getSession().getFamilyId();
+        if (familyId == null) {
+            return;
+        }
+        Thread.ofVirtual().start(() -> {
+            try {
+                var stats = context.getFamilyRepository().loadStats(familyId);
+                Platform.runLater(() -> renderFamilyStats(stats));
+            } catch (Exception ex) {
+                Platform.runLater(() -> statsSection.getChildren().clear());
+            }
+        });
+    }
+
+    private void renderFamilyStats(FamilyDtos.FamilyStatsResponse stats) {
+        statsSection.getChildren().clear();
+        if (stats == null) {
+            return;
+        }
+        statsSection.getChildren().addAll(
+                statChip(stats.totalRecipes() + (stats.totalRecipes() == 1 ? " receta" : " recetas")),
+                statChip(stats.totalMembers() + (stats.totalMembers() == 1 ? " miembro" : " miembros")),
+                statChip(stats.totalStockItems() + " en despensa")
+        );
+        if (stats.lastActivityAt() != null && stats.lastActivityAt().length() >= 10) {
+            statsSection.getChildren().add(statChip("Última actividad: " + stats.lastActivityAt().substring(0, 10)));
+        }
+    }
+
+    private Label statChip(String text) {
+        Label chip = new Label(text);
+        chip.getStyleClass().add("recipe-cell-meta");
+        return chip;
     }
 
     private void loadRecentRecipes() {

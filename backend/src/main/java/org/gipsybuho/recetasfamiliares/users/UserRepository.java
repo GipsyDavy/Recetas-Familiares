@@ -1,8 +1,11 @@
 package org.gipsybuho.recetasfamiliares.users;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<UserEntity, String> {
 
@@ -11,4 +14,7 @@ public interface UserRepository extends JpaRepository<UserEntity, String> {
     Optional<UserEntity> findByEmailIgnoreCaseAndDeletedFalse(String email);
 
     Optional<UserEntity> findByIdAndDeletedFalse(String id);
+
+    @Query("SELECT u.id FROM UserEntity u WHERE u.deleted = false AND u.avatarUrl LIKE CONCAT('%', :suffix)")
+    List<String> findIdsByAvatarUrlSuffix(@Param("suffix") String suffix);
 }

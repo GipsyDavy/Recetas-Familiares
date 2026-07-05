@@ -38,7 +38,7 @@ Plataformas:
 - `shared/`: objetivo para logica compartida Android/iOS cuando aplique. Aun no existe como modulo en el repo; iOS mantiene su propia copia de DTOs y logica bajo `ios/composeApp/`.
 
 Estado conocido a partir de la documentacion previa:
-- Backend: 78 tests, 0 fallos en la ultima validacion documentada.
+- Backend: 88 tests, 0 fallos en la ultima validacion documentada.
 - Android: funcional, con offline-first y UI avanzada.
 - Desktop: funcional, instalador Windows v1.1 generado, ajustes como vista central.
 - iOS: funcional parcialmente, pero con deuda de paridad y build en Windows.
@@ -175,10 +175,11 @@ Resuelto en Sprint 42 (2026-07-02):
 - `/uploads/**` requiere JWT; ownership fino por familia pendiente (SEC-3 parcial).
 - Rate limiter proxy-aware opt-in via `app.security.rate-limit.auth.trust-proxy` (SEC-4).
 
-Riesgos pendientes a verificar:
-- Paginacion de `sync/pull` (COD-5).
-- `lastActivityAt` multi-entidad (COD-4).
-- Ownership por familia en `/uploads/**` (SEC-3 parcial; servir via controller con lookup).
+Resuelto en Sprint 43 (2026-07-05):
+- Paginacion opcional de `sync/pull` via `limit` + `hasMore`/`nextSince` (COD-5).
+- `lastActivityAt` multi-entidad: recetas, stock, menus, listas, notas y favoritos (COD-4).
+- Ownership por familia en `/uploads/**` via `UploadController` con lookup en BD (SEC-3 completo).
+- Bug corregido: `/users/me`, `PUT /me` y avatar upload buscaban por email con un principal userId (404 permanente).
 
 Funcionalidad futura documentada:
 - Chat familiar por fases: texto/emojis en tiempo real, imagenes, videos y push notifications.
@@ -205,8 +206,12 @@ Resuelto en Sprint 42 (2026-07-02):
 - `baseSyncVersion` real en push offline: dirty = syncVersion negativo conservando base (COD-3).
 - Coil configurado con OkHttpClient autenticado para `/uploads/**`.
 
+Resuelto en Sprint 43 (2026-07-05):
+- Perfil consume `/stats` con fallback local offline (UX-6).
+- Pull paginado con `limit=200` y tope de 50 paginas.
+- Icono adaptive con `recetas.png` (mipmaps 5 dpis, fondo #F6E7D8).
+
 Riesgos pendientes a verificar:
-- Consumo completo del endpoint `/stats` en perfil (UX-6).
 - Fuentes TTF reales si se exige identidad premium completa (UX-1).
 
 Funcionalidad futura documentada:
@@ -227,6 +232,10 @@ Implementado/documentado:
 Resuelto en Sprint 42 (2026-07-02):
 - Tokens cifrados con Windows DPAPI (`TokenVault`, JNA) con migracion automatica de valores legado (SEC-2).
 - Carga de imagenes `/uploads/**` con Authorization en segundo plano (fotos de receta y avatar).
+
+Resuelto en Sprint 43 (2026-07-05):
+- Dashboard muestra stats familiares de `/stats` (UX-6 parcial Desktop).
+- Icono de ventana e instalador regenerados desde `recetas.png` (ICO multi-res 16-256).
 
 Riesgos pendientes a verificar:
 - Perfil completo y stats familiares (UX-5/UX-6).
@@ -267,17 +276,15 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Sprint 42 (2026-07-02) cerro los puntos 1-8 de la lista anterior (ver seccion 10).
+Sprint 43 (2026-07-05) cerro los puntos 1-4, 6 (Android/Desktop) y 7 de la lista anterior (ver seccion 10).
 
-Prioridad propuesta para Sprint 43:
+Prioridad propuesta para Sprint 44:
 
-1. Backend: paginar `sync/pull` (COD-5).
-2. Backend: ownership por familia en `/uploads/**` (SEC-3 parcial; hoy: solo autenticado; URLs UUID no adivinables).
-3. Backend: `lastActivityAt` multi-entidad (COD-4).
-4. UX: completar stats familiares en Android/Desktop (UX-6).
-5. iOS: validar en macOS interceptor 401 y Coil autenticado (implementados sin compilar).
-6. Branding: implementar `recetas.png` (raiz del repo) como nuevo icono/logo oficial en Android (adaptive icon/mipmap), Desktop (icono de ventana + instalador) e iOS (AppIcon), sustituyendo el actual.
-7. Producto: especificar chat familiar por fases sin implementarlo todavia: texto/emojis en tiempo real, imagenes, videos y push notifications.
+1. iOS: validar en macOS todo lo implementado sin compilar (interceptor 401, Coil autenticado, pull paginado) y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2).
+2. Desktop: recompilar instalador con JDK 21 LTS (incluira DLLs de JNA y el nuevo icono).
+3. Tests unitarios Android/Desktop para flujos de sync y repositorios (COD-8).
+4. UX: onboarding primer arranque Desktop (UX-8/UX-13), shortcuts modo cocina (UX-11), fuentes TTF (UX-1).
+5. Producto: decidir cuestiones abiertas de `docs/chat-familiar-spec.md` y, si procede, abrir sprint de chat fase 1.
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
@@ -359,6 +366,22 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Validacion ejecutada: `git diff --check` OK; Android `gradlew assembleDebug` OK; Android `gradlew test` OK sin tests (`NO-SOURCE`); Desktop `mvn -DskipTests compile` OK; Desktop `mvn test` OK sin tests.
 - iOS: `gradlew :composeApp:compileKotlinMetadata` no validado; falla en Windows durante configuracion Gradle/SQLDelight (`DefaultArtifactPublicationSet`), antes de compilar el cambio Kotlin. Validar en macOS.
 - Riesgo residual: faltan tests unitarios Android/Desktop/iOS para estos flujos; `recetas.png` queda como asset pendiente de branding.
+
+### Sprint 43 — Sync paginado, ownership uploads, stats y branding (2026-07-05)
+
+- Objetivo: cerrar COD-5, SEC-3 (completo), COD-4, UX-6, branding `recetas.png` y especificacion de chat familiar.
+- Agente lider: Claude Code, en solitario (sin Codex/Gemini en esta sesion; el usuario autorizo proceder directo).
+- Seguridad ejecutada: VibeSec y security-review invocados en la sesion; 0 hallazgos de alta confianza.
+- Backend: `sync/pull` acepta `limit` opcional (1..500); respuesta añade `hasMore`/`nextSince` (aditivo, retrocompatible); truncado por grupos completos de `updatedAt` con orden estable `(updatedAt, id)` — sin perdida de filas ni bucles.
+- Backend: `UploadController` sirve `/uploads/**` con ownership (foto → familia de la receta; avatar → dueño o familia compartida), allowlist de nombre UUID+extension, 404 uniforme, huerfanos no servidos. Eliminado el resource handler estatico (`WebMvcConfig`).
+- Backend: bug corregido — `UserService` buscaba por email con principal userId: `/users/me`, `PUT /me` y avatar upload devolvian 404 siempre.
+- Backend: `lastActivityAt` de `/stats` agrega recetas, stock, menus, listas, notas y favoritos (COD-4).
+- Android: pull paginado (`limit=200`, tope 50 paginas, `lastSyncTime` solo avanza al completar); perfil consume `/stats` con fallback local; adaptive icon con `recetas.png` (mipmaps 5 dpis, se elimino el vector placeholder).
+- Desktop: dashboard muestra stats familiares; `brand/app.ico` e `installer/recetas.ico` regenerados multi-res desde `recetas.png`.
+- iOS: pull paginado implementado SIN COMPILAR (Windows); AppIcon bloqueado — no existe proyecto Xcode/Assets.xcassets todavia. Validar en macOS.
+- Producto: `docs/chat-familiar-spec.md` creado (4 fases, contrato borrador, modelo de datos, seguridad, decisiones pendientes). Sin codigo de chat.
+- Validacion ejecutada: backend `mvn test` 88 tests 0 fallos (10 nuevos: paginacion sync, ownership uploads, users/me, stats multi-entidad); Android `gradlew assembleDebug` OK; Desktop `mvn -DskipTests compile` OK.
+- Riesgo residual: cambios iOS sin compilar; stats Android/Desktop validadas por compilacion y tests backend, sin prueba manual de UI en esta sesion; instalador Windows pendiente de recompilar para empaquetar el nuevo icono.
 
 ### Chequeo obligatorio de cierre
 

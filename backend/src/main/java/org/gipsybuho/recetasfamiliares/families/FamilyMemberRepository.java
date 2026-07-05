@@ -29,4 +29,7 @@ public interface FamilyMemberRepository extends JpaRepository<FamilyMemberEntity
 
     @Query("SELECT m FROM FamilyMemberEntity m JOIN FETCH m.user WHERE m.family.id = :familyId AND m.user.id = :userId AND m.deleted = false")
     Optional<FamilyMemberEntity> findMemberWithUserByFamilyIdAndUserId(@Param("familyId") String familyId, @Param("userId") String userId);
+
+    @Query("SELECT m.family.id FROM FamilyMemberEntity m WHERE m.user.id = :userId AND m.deleted = false")
+    List<String> findFamilyIdsByUserId(@Param("userId") String userId);
 }

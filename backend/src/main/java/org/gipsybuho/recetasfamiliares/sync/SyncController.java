@@ -28,9 +28,10 @@ public class SyncController {
     public SyncPullResponse pull(
             @PathVariable String familyId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since,
+            @RequestParam(required = false) Integer limit,
             Authentication authentication
     ) {
-        return syncService.pull(familyId, authentication.getName(), since);
+        return syncService.pull(familyId, authentication.getName(), since, limit);
     }
 
     @PostMapping("/push")

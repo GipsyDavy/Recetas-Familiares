@@ -26,4 +26,10 @@ public interface ShoppingListItemRepository extends JpaRepository<ShoppingListIt
             String familyId,
             Instant since
     );
+
+    List<ShoppingListItemEntity> findByShoppingList_Family_IdAndUpdatedAtAfter(
+            String familyId,
+            Instant since,
+            Pageable pageable
+    );
 }

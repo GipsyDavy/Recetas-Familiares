@@ -16,6 +16,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceIngredientsRequest
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceStepsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
@@ -63,6 +64,9 @@ interface RecetasApi {
 
     @GET("api/v1/families")
     suspend fun families(): List<FamilyDto>
+
+    @GET("api/v1/families/{familyId}/stats")
+    suspend fun familyStats(@Path("familyId") familyId: String): FamilyStatsDto
 
     @GET("api/v1/families/{familyId}/recipes")
     suspend fun recipes(
@@ -120,7 +124,8 @@ interface RecetasApi {
     @GET("api/v1/families/{familyId}/sync/pull")
     suspend fun pullSync(
         @Path("familyId") familyId: String,
-        @Query("since") since: String? = null
+        @Query("since") since: String? = null,
+        @Query("limit") limit: Int? = null
     ): SyncPullDto
 
     @POST("api/v1/families/{familyId}/sync/push")
