@@ -218,8 +218,10 @@ Resuelto en Sprint 43 (2026-07-05):
 Endurecido tras revision Codex/Gemini post-Sprint 43 (2026-07-05):
 - Si se alcanza el tope de 50 paginas con `hasMore=true`, no avanza `lastSyncTime`; la siguiente sync reintenta sin perder filas.
 
-Riesgos pendientes a verificar:
-- Fuentes TTF reales si se exige identidad premium completa (UX-1).
+Resuelto en Sprint 44 (2026-07-05):
+- Fuentes Nunito/Lato empaquetadas en `res/font` (UX-1); eliminado el provider de Google Fonts por red y la dependencia `ui-text-google-fonts`.
+- Primeros tests unitarios (COD-8 parcial): `SyncRepositoryTest` (pull paginado, tope de paginas, filtrado de pendientes, baseSyncVersion en push) y `StockRepositoryOfflineTest` (convencion COD-3). 11 tests con mockk + coroutines-test.
+- `gradle.properties` incluye truststore Windows-ROOT (mismo fix que iOS) para resolver dependencias.
 
 Funcionalidad futura documentada:
 - Primera pantalla candidata para chat familiar tras cerrar contrato backend.
@@ -247,11 +249,14 @@ Resuelto en Sprint 43 (2026-07-05):
 Endurecido tras revision Codex/Gemini post-Sprint 43 (2026-07-05):
 - Si falla `/stats`, el dashboard muestra fallback local minimo con recetas cacheadas y ultima actividad local cuando existe.
 
+Resuelto en Sprint 44 (2026-07-05):
+- Instalador Windows regenerado con JDK 21 LTS (runtime 21.0.11, JNA embebido, icono nuevo): `desktop/output/RecetasFamiliares-Instalador-v1.1.exe`.
+- Onboarding de primer arranque (UX-8/UX-13): `OnboardingDialog` de 4 pasos, se muestra una vez (Preferences `recetas/ui/onboardingSeen`).
+- Shortcuts completos en modo cocina (UX-11): ←/→/Enter navegar, Espacio temporizador, Esc salir, tooltips y barra de pistas.
+- Primeros tests unitarios (COD-8 parcial): `UpdateFromSyncTest` (filtrado de tombstones, semantica null, cache inmutable); surefire con `useModulePath=false`.
+
 Riesgos pendientes a verificar:
-- Perfil completo y stats familiares (UX-5/UX-6).
-- Onboarding de primer arranque (UX-8/UX-13).
-- Shortcuts completos en modo cocina (UX-11).
-- Recompilar instalador con JDK 21 LTS antes de produccion (incluira DLLs de JNA).
+- Perfil completo y stats familiares (UX-5).
 
 Funcionalidad futura documentada:
 - Chat familiar como segunda implantacion cliente despues de Android.
@@ -292,15 +297,15 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Sprint 43 (2026-07-05) cerro los puntos 1-4, 6 (Android/Desktop) y 7 de la lista anterior (ver seccion 10).
+Sprint 44 (2026-07-05) cerro los puntos 2, 3 (parcial) y 4 de la lista anterior; el punto 1 (iOS/macOS) sigue bloqueado en Windows (ver seccion 10).
 
-Prioridad propuesta para Sprint 44:
+Prioridad propuesta para Sprint 45:
 
-1. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2).
-2. Desktop: recompilar instalador con JDK 21 LTS (incluira DLLs de JNA y el nuevo icono).
-3. Tests unitarios Android/Desktop para flujos de sync y repositorios (COD-8).
-4. UX: onboarding primer arranque Desktop (UX-8/UX-13), shortcuts modo cocina (UX-11), fuentes TTF (UX-1).
-5. Producto: decidir cuestiones abiertas de `docs/chat-familiar-spec.md` y, si procede, abrir sprint de chat fase 1.
+1. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+2. COD-8 ampliacion: mas cobertura Android (RecipeRepository offline, favoritos, notas) y Desktop (AppSession, ApiClient con servidor fake si aporta).
+3. UX Desktop: perfil completo (UX-5), ayuda contextual MVP.
+4. Producto: decidir cuestiones abiertas de `docs/chat-familiar-spec.md` y, si procede, abrir sprint de chat fase 1.
+5. Validacion manual de UI pendiente: onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador.
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
@@ -416,6 +421,21 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Validacion ejecutada: backend `mvn test` 92 tests 0 fallos; Android `.\gradlew.bat assembleDebug` OK; Desktop `mvn test` OK sin tests que ejecutar; iOS `.\gradlew.bat :composeApp:compileKotlinMetadata`, `:composeApp:compileKotlinIosX64`, `:composeApp:compileKotlinIosArm64` y `:composeApp:compileKotlinIosSimulatorArm64` OK; `git diff --check` OK.
 - iOS: ya no falla por `DefaultArtifactPublicationSet`, SQLDelight ni deuda commonMain de Compose. Persisten warnings de `expect/actual` beta y casts Keychain en `SessionStore.ios.kt`; validar login/refresh/Keychain en macOS/dispositivo antes de cerrar runtime iOS.
 - Riesgos residuales: full sync iOS sigue limitado por esquema local; icono/branding requiere revision visual en tamanos pequenos; instalador Windows pendiente de recompilar; uploads aun lee archivo completo en memoria, aceptable con limite actual de subida pero mejorable si se amplian tamanos; la migracion V12 no hace backfill automatico de fotos locales antiguas porque no hay marca historica fiable para distinguir uploads reales de metadata externa que imitara la URL.
+
+### Sprint 44 — Instalador JDK 21, tests COD-8 y UX Desktop/Android (2026-07-05)
+
+- Objetivo: consolidar revision post-Sprint 43 (commit `86f88be`), instalador JDK 21 LTS, primeros tests COD-8 y UX-1/UX-8/UX-11/UX-13.
+- Agente lider: Claude Code, en solitario (el usuario autorizo proceder directo; sin Codex/Gemini en esta sesion).
+- Paso 0: revision post-Sprint 43 revalidada en sesion (backend `mvn test` 92 tests 0 fallos, Android `assembleDebug` OK, Desktop `mvn compile` OK, iOS `compileKotlinMetadata` OK, `git diff --check` OK) y commiteada.
+- Desktop: instalador regenerado con Temurin 21.0.11 LTS via `build-installer.ps1` (runtime empaquetado verificado 21.0.11, JNA en el fat JAR); `RecetasFamiliares-Instalador-v1.1.exe` 50,1 MB.
+- Tests Android: `SyncRepositoryTest` + `StockRepositoryOfflineTest` (11 tests, mockk 1.13.16 + kotlinx-coroutines-test, solo scope test). `testDebugUnitTest` 0 fallos.
+- Tests Desktop: `UpdateFromSyncTest` (4 tests JUnit 5); surefire `useModulePath=false` porque los modulos automaticos (JNA/Gson) no resuelven en el boot layer del fork. `mvn test` 0 fallos.
+- UX-11: shortcuts modo cocina Desktop (←/→/Enter/Espacio/Esc via event filter, tooltips 400ms, barra de pistas).
+- UX-8/UX-13: `OnboardingDialog` 4 pasos, primer arranque, saltable, animaciones 200ms, persistencia en Preferences.
+- UX-1: Nunito (600/700) y Lato (400/700) empaquetadas en `res/font` desde fonts.gstatic.com (magic bytes TTF verificados); eliminados provider por red, `font_certs.xml` y `ui-text-google-fonts`. Lato no publica peso 600: 700 cubre SemiBold.
+- Android: `gradle.properties` con truststore Windows-ROOT (mismo fix documentado para iOS/Maven) para resolver dependencias nuevas.
+- Seguridad ejecutada: VibeSec invocado en la sesion, 0 hallazgos (sin cambios de auth/ownership/red/datos). `security-review` no aplica: backend intacto en Sprint 44.
+- Riesgo residual: onboarding, shortcuts y fuentes validados por compilacion y tests, sin prueba manual de UI en esta sesion; iOS runtime sigue pendiente de macOS.
 
 ### Chequeo obligatorio de cierre
 

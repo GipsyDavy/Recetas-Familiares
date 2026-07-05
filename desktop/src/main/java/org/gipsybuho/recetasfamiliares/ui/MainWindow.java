@@ -128,6 +128,7 @@ public class MainWindow {
         VBox sidebar = buildSidebar();
         root.setLeft(sidebar);
         navigateTo("dashboard");
+        OnboardingDialog.showIfFirstRun(stage);
     }
 
     private VBox buildSidebar() {

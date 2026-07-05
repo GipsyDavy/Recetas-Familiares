@@ -64,15 +64,27 @@ public class CookingView {
 
     private void show() {
         stage.show();
-        stage.getScene().setOnKeyPressed((KeyEvent e) -> {
+        // Filtro en fase de captura: los atajos funcionan aunque el foco este en un boton
+        stage.getScene().addEventFilter(KeyEvent.KEY_PRESSED, (KeyEvent e) -> {
             switch (e.getCode()) {
-                case LEFT -> prevStep();
-                case RIGHT -> nextStep();
+                case LEFT -> { prevStep(); e.consume(); }
+                case RIGHT, ENTER -> { nextStep(); e.consume(); }
+                case SPACE -> {
+                    if (timerBox.isVisible()) onToggleTimer();
+                    e.consume();
+                }
+                case ESCAPE -> { stopTimer(); stage.close(); e.consume(); }
                 default -> {}
             }
         });
         stage.setMaximized(true);
         renderStep(0);
+    }
+
+    private static Tooltip shortcutTooltip(String text) {
+        Tooltip tooltip = new Tooltip(text);
+        tooltip.setShowDelay(Duration.millis(400));
+        return tooltip;
     }
 
     // ── Build UI ──────────────────────────────────────────────────────────────
@@ -81,6 +93,7 @@ public class CookingView {
         // Top bar
         Button exitBtn = new Button("✕  Salir del modo cocina");
         exitBtn.getStyleClass().add("action-button-secondary");
+        exitBtn.setTooltip(shortcutTooltip("Salir (Esc)"));
         exitBtn.setOnAction(e -> { stopTimer(); stage.close(); });
 
         Label titleLabel = new Label(recipe.title());
@@ -123,6 +136,7 @@ public class CookingView {
         toggleTimerBtn.setStyle(
             "-fx-background-color: #C17D52; -fx-text-fill: white; -fx-font-size: 14px; " +
             "-fx-background-radius: 8; -fx-padding: 8 24; -fx-cursor: hand;");
+        toggleTimerBtn.setTooltip(shortcutTooltip("Iniciar/Pausar temporizador (Espacio)"));
         toggleTimerBtn.setOnAction(e -> onToggleTimer());
 
         timerBox.getChildren().addAll(timerValueLabel, toggleTimerBtn);
@@ -141,20 +155,28 @@ public class CookingView {
         prevBtn.getStyleClass().add("action-button-secondary");
         prevBtn.setStyle(prevBtn.getStyle() +
             "; -fx-font-size: 15px; -fx-min-width: 180px;");
+        prevBtn.setTooltip(shortcutTooltip("Paso anterior (←)"));
         prevBtn.setOnAction(e -> prevStep());
 
         nextBtn.setStyle(
             "-fx-background-color: #C17D52; -fx-text-fill: white; -fx-font-size: 15px; " +
             "-fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 20; " +
             "-fx-cursor: hand; -fx-min-width: 180px;");
+        nextBtn.setTooltip(shortcutTooltip("Siguiente paso (→ o Enter)"));
         nextBtn.setOnAction(e -> nextStep());
 
         HBox navBar = new HBox(20, prevBtn, nextBtn);
         navBar.setAlignment(Pos.CENTER);
-        navBar.setPadding(new Insets(8, 24, 32, 24));
+        navBar.setPadding(new Insets(8, 24, 8, 24));
+
+        Label shortcutsHint = new Label("←  →  navegar     ·     Espacio  temporizador     ·     Esc  salir");
+        shortcutsHint.setStyle("-fx-font-size: 12px; -fx-text-fill: #A08876;");
+        HBox hintBar = new HBox(shortcutsHint);
+        hintBar.setAlignment(Pos.CENTER);
+        hintBar.setPadding(new Insets(0, 24, 20, 24));
 
         // Root
-        VBox center = new VBox(20, progressBox, instructionPane, timerWrapper, navBar);
+        VBox center = new VBox(20, progressBox, instructionPane, timerWrapper, navBar, hintBar);
         center.setAlignment(Pos.CENTER);
         VBox.setVgrow(instructionPane, Priority.ALWAYS);
 

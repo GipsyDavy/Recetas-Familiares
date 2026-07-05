@@ -5,7 +5,7 @@
 **Naturaleza del documento:** informe historico de auditoria, no estado operativo actual.
 
 Para continuar trabajo diario usar `CONTINUAR.md`. Para reglas de trabajo usar `CLAUDE.md`. Para vision consolidada usar `Resumen.md`.
-Sprint 42 resolvio varios hallazgos historicos de este informe (`SEC-1`, `SEC-2`, `SEC-3` parcial, `SEC-4`, `SEC-6`, `SEC-7`, `COD-3`, `COD-7`). Sprint 43 resolvio `SEC-3` completo, `COD-4`, `COD-5` y `UX-6`; la revision post-Sprint 43 endurecio uploads, sync paginado, fallback Desktop, documentacion UX y redujo `COD-2`: los targets Kotlin/Native iOS compilan en Windows, pendiente validar runtime en macOS/dispositivo. Revisar `CONTINUAR.md` y el codigo actual antes de tratarlos como pendientes.
+Sprint 42 resolvio varios hallazgos historicos de este informe (`SEC-1`, `SEC-2`, `SEC-3` parcial, `SEC-4`, `SEC-6`, `SEC-7`, `COD-3`, `COD-7`). Sprint 43 resolvio `SEC-3` completo, `COD-4`, `COD-5` y `UX-6`; la revision post-Sprint 43 endurecio uploads, sync paginado, fallback Desktop, documentacion UX y redujo `COD-2`: los targets Kotlin/Native iOS compilan en Windows, pendiente validar runtime en macOS/dispositivo. Sprint 44 (2026-07-05) resolvio `UX-1` (fuentes Nunito/Lato empaquetadas en `res/font`, sin red), `UX-8`/`UX-13` (onboarding primer arranque Desktop), `UX-11` (shortcuts completos en modo cocina Desktop), redujo `COD-8` (primeros tests unitarios Android y Desktop de sync/repositorios) y regenero el instalador Windows con JDK 21 LTS. Revisar `CONTINUAR.md` y el codigo actual antes de tratarlos como pendientes.
 
 ---
 

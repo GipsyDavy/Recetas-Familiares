@@ -6,10 +6,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
 import org.gipsybuho.recetasfamiliares.R
 
@@ -552,19 +551,16 @@ fun AppTheme.darkColors(): ColorScheme = when (this) {
     )
 }
 
-private val fontProvider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage   = "com.google.android.gms",
-    certificates      = R.array.com_google_android_gms_fonts_certs
-)
-
+// Fuentes empaquetadas en res/font (UX-1): sin dependencia de red ni Play Services.
+// Lato no publica peso 600; el peso 700 cubre las peticiones SemiBold.
 private val NunitoFamily = FontFamily(
-    Font(GoogleFont("Nunito"), fontProvider, FontWeight.SemiBold),
-    Font(GoogleFont("Nunito"), fontProvider, FontWeight.Bold),
+    Font(R.font.nunito_semibold, FontWeight.SemiBold),
+    Font(R.font.nunito_bold, FontWeight.Bold),
 )
 private val LatoFamily = FontFamily(
-    Font(GoogleFont("Lato"), fontProvider, FontWeight.Normal),
-    Font(GoogleFont("Lato"), fontProvider, FontWeight.SemiBold),
+    Font(R.font.lato_regular, FontWeight.Normal),
+    Font(R.font.lato_bold, FontWeight.SemiBold),
+    Font(R.font.lato_bold, FontWeight.Bold),
 )
 
 val AppTypography = Typography(
