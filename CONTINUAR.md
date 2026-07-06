@@ -313,6 +313,12 @@ Prioridad propuesta para Sprint 47:
 2. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop `ApiClient` refresh 401 y proteccion de imagenes con servidor HTTP fake si aporta valor sin fragilizar tests.
 3. Producto: chat familiar fase 1. Viabilidad analizada 2026-07-06 (`docs/chat-familiar-spec.md` §9): fase 1 lista para arrancar en cuanto el usuario resuelva las 5 decisiones de §7; unico trabajo nuevo real es WebSocket/STOMP con auth. Video (fase 4) es el hueco serio; posponer.
 4. Validacion manual de UI pendiente: onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
+5. UX-14 (nuevo, sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
+   - Desktop: ayuda contextual en TODOS los modulos, dialogos y formularios (crear/editar receta, stock, menu, compra, notas, miembros, exportaciones, busqueda global, diagnostico), cada pestaña de Ajustes, modo cocina y onboarding; tooltips en todos los controles sin label visible (formato `Accion (Ctrl+X)`, delay 400ms); foco y orden de tabulacion documentados en formularios.
+   - Android: sistema de ayuda equivalente (pantalla o bottom sheet de ayuda por seccion, accesible desde TopAppBar), con `contentDescription` completo y ayuda del modo cocina/manos libres.
+   - iOS: mismo patron cuando el runtime este desbloqueado (COD-1/COD-2).
+   - Contenido: microcopy calido y no tecnico, cubriendo cada opcion, atajo, gesto y estado (vacio/error/offline), de forma que el usuario pueda usar toda la aplicacion sin ayuda externa.
+   - Criterio de cierre: inventario de pantallas/dialogos vs temas de ayuda al 100%, revision Gemini de textos, accesibilidad verificada (TalkBack/tooltips).
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
