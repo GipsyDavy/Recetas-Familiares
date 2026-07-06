@@ -584,7 +584,16 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Seguridad: VibeSec usado como checklist por tocar auth/refresh, token forwarding de imagenes y sync offline. Verificado que los tokens de prueba son ficticios, que `Authorization` no se filtra a hosts externos, que el refresh no adjunta bearer y que no se introducen secretos reales en archivos versionables. `security-review` no esta disponible como herramienta callable directa en esta sesion; se aplico revision manual equivalente sobre diff sensible.
 - OWASP Dependency-Check: `NVD_API_KEY` estaba presente y se intento `mvn -DskipTests verify -P security-audit` en Desktop por la nueva dependencia de test, pero no termino tras 15 minutos; el proceso Maven residual fue identificado y detenido. No hay reporte `dependency-check-report.*`, por tanto no cuenta como validacion PASS.
 - Riesgos residuales: no hay prueba Room/WorkManager real con scheduler Android; la cobertura nueva del worker es por runner puro y la cola offline sigue con DAOs mockeados. OWASP queda pendiente por timeout. iOS sigue bloqueado sin macOS y no se toco.
-- Estado de Git al cierre: cambios de Sprint 47 quedan sin commit salvo que el usuario lo solicite.
+- Estado de Git al cierre: Sprint 47 commiteado en `f34d132 test: cubrir sync worker y refresh desktop`.
+
+### Cierre de sesion Codex (2026-07-06)
+
+- Ultimo commit funcional del sprint: `f34d132 test: cubrir sync worker y refresh desktop`.
+- Esta entrada se commitea como cierre documental de sesion; tras ese commit, el arbol Git debe quedar limpio.
+- Sprint 47 cerrado y documentado: cobertura COD-8 ampliada en Android (`SyncWorkerRunnerTest`, cola offline en `SyncRepositoryTest`) y Desktop (`ApiClientHttpTest` con `MockWebServer`).
+- Validaciones de la sesion ya documentadas en Sprint 47: Desktop `mvn test` 12 tests 0 fallos, Desktop `mvn -DskipTests compile` OK, Android `testDebugUnitTest` 27 tests 0 fallos, Android `assembleDebug` OK, `git diff --check` OK.
+- OWASP Dependency-Check quedo pendiente por timeout de 15 minutos pese a `NVD_API_KEY` presente; no hay reporte utilizable.
+- Punto exacto para retomar: NO hay Sprint 48 autorizado. Opciones recomendadas: resolver OWASP Dependency-Check timeout si se quiere cierre de seguridad de dependencias, avanzar COD-8 con pruebas Room/WorkManager reales, o abrir chat familiar fase 1 solo tras decidir las 5 cuestiones de `docs/chat-familiar-spec.md` §7. iOS sigue bloqueado sin macOS/dispositivo.
 
 ### Chequeo obligatorio de cierre
 
