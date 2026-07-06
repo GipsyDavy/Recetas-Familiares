@@ -515,6 +515,16 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Seguridad: cambios revisados con criterio VibeSec en la sesion (allowlist cliente es defensa en profundidad; ownership/validacion real en backend intacto), 0 hallazgos.
 - Riesgo residual: sin cambios; prueba manual interactiva de perfil/ayuda sigue pendiente del usuario.
 
+### Cierre de sesion Claude Code (2026-07-06)
+
+- Ultimo commit: `0dcb5cd fix: aplicar hallazgos revision Codex/Gemini post-Sprint 46`; anterior: `20ba01a feat: perfil completo y ayuda contextual en desktop (UX-5)`. Arbol Git limpio al cerrar.
+- Sprint 46 CERRADO (UX-5 + ayuda contextual Desktop) y revision post-Sprint 46 aplicada en la misma sesion (Codex 4 hallazgos aplicados, Gemini 8 textos aplicados + 1 descartado con motivo documentado arriba).
+- Procesos dejados en marcha al cerrar: backend dev en `http://localhost:8080` (arrancado con `JWT_SECRET` efimero generado en la sesion — si se reinicia, regenerarlo; las sesiones de clientes previas quedaron invalidadas y requieren re-login) y app Desktop via `javafx:run`. Si la maquina se reinicia, arrancar backend segun seccion 5 recordando exportar `JWT_SECRET`.
+- Punto exacto para retomar: NO hay Sprint 47 autorizado. Queda pendiente de esta sesion solo la PRUEBA MANUAL interactiva del usuario en Desktop: abrir perfil desde la user card del sidebar, editar nombre, cambiar foto (allowlist jpg/jpeg/png/webp, max 8 MB), ver familia/rol/stats, F1 y boton Ayuda en varias vistas, reabrir guia de bienvenida. Si la prueba manual revela fallos, tratarlos como hotfix antes de abrir Sprint 47.
+- Sprint 47 recomendado por viabilidad en Windows (seccion 8): COD-8 siguiente capa (Android `SyncWorker`/colas offline e2e; Desktop `ApiClient` refresh 401 con HTTP fake) o chat familiar fase 1 (decidir antes cuestiones abiertas de `docs/chat-familiar-spec.md`). iOS sigue bloqueado sin macOS.
+- Herramientas confirmadas en esta sesion: VibeSec (skill, ejecutada 2 veces con 0 hallazgos), security-review (skill disponible, no aplico: backend intacto), OWASP Dependency-Check (perfil Maven `security-audit`, no aplico: sin dependencias nuevas), bloques IDE Codex/Gemini (usados en solo lectura, hallazgos verificados contra codigo antes de aplicar). `claude-mem` no existe: la memoria operativa es este archivo + memoria persistente del agente.
+- Al retomar: leer `CLAUDE.md`, este `CONTINUAR.md` (secciones 8 y 10) y, si el sprint toca deuda, `auditoria.md`. Ejecutar validaciones reales en la sesion antes de afirmar estado.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
