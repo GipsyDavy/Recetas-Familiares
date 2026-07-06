@@ -100,10 +100,6 @@
     -fx-border-color: recetas-focus-border;
 }
 
-.login-password-stack {
-    -fx-max-width: Double.MAX_VALUE;
-}
-
 .login-toggle-btn {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
@@ -1004,4 +1000,29 @@
 .expiry-toast-more {
     -fx-font-size: 11px;
     -fx-text-fill: recetas-text-second;
+}
+
+/* ── Perfil (UX-5) ───────────────────────────────────────────────────────────── */
+.profile-name {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: recetas-text-primary;
+}
+
+.profile-family-name {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: recetas-text-primary;
+}
+
+.profile-role-badge {
+    -fx-background-color: recetas-primary-cont;
+    -fx-border-color: recetas-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-text-fill: recetas-on-primary-cont;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 3 10;
 }

@@ -104,6 +104,7 @@ public class LoginView extends VBox {
         StackPane.setAlignment(toggleBtn, Pos.CENTER_RIGHT);
         StackPane.setMargin(toggleBtn, new Insets(0, 6, 0, 0));
         pwStack.getStyleClass().add("login-password-stack");
+        pwStack.setMaxWidth(Double.MAX_VALUE);
 
         // ── Login button ──────────────────────────────────────────────────────
         loginButton.getStyleClass().add("login-button");

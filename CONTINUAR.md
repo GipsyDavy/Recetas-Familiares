@@ -261,8 +261,10 @@ Resuelto en Sprint 44 (2026-07-05):
 Resuelto en Sprint 45 (2026-07-05):
 - COD-8 ampliado en Desktop con `AppSessionTest` y `AuthRepositoryTest`: persistencia/limpieza de sesion, rol desconocido sin privilegios admin, register/login contra `AuthRepository` con `ApiClient` falso y logout best-effort que limpia sesion aunque falle la API.
 
-Riesgos pendientes a verificar:
-- Perfil completo y stats familiares (UX-5).
+Resuelto en Sprint 46 (2026-07-06):
+- UX-5: `ProfileView` completa accesible a todos los roles (antes solo habia user card en sidebar): avatar grande con carga autenticada, cambiar foto, editar nombre, email completo, familia + badge de rol y stats familiares con fallback local. La user card del sidebar navega al perfil; la edicion de nombre/avatar se movio alli desde `MainWindow`.
+- Ayuda contextual MVP: `HelpDialog` con consejos por vista activa (F1 y boton Ayuda en sidebar); la guia de bienvenida es reabrible desde el perfil y desde el propio dialogo de ayuda (antes solo admins via Ajustes).
+- Fix menor preexistente: `style.css` tenia `-fx-max-width: Double.MAX_VALUE` (CSS invalido del hotfix de registro que rompia el parseo del stylesheet); movido a codigo en `LoginView`.
 
 Funcionalidad futura documentada:
 - Chat familiar como segunda implantacion cliente despues de Android.
@@ -303,15 +305,14 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Sprint 45 (2026-07-05) redujo COD-8 con mas tests unitarios Android/Desktop. El runtime iOS/macOS sigue bloqueado en esta maquina Windows (ver seccion 10) y COD-8 sigue parcial: no hay pruebas iOS ni pruebas de UI/manuales.
+Sprint 46 (2026-07-06) cerro UX-5 y la ayuda contextual MVP en Desktop. El runtime iOS/macOS sigue bloqueado en esta maquina Windows (ver seccion 10) y COD-8 sigue parcial: no hay pruebas iOS ni pruebas de UI/manuales.
 
-Prioridad propuesta para Sprint 46:
+Prioridad propuesta para Sprint 47:
 
 1. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
 2. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop `ApiClient` refresh 401 y proteccion de imagenes con servidor HTTP fake si aporta valor sin fragilizar tests.
-3. UX Desktop: perfil completo (UX-5), ayuda contextual MVP.
-4. Producto: decidir cuestiones abiertas de `docs/chat-familiar-spec.md` y, si procede, abrir sprint de chat fase 1.
-5. Validacion manual de UI pendiente: onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador.
+3. Producto: decidir cuestiones abiertas de `docs/chat-familiar-spec.md` y, si procede, abrir sprint de chat fase 1.
+4. Validacion manual de UI pendiente: onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
@@ -488,6 +489,18 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Seguridad: no se cambiaron endpoints, autorizacion backend ni almacenamiento real de secretos. Revision VibeSec manual sin hallazgos nuevos; no se introdujeron secretos ni credenciales en documentacion.
 - Riesgos residuales: COD-8 sigue parcial (sin iOS, sin tests UI/manuales, sin fake HTTP para refresh de `ApiClient`); tests Android son unitarios con mocks y no sustituyen una prueba Room/WorkManager integrada; backend local seguia arrancado por peticion previa del usuario y no fue modificado.
 - Punto exacto tras Sprint 45: sprint cerrado con cambios commiteados; siguiente sprint recomendado es Sprint 46 segun seccion 8.
+
+### Sprint 46 — UX-5 perfil Desktop y ayuda contextual (2026-07-06)
+
+- Objetivo: cerrar UX-5 (vista de perfil completa Desktop) y ayuda contextual MVP, unica opcion de la seccion 8 viable en Windows con UI nueva.
+- Agente lider: Claude Code, en solitario (el usuario autorizo el plan; sin Codex/Gemini en esta sesion — se ofrecen bloques IDE para revision posterior).
+- Desktop: `ProfileView` nueva (avatar 88px con carga autenticada en virtual thread, cambiar foto con allowlist y limite 8 MB, editar nombre, email completo, familia + badge de rol via `loadMyFamilies()`, stats de `/stats` con fallback local igual que Dashboard, boton guia de bienvenida). Accesible a todos los roles desde la user card del sidebar (card completa clicable); edicion de nombre/avatar retirada de `MainWindow` (movida al perfil, `refreshUserCard()` con fade).
+- Desktop: `HelpDialog` nuevo — ayuda contextual por vista activa (9 vistas + fallback), F1 global y boton "Ayuda" en sidebar (tooltip 400ms), con acceso a la guia de bienvenida. Desbloquea onboarding/ayuda para no-admins.
+- Fix preexistente: `-fx-max-width: Double.MAX_VALUE` en `style.css` (CSS invalido introducido con el registro Desktop; el parser lo rechazaba en runtime) sustituido por `setMaxWidth` en `LoginView`.
+- Validacion ejecutada: Desktop `mvn test` 9 tests 0 fallos (compila los 48 fuentes incluidas las vistas nuevas); `git diff --check` OK (solo aviso CRLF); backend dev arrancado y app lanzada con `javafx:run` — arranque limpio, 0 errores CSS y 0 excepciones en log. Prueba manual interactiva pendiente del usuario (app dejada abierta).
+- Seguridad ejecutada: VibeSec en la sesion, 0 hallazgos (solo UI cliente; ownership/validaciones reales en backend intacto; sin secretos ni datos sensibles en logs). `security-review` no aplica: backend sin cambios.
+- Nota de entorno: el backend dev requiere `JWT_SECRET` (SEC-1); se arranco con secreto efimero generado en la sesion, lo que invalida sesiones previas de clientes (re-login necesario).
+- Riesgo residual: sin tests de UI automatizados para las vistas nuevas (COD-8 UI sigue pendiente); prueba manual completa de perfil/ayuda pendiente de confirmacion del usuario.
 
 ### Chequeo obligatorio de cierre
 

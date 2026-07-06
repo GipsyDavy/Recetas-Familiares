@@ -19,13 +19,11 @@ import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
-import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 import java.net.HttpURLConnection;
@@ -52,6 +50,7 @@ public class MainWindow {
     private NotesView notesView;
     private GlobalSearchView searchResultsView;
     private FamilyMembersView familyMembersView;
+    private ProfileView profileView;
     private String activeView = "dashboard";
     private boolean navigating = false;
     private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnSettings, btnMembers;
@@ -83,6 +82,9 @@ public class MainWindow {
             } else if (e.isControlDown() && e.getCode() == KeyCode.COMMA
                     && context.getSession().isAdmin()) {
                 navigateTo("settings");
+                e.consume();
+            } else if (e.getCode() == KeyCode.F1 && context.getSession().isLoggedIn()) {
+                HelpDialog.show(stage, activeView);
                 e.consume();
             }
         });
@@ -121,6 +123,7 @@ public class MainWindow {
         weeklyMenuView = new WeeklyMenuView(context, this::triggerSync);
         shoppingListView = new ShoppingListView(context, this::triggerSync);
         notesView = new NotesView(context, this::triggerSync);
+        profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus);
         if (context.getSession().isAdmin()) {
             familyMembersView = new FamilyMembersView(context);
         }
@@ -178,7 +181,15 @@ public class MainWindow {
         logoutBtn.setMaxWidth(Double.MAX_VALUE);
         logoutBtn.setOnAction(e -> doLogout());
 
-        VBox bottom = new VBox(8, syncBtn, logoutBtn);
+        Button helpBtn = new Button("❓  Ayuda");
+        helpBtn.getStyleClass().add("sidebar-nav-button");
+        helpBtn.setMaxWidth(Double.MAX_VALUE);
+        Tooltip helpTooltip = new Tooltip("Ayuda (F1)");
+        helpTooltip.setShowDelay(Duration.millis(400));
+        Tooltip.install(helpBtn, helpTooltip);
+        helpBtn.setOnAction(e -> HelpDialog.show(stage, activeView));
+
+        VBox bottom = new VBox(8, helpBtn, syncBtn, logoutBtn);
         bottom.setPadding(new Insets(8, 16, 24, 16));
 
         HBox userCard = buildUserCard();
@@ -209,9 +220,6 @@ public class MainWindow {
         String cleanName = displayName != null ? displayName.trim() : "";
 
         Node avatarNode = buildAvatarNode(context.getSession().getAvatarUrl(), cleanName);
-        Tooltip.install(avatarNode, new Tooltip("Cambiar foto de perfil"));
-        avatarNode.setStyle("-fx-cursor: hand;");
-        avatarNode.setOnMouseClicked(e -> showAvatarUploadChooser());
 
         HBox userCard = new HBox(10);
         userCard.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -228,16 +236,37 @@ public class MainWindow {
 
             VBox textBox = new VBox(2, nameLabel, emailLabel);
 
-            Button editBtn = new Button("✏");
-            editBtn.getStyleClass().add("sidebar-nav-button");
-            editBtn.setPadding(new Insets(2, 6, 2, 6));
-            Tooltip.install(editBtn, new Tooltip("Editar nombre"));
-            editBtn.setOnAction(e -> showEditNameDialog());
-
-            userCard.getChildren().addAll(avatarNode, textBox, editBtn);
+            userCard.getChildren().addAll(avatarNode, textBox);
         }
 
+        // UX-5: la card completa navega al perfil (foto y nombre se editan alli)
+        userCard.setStyle("-fx-cursor: hand;");
+        Tooltip profileTooltip = new Tooltip("Ver mi perfil");
+        profileTooltip.setShowDelay(Duration.millis(400));
+        Tooltip.install(userCard, profileTooltip);
+        userCard.setOnMouseClicked(e -> navigateTo("profile"));
+
         return userCard;
+    }
+
+    /** Reconstruye la user card del sidebar con fade tras cambiar nombre o avatar. */
+    private void refreshUserCard() {
+        VBox sidebar = (VBox) root.getLeft();
+        if (sidebar == null) return;
+        Node oldCard = sidebar.getChildren().get(2);
+        HBox newCard = buildUserCard();
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(180), oldCard);
+        fadeOut.setFromValue(1.0);
+        fadeOut.setToValue(0.0);
+        fadeOut.setOnFinished(ev -> {
+            sidebar.getChildren().set(2, newCard);
+            newCard.setOpacity(0.0);
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(220), newCard);
+            fadeIn.setFromValue(0.0);
+            fadeIn.setToValue(1.0);
+            fadeIn.play();
+        });
+        fadeOut.play();
     }
 
     private Node buildAvatarNode(String avatarUrl, String displayName) {
@@ -270,85 +299,6 @@ public class MainWindow {
         label.setFont(Font.font("System", FontWeight.BOLD, 18));
         label.setAlignment(javafx.geometry.Pos.CENTER);
         return label;
-    }
-
-    private void showAvatarUploadChooser() {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Seleccionar foto de perfil");
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Imágenes (JPG, PNG, WebP)", "*.jpg", "*.jpeg", "*.png", "*.webp"));
-        File file = chooser.showOpenDialog(stage);
-        if (file == null) return;
-        if (file.length() > 8L * 1024 * 1024) {
-            showAlert("Archivo demasiado grande", "El tamaño máximo permitido es 8 MB.");
-            return;
-        }
-        Thread.ofVirtual().start(() -> {
-            try {
-                context.getUserRepository().uploadAvatar(file);
-                Platform.runLater(() -> {
-                    VBox sidebar = (VBox) root.getLeft();
-                    if (sidebar != null) {
-                        Node oldCard = sidebar.getChildren().get(2);
-                        HBox newCard = buildUserCard();
-                        FadeTransition fadeOut = new FadeTransition(Duration.millis(180), oldCard);
-                        fadeOut.setFromValue(1.0);
-                        fadeOut.setToValue(0.0);
-                        fadeOut.setOnFinished(ev -> {
-                            sidebar.getChildren().set(2, newCard);
-                            newCard.setOpacity(0.0);
-                            FadeTransition fadeIn = new FadeTransition(Duration.millis(220), newCard);
-                            fadeIn.setFromValue(0.0);
-                            fadeIn.setToValue(1.0);
-                            fadeIn.play();
-                        });
-                        fadeOut.play();
-                    }
-                    setStatus("Foto de perfil actualizada");
-                });
-            } catch (Exception ex) {
-                Platform.runLater(() -> setStatus("Error al subir la foto: " + ex.getMessage()));
-            }
-        });
-    }
-
-    private void showEditNameDialog() {
-        String current = context.getSession().getDisplayName();
-        TextInputDialog dialog = new TextInputDialog(current != null ? current : "");
-        dialog.setTitle("Editar nombre");
-        dialog.setHeaderText(null);
-        dialog.setContentText("Nombre:");
-        DialogStyler.apply(dialog);
-        dialog.showAndWait().ifPresent(newName -> {
-            if (newName.isBlank()) return;
-            Thread.ofVirtual().start(() -> {
-                try {
-                    context.getUserRepository().updateDisplayName(newName.trim());
-                    Platform.runLater(() -> {
-                        VBox sidebar = (VBox) root.getLeft();
-                        if (sidebar != null) {
-                            Node oldCard = sidebar.getChildren().get(2);
-                            HBox newCard = buildUserCard();
-                            FadeTransition fadeOut = new FadeTransition(Duration.millis(180), oldCard);
-                            fadeOut.setFromValue(1.0);
-                            fadeOut.setToValue(0.0);
-                            fadeOut.setOnFinished(ev -> {
-                                sidebar.getChildren().set(2, newCard);
-                                newCard.setOpacity(0.0);
-                                FadeTransition fadeIn = new FadeTransition(Duration.millis(220), newCard);
-                                fadeIn.setFromValue(0.0);
-                                fadeIn.setToValue(1.0);
-                                fadeIn.play();
-                            });
-                            fadeOut.play();
-                        }
-                        setStatus("Nombre actualizado");
-                    });
-                } catch (Exception ex) {
-                    Platform.runLater(() -> setStatus("Error al actualizar nombre: " + ex.getMessage()));
-                }
-            });
-        });
     }
 
     private String initials(String displayName) {
@@ -425,6 +375,10 @@ public class MainWindow {
             case "notes" -> {
                 setCenterWithFade(notesView);
                 notesView.refresh();
+            }
+            case "profile" -> {
+                setCenterWithFade(profileView);
+                profileView.refresh();
             }
             case "members" -> {
                 if (context.getSession().isAdmin() && familyMembersView != null) {
