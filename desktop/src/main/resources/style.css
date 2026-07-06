@@ -1003,6 +1003,15 @@
 }
 
 /* ── Perfil (UX-5) ───────────────────────────────────────────────────────────── */
+.profile-avatar-circle {
+    -fx-background-color: derive(recetas-primary, 40%);
+    -fx-background-radius: 44px;
+    -fx-min-width: 88px;
+    -fx-min-height: 88px;
+    -fx-max-width: 88px;
+    -fx-max-height: 88px;
+}
+
 .profile-name {
     -fx-font-size: 22px;
     -fx-font-weight: bold;

@@ -41,6 +41,8 @@ public class ProfileView extends ScrollPane {
     private final Label familyLabel = new Label();
     private final Label roleBadge = new Label();
     private final HBox statsSection = new HBox(16);
+    // Solo se toca en FX thread: invalida cargas de avatar antiguas que lleguen tarde
+    private int avatarLoadGeneration = 0;
 
     public ProfileView(AppContext context, Stage stage, Runnable onUserInfoChanged,
                        java.util.function.Consumer<String> onStatus) {
@@ -142,16 +144,14 @@ public class ProfileView extends ScrollPane {
         emailLabel.setText(context.getSession().getEmail() != null ? context.getSession().getEmail() : "");
         renderAvatar(cleanName);
 
-        FamilyRole role = context.getSession().getFamilyRole();
-        roleBadge.setText(role != null ? role.displayName() : "");
-        roleBadge.setVisible(role != null);
+        updateRoleBadge(null);
         familyLabel.setText("Cargando...");
-        loadFamilyName();
-        loadFamilyStats();
+        loadFamilyInfo();
     }
 
     private void renderAvatar(String displayName) {
         String avatarUrl = context.getSession().getAvatarUrl();
+        int generation = ++avatarLoadGeneration;
         if (avatarUrl == null || avatarUrl.isBlank()) {
             avatarSlot.getChildren().setAll(initialsNode(displayName));
             return;
@@ -164,6 +164,7 @@ public class ProfileView extends ScrollPane {
                 Image image = new Image(new java.io.ByteArrayInputStream(bytes),
                         AVATAR_SIZE, AVATAR_SIZE, true, true);
                 Platform.runLater(() -> {
+                    if (generation != avatarLoadGeneration) return; // llegó tarde: hay carga más nueva
                     ImageView imageView = new ImageView(image);
                     imageView.setFitWidth(AVATAR_SIZE);
                     imageView.setFitHeight(AVATAR_SIZE);
@@ -182,7 +183,8 @@ public class ProfileView extends ScrollPane {
     private Node initialsNode(String displayName) {
         String text = displayName != null && !displayName.isBlank() ? initials(displayName) : "👤";
         Label label = new Label(text);
-        label.getStyleClass().add("avatar-circle");
+        // Clase propia: .avatar-circle fija 38px por CSS y pisaría el tamaño de código
+        label.getStyleClass().add("profile-avatar-circle");
         label.setTextFill(javafx.scene.paint.Color.WHITE);
         label.setFont(Font.font("System", FontWeight.BOLD, 32));
         label.setAlignment(Pos.CENTER);
@@ -202,31 +204,64 @@ public class ProfileView extends ScrollPane {
         return sb.toString();
     }
 
-    private void loadFamilyName() {
+    /** Badge de rol: usa el rol de la API si llega; si no, el de la sesión. */
+    private void updateRoleBadge(String apiRole) {
+        FamilyRole role = context.getSession().getFamilyRole();
+        if (apiRole != null && !apiRole.isBlank()) {
+            try {
+                role = FamilyRole.valueOf(apiRole.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                // Rol desconocido de la API: se conserva el de sesión
+            }
+        }
+        roleBadge.setText(role != null ? role.displayName() : "");
+        roleBadge.setVisible(role != null);
+    }
+
+    /**
+     * Carga familia, rol y stats de forma consistente: la familia elegida
+     * (la de sesión o, si no coincide, la primera) aporta nombre, rol e id
+     * para stats, evitando mezclar fuentes cuando la sesión está incompleta.
+     */
+    private void loadFamilyInfo() {
         Thread.ofVirtual().start(() -> {
             try {
                 FamilyDtos.FamilyResponse[] families = context.getFamilyRepository().loadMyFamilies();
-                String familyId = context.getSession().getFamilyId();
-                String name = null;
+                String sessionFamilyId = context.getSession().getFamilyId();
+                FamilyDtos.FamilyResponse match = null;
                 for (FamilyDtos.FamilyResponse family : families) {
-                    if (family.id() != null && family.id().equals(familyId)) {
-                        name = family.name();
+                    if (family.id() != null && family.id().equals(sessionFamilyId)) {
+                        match = family;
                         break;
                     }
                 }
-                if (name == null && families.length > 0) name = families[0].name();
-                String display = name != null ? name : "Sin familia";
-                Platform.runLater(() -> familyLabel.setText(display));
+                if (match == null && families.length > 0) match = families[0];
+                FamilyDtos.FamilyResponse selected = match;
+                Platform.runLater(() -> {
+                    if (selected == null) {
+                        familyLabel.setText("Sin familia");
+                        statsSection.getChildren().clear();
+                        return;
+                    }
+                    familyLabel.setText(selected.name() != null ? selected.name() : "Sin nombre");
+                    updateRoleBadge(selected.role());
+                    loadFamilyStats(selected.id());
+                });
             } catch (Exception ex) {
-                Platform.runLater(() -> familyLabel.setText("Familia no disponible sin conexión"));
+                Platform.runLater(() -> {
+                    familyLabel.setText("Familia no disponible sin conexión");
+                    loadFamilyStats(context.getSession().getFamilyId());
+                });
             }
         });
     }
 
-    private void loadFamilyStats() {
+    private void loadFamilyStats(String familyId) {
         statsSection.getChildren().clear();
-        String familyId = context.getSession().getFamilyId();
-        if (familyId == null) return;
+        if (familyId == null) {
+            renderLocalStats();
+            return;
+        }
         Thread.ofVirtual().start(() -> {
             try {
                 var stats = context.getFamilyRepository().loadStats(familyId);
@@ -282,6 +317,17 @@ public class ProfileView extends ScrollPane {
                 new FileChooser.ExtensionFilter("Imágenes (JPG, PNG, WebP)", "*.jpg", "*.jpeg", "*.png", "*.webp"));
         File file = chooser.showOpenDialog(stage);
         if (file == null) return;
+        // Allowlist en cliente: el filtro del chooser es orientativo; la validación real vive en backend
+        String lowerName = file.getName().toLowerCase();
+        if (!(lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")
+                || lowerName.endsWith(".png") || lowerName.endsWith(".webp"))) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Formato no permitido. Usa JPG, PNG o WebP.");
+            alert.setTitle("Formato no válido");
+            alert.setHeaderText(null);
+            DialogStyler.apply(alert);
+            alert.showAndWait();
+            return;
+        }
         if (file.length() > 8L * 1024 * 1024) {
             Alert alert = new Alert(Alert.AlertType.ERROR, "El tamaño máximo permitido es 8 MB.");
             alert.setTitle("Archivo demasiado grande");

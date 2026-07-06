@@ -502,6 +502,19 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Nota de entorno: el backend dev requiere `JWT_SECRET` (SEC-1); se arranco con secreto efimero generado en la sesion, lo que invalida sesiones previas de clientes (re-login necesario).
 - Riesgo residual: sin tests de UI automatizados para las vistas nuevas (COD-8 UI sigue pendiente); prueba manual completa de perfil/ayuda pendiente de confirmacion del usuario.
 
+### Revision post-Sprint 46 — Aplicacion hallazgos Codex/Gemini (2026-07-06)
+
+- Objetivo: integrar la revision tecnica de Codex y la UX/textos de Gemini sobre el commit `20ba01a` (alcance completo autorizado).
+- Agente lider: Claude Code; Codex y Gemini consultados en solo lectura via bloques IDE. Todos los hallazgos verificados contra el codigo antes de aplicar.
+- Codex medio 1 aplicado: `ProfileView.loadFamilyInfo()` unifica familia/rol/stats — la familia elegida (la de sesion o la primera) aporta nombre, `role()` para el badge e `id` para stats; antes el badge solo leia sesion y las stats podian no cargar con `familyId` null pese a haber familias.
+- Codex medio 2 aplicado: contador de generacion en la carga de avatar de `ProfileView` — una carga lenta antigua ya no pisa la imagen mas nueva.
+- Codex menor 1 aplicado (confirmado como bug real): el fallback de iniciales usaba `.avatar-circle`, que fija 38px por CSS y en JavaFX la stylesheet pisa los setters de codigo; nueva clase `.profile-avatar-circle` (88px).
+- Codex menor 2 aplicado: allowlist de extensiones (jpg/jpeg/png/webp) en cliente antes de subir avatar; la validacion fuerte de tipo real sigue en backend.
+- Gemini: 8 retoques de redaccion en `HelpDialog` (calidez/claridad); "retirar miembros" cambiado a "expulsar miembros" para alinear con la UI real (`FamilyMembersView`). Descartado el hallazgo sobre "Sincronizar ahora": el tip es del topic dashboard y el boton del Dashboard se llama exactamente asi.
+- Validacion ejecutada: Desktop `mvn test` 9 tests 0 fallos; app relanzada con `javafx:run` — 0 errores CSS y 0 excepciones en log; `git diff --check` OK.
+- Seguridad: cambios revisados con criterio VibeSec en la sesion (allowlist cliente es defensa en profundidad; ownership/validacion real en backend intacto), 0 hallazgos.
+- Riesgo residual: sin cambios; prueba manual interactiva de perfil/ayuda sigue pendiente del usuario.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:

@@ -28,15 +28,15 @@ final class HelpDialog {
         Map.entry("dashboard", new Topic("🏠", "Inicio", List.of(
             "Resumen de tu familia: recetas recientes, stock próximo a caducar y menú de hoy.",
             "Pulsa \"Sincronizar ahora\" para traer los últimos cambios de tu familia.",
-            "Busca en todo con Ctrl+F desde cualquier pantalla."))),
+            "Usa la búsqueda global (Ctrl+F) para encontrar lo que necesites en cualquier momento."))),
         Map.entry("recipes", new Topic("📖", "Recetas", List.of(
             "Crea recetas con ingredientes, pasos, fotos y tiempo de preparación.",
             "Pulsa \"Cocinar\" en una receta para el modo cocina a pantalla completa.",
-            "En modo cocina: ← y → para navegar, Espacio para el temporizador, Esc para salir.",
+            "En el modo cocina, usa las flechas ← y → para avanzar o retroceder, la barra espaciadora para el temporizador y Esc para salir.",
             "Marca favoritas para encontrarlas antes."))),
         Map.entry("stock", new Topic("🧂", "Stock", List.of(
             "Controla tu despensa: cantidades, unidades y fechas de caducidad.",
-            "Los artículos próximos a caducar aparecen avisados en Inicio.",
+            "Los artículos próximos a caducar se muestran en la pantalla de Inicio.",
             "Define umbral mínimo para no quedarte sin lo esencial."))),
         Map.entry("menu", new Topic("📅", "Menú semanal", List.of(
             "Asigna recetas a cada comida del día para planificar la semana.",
@@ -45,21 +45,21 @@ final class HelpDialog {
         Map.entry("shopping", new Topic("🛒", "Lista de la compra", List.of(
             "Añade artículos a mano o genera la lista desde el menú semanal.",
             "Marca lo comprado; la lista se comparte con tu familia.",
-            "Los artículos comprados pueden pasar al stock."))),
+            "Los artículos comprados pueden añadirse directamente a tu stock."))),
         Map.entry("notes", new Topic("📝", "Notas familiares", List.of(
-            "Apunta trucos, recuerdos y secretos de cocina de la familia.",
+            "Apunta trucos, recuerdos y secretos de cocina de tu familia.",
             "Las notas se sincronizan entre todos los dispositivos.",
             "Usa la búsqueda global (Ctrl+F) para encontrarlas."))),
         Map.entry("members", new Topic("👨‍👩‍👧", "Miembros", List.of(
             "Gestiona quién pertenece a tu familia y su rol.",
-            "Propietario y administradores pueden cambiar roles o retirar miembros.",
+            "El propietario y los administradores pueden cambiar roles o expulsar miembros.",
             "Los datos familiares solo son visibles para los miembros."))),
         Map.entry("settings", new Topic("⚙", "Ajustes", List.of(
             "Cambia tema de color, modo oscuro, tipografía y sonidos.",
-            "Abre Ajustes rápido con Ctrl+,.",
+            "Accede a Ajustes rápidamente con Ctrl + Coma (Ctrl+,).",
             "En Diagnóstico puedes probar la conexión con el backend."))),
         Map.entry("profile", new Topic("👤", "Mi perfil", List.of(
-            "Cambia tu foto y tu nombre; se verán en toda la familia.",
+            "Cambia tu foto y tu nombre, que serán visibles para toda la familia.",
             "Consulta tu familia, tu rol y la actividad compartida.",
             "Desde aquí puedes volver a ver la guía de bienvenida.")))
     );
