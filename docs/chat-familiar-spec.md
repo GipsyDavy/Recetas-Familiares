@@ -143,3 +143,26 @@ Sin binarios en MySQL: storage de archivos con la misma política que fotos de r
 - VibeSec + security-review de la sesión de implementación.
 - Android: envío/recepción en vivo con fallback polling verificado, accesibilidad (TalkBack) y estados vacíos cálidos.
 - Documentación de contrato actualizada en `CONTINUAR.md` §6.
+
+---
+
+## 9. Análisis de viabilidad (2026-07-06, revisión solo lectura del código)
+
+Revisado: `pom.xml` backend, `FileStorageService`, `UploadController`, `AuthRateLimitFilter`, networking Android (OkHttp/Retrofit) y Desktop (`java.net.http`).
+
+### Activos ya existentes que el chat reutiliza
+- Backend: JWT, ownership por familia, Flyway, paginación por cursor y patrón de rate limit (`AuthRateLimitFilter`) operativos.
+- Imágenes: `FileStorageService` valida allowlist + magic bytes + 8 MB + nombres UUID; `UploadController` sirve con ownership. Fase 3 es mayormente reutilización.
+- Android: OkHttp incluye cliente WebSocket nativo; interceptor auth + refresh listos. Desktop: `java.net.http` trae WebSocket (fase 2).
+
+### Huecos detectados, por dureza
+1. **WebSocket (fase 1)**: no existe nada. Falta `spring-boot-starter-websocket`, config STOMP, JWT en CONNECT y validación de membership al suscribir al topic. Trabajo nuevo real pero acotado.
+2. **Vídeo (fase 4) — el hueco serio**: `FileStorageService` lee el archivo completo en memoria (inviable a 50 MB) y no hay serving con `Range` para reproducción. Validar MP4/H.264 real o extraer thumbnail de frame exige ffmpeg (dependencia pesada, choca con YAGNI). Sin antivirus. Resoluble pero es un mini-proyecto.
+3. **Thumbnails de imagen en backend (fase 3)**: no existen (hoy los genera el cliente). `ImageIO` cubre JPEG/PNG barato; WebP no está soportado nativo — decidir si el thumbnail WebP se degrada a JPEG o se omite.
+4. **Push notifications (fase 4)**: FCM sin configurar (requiere proyecto Firebase); APNs imposible sin macOS. Sin push, el tiempo real solo funciona con la app abierta.
+5. **iOS**: bloqueado hasta COD-1/COD-2, como ya indica esta spec.
+
+### Conclusión y orden recomendado
+- Viable **por fases**, no de una tacada. Fase 1 lista para arrancar en cuanto se resuelvan las decisiones de §7 (bloqueo formal, no técnico).
+- Orden: decisiones §7 → fase 1 (backend + Android, 1-2 sprints, riesgo bajo) → fase 2 Desktop → fase 3 imágenes (barata) → reevaluar vídeo con límites más humildes (p. ej. 30 s / 20 MB) y streaming a disco antes que ffmpeg.
+- Push FCM: intercalar entre fase 1 y 3 si importa el tiempo real con app cerrada.

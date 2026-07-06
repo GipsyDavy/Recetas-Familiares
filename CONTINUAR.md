@@ -311,7 +311,7 @@ Prioridad propuesta para Sprint 47:
 
 1. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
 2. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop `ApiClient` refresh 401 y proteccion de imagenes con servidor HTTP fake si aporta valor sin fragilizar tests.
-3. Producto: decidir cuestiones abiertas de `docs/chat-familiar-spec.md` y, si procede, abrir sprint de chat fase 1.
+3. Producto: chat familiar fase 1. Viabilidad analizada 2026-07-06 (`docs/chat-familiar-spec.md` §9): fase 1 lista para arrancar en cuanto el usuario resuelva las 5 decisiones de §7; unico trabajo nuevo real es WebSocket/STOMP con auth. Video (fase 4) es el hueco serio; posponer.
 4. Validacion manual de UI pendiente: onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
@@ -524,6 +524,14 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Sprint 47 recomendado por viabilidad en Windows (seccion 8): COD-8 siguiente capa (Android `SyncWorker`/colas offline e2e; Desktop `ApiClient` refresh 401 con HTTP fake) o chat familiar fase 1 (decidir antes cuestiones abiertas de `docs/chat-familiar-spec.md`). iOS sigue bloqueado sin macOS.
 - Herramientas confirmadas en esta sesion: VibeSec (skill, ejecutada 2 veces con 0 hallazgos), security-review (skill disponible, no aplico: backend intacto), OWASP Dependency-Check (perfil Maven `security-audit`, no aplico: sin dependencias nuevas), bloques IDE Codex/Gemini (usados en solo lectura, hallazgos verificados contra codigo antes de aplicar). `claude-mem` no existe: la memoria operativa es este archivo + memoria persistente del agente.
 - Al retomar: leer `CLAUDE.md`, este `CONTINUAR.md` (secciones 8 y 10) y, si el sprint toca deuda, `auditoria.md`. Ejecutar validaciones reales en la sesion antes de afirmar estado.
+
+### Analisis de viabilidad chat familiar (2026-07-06, solo lectura)
+
+- Objetivo: evaluar viabilidad de chat tipo WhatsApp (texto en tiempo real + fotos + videos) a peticion del usuario. Sin cambios de codigo.
+- Agente: Claude Code en solitario (analisis de solo lectura; no aplicaban Codex/Gemini ni skills de seguridad — sin diff que revisar).
+- Resultado completo en `docs/chat-familiar-spec.md` §9. Resumen: fase 1 (texto tiempo real backend+Android) viable ya — solo falta WebSocket/STOMP con auth por membership; fase 3 (imagenes) barata reutilizando `FileStorageService`/`UploadController`; fase 4 (video+push) es el hueco serio (lectura completa en memoria, sin Range serving, ffmpeg pesado, FCM sin configurar, APNs sin macOS).
+- Bloqueo formal para fase 1: las 5 decisiones de §7 de la spec (retencion, read-receipts, reacciones, broker, tests) — decision de producto del usuario, no trabajo tecnico.
+- Preparado para proximo sprint: si el usuario resuelve §7, abrir "Sprint chat fase 1" con alcance backend (modulo chat + WS + tests de ownership/rate limit) y Android (pantalla chat + WS con fallback polling).
 
 ### Chequeo obligatorio de cierre
 
