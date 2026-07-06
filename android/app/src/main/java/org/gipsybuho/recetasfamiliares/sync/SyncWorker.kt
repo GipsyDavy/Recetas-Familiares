@@ -2,7 +2,9 @@ package org.gipsybuho.recetasfamiliares.sync
 
 import android.content.Context
 import androidx.work.CoroutineWorker
+import androidx.work.ListenableWorker.Result
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CancellationException
 import org.gipsybuho.recetasfamiliares.RecetasApplication
 
 class SyncWorker(
@@ -12,11 +14,21 @@ class SyncWorker(
 
     override suspend fun doWork(): Result {
         val container = (applicationContext as RecetasApplication).container
-        return runCatching {
+        return SyncWorkerRunner.run {
             container.syncRepository.pushThenPull()
-        }.fold(
-            onSuccess = { Result.success() },
-            onFailure = { Result.retry() }
-        )
+        }
+    }
+}
+
+internal object SyncWorkerRunner {
+    suspend fun run(pushThenPull: suspend () -> Unit): Result {
+        return try {
+            pushThenPull()
+            Result.success()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            Result.retry()
+        }
     }
 }

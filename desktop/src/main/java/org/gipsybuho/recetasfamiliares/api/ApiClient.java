@@ -12,17 +12,22 @@ import java.util.concurrent.TimeUnit;
 public class ApiClient {
 
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-    private static final String BASE_URL = System.getProperty("api.base.url", "http://localhost:8080/");
 
     private final AppSession session;
     private final Gson gson;
+    private final String baseUrl;
     private final OkHttpClient client;
     // Separate client for token refresh — avoids authenticator recursion
     private final OkHttpClient refreshClient;
 
     public ApiClient(AppSession session) {
+        this(session, System.getProperty("api.base.url", "http://localhost:8080/"));
+    }
+
+    public ApiClient(AppSession session, String baseUrl) {
         this.session = session;
         this.gson = new GsonBuilder().create();
+        this.baseUrl = normalizeBaseUrl(baseUrl);
         this.refreshClient = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(15, TimeUnit.SECONDS)
@@ -38,7 +43,7 @@ public class ApiClient {
 
     public <T> T get(String path, Class<T> responseType) throws ApiException {
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(baseUrl + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .get()
                 .build();
@@ -48,7 +53,7 @@ public class ApiClient {
     public <T> T post(String path, Object body, Class<T> responseType) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(baseUrl + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .post(rb)
                 .build();
@@ -58,7 +63,7 @@ public class ApiClient {
     public <T> T postAuth(String path, Object body, Class<T> responseType) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(baseUrl + path)
                 .post(rb)
                 .build();
         return execute(request, responseType);
@@ -67,7 +72,7 @@ public class ApiClient {
     public <T> T put(String path, Object body, Class<T> responseType) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(baseUrl + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .put(rb)
                 .build();
@@ -77,7 +82,7 @@ public class ApiClient {
     public void put(String path, Object body) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(baseUrl + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .put(rb)
                 .build();
@@ -86,7 +91,7 @@ public class ApiClient {
 
     public void delete(String path) throws ApiException {
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(baseUrl + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .delete()
                 .build();
@@ -100,7 +105,7 @@ public class ApiClient {
                 .addFormDataPart(partName, file.getName(), fileBody)
                 .build();
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(baseUrl + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .post(multipart)
                 .build();
@@ -188,7 +193,7 @@ public class ApiClient {
         var refreshBody = new AuthDtos.RefreshRequest(refreshToken);
         RequestBody rb = RequestBody.create(gson.toJson(refreshBody), JSON);
         Request refreshRequest = new Request.Builder()
-                .url(BASE_URL + "api/v1/auth/refresh")
+                .url(baseUrl + "api/v1/auth/refresh")
                 .post(rb)
                 .build();
 
@@ -211,11 +216,18 @@ public class ApiClient {
         return count;
     }
 
-    private static boolean isApiOrigin(HttpUrl requested) {
-        HttpUrl base = HttpUrl.parse(BASE_URL);
+    private boolean isApiOrigin(HttpUrl requested) {
+        HttpUrl base = HttpUrl.parse(baseUrl);
         return base != null
                 && requested.scheme().equals(base.scheme())
                 && requested.host().equals(base.host())
                 && requested.port() == base.port();
+    }
+
+    private static String normalizeBaseUrl(String rawBaseUrl) {
+        String normalized = rawBaseUrl == null || rawBaseUrl.isBlank()
+                ? "http://localhost:8080/"
+                : rawBaseUrl;
+        return normalized.endsWith("/") ? normalized : normalized + "/";
     }
 }

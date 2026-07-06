@@ -10,7 +10,9 @@ import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteDao
+import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.FavoriteRecipeDao
+import org.gipsybuho.recetasfamiliares.data.local.FavoriteRecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.MenuItemDao
 import org.gipsybuho.recetasfamiliares.data.local.RecetasDatabase
 import org.gipsybuho.recetasfamiliares.data.local.RecipeDao
@@ -20,7 +22,9 @@ import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoDao
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepDao
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListDao
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemDao
+import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockDao
+import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPullDto
@@ -188,6 +192,51 @@ class SyncRepositoryTest {
         coVerify(exactly = 1) { api.pullSync(FAMILY_ID, null, any()) }
     }
 
+    @Test
+    fun `pushThenPull envia colas offline de stock notas favoritos y compra`() = runTest {
+        coEvery { recipeDao.findPendingCreate() } returns emptyList()
+        coEvery { recipeDao.findPendingDelete() } returns emptyList()
+        coEvery { stockDao.findPendingCreate() } returns listOf(stockEntity("s-new", syncVersion = 0L))
+        coEvery { stockDao.findPendingDelete() } returns listOf(stockEntity("s-deleted", syncVersion = -8L, deleted = true))
+        coEvery { noteDao.findPendingCreate() } returns listOf(noteEntity("n-edited", syncVersion = -3L))
+        coEvery { noteDao.findPendingDelete() } returns listOf(noteEntity("n-deleted", syncVersion = -4L, deleted = true))
+        coEvery { shoppingListItemDao.findPendingCheck() } returns listOf(shoppingItemEntity("li-checked", syncVersion = -5L))
+        coEvery { favoriteDao.findPendingCreate() } returns listOf(favoriteEntity("f-new", syncVersion = 0L))
+        coEvery { favoriteDao.findPendingDelete() } returns listOf(favoriteEntity("f-deleted", syncVersion = -6L, deleted = true))
+
+        val pushed = slot<SyncPushRequestDto>()
+        coEvery { api.pushSync(FAMILY_ID, capture(pushed)) } returns emptyPull(serverTime = "T-PUSH")
+        coEvery { api.pullSync(FAMILY_ID, null, any()) } returns emptyPull(serverTime = "T-PULL")
+
+        repository.pushThenPull()
+
+        val stockById = pushed.captured.stockItems!!.associateBy { it.id }
+        assertNull(stockById.getValue("s-new").baseSyncVersion)
+        assertEquals(false, stockById.getValue("s-new").deleted)
+        assertEquals(8L, stockById.getValue("s-deleted").baseSyncVersion)
+        assertEquals(true, stockById.getValue("s-deleted").deleted)
+
+        val notesById = pushed.captured.familyNotes!!.associateBy { it.id }
+        assertEquals(3L, notesById.getValue("n-edited").baseSyncVersion)
+        assertEquals("Nota", notesById.getValue("n-edited").title)
+        assertEquals(false, notesById.getValue("n-edited").deleted)
+        assertEquals(4L, notesById.getValue("n-deleted").baseSyncVersion)
+        assertEquals(true, notesById.getValue("n-deleted").deleted)
+
+        val shoppingItem = pushed.captured.shoppingListItems!!.single()
+        assertEquals("li-checked", shoppingItem.id)
+        assertEquals(5L, shoppingItem.baseSyncVersion)
+        assertEquals(true, shoppingItem.checked)
+
+        val favoritesById = pushed.captured.favoriteRecipes!!.associateBy { it.id }
+        assertNull(favoritesById.getValue("f-new").baseSyncVersion)
+        assertEquals("r-fav", favoritesById.getValue("f-new").recipeId)
+        assertEquals(false, favoritesById.getValue("f-new").deleted)
+        assertEquals(6L, favoritesById.getValue("f-deleted").baseSyncVersion)
+        assertEquals(true, favoritesById.getValue("f-deleted").deleted)
+        assertEquals("T-PULL", savedLastSyncTime)
+    }
+
     private companion object {
         const val FAMILY_ID = "fam-1"
 
@@ -213,6 +262,33 @@ class SyncRepositoryTest {
         fun recipeEntity(id: String, syncVersion: Long, deleted: Boolean = false) = RecipeEntity(
             id = id, familyId = FAMILY_ID, title = "t", description = null, servings = null,
             prepMinutes = null, cookMinutes = null, difficulty = null,
+            createdAt = "2026-01-01T00:00:00Z", updatedAt = "2026-01-01T00:00:00Z",
+            syncVersion = syncVersion, deleted = deleted
+        )
+
+        fun stockEntity(id: String, syncVersion: Long, deleted: Boolean = false) = StockItemEntity(
+            id = id, familyId = FAMILY_ID, name = "Harina", quantity = 1.0, unit = "kg",
+            lowStockThreshold = null, expiresAt = null, note = null,
+            createdAt = "2026-01-01T00:00:00Z", updatedAt = "2026-01-01T00:00:00Z",
+            syncVersion = syncVersion, deleted = deleted
+        )
+
+        fun noteEntity(id: String, syncVersion: Long, deleted: Boolean = false) = FamilyNoteEntity(
+            id = id, familyId = FAMILY_ID, recipeId = null, recipeTitle = null,
+            title = "Nota", body = "Cuerpo", pinned = true,
+            createdAt = "2026-01-01T00:00:00Z", updatedAt = "2026-01-01T00:00:00Z",
+            syncVersion = syncVersion, deleted = deleted
+        )
+
+        fun shoppingItemEntity(id: String, syncVersion: Long) = ShoppingListItemEntity(
+            id = id, shoppingListId = "list-1", position = 1, name = "Pan",
+            quantity = 1.0, unit = "ud", checked = true, note = null,
+            createdAt = "2026-01-01T00:00:00Z", updatedAt = "2026-01-01T00:00:00Z",
+            syncVersion = syncVersion, deleted = false
+        )
+
+        fun favoriteEntity(id: String, syncVersion: Long, deleted: Boolean = false) = FavoriteRecipeEntity(
+            id = id, familyId = FAMILY_ID, recipeId = "r-fav", recipeTitle = "Tarta",
             createdAt = "2026-01-01T00:00:00Z", updatedAt = "2026-01-01T00:00:00Z",
             syncVersion = syncVersion, deleted = deleted
         )
