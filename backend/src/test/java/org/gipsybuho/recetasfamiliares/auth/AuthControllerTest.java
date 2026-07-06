@@ -34,7 +34,7 @@ class AuthControllerTest {
 
     @Test
     void registerCreatesFamilyAndIssuesTokens() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult registered = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -49,7 +49,15 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accessToken", not(isEmptyOrNullString())))
                 .andExpect(jsonPath("$.refreshToken", not(isEmptyOrNullString())))
                 .andExpect(jsonPath("$.user.email").value("maria@example.com"))
-                .andExpect(jsonPath("$.family.name").value("Familia Cocina"));
+                .andExpect(jsonPath("$.family.name").value("Familia Cocina"))
+                .andReturn();
+
+        String accessToken = read(registered, "accessToken");
+        mockMvc.perform(get("/api/v1/families")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Familia Cocina"))
+                .andExpect(jsonPath("$[0].role").value("OWNER"));
     }
 
     @Test

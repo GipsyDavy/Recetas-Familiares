@@ -531,6 +531,40 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Herramientas confirmadas en esta sesion: VibeSec (skill, ejecutada 2 veces con 0 hallazgos), security-review (skill disponible, no aplico: backend intacto), OWASP Dependency-Check (perfil Maven `security-audit`, no aplico: sin dependencias nuevas), bloques IDE Codex/Gemini (usados en solo lectura, hallazgos verificados contra codigo antes de aplicar). `claude-mem` no existe: la memoria operativa es este archivo + memoria persistente del agente.
 - Al retomar: leer `CLAUDE.md`, este `CONTINUAR.md` (secciones 8 y 10) y, si el sprint toca deuda, `auditoria.md`. Ejecutar validaciones reales en la sesion antes de afirmar estado.
 
+### Hotfix admin inicial y gestion de miembros (2026-07-06)
+
+- Objetivo: comprobar que el primer usuario de una instalacion nueva queda con rol administrador suficiente y, si faltaba funcionalidad, permitir crear/anadir usuarios y asignar roles desde Desktop.
+- Resultado: el registro backend ya creaba el primer usuario como `OWNER`; se anadio cobertura explicita y migracion `V13__ensure_family_owner_members.sql` para promover defensivamente a `OWNER` al miembro activo mas antiguo de familias existentes que no tuvieran propietario.
+- Backend: `InviteMemberRequest` acepta opcionalmente `displayName` y `password`; `FamilyService.inviteMember()` mantiene invitacion silenciosa de usuarios existentes/no existentes sin datos de creacion, y permite a `OWNER`/`ADMIN` crear nuevos usuarios con password hasheada y rol `MEMBER` o `ADMIN`. `OWNER` sigue bloqueado como rol asignable por invitacion.
+- Desktop: `FamilyMembersView` incorpora boton "Anadir miembro" visible solo para admins/owner, valida email/nombre/password/rol, ejecuta IO en `Thread.ofVirtual()` y actualiza UI con `Platform.runLater`; `MainWindow` refresca el rol persistido al arrancar para recoger promociones por migracion sin exigir re-login si la API responde.
+- Seguridad: VibeSec usado como checklist manual por tocar auth/roles. La autorizacion real sigue en backend mediante `requireAdminOrAbove`; no se introdujeron secretos ni logs sensibles. Colisiones de email al crear usuarios se convierten en `409 CONFLICT`.
+- Base local dev comprobada sin exponer PII: `active_users=1`, `active_families=1`, `role_OWNER=1`, `families_without_owner=0`.
+- Validacion ejecutada: backend `mvn test` 93 tests 0 fallos; Desktop `mvn test` 9 tests 0 fallos; `git diff --check` sin errores (solo avisos LF/CRLF de Windows).
+- Riesgo residual: no se hizo prueba manual interactiva de Desktop; queda pendiente verificar visualmente el dialogo de anadir miembro contra backend real antes de empaquetar.
+
+### Punto de retoma para proximo sprint — tras hotfix admin (2026-07-06)
+
+- Estado Git al documentar: hay cambios sin commit del hotfix admin. No abrir Sprint 47 ni mezclar trabajo nuevo hasta decidir si se prueba manualmente y se commitea este hotfix.
+- Ultimo commit confirmado antes del hotfix: `0dcb5cd fix: aplicar hallazgos revision Codex/Gemini post-Sprint 46`.
+- Archivos de produccion modificados por el hotfix: `backend/src/main/java/org/gipsybuho/recetasfamiliares/families/FamilyService.java`, `InviteMemberRequest.java`, `users/UserRepository.java`, migracion `V13__ensure_family_owner_members.sql`, `desktop/api/dto/FamilyDtos.java`, `desktop/data/repository/FamilyRepository.java`, `desktop/ui/FamilyMembersView.java`, `desktop/ui/MainWindow.java`.
+- Tests modificados/anadidos: `AuthControllerTest` verifica que registro/login exponen rol `OWNER`; `FamilyMemberControllerTest` cubre owner inicial creando admin, admin creando miembro, cambio de rol y expulsion.
+- Contrato API cambiado de forma compatible hacia atras: `POST /api/v1/families/{familyId}/members` mantiene `email` y `role`, y acepta opcionalmente `displayName` y `password` para crear usuario nuevo. Clientes antiguos que solo invitan emails existentes siguen funcionando.
+- Impacto multiplataforma revisado: backend y Desktop actualizados; Android/iOS/shared no se tocaron porque no tienen UI de gestion de miembros en este hotfix. Si se implementa la gestion de miembros en Android/iOS, reutilizar este contrato y no duplicar reglas de permisos en cliente.
+- Primera accion al retomar: ejecutar prueba manual Desktop con backend dev real: abrir Miembros, comprobar boton "Anadir miembro" como OWNER, crear un ADMIN con password temporal, iniciar sesion con ese admin, crear MEMBER, cambiar rol y expulsar MEMBER. Confirmar que un usuario MEMBER no ve/usa acciones admin.
+- Segunda accion al retomar: si la prueba manual pasa, ejecutar `git diff --check`, backend `mvn test`, Desktop `mvn test`, revisar `git diff --stat` y hacer commit del hotfix. Si falla, tratarlo como hotfix antes de cualquier sprint nuevo.
+- Seguridad pendiente antes de cerrar el hotfix: repetir checklist VibeSec/security-review si se cambian endpoints, permisos o UI sensible adicional; no loggear emails/passwords reales durante pruebas; usar cuentas temporales sin datos personales.
+- Siguiente sprint recomendado tras cerrar este hotfix: COD-8 capa siguiente (Desktop `ApiClient` refresh 401 con HTTP fake y/o Android `SyncWorker`/colas offline e2e). Alternativa de producto: chat familiar fase 1 solo si el usuario decide las 5 cuestiones abiertas de `docs/chat-familiar-spec.md` §7.
+- Riesgo residual documentado para el siguiente sprint: falta automatizacion UI para dialogos Desktop y falta paridad de gestion de miembros en Android/iOS; no bloquear el hotfix por esto, pero registrarlo como deuda funcional multiplataforma.
+
+### Cierre hotfix admin y gestion de miembros (2026-07-06)
+
+- Cerrado por Claude Code tras el plan de retoma de la entrada anterior.
+- Revalidacion en sesion: revision de seguridad del diff con criterio VibeSec/security-review (auth/roles/migracion) sin hallazgos; backend `mvn test` 93 tests 0 fallos; Desktop `mvn test` 9 tests 0 fallos; `git diff --check` OK.
+- Jar backend reempaquetado (el jar en ejecucion no incluia el hotfix), backend rearrancado y migracion `V13` aplicada con exito (BD en v13); app Desktop relanzada sin errores.
+- Prueba manual del usuario: PASS (añadir miembro como OWNER, crear ADMIN, ADMIN crea MEMBER, cambio de rol, expulsion, MEMBER sin acciones admin; perfil y F1 de Sprint 46 tambien verificados).
+- Nota de contrato: `POST /families/{id}/members` acepta opcionalmente `displayName`+`password` (retrocompatible). Android/iOS sin UI de miembros: deuda de paridad documentada.
+- Riesgo residual: 409 al crear usuario confirma a un admin autenticado que un email ya existe (necesario para UX de creacion; superficie limitada a admins).
+
 ### Analisis de viabilidad chat familiar (2026-07-06, solo lectura)
 
 - Objetivo: evaluar viabilidad de chat tipo WhatsApp (texto en tiempo real + fotos + videos) a peticion del usuario. Sin cambios de codigo.

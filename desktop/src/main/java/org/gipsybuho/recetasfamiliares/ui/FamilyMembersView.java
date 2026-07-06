@@ -22,6 +22,7 @@ public class FamilyMembersView extends VBox {
     private final Label familyLabel  = new Label("—");
     private final Label roleLabel    = new Label("—");
     private final TableView<MemberRow> table = buildTable();
+    private final Button addBtn        = new Button("Añadir miembro");
     private final Button changeRoleBtn = new Button("Cambiar rol");
     private final Button removeBtn     = new Button("Expulsar");
 
@@ -68,6 +69,10 @@ public class FamilyMembersView extends VBox {
         infoCard.setPadding(new Insets(16));
 
         // ── Action toolbar (only visible to ADMIN/OWNER) ──────────────────────
+        addBtn.getStyleClass().add("action-button-primary");
+        addBtn.setOnAction(e -> onAddMember());
+        Tooltip.install(addBtn, new Tooltip("Crear o añadir miembro a la familia"));
+
         changeRoleBtn.getStyleClass().add("action-button-secondary");
         changeRoleBtn.setDisable(true);
         changeRoleBtn.setOnAction(e -> onChangeRole());
@@ -78,7 +83,7 @@ public class FamilyMembersView extends VBox {
         removeBtn.setOnAction(e -> onRemoveMember());
         Tooltip.install(removeBtn, new Tooltip("Expulsar miembro seleccionado de la familia"));
 
-        HBox toolbar = new HBox(8, changeRoleBtn, removeBtn);
+        HBox toolbar = new HBox(8, addBtn, changeRoleBtn, removeBtn);
         toolbar.setAlignment(Pos.CENTER_LEFT);
 
         boolean isAdmin = context.getSession().isAdmin();
@@ -115,7 +120,9 @@ public class FamilyMembersView extends VBox {
         roleCol.setCellValueFactory(new PropertyValueFactory<>("roleLabel"));
         roleCol.setMinWidth(120);
 
-        tv.getColumns().addAll(nameCol, emailCol, roleCol);
+        tv.getColumns().add(nameCol);
+        tv.getColumns().add(emailCol);
+        tv.getColumns().add(roleCol);
         return tv;
     }
 
@@ -185,6 +192,124 @@ public class FamilyMembersView extends VBox {
         });
     }
 
+    private void onAddMember() {
+        String familyId = context.getSession().getFamilyId();
+        if (familyId == null || familyId.isBlank()) {
+            statusLabel.setText("Sin sesión de familia activa.");
+            return;
+        }
+
+        Dialog<InviteForm> dialog = new Dialog<>();
+        dialog.setTitle("Añadir miembro");
+        dialog.setHeaderText(null);
+
+        ButtonType addType = new ButtonType("Añadir", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(addType, ButtonType.CANCEL);
+
+        TextField emailField = new TextField();
+        emailField.setPromptText("correo@ejemplo.com");
+        emailField.setMaxWidth(Double.MAX_VALUE);
+
+        TextField nameField = new TextField();
+        nameField.setPromptText("Nombre visible");
+        nameField.setMaxWidth(Double.MAX_VALUE);
+
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Contraseña temporal");
+        passwordField.setMaxWidth(Double.MAX_VALUE);
+
+        ChoiceBox<String> roleBox = new ChoiceBox<>();
+        roleBox.getItems().addAll("MEMBER", "ADMIN");
+        roleBox.setValue("MEMBER");
+        roleBox.setMaxWidth(Double.MAX_VALUE);
+
+        Label error = new Label();
+        error.getStyleClass().add("login-error");
+        error.setVisible(false);
+        error.setManaged(false);
+        error.setWrapText(true);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.add(metaKey("Email:"), 0, 0);
+        grid.add(emailField, 1, 0);
+        grid.add(metaKey("Nombre:"), 0, 1);
+        grid.add(nameField, 1, 1);
+        grid.add(metaKey("Contraseña:"), 0, 2);
+        grid.add(passwordField, 1, 2);
+        grid.add(metaKey("Rol:"), 0, 3);
+        grid.add(roleBox, 1, 3);
+        grid.add(error, 1, 4);
+        ColumnConstraints keyCol = new ColumnConstraints();
+        keyCol.setMinWidth(92);
+        ColumnConstraints valueCol = new ColumnConstraints();
+        valueCol.setHgrow(Priority.ALWAYS);
+        grid.getColumnConstraints().addAll(keyCol, valueCol);
+
+        dialog.getDialogPane().setContent(grid);
+        DialogStyler.apply(dialog);
+
+        Button addButton = (Button) dialog.getDialogPane().lookupButton(addType);
+        addButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            String message = inviteValidationMessage(
+                    emailField.getText(), nameField.getText(), passwordField.getText(), roleBox.getValue());
+            if (message != null) {
+                error.setText(message);
+                error.setVisible(true);
+                error.setManaged(true);
+                event.consume();
+            }
+        });
+
+        dialog.setResultConverter(button -> {
+            if (button != addType) return null;
+            return new InviteForm(
+                    emailField.getText().trim(),
+                    nameField.getText().trim(),
+                    passwordField.getText(),
+                    roleBox.getValue()
+            );
+        });
+
+        dialog.showAndWait().ifPresent(form -> {
+            statusLabel.setText("Añadiendo miembro...");
+            addBtn.setDisable(true);
+            Thread.ofVirtual().start(() -> {
+                try {
+                    context.getFamilyRepository().inviteMember(
+                            familyId, form.email(), form.displayName(), form.password(), form.role());
+                    Platform.runLater(() -> {
+                        addBtn.setDisable(false);
+                        statusLabel.setText("Miembro añadido correctamente.");
+                        refresh();
+                    });
+                } catch (ApiException ex) {
+                    Platform.runLater(() -> {
+                        addBtn.setDisable(false);
+                        statusLabel.setText("Error: " + ex.getMessage());
+                    });
+                }
+            });
+        });
+    }
+
+    private String inviteValidationMessage(String email, String displayName, String password, String role) {
+        if (email == null || email.isBlank() || !email.contains("@")) {
+            return "Introduce un email válido.";
+        }
+        if (displayName == null || displayName.isBlank()) {
+            return "Introduce el nombre del nuevo miembro.";
+        }
+        if (password == null || password.length() < 12) {
+            return "La contraseña debe tener al menos 12 caracteres.";
+        }
+        if (!"MEMBER".equals(role) && !"ADMIN".equals(role)) {
+            return "Selecciona un rol válido.";
+        }
+        return null;
+    }
+
     private void onRemoveMember() {
         MemberRow selected = table.getSelectionModel().getSelectedItem();
         if (selected == null) return;
@@ -235,6 +360,8 @@ public class FamilyMembersView extends VBox {
     }
 
     // ── Row model ─────────────────────────────────────────────────────────────
+
+    private record InviteForm(String email, String displayName, String password, String role) {}
 
     public static final class MemberRow {
         private final String userId;

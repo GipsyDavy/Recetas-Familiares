@@ -41,6 +41,13 @@ public class FamilyRepository {
                 java.util.Map.of("role", newRole), FamilyDtos.FamilyMemberResponse.class);
     }
 
+    /** Invites an existing user or creates and adds a new user (OWNER/ADMIN only). */
+    public void inviteMember(String familyId, String email, String displayName, String password, String role) throws ApiException {
+        api.post("api/v1/families/" + familyId + "/members",
+                new FamilyDtos.InviteMemberRequest(email, displayName, password, role),
+                Void.class);
+    }
+
     /** Removes (soft-deletes) a member from the family (OWNER/ADMIN only). */
     public void removeMember(String familyId, String userId) throws ApiException {
         api.delete("api/v1/families/" + familyId + "/members/" + userId);
@@ -63,7 +70,9 @@ public class FamilyRepository {
             }
             session.setFamilyRole(role);
         } catch (Exception ex) {
-            session.setFamilyRole(FamilyRole.MEMBER);
+            if (session.getFamilyRole() == null) {
+                session.setFamilyRole(FamilyRole.MEMBER);
+            }
         }
     }
 }

@@ -13,7 +13,9 @@ import org.gipsybuho.recetasfamiliares.shopping.ShoppingListRepository;
 import org.gipsybuho.recetasfamiliares.stock.StockItemRepository;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,6 +33,7 @@ public class FamilyService {
     private final ShoppingListRepository shoppingListRepository;
     private final FamilyNoteRepository familyNoteRepository;
     private final FavoriteRecipeRepository favoriteRecipeRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public FamilyService(
             FamilyMemberRepository familyMemberRepository,
@@ -42,7 +45,8 @@ public class FamilyService {
             MenuItemRepository menuItemRepository,
             ShoppingListRepository shoppingListRepository,
             FamilyNoteRepository familyNoteRepository,
-            FavoriteRecipeRepository favoriteRecipeRepository
+            FavoriteRecipeRepository favoriteRecipeRepository,
+            PasswordEncoder passwordEncoder
     ) {
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
@@ -54,6 +58,7 @@ public class FamilyService {
         this.shoppingListRepository = shoppingListRepository;
         this.familyNoteRepository = familyNoteRepository;
         this.favoriteRecipeRepository = favoriteRecipeRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional(readOnly = true)
@@ -118,14 +123,18 @@ public class FamilyService {
         if (role == FamilyRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot assign OWNER role");
         }
-        userRepository.findByEmailIgnoreCaseAndDeletedFalse(request.email()).ifPresent(invitedUser -> {
-            if (familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, invitedUser.getId())) {
-                return; // Already a member — silent no-op (OWASP A01: full anti-enumeration)
-            }
-            FamilyEntity family = familyRepository.findById(familyId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
-            familyMemberRepository.save(new FamilyMemberEntity(family, invitedUser, role));
-        });
+        String email = normalizeEmail(request.email());
+        UserEntity invitedUser = userRepository.findByEmailIgnoreCaseAndDeletedFalse(email)
+                .orElseGet(() -> createUserForInvite(email, request));
+        if (invitedUser == null) {
+            return; // Anti-enumeration: inviting an unknown email without creation data is a silent no-op.
+        }
+        if (familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, invitedUser.getId())) {
+            return; // Already a member — silent no-op (OWASP A01: full anti-enumeration).
+        }
+        FamilyEntity family = familyRepository.findById(familyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
+        familyMemberRepository.save(new FamilyMemberEntity(family, invitedUser, role));
     }
 
     @Transactional(readOnly = true)
@@ -173,6 +182,36 @@ public class FamilyService {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role: " + roleStr);
         }
+    }
+
+    private UserEntity createUserForInvite(String email, InviteMemberRequest request) {
+        boolean hasDisplayName = request.displayName() != null && !request.displayName().isBlank();
+        boolean hasPassword = request.password() != null && !request.password().isBlank();
+        if (!hasDisplayName && !hasPassword) {
+            return null;
+        }
+        if (!hasDisplayName) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Display name is required for new users");
+        }
+        if (!hasPassword || request.password().length() < 12) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 12 characters");
+        }
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
+        }
+        try {
+            return userRepository.saveAndFlush(new UserEntity(
+                    email,
+                    request.displayName().trim(),
+                    passwordEncoder.encode(request.password())
+            ));
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered", ex);
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private FamilyMemberResponse toMemberResponse(FamilyMemberEntity member) {

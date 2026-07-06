@@ -155,6 +155,90 @@ class FamilyMemberControllerTest {
     }
 
     @Test
+    void firstOwnerCanCreateAdminMemberChangeRoleAndRemoveMembers() throws Exception {
+        RegisteredUser owner = register("first-owner@example.com", "Familia FirstOwner");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "created-admin@example.com",
+                                  "displayName": "Created Admin",
+                                  "password": "created-admin-password",
+                                  "role": "ADMIN"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        MvcResult members = mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].email").value("first-owner@example.com"))
+                .andExpect(jsonPath("$[0].role").value("OWNER"))
+                .andExpect(jsonPath("$[1].email").value("created-admin@example.com"))
+                .andExpect(jsonPath("$[1].role").value("ADMIN"))
+                .andReturn();
+        String createdAdminId = readUserIdByEmail(members, "created-admin@example.com");
+
+        MvcResult adminLogin = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "created-admin@example.com",
+                                  "password": "created-admin-password"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.family.id").value(owner.familyId()))
+                .andReturn();
+        String createdAdminToken = read(adminLogin, "accessToken");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + createdAdminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "created-member@example.com",
+                                  "displayName": "Created Member",
+                                  "password": "created-member-password",
+                                  "role": "MEMBER"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        MvcResult afterAdminCreate = mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[2].email").value("created-member@example.com"))
+                .andExpect(jsonPath("$[2].role").value("MEMBER"))
+                .andReturn();
+        String createdMemberId = readUserIdByEmail(afterAdminCreate, "created-member@example.com");
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}/role",
+                        owner.familyId(), createdAdminId)
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role": "MEMBER"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("MEMBER"));
+
+        mockMvc.perform(delete("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), createdMemberId)
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
     void removeMemberRevokesRefreshToken() throws Exception {
         RegisteredUser owner = register("revoke-owner@example.com", "Familia Revoke");
         RegisteredUser guest = register("revoke-guest@example.com", "Familia RevokeGuest");
@@ -283,5 +367,20 @@ class FamilyMemberControllerTest {
                 response.get("family").get("id").asText(),
                 response.get("user").get("id").asText()
         );
+    }
+
+    private String read(MvcResult result, String field) throws Exception {
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        return response.get(field).asText();
+    }
+
+    private String readUserIdByEmail(MvcResult result, String email) throws Exception {
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        for (JsonNode member : response) {
+            if (email.equals(member.get("email").asText())) {
+                return member.get("userId").asText();
+            }
+        }
+        throw new AssertionError("Member not found: " + email);
     }
 }

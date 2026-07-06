@@ -22,6 +22,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
+import org.gipsybuho.recetasfamiliares.core.FamilyRole;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -90,11 +91,8 @@ public class MainWindow {
         });
 
         if (context.getSession().isLoggedIn()) {
-            // Role may already be persisted from a previous session — ensure it's loaded
-            if (context.getSession().getFamilyRole() == null) {
-                Thread.ofVirtual().start(() -> context.getFamilyRepository().detectAndSaveRole());
-            }
             showMain();
+            refreshPersistedRole();
         } else {
             showLogin();
         }
@@ -132,6 +130,17 @@ public class MainWindow {
         root.setLeft(sidebar);
         navigateTo("dashboard");
         OnboardingDialog.showIfFirstRun(stage);
+    }
+
+    private void refreshPersistedRole() {
+        FamilyRole before = context.getSession().getFamilyRole();
+        Thread.ofVirtual().start(() -> {
+            context.getFamilyRepository().detectAndSaveRole();
+            FamilyRole after = context.getSession().getFamilyRole();
+            if (!Objects.equals(before, after)) {
+                Platform.runLater(this::showMain);
+            }
+        });
     }
 
     private VBox buildSidebar() {
