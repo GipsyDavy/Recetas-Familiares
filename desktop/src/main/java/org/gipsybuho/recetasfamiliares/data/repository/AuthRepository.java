@@ -36,6 +36,7 @@ public class AuthRepository {
         session.setFamilyId(fid);
         if (response.user() != null) {
             session.setUserInfo(response.user().displayName(), response.user().email());
+            session.setUserId(response.user().id());
         }
     }
 

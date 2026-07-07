@@ -15,6 +15,18 @@ public class UserRepository {
         this.session = session;
     }
 
+    /**
+     * Consulta el perfil propio y refresca la sesion. Sirve para rellenar el
+     * userId en sesiones persistidas antes de que se guardara (chat familiar).
+     */
+    public UserDtos.UserResponse fetchMe() throws ApiException {
+        UserDtos.UserResponse response = api.get("api/v1/users/me", UserDtos.UserResponse.class);
+        session.setUserInfo(response.displayName(), response.email());
+        session.setAvatarUrl(response.avatarUrl());
+        session.setUserId(response.id());
+        return response;
+    }
+
     public UserDtos.UserResponse updateDisplayName(String newName) throws ApiException {
         UserDtos.UserResponse response = api.put("api/v1/users/me",
                 new UserDtos.UpdateDisplayNameRequest(newName.trim()),
