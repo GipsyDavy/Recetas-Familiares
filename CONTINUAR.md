@@ -629,8 +629,14 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 
 - Commit hotfix en rama: `43877f6 fix: endurecer chat Android tras validacion manual`.
 - Merge local a `main`: `merge: integrar chat familiar fase 1`.
-- Estado: Chat Fase 1 queda integrado localmente en `main`; no se hizo `push` a remoto.
+- Estado: Chat Fase 1 queda integrado localmente en `main`; push remoto pendiente hasta autorizacion explicita.
 - Punto de retoma: revisar `git status`, decidir si subir `main` a remoto y planificar siguiente fase. Pendientes funcionales recomendados: formato local de fechas en export Android, TalkBack/historial largo, Desktop chat fase 2, fotos fase 3.
+
+### Publicacion remota Chat Fase 1 (2026-07-07)
+
+- Usuario autorizo proceder tras el cierre local.
+- Accion prevista en esta sesion: publicar `main` en `origin/main` con Chat Fase 1 y esta trazabilidad documental.
+- No se publica la rama temporal `feat/chat-fase-1` salvo orden posterior.
 
 ### Chequeo obligatorio de cierre
 
