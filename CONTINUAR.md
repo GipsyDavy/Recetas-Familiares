@@ -152,7 +152,13 @@ No cambiar sin revisar Backend, Android, Desktop e iOS:
 - `RecipeStepResponse`: `position`, `instruction`, `timerMinutes`.
 - Entidades sincronizables: `id`, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
 - Ownership familiar obligatorio en backend aunque el cliente oculte acciones.
-- Chat familiar futuro: si se implementa, debe ser modulo independiente de notas, con ownership por familia, historial paginado, tiempo real, adjuntos protegidos y contrato estable antes de llevarlo a todos los clientes.
+- Chat familiar (fase 1 implementada en rama `feat/chat-fase-1`, 2026-07-07): modulo independiente bajo `/api/v1/families/{familyId}/chat`.
+  - `GET /messages?before=<id>&limit=<=50` → `{ items[], hasMore, nextBefore }` (desc por cursor, filtrado por limpieza del usuario).
+  - `POST /messages` `{ id?, body }` (id de cliente idempotente, `body` <=2000) → `ChatMessageResponse` + broadcast WS.
+  - `POST /clear` → 204 (limpieza por usuario, marca `cleared_before`, no borra para otros).
+  - `GET /export` → copia del usuario en orden ascendente.
+  - WS `/ws` (STOMP, broker simple), topic `/topic/families/{familyId}/chat` (solo entrega); JWT en el CONNECT, ownership en el SUBSCRIBE, rate limit de envio por usuario.
+  - No entra en `sync/pull`: cursor propio. Borrado/export es POR USUARIO, no global. Detalle completo en `docs/chat-familiar-spec.md` §10.
 
 ---
 
@@ -594,6 +600,30 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Validaciones de la sesion ya documentadas en Sprint 47: Desktop `mvn test` 12 tests 0 fallos, Desktop `mvn -DskipTests compile` OK, Android `testDebugUnitTest` 27 tests 0 fallos, Android `assembleDebug` OK, `git diff --check` OK.
 - OWASP Dependency-Check quedo pendiente por timeout de 15 minutos pese a `NVD_API_KEY` presente; no hay reporte utilizable.
 - Punto exacto para retomar: NO hay Sprint 48 autorizado. Opciones recomendadas: resolver OWASP Dependency-Check timeout si se quiere cierre de seguridad de dependencias, avanzar COD-8 con pruebas Room/WorkManager reales, o abrir chat familiar fase 1 solo tras decidir las 5 cuestiones de `docs/chat-familiar-spec.md` §7. iOS sigue bloqueado sin macOS/dispositivo.
+
+### Sprint Chat Fase 1 — Chat familiar texto tiempo real backend + Android (2026-07-07)
+
+- Objetivo: implementar la fase 1 del chat familiar (texto/emojis en tiempo real) tras resolver el usuario las 5 decisiones de `docs/chat-familiar-spec.md` §7. Alcance elegido por el usuario: texto en tiempo real + borrado/exportacion por usuario; reacciones, fotos y video quedan para fases posteriores.
+- Agente lider: Claude Code, en solitario. No se usaron Codex/Gemini: el usuario pidio implementar directamente; el trabajo fue tecnico y con validacion local (tests + build). Se ofrecen bloques IDE si se quiere revision paralela antes de fusionar la rama.
+- Rama: `feat/chat-fase-1` (creada desde `main` `792d603`). Commits: `5b92135` (backend), `88f101b` (Android). Docs en este mismo cierre.
+- Decisiones de producto registradas: retencion ilimitada; borrar/limpiar y exportar POR USUARIO (marca `cleared_before`, no afecta a otros); sin read-receipts; reacciones a fase 2; broker STOMP embebido; tests REST + autorizacion WS.
+- Backend: modulo `chat/` independiente, migracion `V14` (`chat_messages`, `chat_message_clears`), REST (`GET/POST /chat/messages`, `POST /chat/clear`, `GET /chat/export`), WebSocket/STOMP `/ws` con JWT en el CONNECT y ownership en el SUBSCRIBE, rate limit de envio por usuario, idempotencia por id de cliente. `spring-boot-starter-websocket` anadido; `SecurityConfig` permite el handshake `/ws/**` (auth en STOMP).
+- Android: `ChatScreen` (overlay desde TopAppBar), `ChatSocket` (STOMP minimo sobre WebSocket OkHttp, sin dependencias nuevas), `ChatRepository`, DTOs y endpoints, estado/logica en `RecetasViewModel` (merge sin duplicados, autoscroll, polling de respaldo 15 s, cierre en `onCleared`). Envio offline no permitido (sin cola local); degrada a polling.
+- Seguridad ejecutada: `security-review` (skill) sobre el backend en la sesion → 0 hallazgos de alta confianza (notas defense-in-depth: origen WS `*` por defecto configurable, 409 por reuso de id mitigado por UUID, export sin limite de tamano). VibeSec aplicado como checklist manual sobre el diff Android (token en frame no en URL, Bearer limitado al host, sin logs sensibles) → 0 hallazgos.
+- Validacion ejecutada: backend `mvn test` 107 tests 0 fallos (antes 93; +14 chat: 7 REST + 7 interceptor STOMP); Android `:app:compileDebugKotlin` OK, `:app:assembleDebug` OK, `:app:testDebugUnitTest` OK (sin regresion, 27 tests previos). `git diff --check` no revisado en este cierre (solo avisos LF/CRLF esperados de Windows).
+- Riesgos residuales: sin prueba manual end-to-end en dispositivo/emulador con backend arrancado (tiempo real y fallback validados por compilacion y tests de contrato, no en runtime); STOMP sin heartbeats (caida silenciosa se detecta al fallar el socket, polling cubre mientras); iOS bloqueado sin macOS; Desktop es la siguiente implantacion (fase 2); reacciones/edicion/fotos/video+push en fases 2-4. Rama sin fusionar a `main`: pendiente de decision del usuario (prueba manual y/o revision Codex/Gemini antes de merge).
+- Punto exacto para retomar: probar manualmente Android contra backend dev real (abrir chat, enviar/recibir en vivo, verificar fallback a polling deteniendo el WS, borrar para mi, exportar). Si pasa, decidir merge de `feat/chat-fase-1`. Siguiente incremento: fase 2 Desktop o fase 3 fotos.
+
+### Hotfix y validacion manual post-Gemini — Chat Android (2026-07-07)
+
+- Objetivo: aplicar hallazgos de la revision Gemini antes de cerrar la fase 1 y ejecutar prueba manual Android real contra backend dev.
+- Alcance aplicado solo Android: `ChatScreen.kt`, `RecetasViewModel.kt`, `ChatRepository.kt`, `ChatSocket.kt`.
+- Hallazgo critico cerrado: el envio queda bloqueado si `chatConnected=false`; `sendChat()` tambien rechaza llamadas sin conexion en tiempo real y emite mensaje de usuario.
+- Hallazgos medios cerrados: limite UI/backend de 2000 caracteres compartido (`CHAT_MAX_BODY_LENGTH`), borrador se limpia solo tras `POST` correcto, autoscroll no interrumpe lectura salvo carga inicial/cerca del final/mensaje propio, parseo defensivo de `MESSAGE` STOMP, `toWebSocketUrl()` soporta `ws/wss` y baseUrl sin protocolo, reconexion WebSocket con backoff corto tras caidas no iniciadas por el cliente.
+- Validacion automatizada ejecutada tras los cambios finales: Android `:app:compileDebugKotlin` OK; `:app:testDebugUnitTest` OK; `:app:assembleDebug` OK; `git diff --check` OK (solo avisos LF/CRLF de Windows).
+- Validacion runtime Android ejecutada en AVD `Pixel_9_Pro`: APK instalada; backend dev `GET /api/v1/health` OK; migracion `V14` aplicada por jar actual; historial REST `200`; handshake WebSocket `/ws` `101`; envio desde Android `POST /chat/messages` `201`; recepcion en vivo de mensaje enviado por segundo usuario via API; limite de 2050 caracteres queda capado en `2000/2000` sin `POST`; exportacion abre sharesheet con preview; borrar para mi muestra dialogo, cancelar conserva mensajes, confirmar devuelve `204`, owner queda vacio y otro miembro conserva historial por API; red del emulador cortada bloquea boton y no emite `POST`; red restaurada reconecta a `En linea`; recepcion post-reconexion verificada.
+- Seguridad/entorno: se usaron cuentas temporales locales `@recetas.local`, sin datos personales. VibeSec usado como checklist: JWT en frame STOMP, no en URL; sin logs de tokens; validaciones de ownership siguen en backend. Backend dev quedo arrancado localmente con `JWT_SECRET` efimero y `DB_USERNAME=root` por desajuste local de credenciales de `recetas_app`; no usar esa desviacion fuera de pruebas locales.
+- Riesgos residuales: export Android sigue mostrando fechas ISO/UTC, no formato local legible (hallazgo menor pendiente); STOMP sigue sin heartbeats reales, aunque ahora hay reconexion por cierre/fallo; no se ejecuto TalkBack ni prueba de historial largo con lectura manual prolongada; Desktop/iOS chat siguen pendientes por fases posteriores. Estado al documentar esta validacion: rama `feat/chat-fase-1` pendiente de commit hotfix y merge local.
 
 ### Chequeo obligatorio de cierre
 

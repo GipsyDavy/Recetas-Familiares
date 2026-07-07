@@ -454,3 +454,35 @@ data class UpdateStockItemRequestDto(
     val expiresAt: String?,
     val note: String?
 )
+
+// ── Chat familiar (fase 1) ──────────────────────────────────────────────────────
+
+data class ChatMessageDto(
+    val id: String,
+    val familyId: String,
+    val authorUserId: String,
+    val authorDisplayName: String,
+    val body: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean = false
+)
+
+data class SendChatMessageRequestDto(
+    val id: String,
+    val body: String
+)
+
+data class ChatHistoryDto(
+    val items: List<ChatMessageDto>,
+    val hasMore: Boolean,
+    val nextBefore: String? = null
+)
+
+data class ChatExportDto(
+    val familyId: String,
+    val exportedAt: String,
+    val totalMessages: Int,
+    val messages: List<ChatMessageDto>
+)

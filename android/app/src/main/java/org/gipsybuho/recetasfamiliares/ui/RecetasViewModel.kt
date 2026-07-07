@@ -20,8 +20,15 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
+import org.gipsybuho.recetasfamiliares.data.remote.ChatSocket
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
+import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
 import org.gipsybuho.recetasfamiliares.ui.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.ui.theme.ThemeMode
 import android.content.Context
@@ -47,6 +54,8 @@ import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import org.gipsybuho.recetasfamiliares.sync.ExpiryNotificationWorker
 import org.gipsybuho.recetasfamiliares.sync.SyncWorker
 import java.util.concurrent.TimeUnit
+
+private const val CHAT_POLL_MS = 15_000L
 
 class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
@@ -451,6 +460,146 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             runCatching { container.recipePhotoRepository.delete(photo) }
                 .onSuccess { _userMessage.emit("Foto eliminada") }
         }
+    }
+
+    // ── Chat familiar (fase 1) ───────────────────────────────────────────────
+
+    private val _chatMessages = MutableStateFlow<List<ChatMessageDto>>(emptyList())
+    val chatMessages: StateFlow<List<ChatMessageDto>> = _chatMessages.asStateFlow()
+
+    private val _chatConnected = MutableStateFlow(false)
+    val chatConnected: StateFlow<Boolean> = _chatConnected.asStateFlow()
+
+    private val _chatLoading = MutableStateFlow(false)
+    val chatLoading: StateFlow<Boolean> = _chatLoading.asStateFlow()
+
+    private val _chatHasMoreOlder = MutableStateFlow(false)
+    val chatHasMoreOlder: StateFlow<Boolean> = _chatHasMoreOlder.asStateFlow()
+
+    private var chatOldestCursor: String? = null
+    private var chatSocket: ChatSocket? = null
+    private var chatPollingJob: Job? = null
+
+    /** Abre el chat: carga la pagina reciente, conecta en tiempo real y arranca el polling de respaldo. */
+    fun openChat() {
+        _chatLoading.value = true
+        viewModelScope.launch {
+            runCatching { container.chatRepository.loadHistory() }
+                .onSuccess { history ->
+                    _chatMessages.value = history.items.sortedBy { it.createdAt }
+                    _chatHasMoreOlder.value = history.hasMore
+                    chatOldestCursor = history.nextBefore
+                }
+                .onFailure { _userMessage.emit("No se pudo cargar el chat") }
+            _chatLoading.value = false
+        }
+        chatSocket = container.chatRepository.openRealtime(
+            onMessage = { msg -> _chatMessages.update { mergeChat(it, listOf(msg)) } },
+            onConnectionChange = { connected -> _chatConnected.value = connected }
+        )
+        startChatPolling()
+    }
+
+    fun closeChat() {
+        chatSocket?.disconnect()
+        chatSocket = null
+        chatPollingJob?.cancel()
+        chatPollingJob = null
+        _chatConnected.value = false
+    }
+
+    fun sendChat(body: String, onSent: () -> Unit = {}) {
+        val text = body.trim()
+        if (text.isEmpty()) return
+        if (!_chatConnected.value) {
+            viewModelScope.launch { _userMessage.emit("Sin conexión en tiempo real") }
+            return
+        }
+        if (text.length > CHAT_MAX_BODY_LENGTH) {
+            viewModelScope.launch { _userMessage.emit("El mensaje no puede superar $CHAT_MAX_BODY_LENGTH caracteres") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { container.chatRepository.send(text) }
+                .onSuccess { msg ->
+                    _chatMessages.update { mergeChat(it, listOf(msg)) }
+                    onSent()
+                }
+                .onFailure { _userMessage.emit("No se pudo enviar el mensaje") }
+        }
+    }
+
+    fun loadOlderChat() {
+        if (!_chatHasMoreOlder.value) return
+        val cursor = chatOldestCursor ?: return
+        viewModelScope.launch {
+            runCatching { container.chatRepository.loadHistory(before = cursor) }
+                .onSuccess { history ->
+                    _chatMessages.update { mergeChat(it, history.items) }
+                    _chatHasMoreOlder.value = history.hasMore
+                    chatOldestCursor = history.nextBefore
+                }
+        }
+    }
+
+    fun clearChat() {
+        viewModelScope.launch {
+            runCatching { container.chatRepository.clear() }
+                .onSuccess {
+                    _chatMessages.value = emptyList()
+                    _chatHasMoreOlder.value = false
+                    chatOldestCursor = null
+                    _userMessage.emit("Chat borrado para ti")
+                }
+                .onFailure { _userMessage.emit("No se pudo borrar el chat") }
+        }
+    }
+
+    fun exportChat(onReady: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching { container.chatRepository.export() }
+                .onSuccess { export ->
+                    val text = buildString {
+                        append("💬 Chat familiar\n\n")
+                        export.messages.forEach { m ->
+                            append(m.createdAt).append(" — ")
+                            append(m.authorDisplayName).append(": ")
+                            append(m.body ?: "(mensaje eliminado)").append("\n")
+                        }
+                    }
+                    onReady(text.trim())
+                }
+                .onFailure { _userMessage.emit("No se pudo exportar el chat") }
+        }
+    }
+
+    private fun startChatPolling() {
+        chatPollingJob?.cancel()
+        chatPollingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(CHAT_POLL_MS)
+                if (!_chatConnected.value) {
+                    runCatching { container.chatRepository.loadHistory() }
+                        .onSuccess { history -> _chatMessages.update { mergeChat(it, history.items) } }
+                }
+            }
+        }
+    }
+
+    /** Une mensajes evitando duplicados por id y mantiene orden cronologico ascendente. */
+    private fun mergeChat(
+        existing: List<ChatMessageDto>,
+        incoming: List<ChatMessageDto>
+    ): List<ChatMessageDto> {
+        val byId = LinkedHashMap<String, ChatMessageDto>(existing.size + incoming.size)
+        existing.forEach { byId[it.id] = it }
+        incoming.forEach { byId[it.id] = it }
+        return byId.values.sortedBy { it.createdAt }
+    }
+
+    override fun onCleared() {
+        closeChat()
+        super.onCleared()
     }
 
     private fun compressImage(context: Context, uri: Uri): Pair<ByteArray, String> {
