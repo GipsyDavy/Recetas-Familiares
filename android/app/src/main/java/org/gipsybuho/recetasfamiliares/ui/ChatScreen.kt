@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
+import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -84,13 +85,20 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
         onDispose { viewModel.closeChat() }
     }
 
-    // Autoscroll al fondo cuando llega un mensaje nuevo (no al cargar historial antiguo).
+    // Autoscroll al fondo solo si no interrumpe lectura de historial antiguo.
     var lastId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(messages.lastOrNull()?.id) {
-        val newLast = messages.lastOrNull()?.id
-        if (newLast != null && newLast != lastId) {
-            lastId = newLast
-            listState.animateScrollToItem(messages.size - 1)
+        val newest = messages.lastOrNull()
+        if (newest != null && newest.id != lastId) {
+            val previousLastId = lastId
+            lastId = newest.id
+            val visibleLastIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val isInitialLoad = previousLastId == null
+            val isNearBottom = visibleLastIndex >= messages.lastIndex - 2
+            val isOwnMessage = newest.authorUserId == myUserId
+            if (isInitialLoad || isNearBottom || isOwnMessage) {
+                listState.animateScrollToItem(messages.lastIndex)
+            }
         }
     }
 
@@ -181,12 +189,16 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
 
             ChatInputBar(
                 draft = draft,
-                onDraftChange = { draft = it },
+                connected = connected,
+                onDraftChange = { draft = it.take(CHAT_MAX_BODY_LENGTH) },
                 onSend = {
                     val text = draft.trim()
                     if (text.isNotEmpty()) {
-                        viewModel.sendChat(text)
-                        draft = ""
+                        viewModel.sendChat(text) {
+                            if (draft.trim() == text) {
+                                draft = ""
+                            }
+                        }
                     }
                 }
             )
@@ -265,10 +277,13 @@ private fun MessageBubble(message: ChatMessageDto, isMine: Boolean) {
 @Composable
 private fun ChatInputBar(
     draft: String,
+    connected: Boolean,
     onDraftChange: (String) -> Unit,
     onSend: () -> Unit
 ) {
     Surface(tonalElevation = 3.dp) {
+        val nearLimit = draft.length >= CHAT_MAX_BODY_LENGTH - 160
+        val canSend = connected && draft.isNotBlank() && draft.trim().length <= CHAT_MAX_BODY_LENGTH
         Row(
             Modifier
                 .fillMaxWidth()
@@ -280,10 +295,14 @@ private fun ChatInputBar(
                 value = draft,
                 onValueChange = onDraftChange,
                 placeholder = { Text("Mensaje…") },
+                supportingText = if (nearLimit) {
+                    { Text("${draft.length}/$CHAT_MAX_BODY_LENGTH") }
+                } else {
+                    null
+                },
                 modifier = Modifier.weight(1f),
                 maxLines = 4
             )
-            val canSend = draft.isNotBlank()
             Surface(
                 shape = CircleShape,
                 color = if (canSend) MaterialTheme.colorScheme.primary
@@ -293,7 +312,13 @@ private fun ChatInputBar(
                 IconButton(onClick = onSend, enabled = canSend) {
                     Icon(
                         Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Enviar mensaje",
+                        contentDescription = if (canSend) {
+                            "Enviar mensaje"
+                        } else if (!connected) {
+                            "Sin conexión en tiempo real"
+                        } else {
+                            "Mensaje no listo para enviar"
+                        },
                         tint = if (canSend) MaterialTheme.colorScheme.onPrimary
                                else MaterialTheme.colorScheme.onSurfaceVariant
                     )

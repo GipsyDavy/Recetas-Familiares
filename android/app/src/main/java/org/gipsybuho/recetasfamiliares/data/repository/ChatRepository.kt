@@ -11,6 +11,8 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SendChatMessageRequestDto
 import java.util.UUID
 
+const val CHAT_MAX_BODY_LENGTH = 2_000
+
 /**
  * Chat familiar fase 1: envio/historial por REST y recepcion en tiempo real via
  * WebSocket/STOMP. Sin cola offline (fase 1): el envio requiere red.
@@ -33,7 +35,10 @@ class ChatRepository(
 
     suspend fun send(body: String): ChatMessageDto {
         val family = requireFamily()
-        val request = SendChatMessageRequestDto(id = UUID.randomUUID().toString(), body = body)
+        val text = body.trim()
+        require(text.isNotEmpty()) { "Chat message body is blank" }
+        require(text.length <= CHAT_MAX_BODY_LENGTH) { "Chat message body is too long" }
+        val request = SendChatMessageRequestDto(id = UUID.randomUUID().toString(), body = text)
         return api.sendChatMessage(family, request)
     }
 

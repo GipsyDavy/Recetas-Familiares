@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.AppContainer
 import org.gipsybuho.recetasfamiliares.data.remote.ChatSocket
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
+import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
 import org.gipsybuho.recetasfamiliares.ui.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.ui.theme.ThemeMode
 import android.content.Context
@@ -507,12 +508,23 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _chatConnected.value = false
     }
 
-    fun sendChat(body: String) {
+    fun sendChat(body: String, onSent: () -> Unit = {}) {
         val text = body.trim()
         if (text.isEmpty()) return
+        if (!_chatConnected.value) {
+            viewModelScope.launch { _userMessage.emit("Sin conexión en tiempo real") }
+            return
+        }
+        if (text.length > CHAT_MAX_BODY_LENGTH) {
+            viewModelScope.launch { _userMessage.emit("El mensaje no puede superar $CHAT_MAX_BODY_LENGTH caracteres") }
+            return
+        }
         viewModelScope.launch {
             runCatching { container.chatRepository.send(text) }
-                .onSuccess { msg -> _chatMessages.update { mergeChat(it, listOf(msg)) } }
+                .onSuccess { msg ->
+                    _chatMessages.update { mergeChat(it, listOf(msg)) }
+                    onSent()
+                }
                 .onFailure { _userMessage.emit("No se pudo enviar el mensaje") }
         }
     }
