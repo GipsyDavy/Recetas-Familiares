@@ -74,7 +74,11 @@ public class SecurityConfig {
                                 "/api/v1/auth/logout",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                // Handshake WebSocket: la autenticacion JWT y la
+                                // autorizacion de familia se aplican en el CONNECT/SUBSCRIBE
+                                // STOMP (ChatStompAuthChannelInterceptor), no en el upgrade HTTP.
+                                "/ws/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
