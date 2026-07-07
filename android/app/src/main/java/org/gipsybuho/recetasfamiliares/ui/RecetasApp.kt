@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Inventory2
@@ -185,6 +186,7 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var showThemePicker by remember { mutableStateOf(false) }
+    var chatOpen by remember { mutableStateOf(false) }
     val recipes by viewModel.recipes.collectAsState()
     val filteredRecipes by viewModel.filteredRecipes.collectAsState()
     val filterByStock by viewModel.filterByStock.collectAsState()
@@ -208,6 +210,11 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
             tab = MainTab.RECIPES
             navigateToRecipeId = initialRecipeId
         }
+    }
+
+    if (chatOpen) {
+        ChatScreen(viewModel, onClose = { chatOpen = false })
+        return
     }
 
     Scaffold(
@@ -258,6 +265,15 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                         ) {
                             IconButton(onClick = { showThemePicker = true }) {
                                 Icon(Icons.Filled.Palette, contentDescription = "Cambiar tema")
+                            }
+                        }
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = { PlainTooltip { Text("Chat familiar") } },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(onClick = { chatOpen = true }) {
+                                Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "Chat familiar")
                             }
                         }
                         TooltipBox(

@@ -5,6 +5,10 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.InviteMemberRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AssignMenuItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.MenuItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AuthResponseDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatExportDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatHistoryDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SendChatMessageRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateStockItemRequestDto
@@ -259,4 +263,29 @@ interface RecetasApi {
         @Path("familyId") familyId: String,
         @Body request: InviteMemberRequestDto
     ): Unit
+
+    // ── Chat familiar (fase 1) ──────────────────────────────────────────────
+
+    @GET("api/v1/families/{familyId}/chat/messages")
+    suspend fun chatMessages(
+        @Path("familyId") familyId: String,
+        @Query("before") before: String? = null,
+        @Query("limit") limit: Int? = null
+    ): ChatHistoryDto
+
+    @POST("api/v1/families/{familyId}/chat/messages")
+    suspend fun sendChatMessage(
+        @Path("familyId") familyId: String,
+        @Body request: SendChatMessageRequestDto
+    ): ChatMessageDto
+
+    @POST("api/v1/families/{familyId}/chat/clear")
+    suspend fun clearChat(
+        @Path("familyId") familyId: String
+    ): Unit
+
+    @GET("api/v1/families/{familyId}/chat/export")
+    suspend fun exportChat(
+        @Path("familyId") familyId: String
+    ): ChatExportDto
 }
