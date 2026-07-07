@@ -625,6 +625,13 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Seguridad/entorno: se usaron cuentas temporales locales `@recetas.local`, sin datos personales. VibeSec usado como checklist: JWT en frame STOMP, no en URL; sin logs de tokens; validaciones de ownership siguen en backend. Backend dev quedo arrancado localmente con `JWT_SECRET` efimero y `DB_USERNAME=root` por desajuste local de credenciales de `recetas_app`; no usar esa desviacion fuera de pruebas locales.
 - Riesgos residuales: export Android sigue mostrando fechas ISO/UTC, no formato local legible (hallazgo menor pendiente); STOMP sigue sin heartbeats reales, aunque ahora hay reconexion por cierre/fallo; no se ejecuto TalkBack ni prueba de historial largo con lectura manual prolongada; Desktop/iOS chat siguen pendientes por fases posteriores. Estado al documentar esta validacion: rama `feat/chat-fase-1` pendiente de commit hotfix y merge local.
 
+### Cierre local Chat Fase 1 (2026-07-07)
+
+- Commit hotfix en rama: `43877f6 fix: endurecer chat Android tras validacion manual`.
+- Merge local a `main`: `merge: integrar chat familiar fase 1`.
+- Estado: Chat Fase 1 queda integrado localmente en `main`; no se hizo `push` a remoto.
+- Punto de retoma: revisar `git status`, decidir si subir `main` a remoto y planificar siguiente fase. Pendientes funcionales recomendados: formato local de fechas en export Android, TalkBack/historial largo, Desktop chat fase 2, fotos fase 3.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
