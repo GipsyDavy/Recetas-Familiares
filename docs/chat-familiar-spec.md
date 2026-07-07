@@ -1,7 +1,7 @@
 # Especificación: Chat Familiar por Fases
 
-Estado: **especificación aprobada para diseño, NO implementada**.
-Sprint de origen: 43 (2026-07-05). No escribir código de chat hasta que se abra un sprint dedicado.
+Estado: **fase 1 implementada (backend + Android) en rama `feat/chat-fase-1` (2026-07-07)**. Fases 2-4 siguen sin implementar.
+Sprint de origen: 43 (2026-07-05). Fase 1 ejecutada en el sprint de chat (2026-07-07); ver §10.
 
 Referencias: `CONTINUAR.md` §6 y §7 (funcionalidad futura documentada), `CLAUDE.md` (seguridad, sincronización, contratos API).
 
@@ -127,13 +127,13 @@ Sin binarios en MySQL: storage de archivos con la misma política que fotos de r
 
 ---
 
-## 7. Decisiones pendientes (resolver antes de implementar fase 1)
+## 7. Decisiones (resueltas por el usuario 2026-07-07)
 
-1. ¿Retención ilimitada del historial o límite (p.ej. 2 años) con export?
-2. ¿Read-receipts por usuario en alguna fase? (privacidad vs utilidad familiar)
-3. ¿Reacciones con emoji a mensajes (fase 2-3)? Barato en contrato si se decide pronto.
-4. Broker STOMP simple embebido vs broker externo — para 1 familia/servidor doméstico, embebido basta.
-5. Estrategia de tests: contrato REST completo + test de autorización del WebSocket.
+1. Retención: **ilimitada, sin purga automática**. En su lugar, cada usuario puede **borrar/limpiar su propia vista** (marca `cleared_before`, no afecta a otros miembros) y **exportar su copia**.
+2. Read-receipts: **no** en fase 1 (solo indicador de mensajes nuevos). Más privado y simple.
+3. Reacciones emoji a mensajes: **diferidas a fase 2**. Los emojis Unicode en el cuerpo del mensaje ya funcionan de forma nativa.
+4. Broker: **STOMP simple embebido** (`enableSimpleBroker`), suficiente para 1 familia/servidor doméstico.
+5. Tests: contrato REST completo + autorización del WebSocket (interceptor STOMP). Implementado: 7 tests REST + 7 tests de interceptor.
 
 ---
 
@@ -166,3 +166,33 @@ Revisado: `pom.xml` backend, `FileStorageService`, `UploadController`, `AuthRate
 - Viable **por fases**, no de una tacada. Fase 1 lista para arrancar en cuanto se resuelvan las decisiones de §7 (bloqueo formal, no técnico).
 - Orden: decisiones §7 → fase 1 (backend + Android, 1-2 sprints, riesgo bajo) → fase 2 Desktop → fase 3 imágenes (barata) → reevaluar vídeo con límites más humildes (p. ej. 30 s / 20 MB) y streaming a disco antes que ffmpeg.
 - Push FCM: intercalar entre fase 1 y 3 si importa el tiempo real con app cerrada.
+
+---
+
+## 10. Estado de implementación — Fase 1 (2026-07-07)
+
+Rama: `feat/chat-fase-1`. Backend + Android. iOS y Desktop pendientes (fase 2 Desktop).
+
+### Backend (implementado y validado)
+- Módulo `chat/` independiente de notas. Migración `V14` (`chat_messages`, `chat_message_clears`).
+- REST bajo `/api/v1/families/{familyId}/chat`:
+  - `GET /messages?before=<id>&limit=<=50` → `{ items[], hasMore, nextBefore }` (desc por cursor `(createdAt, id)`), filtrado por la marca de limpieza del usuario.
+  - `POST /messages` `{ id?, body }` (id de cliente para idempotencia; máx 2000 chars) → `ChatMessageResponse` y broadcast WS.
+  - `POST /clear` → 204 (marca `cleared_before = now` para el usuario; oculta su vista sin borrar mensajes compartidos).
+  - `GET /export` → `{ familyId, exportedAt, totalMessages, messages[] }` (vista del usuario, ascendente).
+- WebSocket: endpoint `/ws` (STOMP, broker simple), topic `/topic/families/{familyId}/chat` (solo entrega). JWT en el CONNECT (`Authorization`), ownership de familia en el SUBSCRIBE, re-validado en cada suscripción. Rate limit de envío por usuario (10/10s por defecto).
+- Modelo de borrado/export **por usuario** (decisión §7.1): difiere del borrado global; preserva memoria de los demás.
+- Tests: `ChatControllerTest` (7) + `ChatStompAuthChannelInterceptorTest` (7). Suite backend: 107 tests, 0 fallos. `security-review` en sesión: 0 hallazgos de alta confianza.
+
+### Android (implementado, compila; sin prueba manual en dispositivo aún)
+- `ChatScreen` accesible desde la TopAppBar (overlay). Burbujas propias/ajenas, estados vacíos cálidos, accesibilidad por `semantics`, hora local.
+- `ChatSocket`: cliente STOMP mínimo sobre el WebSocket nativo de OkHttp (sin dependencias nuevas), JWT en el CONNECT, fallback a **polling** (15 s) cuando el tiempo real no está activo.
+- `ChatRepository` + endpoints REST + DTOs; estado en `RecetasViewModel` (merge sin duplicados por id, autoscroll, cierre de conexión en `onCleared`).
+- Envío offline **no permitido** en fase 1 (sin cola local); degrada a polling.
+- `assembleDebug` + `testDebugUnitTest` sin regresión. VibeSec manual: 0 hallazgos.
+
+### Riesgos residuales fase 1
+- Sin prueba manual end-to-end multi-dispositivo (requiere backend arrancado + emulador/dispositivo); tiempo real y fallback validados por compilación y tests de contrato, no en runtime en esta sesión.
+- STOMP sin heartbeats: una caída silenciosa de conexión se detecta al fallar el socket; el polling cubre la entrega mientras tanto.
+- iOS bloqueado (COD-1/COD-2, sin macOS). Desktop es la siguiente implantación (fase 2).
+- Reacciones, edición/borrado por mensaje, fotos y vídeo+push: fases 2-4.
