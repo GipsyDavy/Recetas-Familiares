@@ -638,6 +638,16 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Accion realizada: publicado `main` en `origin/main` con Chat Fase 1 y esta trazabilidad documental.
 - No se publica la rama temporal `feat/chat-fase-1` salvo orden posterior.
 
+### Cierre de sesion Codex — Chat Fase 1 publicado (2026-07-07)
+
+- Estado Git al cerrar: `main` limpio y alineado con `origin/main` en `0ea0e14 docs: confirmar publicacion remota chat fase 1`; rama local temporal `feat/chat-fase-1` conserva el ultimo commit de rama `43877f6` y no se publico.
+- Trabajo cerrado en esta sesion: revision Gemini incorporada, hotfix Android aplicado, pruebas automatizadas Android ejecutadas, prueba manual completa de chat en AVD, merge local de `feat/chat-fase-1` a `main`, publicacion de `main` a GitHub y trazabilidad documental actualizada.
+- Validaciones relevantes ya ejecutadas en la sesion: Android `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, `:app:assembleDebug`, `git diff --check`, backend health `UP`, WebSocket Android `101`, envio REST `201`, recepcion en vivo, bloqueo offline sin `POST`, reconexion tras restaurar red, exportacion sharesheet y borrado por usuario `204`.
+- Entorno al cerrar: backend dev sigue arrancado en `http://localhost:8080` con proceso Java `PID 16636`, `JWT_SECRET` efimero y `DB_USERNAME=root` por desajuste local de credenciales de `recetas_app`; no usar esa desviacion fuera de pruebas locales. El emulador/AVD ya no aparece conectado por `adb devices`.
+- Punto exacto de retoma: empezar en `main`, ejecutar `git status --short --branch` y confirmar que sigue alineado con `origin/main`. No queda trabajo sin commit de Chat Fase 1. Antes de abrir una fase nueva, decidir si se borra la rama local `feat/chat-fase-1` o se conserva como referencia.
+- Siguiente sprint recomendado: Chat Desktop fase 2 si se quiere paridad cliente; alternativa corta: corregir export Android a zona horaria/formato local y ampliar prueba manual TalkBack + historial largo. Fase fotos queda como fase 3; iOS sigue bloqueado sin macOS/dispositivo.
+- Riesgos residuales vivos: export Android usa ISO/UTC, STOMP no implementa heartbeats reales aunque reconecta tras cierre/fallo, no hay pruebas UI automatizadas del chat, no se ejecuto TalkBack, y la base local contiene cuentas temporales `@recetas.local` creadas para la prueba.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
