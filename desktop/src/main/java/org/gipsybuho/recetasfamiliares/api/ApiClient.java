@@ -140,6 +140,20 @@ public class ApiClient {
         }
     }
 
+    /** Base URL normalizada (termina en "/"). Necesaria para derivar la URL WebSocket. */
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    /**
+     * Abre un WebSocket sobre el mismo cliente autenticado. La autenticacion del
+     * canal STOMP viaja en el frame CONNECT (no en la URL), gestionada por el
+     * llamador. Se reutiliza {@code client} para compartir pool y timeouts.
+     */
+    public WebSocket newWebSocket(Request request, WebSocketListener listener) {
+        return client.newWebSocket(request, listener);
+    }
+
     public void shutdown() {
         client.dispatcher().executorService().shutdown();
         client.connectionPool().evictAll();

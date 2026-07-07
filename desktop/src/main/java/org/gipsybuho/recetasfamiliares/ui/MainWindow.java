@@ -49,12 +49,13 @@ public class MainWindow {
     private WeeklyMenuView weeklyMenuView;
     private ShoppingListView shoppingListView;
     private NotesView notesView;
+    private ChatView chatView;
     private GlobalSearchView searchResultsView;
     private FamilyMembersView familyMembersView;
     private ProfileView profileView;
     private String activeView = "dashboard";
     private boolean navigating = false;
-    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnSettings, btnMembers;
+    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnSettings, btnMembers;
     private final TextField globalSearch = new TextField();
     private final Label statusBar = new Label("");
 
@@ -101,6 +102,9 @@ public class MainWindow {
     // ── Login ────────────────────────────────────────────────────────────────
 
     private void showLogin() {
+        if (chatView != null) {
+            chatView.onHidden();
+        }
         LoginView loginView = new LoginView(context, () -> {
             showMain();
             triggerInitialSync();
@@ -121,6 +125,7 @@ public class MainWindow {
         weeklyMenuView = new WeeklyMenuView(context, this::triggerSync);
         shoppingListView = new ShoppingListView(context, this::triggerSync);
         notesView = new NotesView(context, this::triggerSync);
+        chatView = new ChatView(context, this::setStatus);
         profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus);
         if (context.getSession().isAdmin()) {
             familyMembersView = new FamilyMembersView(context);
@@ -176,6 +181,7 @@ public class MainWindow {
         btnMenu      = sidebarButton("📅  Menú semanal", "menu");
         btnShopping  = sidebarButton("🛒  Lista de la compra", "shopping");
         btnNotes     = sidebarButton("📝  Notas familiares", "notes");
+        btnChat      = sidebarButton("💬  Chat familiar", "chat");
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -205,7 +211,7 @@ public class MainWindow {
 
         // ── Common buttons ────────────────────────────────────────────────────
         sidebar.getChildren().addAll(header, globalSearch, userCard,
-                btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes);
+                btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat);
 
         // ── Admin-only buttons ────────────────────────────────────────────────
         if (context.getSession().isAdmin()) {
@@ -359,6 +365,10 @@ public class MainWindow {
         activeView = view;
         globalSearch.clear();
         navigating = false;
+        // Cerrar la conexion en tiempo real del chat al abandonar la vista.
+        if (chatView != null && !"chat".equals(view)) {
+            chatView.onHidden();
+        }
         updateActiveSidebarButton(view);
         switch (view) {
             case "dashboard" -> {
@@ -384,6 +394,10 @@ public class MainWindow {
             case "notes" -> {
                 setCenterWithFade(notesView);
                 notesView.refresh();
+            }
+            case "chat" -> {
+                setCenterWithFade(chatView);
+                chatView.onShown();
             }
             case "profile" -> {
                 setCenterWithFade(profileView);
@@ -464,7 +478,7 @@ public class MainWindow {
     // ── Logout ───────────────────────────────────────────────────────────────
 
     private void updateActiveSidebarButton(String view) {
-        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnSettings, btnMembers};
+        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnSettings, btnMembers};
         for (Button btn : navButtons) {
             if (btn != null) btn.getStyleClass().remove("sidebar-nav-button-active");
         }
@@ -475,6 +489,7 @@ public class MainWindow {
             case "menu"      -> btnMenu;
             case "shopping"  -> btnShopping;
             case "notes"     -> btnNotes;
+            case "chat"      -> btnChat;
             case "settings"  -> btnSettings;
             case "members"   -> btnMembers;
             default          -> null;

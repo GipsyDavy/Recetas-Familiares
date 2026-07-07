@@ -1035,3 +1035,87 @@
     -fx-font-weight: bold;
     -fx-padding: 3 10;
 }
+
+/* ── Chat familiar ─────────────────────────────────────────────────────────────── */
+.chat-view {
+    -fx-background-color: recetas-bg;
+}
+
+.chat-status {
+    -fx-font-size: 12px;
+    -fx-text-fill: recetas-text-second;
+}
+
+.chat-scroll {
+    -fx-background-color: transparent;
+}
+
+.chat-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.chat-messages {
+    -fx-background-color: transparent;
+}
+
+.chat-empty {
+    -fx-font-size: 14px;
+    -fx-text-fill: recetas-text-second;
+    -fx-text-alignment: center;
+}
+
+.chat-bubble-other {
+    -fx-background-color: recetas-surface;
+    -fx-border-color: recetas-surface-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 4 14 14 14;
+    -fx-border-radius: 4 14 14 14;
+    -fx-padding: 8 12;
+}
+
+.chat-bubble-mine {
+    -fx-background-color: recetas-primary-cont;
+    -fx-border-color: recetas-primary-cont;
+    -fx-border-width: 1;
+    -fx-background-radius: 14 4 14 14;
+    -fx-border-radius: 14 4 14 14;
+    -fx-padding: 8 12;
+}
+
+.chat-author {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: recetas-primary;
+}
+
+.chat-body {
+    -fx-font-size: 14px;
+    -fx-text-fill: recetas-text-primary;
+}
+
+.chat-body-mine {
+    -fx-font-size: 14px;
+    -fx-text-fill: recetas-on-primary-cont;
+}
+
+.chat-time {
+    -fx-font-size: 10px;
+    -fx-text-fill: recetas-text-muted;
+}
+
+.chat-time-mine {
+    -fx-font-size: 10px;
+    -fx-text-fill: recetas-on-primary-cont;
+    -fx-opacity: 0.7;
+}
+
+.chat-input {
+    -fx-font-size: 14px;
+    -fx-pref-row-count: 1;
+}
+
+.chat-char-counter {
+    -fx-font-size: 11px;
+    -fx-text-fill: recetas-text-muted;
+    -fx-padding: 4 2 0 0;
+}

@@ -15,6 +15,7 @@ public class AppSession {
     private static final String PREF_NODE        = "recetas-familiares";
     private static final String KEY_ACCESS       = "accessToken";
     private static final String KEY_REFRESH      = "refreshToken";
+    private static final String KEY_USER_ID      = "userId";
     private static final String KEY_FAMILY_ID    = "familyId";
     private static final String KEY_LAST_SYNC    = "lastSyncTime";
     private static final String KEY_DISPLAY_NAME = "displayName";
@@ -26,6 +27,7 @@ public class AppSession {
 
     private String accessToken;
     private String refreshToken;
+    private String userId;
     private String familyId;
     private String lastSyncTime;
     private String displayName;
@@ -41,6 +43,7 @@ public class AppSession {
         this.prefs = prefs;
         this.accessToken  = readToken(KEY_ACCESS);
         this.refreshToken = readToken(KEY_REFRESH);
+        this.userId       = prefs.get(KEY_USER_ID,       null);
         this.familyId     = prefs.get(KEY_FAMILY_ID,     null);
         this.lastSyncTime = prefs.get(KEY_LAST_SYNC,     null);
         this.displayName  = prefs.get(KEY_DISPLAY_NAME,  null);
@@ -56,6 +59,7 @@ public class AppSession {
 
     public String getAccessToken()  { return accessToken; }
     public String getRefreshToken() { return refreshToken; }
+    public String getUserId()       { return userId; }
     public String getFamilyId()     { return familyId; }
     public String getLastSyncTime() { return lastSyncTime; }
     public String getDisplayName()  { return displayName; }
@@ -109,6 +113,12 @@ public class AppSession {
         return plain;
     }
 
+    public void setUserId(String userId) {
+        this.userId = userId;
+        if (userId != null) prefs.put(KEY_USER_ID, userId);
+        else prefs.remove(KEY_USER_ID);
+    }
+
     public void setFamilyId(String familyId) {
         this.familyId = familyId;
         if (familyId != null) prefs.put(KEY_FAMILY_ID, familyId);
@@ -143,6 +153,7 @@ public class AppSession {
     public void clear() {
         accessToken  = null;
         refreshToken = null;
+        userId       = null;
         familyId     = null;
         lastSyncTime = null;
         displayName  = null;
@@ -151,6 +162,7 @@ public class AppSession {
         avatarUrl    = null;
         prefs.remove(KEY_ACCESS);
         prefs.remove(KEY_REFRESH);
+        prefs.remove(KEY_USER_ID);
         prefs.remove(KEY_FAMILY_ID);
         prefs.remove(KEY_LAST_SYNC);
         prefs.remove(KEY_DISPLAY_NAME);

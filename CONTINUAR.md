@@ -246,6 +246,7 @@ Implementado/documentado:
 - Modo cocina, exportaciones, notificaciones, sonidos opcionales.
 - Temas, ajustes como vista central, diagnostico e instalador Windows v1.1.
 - Gestion de miembros y avatar upload.
+- Chat familiar fase 1: historial paginado, envio y recepcion en tiempo real (WebSocket/STOMP), borrar/exportar por usuario (implementado 2026-07-07, sin prueba manual E2E).
 
 Resuelto en Sprint 42 (2026-07-02):
 - Tokens cifrados con Windows DPAPI (`TokenVault`, JNA) con migracion automatica de valores legado (SEC-2).
@@ -273,9 +274,8 @@ Resuelto en Sprint 46 (2026-07-06):
 - Fix menor preexistente: `style.css` tenia `-fx-max-width: Double.MAX_VALUE` (CSS invalido del hotfix de registro que rompia el parseo del stylesheet); movido a codigo en `LoginView`.
 
 Funcionalidad futura documentada:
-- Chat familiar como segunda implantacion cliente despues de Android.
-- Mantener comportamiento coherente con el contrato backend y evitar logica divergente.
-- Soportar texto/emojis primero; imagenes/videos despues de cerrar storage protegido y limites de adjuntos.
+- Chat familiar fase 1 ya implementado (ver trazabilidad); pendiente prueba manual E2E Desktop<->Android.
+- Imagenes/videos en chat despues de cerrar storage protegido y limites de adjuntos (fases 3-4).
 
 ### iOS
 
@@ -647,6 +647,33 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Punto exacto de retoma: empezar en `main`, ejecutar `git status --short --branch` y confirmar que sigue alineado con `origin/main`. No queda trabajo sin commit de Chat Fase 1. Antes de abrir una fase nueva, decidir si se borra la rama local `feat/chat-fase-1` o se conserva como referencia.
 - Siguiente sprint recomendado: Chat Desktop fase 2 si se quiere paridad cliente; alternativa corta: corregir export Android a zona horaria/formato local y ampliar prueba manual TalkBack + historial largo. Fase fotos queda como fase 3; iOS sigue bloqueado sin macOS/dispositivo.
 - Riesgos residuales vivos: export Android usa ISO/UTC, STOMP no implementa heartbeats reales aunque reconecta tras cierre/fallo, no hay pruebas UI automatizadas del chat, no se ejecuto TalkBack, y la base local contiene cuentas temporales `@recetas.local` creadas para la prueba.
+
+### Chat Fase 2 — Chat familiar Desktop (2026-07-07)
+
+- Objetivo: implantar el chat familiar (fase 1, solo texto) en Desktop JavaFX conectado al mismo backend que Android, para mensajeria en tiempo real dentro de la familia.
+- Agente lider: Claude Code en solitario para implementar; revision UX/producto de Gemini via bloque IDE (solo lectura). Hallazgos verificados contra el codigo antes de aplicar.
+- Backend: sin cambios (contrato chat fase 1 ya existente y auditado). Desktop solo consume REST + WebSocket/STOMP.
+- Archivos nuevos Desktop: `api/dto/ChatDtos.java`, `api/ChatSocket.java` (STOMP minimo sobre `okhttp3.WebSocket`, sin dependencias nuevas), `data/repository/ChatRepository.java`, `ui/ChatView.java`.
+- Archivos modificados Desktop: `core/AppSession.java` (+`userId` persistido), `data/repository/AuthRepository.java` (guarda userId en login), `data/repository/UserRepository.java` (`fetchMe()` backfill), `api/ApiClient.java` (`getBaseUrl()` + `newWebSocket()`), `core/AppContext.java` (registro `ChatRepository`), `ui/MainWindow.java` (boton sidebar "Chat familiar", navegacion, apertura/cierre de socket en navegacion y logout), `resources/style.css` (clases `chat-*` tematizadas).
+- Paridad con Android: mismo topic `/topic/families/{id}/chat`; JWT en el frame CONNECT (no en URL); ownership validado en backend; envio por REST, recepcion por WS; borrar/exportar por usuario.
+- Revision Gemini incorporada (alcance C autorizado): (1) burbujas muestran fecha cuando el mensaje no es de hoy (Hoy/Ayer/DD/MM) — mejora sobre Android, que solo muestra HH:mm; (2) `TextArea` de entrada con tope de altura (120px); (3) esta documentacion; (4) re-render tras backfill de `userId`. Descartados por paridad/ruido: contador siempre visible, boton "cargar anteriores" persistente, separar statusLabel. Hallazgo "alto" de race de `userId` verificado como no real (el flujo resuelve el id antes de renderizar historial/envios).
+- Seguridad: `/VibeSec` (skill) ejecutado sobre el diff en la sesion → PASS, 0 hallazgos de alta confianza (token en frame STOMP no en URL, Bearer solo al origen del API, ownership en backend, `Label` JavaFX renderiza texto plano sin XSS, sin secretos en logs; userId en prefs es UUID opaco no secreto). `/security-review` no aplica: backend sin cambios.
+- Validacion ejecutada: Desktop `mvn -DskipTests compile` BUILD SUCCESS; Desktop `mvn test` 12 tests 0 fallos (incluye `AppSessionTest` tras anadir `userId`); backend contrato chat `ChatControllerTest`+`ChatStompAuthChannelInterceptorTest` 14/14 0 fallos.
+- Riesgos residuales: STOMP sin heartbeats (igual que Android; reconexion por cierre/fallo); si el access token expira con el chat abierto el WS no refresca solo hasta reentrar (paridad Android); sin tests UI automatizados; prueba de renderizado/clics de la GUI JavaFX y del emulador Android sigue pendiente (no automatizable por el agente).
+- Commit: rama `feat/chat-desktop` `6ee4697` (backend intacto).
+
+### E2E de protocolo Chat Desktop y cierre (2026-07-07)
+
+- Objetivo: validar en runtime el camino de datos del chat Desktop (REST + WebSocket/STOMP) contra backend real, y cerrar el sprint con merge a `main`.
+- Agente lider: Claude Code en solitario. El usuario facilito credencial MySQL de sesion (`root`) usada solo como variable de entorno; NO escrita en ningun archivo versionado ni scratchpad.
+- Entorno: backend dev arrancado con `DB_USERNAME=root`, `JWT_SECRET` efimero de sesion; MySQL local. Se creo familia de prueba `TestChat` con cuentas `@recetas.local` (userA OWNER, userB MEMBER).
+- Metodo: cliente Node que replica exactamente los frames STOMP del `ChatSocket` Desktop/Android (CONNECT con JWT en el frame, SUBSCRIBE al topic, parseo de MESSAGE) + `curl` para REST. Sustituto fiel de la capa de red del cliente Desktop.
+- Resultado tiempo real (WS): handshake+SUBSCRIBE de A y B OK; A envia REST -> B recibe en vivo por WS (autor correcto); B envia REST -> A recibe en vivo por WS; idempotencia por client id (misma id de servidor, sin duplicar). 4/4 PASS.
+- Resultado REST: B ve historial compartido de la familia; rechaza body >2000 (400) y acepta exactamente 2000 (201); export A devuelve mensajes; borrar para A devuelve 204 y deja A vacio mientras B conserva su historial (borrado por-usuario, no global). Todo correcto.
+- Conclusion: interoperabilidad Desktop<->Android en tiempo real a traves del backend CONFIRMADA a nivel de protocolo (mismos endpoints y frames STOMP). Ownership, idempotencia, limites, export y borrado por-usuario verificados en runtime.
+- No validado (requiere interaccion humana): renderizado/clics de la GUI JavaFX y UI del emulador Android. Runbook de prueba manual entregado al usuario.
+- Cierre Git: `feat/chat-desktop` (`6ee4697`) fusionado a `main`. Push remoto pendiente de autorizacion explicita del usuario.
+- Punto de retoma: opcional prueba manual GUI Desktop/Android con el runbook; decidir push de `main` a `origin`; siguiente incremento chat: fase 3 (fotos) o iOS (bloqueado sin macOS). Limpieza pendiente: base local con cuentas de prueba `@recetas.local` y familia `TestChat`.
 
 ### Chequeo obligatorio de cierre
 
