@@ -326,6 +326,8 @@ Prioridad propuesta para Sprint 47:
    - Contenido: microcopy calido y no tecnico, cubriendo cada opcion, atajo, gesto y estado (vacio/error/offline), de forma que el usuario pueda usar toda la aplicacion sin ayuda externa.
    - Criterio de cierre: inventario de pantallas/dialogos vs temas de ayuda al 100%, revision Gemini de textos, accesibilidad verificada (TalkBack/tooltips).
 
+6. Infra (candidato, NO autorizado): migracion de base de datos **MySQL -> PostgreSQL** con backend Spring intacto y DB en Hetzner. Analizada 2026-07-08: viable y acotada (queries JPQL sin SQL nativo, timestamps por app, tests en H2, clientes sin tocar). Plan completo en `docs/migracion-mysql-a-postgresql-plan.md`. Descartado el "full Supabase" (reescritura de backend + 3 clientes). Requiere que el usuario resuelva las 5 decisiones de §4 del plan (hosting gestionado vs autogestionado, tipo UUID, migrar datos, tests Testcontainers, pooler) antes de arrancar.
+
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
 ---
@@ -674,6 +676,17 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - No validado (requiere interaccion humana): renderizado/clics de la GUI JavaFX y UI del emulador Android. Runbook de prueba manual entregado al usuario.
 - Cierre Git: `feat/chat-desktop` (`6ee4697`) fusionado a `main`. Push remoto pendiente de autorizacion explicita del usuario.
 - Punto de retoma: opcional prueba manual GUI Desktop/Android con el runbook; decidir push de `main` a `origin`; siguiente incremento chat: fase 3 (fotos) o iOS (bloqueado sin macOS). Limpieza pendiente: base local con cuentas de prueba `@recetas.local` y familia `TestChat`.
+
+### Analisis migracion MySQL -> PostgreSQL (2026-07-08, solo lectura)
+
+- Objetivo: evaluar a peticion del usuario si migrar la DB a Supabase o a Postgres en Hetzner. Sin cambios de codigo de migracion.
+- Agente: Claude Code en solitario (analisis de solo lectura; no aplicaban skills de seguridad ni otros agentes: no habia diff).
+- Aclaracion aportada al usuario: Supabase no es una DB (su motor es Postgres); Hetzner es hosting ortogonal; Supabase Cloud no corre en Hetzner (seria self-hosted). "Full Supabase" = reescritura de backend + 3 clientes + operar stack self-hosted; descartado.
+- Decision acordada: Camino 1 = mantener Spring Boot y migrar solo el motor **MySQL 8.0 -> PostgreSQL**, con la DB en Hetzner. Clientes sin cambios.
+- Evidencia de viabilidad recogida (inspeccion 2026-07-08): todas las `@Query` son JPQL (0 nativeQuery); timestamps por `@PrePersist`/`@PreUpdate` (el `ON UPDATE CURRENT_TIMESTAMP` MySQL es redundante); esquema portable (CHAR(36) UUID, VARCHAR, BIGINT, BOOLEAN, TIMESTAMP(6); sin AUTO_INCREMENT/ENGINE/ENUM/JSON); 14 migraciones Flyway; tests ya en H2; `DB_URL/USERNAME/PASSWORD` externalizados; dialecto Hibernate autodetectado.
+- Entregable: `docs/migracion-mysql-a-postgresql-plan.md` con decision, evidencia, alcance, 5 decisiones pendientes del usuario, plan paso a paso (deps, traduccion de las 14 migraciones, entidades/validate, config, tests Testcontainers, migracion de datos, infra Hetzner), validacion esperada, riesgos y rollback.
+- Gotcha principal a decidir: Postgres autogestionado en Hetzner implica backups/PITR/hardening propios (Hetzner no da Postgres gestionado nativo).
+- Estado: sprint de migracion NO autorizado. Documentado para arrancar en frio cuando el usuario lo autorice. Sin cambios en el codigo del backend ni en la DB.
 
 ### Chequeo obligatorio de cierre
 
