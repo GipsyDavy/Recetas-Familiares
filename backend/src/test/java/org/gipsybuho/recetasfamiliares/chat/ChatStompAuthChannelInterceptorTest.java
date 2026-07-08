@@ -86,6 +86,23 @@ class ChatStompAuthChannelInterceptorTest {
         assertThrows(MessagingException.class, () -> interceptor.preSend(subscribe, channel));
     }
 
+    @Test
+    void rejectsClientSendToBroker() {
+        // Un cliente autenticado no debe poder publicar por STOMP: burlaria
+        // ownership, persistencia y rate limit inyectando mensajes falsos.
+        Message<byte[]> send = send(TOPIC, new StompPrincipal(USER_ID));
+        assertThrows(MessagingException.class, () -> interceptor.preSend(send, channel));
+    }
+
+    private Message<byte[]> send(String destination, StompPrincipal principal) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination(destination);
+        if (principal != null) {
+            accessor.setUser(principal);
+        }
+        return MessageBuilder.createMessage("{\"body\":\"spoofed\"}".getBytes(), accessor.getMessageHeaders());
+    }
+
     private Message<byte[]> connect(String authorizationHeader) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         // En el canal entrante real Spring entrega un accessor mutable; se replica

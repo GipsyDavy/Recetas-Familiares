@@ -20,8 +20,11 @@ spring:
     locations: classpath:db/migration
   servlet:
     multipart:
+      # Chat permite hasta 5 imagenes x 8 MB por mensaje. El limite de request
+      # debe cubrir ese lote mas el overhead multipart; si no, Tomcat rechaza
+      # antes de la validacion de la app.
       max-file-size: 10MB
-      max-request-size: 12MB
+      max-request-size: 50MB
 
 server:
   port: ${SERVER_PORT:8080}

@@ -16,6 +16,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -112,7 +114,7 @@ public class ChatService {
         ChatMessageEntity message = new ChatMessageEntity(clientId, family, author, request.body().trim());
         ChatMessageEntity saved = messageRepository.save(message);
         ChatMessageResponse response = ChatMessageResponse.from(saved);
-        realtimePublisher.publishMessage(response);
+        publishAfterCommit(response, null);
         return response;
     }
 
@@ -168,12 +170,37 @@ public class ChatService {
         try {
             ChatMessageEntity saved = messageRepository.save(message);
             ChatMessageResponse response = ChatMessageResponse.from(saved);
-            realtimePublisher.publishMessage(response);
+            publishAfterCommit(response, storedFiles);
             return response;
         } catch (RuntimeException e) {
             cleanupStoredFiles(storedFiles);
             throw e;
         }
+    }
+
+    /**
+     * Publica el mensaje por WebSocket solo si la transaccion confirma, y limpia
+     * los archivos escritos si termina en rollback. Evita broadcasts fantasma y
+     * binarios huerfanos cuando el commit falla despues de escribir en disco.
+     */
+    private void publishAfterCommit(ChatMessageResponse response, List<FileStorageService.StoredFile> storedFiles) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            realtimePublisher.publishMessage(response);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                realtimePublisher.publishMessage(response);
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK && storedFiles != null) {
+                    cleanupStoredFiles(storedFiles);
+                }
+            }
+        });
     }
 
     @Transactional

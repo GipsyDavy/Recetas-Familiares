@@ -20,6 +20,11 @@ import org.springframework.stereotype.Component;
  *   <li>SUBSCRIBE: valida membership de familia contra el destino
  *       {@code /topic/families/{familyId}/chat}. Se re-valida en cada nueva
  *       suscripcion, de modo que un usuario expulsado no puede resuscribirse.</li>
+ *   <li>SEND: se rechaza siempre. Los clientes publican por REST; permitir un
+ *       SEND directo al broker simple dejaria inyectar mensajes falsos en el
+ *       topic de cualquier familia saltandose ownership, persistencia y rate
+ *       limit. El broadcast legitimo lo emite el servidor via
+ *       {@link ChatRealtimePublisher}, que no pasa por este canal entrante.</li>
  * </ul>
  */
 @Component
@@ -49,6 +54,10 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
             authenticate(accessor);
         } else if (StompCommand.SUBSCRIBE.equals(command)) {
             authorizeSubscription(accessor);
+        } else if (StompCommand.SEND.equals(command)) {
+            // Los clientes nunca publican por STOMP (envian por REST). Un SEND
+            // al broker simple burlaria ownership, persistencia y rate limit.
+            throw new MessagingException("Client SEND not allowed on chat channel");
         }
         return message;
     }

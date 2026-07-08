@@ -765,7 +765,19 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Hallazgo MEDIO (correctness, no seguridad): `spring.servlet.multipart.max-request-size=12MB` es menor que la capacidad anunciada (5 imagenes x 8MB). Enviar >12MB por mensaje lo rechaza Tomcat antes de la validacion de la app. Decision pendiente del usuario: subir el limite (aumenta DoS) o documentar/reducir el maximo real. No se toco en este cierre.
 - Validacion ejecutada en sesion: backend `mvn test` 111 tests 0 fallos + `mvn -DskipTests package` OK (jar generado, V15 validada); Desktop `mvn test` 12 tests 0 fallos; Android `gradlew test assembleDebug` BUILD SUCCESSFUL. iOS no aplica (chat iOS es fase futura, sin runtime macOS en Windows).
 - Archivos nuevos committeados: `chat/ChatAttachmentEntity/Repository/Response.java`, migracion `V15__create_chat_attachments.sql`, `desktop/owasp-suppressions.xml`.
-- Riesgos residuales: sin prueba manual GUI de envio real de imagenes en Android/Desktop; decodificacion de imagen en request thread (deuda diferida documentada); Desktop `sendImage` solo envia 1 archivo; mismatch multipart pendiente de decision; push remoto pendiente de autorizacion explicita.
+- Riesgos residuales: sin prueba manual GUI de envio real de imagenes en Android/Desktop; decodificacion de imagen en request thread (deuda diferida documentada); Desktop `sendImage` solo envia 1 archivo; push remoto pendiente de autorizacion explicita.
+
+### Endurecimiento Chat Fase 3 — hallazgos Codex/Gemini (2026-07-08)
+
+- Objetivo: integrar la revision multi-IA (Codex tecnico, Gemini UX) del chat con imagenes. Todos los hallazgos verificados contra codigo antes de aplicar; solo se integro lo confirmado.
+- Agente lider: Claude Code. Bloques Codex/Gemini entregados al usuario para el chat IDE (no CLI). Alcance aprobado por el usuario: seguridad + robustez + doc barato, sin features nuevas.
+- SEGURIDAD (ALTO, corregido): `ChatStompAuthChannelInterceptor` ahora rechaza frames STOMP `SEND`. Antes, un cliente autenticado podia publicar directo al broker simple (`/topic/families/{id}/chat`) saltandose REST, ownership, persistencia y rate limit, permitiendo spoofing de autor e inyeccion cross-family en vivo. Los clientes solo usan CONNECT/SUBSCRIBE; el broadcast legitimo lo emite el servidor (`ChatRealtimePublisher`), fuera del canal entrante. Test `rejectsClientSendToBroker` anadido.
+- ROBUSTEZ backend: (1) publish WS movido a `afterCommit` de la transaccion y limpieza de archivos en `afterCompletion(ROLLED_BACK)` — evita broadcast fantasma y binarios huerfanos si el commit falla tras escribir en disco; (2) N+1 en historial/export resuelto con `@BatchSize(50)` en `ChatMessageEntity.attachments` (compatible con la paginacion por cursor, a diferencia de un fetch join); (3) `max-request-size` multipart 12MB -> 50MB (cubre 5x8MB) + handler `MaxUploadSizeExceededException` -> 413 en `GlobalExceptionHandler`.
+- CLIENTE: Android `compressImage` hace downsample durante la decodificacion (`setTargetSampleSize`) para no cargar el bitmap a resolucion completa (evita OOM con fotos grandes; afecta tambien a subida de fotos de receta). Desktop deja de exponer `ex.getMessage()` al enviar imagen (microcopy calido). Android `contentDescription` de adjunto incluye el caption si existe.
+- DOC: `docs/chat-familiar-spec.md` aclara que el backend acepta hasta 5 imagenes pero Android/Desktop envian 1 por mensaje en esta fase.
+- Validacion en sesion: backend `mvn test` **112 tests 0 fallos** (+1 SEND denegado); Desktop `mvn test` 12 tests 0 fallos; Android `gradlew test assembleDebug` BUILD SUCCESSFUL.
+- Hallazgos diferidos (backlog, no en este alcance): indicador de progreso de subida y visor de imagen a tamano completo (Gemini, features nuevas); cobertura de tests de casos limite backend (rollback, mismatch magic byte, exceso dimensiones); tope de tamano en export; pulido visual de placeholders de carga.
+- Riesgo residual: sin prueba manual GUI de envio real de imagenes; push remoto pendiente de autorizacion.
 
 ### Chequeo obligatorio de cierre
 

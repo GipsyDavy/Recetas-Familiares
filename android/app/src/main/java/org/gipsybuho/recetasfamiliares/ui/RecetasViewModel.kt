@@ -637,13 +637,20 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     private fun compressImage(context: Context, uri: Uri): Pair<ByteArray, String> {
+        val maxDim = 1080
         val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
+            ImageDecoder.decodeBitmap(
+                ImageDecoder.createSource(context.contentResolver, uri)
+            ) { decoder, info, _ ->
+                // Downsample durante la decodificacion: no cargar el bitmap a
+                // resolucion completa en memoria (evita OOM con fotos grandes).
+                val sample = sampleSizeFor(info.size.width, info.size.height, maxDim)
+                if (sample > 1) decoder.setTargetSampleSize(sample)
+            }
         } else {
             @Suppress("DEPRECATION")
             android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
         }
-        val maxDim = 1080
         val scaled = if (bitmap.width > maxDim || bitmap.height > maxDim) {
             val ratio = minOf(maxDim.toFloat() / bitmap.width, maxDim.toFloat() / bitmap.height)
             Bitmap.createScaledBitmap(
@@ -654,6 +661,20 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         scaled.compress(Bitmap.CompressFormat.JPEG, 85, baos)
         if (scaled !== bitmap) scaled.recycle()
         return Pair(baos.toByteArray(), "image/jpeg")
+    }
+
+    private fun sampleSizeFor(width: Int, height: Int, maxDim: Int): Int {
+        var sample = 1
+        var w = width
+        var h = height
+        // Duplica el factor mientras reducir a la mitad siga por encima del
+        // objetivo: deja el bitmap decodificado cerca de maxDim, no a resolucion full.
+        while (w / 2 >= maxDim && h / 2 >= maxDim) {
+            w /= 2
+            h /= 2
+            sample *= 2
+        }
+        return sample
     }
 }
 

@@ -284,7 +284,7 @@ private fun MessageBubble(message: ChatMessageDto, isMine: Boolean) {
                 }
                 attachments.forEachIndexed { index, attachment ->
                     if (index > 0) Spacer(Modifier.height(Spacing.sm))
-                    ChatAttachmentImage(attachment, speaker)
+                    ChatAttachmentImage(attachment, speaker, bodyText)
                 }
                 val visibleText = deletedText ?: bodyText
                 if (visibleText != null) {
@@ -310,10 +310,14 @@ private fun MessageBubble(message: ChatMessageDto, isMine: Boolean) {
 }
 
 @Composable
-private fun ChatAttachmentImage(attachment: ChatAttachmentDto, speaker: String) {
+private fun ChatAttachmentImage(attachment: ChatAttachmentDto, speaker: String, caption: String?) {
     AsyncImage(
         model = attachment.thumbnailUrl ?: attachment.url,
-        contentDescription = "Imagen compartida por $speaker",
+        contentDescription = if (caption.isNullOrBlank()) {
+            "Imagen compartida por $speaker"
+        } else {
+            "Imagen compartida por $speaker: $caption"
+        },
         contentScale = ContentScale.Crop,
         modifier = Modifier
             .fillMaxWidth()

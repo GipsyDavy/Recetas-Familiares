@@ -417,7 +417,8 @@ public class ChatView extends VBox {
             } catch (Exception ex) {
                 Platform.runLater(() -> {
                     setSending(false);
-                    onStatus.accept("No se pudo enviar la imagen: " + ex.getMessage());
+                    // Sin exponer detalles tecnicos del error al usuario.
+                    onStatus.accept("No pudimos enviar tu imagen. Comprueba que sea una foto valida e intentalo de nuevo.");
                 });
             }
         });

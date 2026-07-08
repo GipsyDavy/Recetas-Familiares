@@ -18,6 +18,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.BatchSize;
+
 import org.gipsybuho.recetasfamiliares.families.FamilyEntity;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 
@@ -60,8 +62,12 @@ public class ChatMessageEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    // BatchSize evita N+1 al mapear historial/export: los adjuntos de varios
+    // mensajes se cargan en lotes en vez de una consulta por mensaje. Compatible
+    // con la paginacion por cursor del historial (a diferencia de un fetch join).
     @OneToMany(mappedBy = "message", cascade = CascadeType.ALL)
     @OrderBy("createdAt ASC, id ASC")
+    @BatchSize(size = 50)
     private List<ChatAttachmentEntity> attachments = new ArrayList<>();
 
     protected ChatMessageEntity() {

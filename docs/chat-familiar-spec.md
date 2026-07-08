@@ -35,7 +35,7 @@ Principios:
 ### Fase 3 — Imágenes — implementada
 - Adjuntos de imagen reutilizando la infraestructura de uploads (allowlist JPEG/PNG/WebP, magic bytes, 8 MB, ownership familiar por controller — misma política que `/uploads/**`).
 - Miniaturas generadas en backend. Implementación actual: generación síncrona durante el upload; mover a worker/cola queda como mejora si sube el volumen.
-- Límite: 5 imágenes por mensaje.
+- Límite: hasta 5 imágenes por mensaje en el backend. Nota: Android y Desktop envían **1 imagen por mensaje** en esta fase (selección simple); el envío múltiple queda como mejora de cliente sin cambio de contrato backend.
 
 ### Fase 4 — Vídeos + push notifications
 - Vídeo MP4/H.264, máx. 60 s / 50 MB, con validación de tipo real.
