@@ -830,6 +830,50 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Punto de retoma operativo: en esta sesion se habian arrancado backend dev/H2, emulador Android y Desktop para pruebas visuales. En una nueva sesion, comprobar procesos vivos y reiniciar limpio si hace falta. No versionar credenciales de prueba; recrear usuarios locales en la misma familia si el backend H2 se reinicia.
 - Recomendacion de orden: hacer este sprint antes de video/push, porque cierre UX de imagenes es deuda de la Fase 3 ya integrada.
 
+### PUNTO DE RETOMA EXACTO — Migracion PostgreSQL en curso (2026-07-09)
+
+Documento redactado como ingeniero senior experto en programacion para retomar sin ambiguedad en la proxima sesion. Hay DOS hilos abiertos en paralelo, en ramas distintas. Leer entero antes de tocar nada.
+
+#### Estado del repositorio
+- Rama activa al cerrar la sesion: `feat/migracion-postgresql` (creada desde `main`).
+- `main` sigue SIN los cambios del chat: viven solo en `feat/chat-imagenes-ux` (pusheada a origin) y en esta rama de migracion NO estan (salio de main limpio). No mezclar.
+- Carpeta `herztner/` sin versionar (IP VPS + clave publica + comando ssh). No commitear; considerar `.gitignore` mas adelante.
+
+#### Hilo A — Chat imagenes UX (COMPLETO, pendiente de merge y prueba manual)
+- Rama `feat/chat-imagenes-ux`, commit `ca75ebf`, PUSHEADA a origin. Builds verdes (Android assembleDebug OK, Desktop 12 tests). VibeSec + security-review 0 hallazgos. Hallazgos Codex/Gemini integrados.
+- PR NO creado (no habia `gh`; se instalo, no se autentico y se DESINSTALO por decision del usuario). Crear PR a mano: https://github.com/GipsyDavy/Recetas-Familiares/pull/new/feat/chat-imagenes-ux (base `main`).
+- Residual: falta prueba visual cross-device real (thumbnail, abrir original, guardar Desktop<->Android, error 404). Desktop no normaliza el origen de la URL (riesgo al exponer en Hetzner; Android ya cubierto por `rewriteUploadUrl`).
+
+#### Hilo B — Migracion MySQL -> PostgreSQL (EN CURSO, Fase 1 hecha)
+- Tipo de migracion confirmado: **MySQL 8 -> PostgreSQL**, backend Spring Boot INTACTO (misma seguridad). NO es Supabase. Plan completo: `docs/migracion-mysql-a-postgresql-plan.md`.
+- Decisiones cerradas (usuario eligio "defaults" + matices):
+  - Hosting: Postgres autogestionado en VPS Hetzner (`167.233.213.242`).
+  - UUID: se mantiene `CHAR(36)` (minimo cambio).
+  - Datos: migrar `FamilyDemo` con `pgloader` (base no limpia).
+  - Tests: subir a Testcontainers-Postgres.
+  - Pooler: conexion directa para migraciones.
+  - **Backend LOCAL por ahora** (no en el VPS todavia).
+  - **Red: WireGuard** (no Tailscale, no Cloudflare). Justificacion: con backend local, el trafico critico es backend local -> Postgres Hetzner (TCP crudo), no HTTP; WireGuard es la alternativa directa a Tailscale y no necesita dominio. Postgres escuchara SOLO en la interfaz WireGuard, jamas publico. Cloudflare Tunnel + Zero Trust queda APLAZADO para cuando se exponga la API publica (backend en VPS); ademas requiere un dominio en Cloudflare que el usuario NO tiene (la cuenta/plan es gratis, el nombre de dominio no). No se creo cuenta Cloudflare (accion interactiva del usuario, no automatizable).
+
+- FASE 1 — HECHA y commiteada: commit `2514c29` en `feat/migracion-postgresql`.
+  - `backend/pom.xml`: `com.mysql:mysql-connector-j` -> `org.postgresql:postgresql` (runtime); `org.flywaydb:flyway-mysql` -> `org.flywaydb:flyway-database-postgresql`. Versiones gestionadas por el BOM de Spring Boot (sin `<version>`).
+  - Validado: `mvn test` -> 116 tests, 0 fallos (aun sobre H2 en MODE=MySQL).
+
+- FASE 2 — SIGUIENTE, NO empezada. Alcance exacto:
+  - Traducir `backend/src/main/resources/db/migration/V1..V14` a sintaxis PostgreSQL: eliminar `ON UPDATE CURRENT_TIMESTAMP(6)` (la app fija `updated_at` via `@PreUpdate`); `DEFAULT CURRENT_TIMESTAMP(6)` -> `now()` o quitar default; `TIMESTAMP(6)` -> `timestamptz` (UTC; ya hay `hibernate.jdbc.time_zone: UTC`); mantener `CHAR(36)`; indices/PK/FK/UNIQUE sin cambios. Revisar V13 `ensure_family_owner_members` por sintaxis especifica.
+  - ACOPLAMIENTO CRITICO: los tests usan H2 en `MODE=MySQL` con `ddl-auto=validate` (`backend/src/test/resources/application-test.yml`, y `DevDataSeederTest` con url H2 inline). Al pasar las migraciones a sintaxis Postgres, H2 deja de servir. Por eso Fase 2 DEBE incluir el cambio de tests a Testcontainers-Postgres EN EL MISMO COMMIT para no dejar un commit rojo. Anadir dependencia Testcontainers-postgresql (scope test), base class con `@Container PostgreSQLContainer` + `@DynamicPropertySource`, y quitar la config H2.
+  - REQUISITO DE ENTORNO: Fase 2 necesita **Docker** en la maquina (Testcontainers arranca `postgres:16`). PREGUNTA ABIERTA al usuario sin responder: si hay Docker Desktop instalado/corriendo. Alternativas si no: Postgres local levantado por el usuario, o validar solo compilacion y aplazar la ejecucion de tests.
+  - Criterio de cierre Fase 2: `mvn test` verde contra Postgres real + arranque con `ddl-auto=validate` sin desajustes entidad/columna.
+
+- FASES POSTERIORES (no empezadas): Fase 3 ya absorbida en Fase 2 (tests). Fase 4 config despliegue (`application*.yml`/env, `sslmode=require`), sin secretos. Fase 5 infra Hetzner (Postgres Docker, usuario minimo privilegio, backups pg_dump/PITR, firewall) + Fase 5b WireGuard (VPS<->maquina local, Postgres bind a wg0, drop publico 5432). Fase 6 datos (`pgloader` FamilyDemo, verificar recuentos). Fase 7 smoke E2E (health UP, Flyway V1..V14, registro/login, CRUD, sync, chat REST+WS) + VibeSec sobre config de conexion + cierre docs.
+
+- Metodo de trabajo pactado: commitear POR FASE (por si se agota cuota de IA), verificar build/tests reales en cada fase, no marcar nada como validado sin ejecutarlo. Rollback: MySQL actual intacto hasta Fase 7; todo en rama.
+
+#### Primer paso de la proxima sesion
+1. `git checkout feat/migracion-postgresql` y confirmar `git log -1` = `2514c29`.
+2. Confirmar disponibilidad de Docker (Fase 2). Si no hay, decidir alternativa.
+3. Ejecutar Fase 2 (traducir V1..V14 + Testcontainers) y commitear al quedar verde.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
