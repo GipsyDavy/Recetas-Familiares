@@ -28,7 +28,7 @@ No abrir como proyecto principal:
 
 ## 2. Estado Actual Consolidado
 
-Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros, sincronizacion y chat familiar con texto, imagenes y edicion/borrado propio en tiempo real. Las fases futuras del chat son video/push e iOS.
+Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros, sincronizacion y chat familiar con texto, adjuntos de imagen basicos y edicion/borrado propio en tiempo real. Las fases futuras del chat son cerrar UX de imagenes, video/push e iOS.
 
 Plataformas:
 - `backend/`: Spring Boot + MySQL + Flyway + JWT.
@@ -196,9 +196,10 @@ Endurecido tras revision Codex/Gemini post-Sprint 43 (2026-07-05):
 - `sync/pull` devuelve `serverTime` capturado antes de consultar para evitar saltos por cambios concurrentes.
 
 Chat familiar:
-- Texto/emojis, imagenes y edicion/borrado propio ya integrados en backend, Android y Desktop.
+- Texto/emojis y edicion/borrado propio ya integrados en backend, Android y Desktop.
 - REST para historial paginado, envio inicial/fallback, envio de imagenes multipart, editar/borrar mensajes propios, limpiar/exportar por usuario y WebSocket/STOMP operativo.
-- Fases pendientes: videos, push notifications e iOS.
+- Imagenes Fase 3 tiene backend/contrato/storage y miniaturas, pero queda abierto un sprint funcional de UX: en Desktop las imagenes quedan en el chat sin abrirse ni descargarse; en Android se ha observado mensaje con globo/adjunto sin thumbnail visible y tampoco hay abrir/descargar.
+- Fases pendientes: cerrar UX de imagenes, videos, push notifications e iOS.
 - Storage protegido para imagenes y videos; no guardar binarios pesados directamente en MySQL.
 - Imagenes fase 3: JPEG/PNG/WebP, max 5 por mensaje, max 8 MB, extension + `Content-Type` + magic bytes + parseo real, stripping de metadata por re-encode, thumbnails backend y cleanup best-effort de fallos parciales.
 - Produccion seria deberia contemplar mover miniaturas a worker si sube volumen y analisis antivirus o servicio equivalente para adjuntos.
@@ -238,11 +239,12 @@ Resuelto en Sprint 45 (2026-07-05):
 
 Chat familiar:
 - Fase texto/emojis implementada y validada en AVD con backend real: historial, envio/recepcion en vivo, fallback/reconexion, limpiar/exportar por usuario y bloqueo offline sin `POST`.
-- Fase imagenes implementada: selector del sistema, caption opcional, compresion JPEG fuera del hilo principal, envio multipart y render de thumbnails con Coil + OkHttp autenticado.
+- Fase imagenes implementada a nivel de contrato/envio: selector del sistema, caption opcional, compresion JPEG fuera del hilo principal, envio multipart y render previsto de thumbnails con Coil + OkHttp autenticado.
+- Pendiente vivo de imagenes: la validacion visual reporto que en Android no aparece el thumbnail, solo el globo del mensaje con adjunto; falta abrir a tamano completo y guardar/descargar.
 - Edicion/borrado propio implementado: menu en mensaje propio, dialogo de edicion, confirmacion de borrado y merge por id de respuestas REST/WS.
 - Envio offline no permitido en fase texto; sin cola local.
 - Pendiente menor: export Android usa fechas ISO/UTC en vez de formato local legible.
-- Fases posteriores: video/push y progreso explicito de subida si se detecta necesidad UX.
+- Fases posteriores: cerrar imagenes UX, video/push y progreso explicito de subida si se detecta necesidad UX.
 
 ### Desktop
 
@@ -252,7 +254,7 @@ Implementado/documentado:
 - Modo cocina, exportaciones, notificaciones, sonidos opcionales.
 - Temas, ajustes como vista central, diagnostico e instalador Windows v1.1.
 - Gestion de miembros y avatar upload.
-- Chat familiar texto e imagenes: historial paginado, envio/recepcion en tiempo real (WebSocket/STOMP), limpiar/exportar por usuario, selector JPG/PNG/WebP y render de thumbnails autenticados. Texto validado a nivel de protocolo contra backend real; pendiente prueba manual de renderizado/clics GUI JavaFX con imagenes.
+- Chat familiar texto e imagenes: historial paginado, envio/recepcion en tiempo real (WebSocket/STOMP), limpiar/exportar por usuario, selector JPG/PNG/WebP y render de thumbnails autenticados. Texto validado a nivel de protocolo contra backend real; pendiente funcional detectado en imagenes: no hay click para abrir original ni accion de guardar/descargar desde JavaFX.
 
 Resuelto en Sprint 42 (2026-07-02):
 - Tokens cifrados con Windows DPAPI (`TokenVault`, JNA) con migracion automatica de valores legado (SEC-2).
@@ -317,17 +319,18 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Tras Chat Fase 1, Chat Desktop Fase 2, remediacion OWASP, Chat Fase 3 imagenes y edicion/borrado propio (publicado en `main` el 2026-07-08), el chat de texto/imagenes/edicion queda implementado en backend/Android/Desktop con build/tests verdes en sesion. Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
+Tras Chat Fase 1, Chat Desktop Fase 2, remediacion OWASP, Chat Fase 3 imagenes y edicion/borrado propio (publicado en `main` el 2026-07-08), el chat de texto/edicion queda implementado en backend/Android/Desktop con build/tests verdes en sesion. Imagenes tienen contrato/backend/storage y envio basico, pero la validacion visual dejo una brecha funcional en clientes: falta visor/descarga y Android no renderiza de forma fiable el adjunto. Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
 Prioridad propuesta para el siguiente sprint no autorizado:
 
-1. Validacion manual de UI pendiente: Chat GUI Desktop/Android con imagenes reales y menus de edicion/borrado, onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
-2. Chat siguiente capa: fase 4 video/push si el usuario prioriza multimedia/notificaciones. Video requiere redisenar storage a streaming a disco/Range y antivirus o servicio equivalente.
-3. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01 y sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista; monitorizar PDFBox porque 3.0.7 sigue con CVEs medias y no hay 3.0.x posterior en Maven Central a 2026-07-08.
-4. PostgreSQL en Hetzner: migracion MySQL -> PostgreSQL con backend Spring intacto. Plan completo en `docs/migracion-mysql-a-postgresql-plan.md`; requiere resolver las 5 decisiones de §4 del plan antes de arrancar.
-5. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
-6. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
-7. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
+1. Chat imagenes UX (siguiente sprint recomendado): render fiable de imagenes en Android, abrir imagen original a tamano completo en Desktop/Android, guardar/descargar con flujo autenticado, placeholders/error states y validacion cruzada Desktop<->Android con imagen real.
+2. Validacion manual de UI pendiente: menus de edicion/borrado del chat, onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
+3. Chat siguiente capa: fase 4 video/push si el usuario prioriza multimedia/notificaciones. Video requiere redisenar storage a streaming a disco/Range y antivirus o servicio equivalente.
+4. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01 y sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista; monitorizar PDFBox porque 3.0.7 sigue con CVEs medias y no hay 3.0.x posterior en Maven Central a 2026-07-08.
+5. PostgreSQL en Hetzner: migracion MySQL -> PostgreSQL con backend Spring intacto. Plan completo en `docs/migracion-mysql-a-postgresql-plan.md`; requiere resolver las 5 decisiones de §4 del plan antes de arrancar.
+6. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
+7. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+8. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
    - Desktop: ayuda contextual en TODOS los modulos, dialogos y formularios (crear/editar receta, stock, menu, compra, notas, miembros, exportaciones, busqueda global, diagnostico), cada pestaña de Ajustes, modo cocina y onboarding; tooltips en todos los controles sin label visible (formato `Accion (Ctrl+X)`, delay 400ms); foco y orden de tabulacion documentados en formularios.
    - Android: sistema de ayuda equivalente (pantalla o bottom sheet de ayuda por seccion, accesible desde TopAppBar), con `contentDescription` completo y ayuda del modo cocina/manos libres.
    - iOS: mismo patron cuando el runtime este desbloqueado (COD-1/COD-2).
@@ -808,6 +811,24 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Riesgos residuales: sin prueba manual GUI de los menus/dialogos en Android/Desktop; sin tests UI automatizados Compose/JavaFX; borrado admin/owner de mensajes ajenos queda fuera de alcance por decision de "individual propio".
 - Commit publicado: `2c18a9f feat: editar y borrar mensajes propios en chat`.
 - Punto de retoma: revisar `git status`. Queda una carpeta no versionada `herztner/` ajena a este sprint, no tocada. Siguiente sprint recomendado: validacion manual GUI del chat completo (imagenes + edicion/borrado) o fase 4 video/push con redisenio de storage.
+
+### Sprint pendiente - Chat imagenes UX: visor, descarga y render fiable (2026-07-08)
+
+- Origen: durante la prueba visual manual del chat, el usuario confirma que las imagenes enviadas/recibidas en Desktop se quedan dentro del chat sin posibilidad de abrirlas ni descargarlas. En Android no se ve la imagen en el chat; solo aparece el globo de mensaje con adjunto, sin abrir ni descargar.
+- Severidad producto: funcional. El backend y el multipart existen, pero el adjunto no es consumible de forma suficiente por los usuarios.
+- Alcance recomendado:
+  - Backend: verificar contrato `ChatMessageResponse.attachments[]`, `url`, `thumbnailUrl`, ownership 404 fail-closed y headers de descarga. Si hace falta accion de descarga dedicada, mantenerla autenticada y sin exponer bearer en URLs externas.
+  - Android: corregir render de thumbnail autenticado en `ChatScreen`, revisar base URL/URLs relativas, estados loading/error, tap para visor a tamano completo y accion guardar/compartir/descargar.
+  - Desktop: hacer click en thumbnail para abrir original en dialogo/ventana, accion guardar con `FileChooser`, placeholder/error/retry y fetch autenticado del original.
+  - Tiempo real: validar que un envio con imagen desde Desktop aparece con thumbnail util en Android y viceversa, sin depender de recargar historial.
+  - Seguridad: no filtrar bearer a terceros, no abrir directamente URLs con token en navegador externo, conservar ownership por familia y path traversal fail-closed.
+- Criterios de cierre:
+  - Backend tests si se toca serving/headers/contrato.
+  - Android `test assembleDebug`.
+  - Desktop `mvn test`.
+  - Prueba visual real con una imagen enviada Desktop -> Android y otra Android -> Desktop: thumbnail visible, abrir original, guardar/descargar y error state si el adjunto devuelve 404.
+- Punto de retoma operativo: en esta sesion se habian arrancado backend dev/H2, emulador Android y Desktop para pruebas visuales. En una nueva sesion, comprobar procesos vivos y reiniciar limpio si hace falta. No versionar credenciales de prueba; recrear usuarios locales en la misma familia si el backend H2 se reinicia.
+- Recomendacion de orden: hacer este sprint antes de video/push, porque cierre UX de imagenes es deuda de la Fase 3 ya integrada.
 
 ### Chequeo obligatorio de cierre
 

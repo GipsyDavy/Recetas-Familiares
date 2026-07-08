@@ -2,6 +2,7 @@
 
 Estado: **chat con texto, imágenes y edición/borrado propio integrado en `main` (backend + Android + Desktop, 2026-07-08)**. Fase 4 (vídeo + push) e iOS siguen pendientes.
 Sprint de origen: 43 (2026-07-05). Fase 1 backend+Android y fase 2 Desktop se ejecutaron el 2026-07-07; fase 3 imágenes y edición/borrado propio el 2026-07-08; ver §10-§13.
+Limitación abierta tras validación visual: la Fase 3 cubre contrato, subida, storage y miniaturas, pero falta cerrar UX de imágenes en clientes: Android no renderiza de forma fiable el adjunto y Desktop/Android no permiten abrir original ni guardar/descargar.
 
 Referencias: `CONTINUAR.md` §6 y §7 (contrato y estado por plataforma), `CLAUDE.md` (seguridad, sincronización, contratos API).
 
@@ -36,6 +37,7 @@ Principios:
 - Adjuntos de imagen reutilizando la infraestructura de uploads (allowlist JPEG/PNG/WebP, magic bytes, 8 MB, ownership familiar por controller — misma política que `/uploads/**`).
 - Miniaturas generadas en backend. Implementación actual: generación síncrona durante el upload; mover a worker/cola queda como mejora si sube el volumen.
 - Límite: hasta 5 imágenes por mensaje en el backend. Nota: Android y Desktop envían **1 imagen por mensaje** en esta fase (selección simple); el envío múltiple queda como mejora de cliente sin cambio de contrato backend.
+- Pendiente funcional de cliente: thumbnail fiable en Android, visor a tamaño completo y descarga/guardado autenticado en Android y Desktop.
 
 ### Fase 4 — Vídeos + push notifications
 - Vídeo MP4/H.264, máx. 60 s / 50 MB, con validación de tipo real.
@@ -165,8 +167,8 @@ Revisado: `pom.xml` backend, `FileStorageService`, `UploadController`, `AuthRate
 5. **iOS**: bloqueado hasta COD-1/COD-2, como ya indica esta spec.
 
 ### Conclusión y orden recomendado
-- Viable **por fases**, no de una tacada. Fase 1, Desktop, fase 3 imágenes y edición/borrado propio ya están integrados localmente; lo siguiente natural es prueba GUI manual de imágenes/edición/borrado o fase 4.
-- Orden actualizado: prueba GUI Desktop/Android con imágenes y edición/borrado si se desea → reevaluar vídeo con límites más humildes (p. ej. 30 s / 20 MB) y streaming a disco antes que ffmpeg.
+- Viable **por fases**, no de una tacada. Fase 1, Desktop, fase 3 imágenes y edición/borrado propio ya están integrados localmente; lo siguiente natural es cerrar UX de imágenes en clientes antes de subir a vídeo/push.
+- Orden actualizado: Chat imágenes UX (thumbnail fiable, visor, guardar/descargar) → prueba GUI Desktop/Android de edición/borrado → reevaluar vídeo con límites más humildes (p. ej. 30 s / 20 MB) y streaming a disco antes que ffmpeg.
 - Push FCM: intercalar antes o durante fase 4 si importa el tiempo real con app cerrada.
 
 ---
@@ -235,13 +237,15 @@ Integrada en `main` y publicada tras el endurecimiento de Chat Fase 3. Implement
 ### Android
 - DTOs con `ChatAttachmentDto`; Retrofit multipart para imágenes.
 - `ChatRepository.sendImages()` genera partes `files`; `RecetasViewModel.sendChatImage()` comprime la imagen seleccionada a JPEG fuera del hilo principal.
-- `ChatScreen` añade selector de imagen del sistema, caption opcional y render de thumbnails con Coil usando el cliente OkHttp autenticado ya existente.
+- `ChatScreen` añade selector de imagen del sistema, caption opcional y render previsto de thumbnails con Coil usando el cliente OkHttp autenticado ya existente.
 - Export incluye contador de imágenes por mensaje.
+- Pendiente detectado en prueba visual: no siempre aparece el thumbnail del adjunto; falta abrir original y guardar/descargar.
 
 ### Desktop
 - DTOs extendidos con `ChatAttachment`.
 - `ApiClient.postMultipart()` soporta campos de texto y archivos repetidos; `ChatRepository.sendImage()` usa el endpoint de fase 3.
 - `ChatView` añade selector JPG/PNG/WebP, caption opcional, render asíncrono de thumbnails mediante `fetchImage()` autenticado y export con contador de imágenes.
+- Pendiente detectado en prueba visual: el thumbnail queda incrustado en el chat, pero no hay acción para abrir original ni guardar/descargar.
 
 ### Validación
 - Backend `mvn -f backend\pom.xml test` -> 111 tests, 0 fallos.
@@ -254,7 +258,7 @@ Integrada en `main` y publicada tras el endurecimiento de Chat Fase 3. Implement
 ### Riesgos residuales fase 3
 - Miniaturas generadas síncronamente en la petición; si sube volumen, mover a worker/cola.
 - Sin antivirus o sandbox externo para adjuntos; pendiente para producción seria.
-- No se ejecutó prueba manual GUI de Android/Desktop enviando imágenes reales contra backend dev.
+- Prueba visual manual posterior detectó deuda funcional de clientes: Android puede mostrar solo el globo de adjunto sin imagen; Desktop no permite abrir ni descargar la imagen. Siguiente sprint recomendado: Chat imágenes UX.
 - WebP se acepta como entrada, pero se almacena como JPEG para compatibilidad y stripping de metadata.
 
 ---
@@ -289,3 +293,17 @@ Integrada en `main` y publicada en `origin/main` (`2c18a9f`). Implementada en ba
 - No se hizo prueba manual GUI de Android/Desktop para clicks/diálogos.
 - No hay tests UI automatizados de Compose/JavaFX para los menús.
 - Borrado admin/owner de mensajes ajenos queda fuera de alcance por decisión de "individual propio".
+
+---
+
+## 14. Sprint siguiente recomendado — Chat imágenes UX
+
+Objetivo: hacer consumibles los adjuntos de imagen ya persistidos por Fase 3.
+
+Alcance mínimo:
+- Android: thumbnail visible en mensajes entrantes/salientes, tap para visor a tamaño completo, acción guardar/descargar, estados de carga/error y fetch autenticado sin filtrar bearer fuera del origen API.
+- Desktop: click en thumbnail para abrir original, acción guardar con selector de archivo, estado de error/reintento y descarga autenticada del original.
+- Backend: solo tocar si hace falta ajustar headers/contrato de descarga; conservar ownership familiar y 404 fail-closed.
+- Validación: imagen Desktop → Android e imagen Android → Desktop sin recargar historial; thumbnail visible, abrir original, guardar/descargar y comportamiento correcto ante 404.
+
+Este sprint debe ir antes de vídeo/push, porque cierra deuda funcional de la Fase 3 ya integrada.
