@@ -32,11 +32,15 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
 import org.gipsybuho.recetasfamiliares.ui.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.ui.theme.ThemeMode
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import okhttp3.Request
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.MenuItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
@@ -635,6 +639,69 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                     onReady(text.trim())
                 }
                 .onFailure { _userMessage.emit("No se pudo exportar el chat") }
+        }
+    }
+
+    /**
+     * Descarga el original del adjunto con el cliente autenticado (SEC-3) y lo
+     * guarda en la galeria. En API 29+ usa MediaStore sin permiso; en versiones
+     * anteriores el llamador debe garantizar WRITE_EXTERNAL_STORAGE.
+     */
+    fun saveChatImageToGallery(context: Context, url: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val request = Request.Builder().url(url).get().build()
+                    container.httpClient.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) error("HTTP ${response.code}")
+                        val bytes = response.body.bytes()
+                        writeImageToGallery(context, bytes, response.header("Content-Type"))
+                    }
+                }
+            }
+                .onSuccess { _userMessage.emit("Imagen guardada en la galeria") }
+                .onFailure { _userMessage.emit("No se pudo guardar la imagen") }
+        }
+    }
+
+    private fun writeImageToGallery(context: Context, bytes: ByteArray, contentType: String?) {
+        val extension = when (contentType?.substringBefore(';')?.trim()?.lowercase()) {
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            else -> "jpg"
+        }
+        val mime = when (extension) {
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            else -> "image/jpeg"
+        }
+        val resolver = context.contentResolver
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "recetas-chat-${System.currentTimeMillis()}.$extension")
+            put(MediaStore.Images.Media.MIME_TYPE, mime)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(
+                    MediaStore.Images.Media.RELATIVE_PATH,
+                    Environment.DIRECTORY_PICTURES + "/RecetasFamiliares"
+                )
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: error("No se pudo crear el registro en la galeria")
+        try {
+            resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: error("No se pudo abrir el destino")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                values.clear()
+                values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                if (resolver.update(uri, values, null, null) == 0) {
+                    error("No se pudo finalizar el guardado en la galeria")
+                }
+            }
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            throw e
         }
     }
 

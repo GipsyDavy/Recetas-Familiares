@@ -1,8 +1,10 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.Button;
@@ -12,8 +14,10 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
@@ -33,6 +37,8 @@ import org.gipsybuho.recetasfamiliares.data.repository.ChatRepository;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -59,6 +65,8 @@ public class ChatView extends VBox {
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("dd/MM");
     private static final DateTimeFormatter DAY_YEAR_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final double NEAR_BOTTOM_THRESHOLD = 0.95;
+    private static final ButtonType SAVE_BUTTON_TYPE =
+            new ButtonType("Guardar", ButtonBar.ButtonData.OTHER);
 
     private final AppContext context;
     private final Consumer<String> onStatus;
@@ -727,7 +735,130 @@ public class ChatView extends VBox {
                 Platform.runLater(() -> loading.setText("Imagen no disponible"));
             }
         });
+
+        String originalUrl = attachment.url();
+        if (originalUrl != null && !originalUrl.isBlank()) {
+            frame.setCursor(Cursor.HAND);
+            Tooltip.install(frame, new Tooltip("Ver imagen completa"));
+            frame.setOnMouseClicked(e -> openAttachmentViewer(attachment));
+        }
         return frame;
+    }
+
+    /**
+     * Abre la imagen original a tamano completo en un dialogo modal, con opcion
+     * de guardarla en disco. Los bytes se descargan una sola vez con el cliente
+     * autenticado (SEC-3) y se reutilizan para el guardado.
+     */
+    private void openAttachmentViewer(ChatDtos.ChatAttachment attachment) {
+        String url = attachment.url();
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        Dialog<Void> dialog = new Dialog<>();
+        if (getScene() != null) {
+            dialog.initOwner(getScene().getWindow());
+        }
+        dialog.setTitle("Imagen del chat");
+        dialog.getDialogPane().getButtonTypes().addAll(SAVE_BUTTON_TYPE, ButtonType.CLOSE);
+
+        StackPane content = new StackPane();
+        content.setPrefSize(720, 520);
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setMaxSize(48, 48);
+        content.getChildren().add(spinner);
+        dialog.getDialogPane().setContent(content);
+
+        Button saveButton = (Button) dialog.getDialogPane().lookupButton(SAVE_BUTTON_TYPE);
+        saveButton.setDisable(true);
+        final byte[][] loaded = new byte[1][];
+        // Guardar no debe cerrar el visor.
+        saveButton.addEventFilter(ActionEvent.ACTION, e -> {
+            e.consume();
+            if (loaded[0] != null) {
+                saveAttachmentToDisk(attachment, loaded[0]);
+            }
+        });
+
+        // Si el usuario cierra el visor antes de que termine la descarga, no
+        // tocar nodos ya descartados.
+        final boolean[] closed = {false};
+        dialog.setOnHidden(e -> closed[0] = true);
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                byte[] bytes = context.getApiClient().fetchImage(url);
+                Platform.runLater(() -> {
+                    if (closed[0]) {
+                        return;
+                    }
+                    Image image = new Image(new ByteArrayInputStream(bytes), 700, 480, true, true);
+                    if (image.isError()) {
+                        content.getChildren().setAll(viewerErrorLabel());
+                        return;
+                    }
+                    ImageView view = new ImageView(image);
+                    view.setPreserveRatio(true);
+                    view.setSmooth(true);
+                    view.setFitWidth(700);
+                    view.setFitHeight(480);
+                    content.getChildren().setAll(view);
+                    loaded[0] = bytes;
+                    saveButton.setDisable(false);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    if (!closed[0]) {
+                        content.getChildren().setAll(viewerErrorLabel());
+                    }
+                });
+            }
+        });
+
+        dialog.showAndWait();
+    }
+
+    private Label viewerErrorLabel() {
+        Label label = new Label("No se pudo cargar la imagen");
+        label.getStyleClass().add("chat-attachment-placeholder");
+        return label;
+    }
+
+    private void saveAttachmentToDisk(ChatDtos.ChatAttachment attachment, byte[] bytes) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Guardar imagen");
+        String extension = extensionForContentType(attachment.contentType());
+        chooser.setInitialFileName("recetas-chat-" + System.currentTimeMillis() + extension);
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Imagen", "*" + extension));
+        File target = getScene() != null
+                ? chooser.showSaveDialog(getScene().getWindow())
+                : chooser.showSaveDialog(null);
+        if (target == null) {
+            return;
+        }
+        // La escritura a disco no debe bloquear el hilo de JavaFX.
+        Thread.ofVirtual().start(() -> {
+            try {
+                Files.write(target.toPath(), bytes);
+                Platform.runLater(() -> onStatus.accept("Imagen guardada en " + target.getName()));
+            } catch (IOException ex) {
+                Platform.runLater(() -> onStatus.accept("No pudimos guardar la imagen."));
+            }
+        });
+    }
+
+    private static String extensionForContentType(String contentType) {
+        if (contentType == null) {
+            return ".jpg";
+        }
+        String normalized = contentType.toLowerCase(java.util.Locale.ROOT);
+        if (normalized.contains("png")) {
+            return ".png";
+        }
+        if (normalized.contains("webp")) {
+            return ".webp";
+        }
+        return ".jpg";
     }
 
     private boolean isMine(ChatDtos.ChatMessage message) {

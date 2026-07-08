@@ -72,6 +72,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -201,8 +202,14 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     var navigateToRecipeId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Con el chat abierto, RecetasApp hace return antes de componer su SnackbarHost;
+    // en ese caso el propio ChatScreen muestra los avisos. Se descartan aqui para no
+    // encolar un snackbar rezagado que reaparezca al cerrar el chat.
+    val chatOpenState = rememberUpdatedState(chatOpen)
     LaunchedEffect(Unit) {
-        viewModel.userMessage.collect { message -> snackbarHostState.showSnackbar(message) }
+        viewModel.userMessage.collect { message ->
+            if (!chatOpenState.value) snackbarHostState.showSnackbar(message)
+        }
     }
 
     LaunchedEffect(Unit) {

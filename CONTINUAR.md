@@ -830,6 +830,43 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Punto de retoma operativo: en esta sesion se habian arrancado backend dev/H2, emulador Android y Desktop para pruebas visuales. En una nueva sesion, comprobar procesos vivos y reiniciar limpio si hace falta. No versionar credenciales de prueba; recrear usuarios locales en la misma familia si el backend H2 se reinicia.
 - Recomendacion de orden: hacer este sprint antes de video/push, porque cierre UX de imagenes es deuda de la Fase 3 ya integrada.
 
+### Sprint 47 - Chat imagenes UX: render fiable, visor y descarga (2026-07-09)
+
+- Objetivo: cerrar la brecha funcional de imagenes del chat (render Android, abrir original y guardar/descargar en Android y Desktop). Autorizado por el usuario; sin cambios de backend.
+- Agente lider: Claude Code en solitario. Codex y Gemini NO ejecutados en la sesion; se dejan bloques de verificacion copy-paste (solo lectura) para el usuario, segun regla de bloques IDE.
+- Causa raiz del render Android (diagnosticada, no solo parcheada): el backend genera URLs de adjunto absolutas con `app.upload.base-url` (por defecto `http://localhost:8080`). En emulador el host del API es `10.0.2.2`, asi que `AuthInterceptor` no adjuntaba el Bearer (host distinto) y `localhost` apuntaba al propio emulador -> el thumbnail nunca cargaba. Desktop funcionaba porque corre en el mismo host `localhost` que el backend.
+- Android implementado:
+  - `ChatRepository`: nueva normalizacion de origen de las URLs de adjunto (`/uploads/**`) al host del API del cliente (`apiOrigin`), aplicada en un unico punto que cubre REST y WS (historial, envio, envio imagen, editar, borrar, export y `openRealtime`). URLs externas sin `/uploads/` se dejan intactas.
+  - `ChatScreen`: `SubcomposeAsyncImage` con estados loading/error, thumbnail clicable y `ChatImageViewer` a pantalla completa (Dialog full-screen, cerrar y guardar).
+  - `RecetasViewModel`: `saveChatImageToGallery` descarga el original con el `httpClient` autenticado y escribe en MediaStore (API 29+ sin permiso; en API<29 el visor solicita `WRITE_EXTERNAL_STORAGE`).
+  - `AndroidManifest.xml`: `WRITE_EXTERNAL_STORAGE` con `maxSdkVersion=28`.
+- Desktop implementado:
+  - `ChatView`: thumbnail clicable (cursor mano + tooltip) abre `openAttachmentViewer` (dialogo modal con el original a tamano completo, fetch autenticado una sola vez) y `saveAttachmentToDisk` con `FileChooser`, reutilizando los bytes ya descargados.
+- Validacion ejecutada en la sesion:
+  - Android `./gradlew assembleDebug` -> BUILD SUCCESSFUL; `compileDebugKotlin` sin warnings ni errores.
+  - Desktop `mvn test` -> 12 tests, 0 fallos; `mvn -DskipTests compile` OK.
+  - Backend no tocado; no re-ejecutado.
+- Seguridad ejecutada: VibeSec y `security-review` aplicados al diff en la sesion. 0 hallazgos de alta confianza. La normalizacion de URL reduce la superficie de fuga de Bearer (una URL hostil solo puede redirigir a la propia API). Path traversal fail-closed sigue en backend; nombre de archivo local generado por el cliente (timestamp).
+- Riesgos residuales:
+  - NO se realizo prueba visual real cross-device en esta sesion (no se arrancaron backend/emulador/Desktop GUI). El fix esta verificado por analisis de causa raiz + build/tests, pero falta validacion manual: thumbnail visible, abrir original y guardar Desktop<->Android con imagen real y estado de error ante 404.
+  - Desktop NO normaliza el origen de la URL (depende de que backend y `api.base.url` compartan host). En dev `localhost` funciona; al migrar a Hetzner, si `UPLOAD_BASE_URL` no coincide con el dominio de los clientes, Desktop volveria a fallar (Android ya queda protegido). Considerar replicar la normalizacion en Desktop antes/junto a la migracion PostgreSQL.
+  - Sin tests UI automatizados (Compose/JavaFX), coherente con deuda COD-8.
+
+### Sprint 47 (cont.) - Integracion hallazgos Codex/Gemini (2026-07-09)
+
+- El usuario ejecuto los bloques copy-paste; hallazgos verificados contra codigo antes de integrar. Solo se aplico lo confirmado.
+- Codex (4 confirmados):
+  - MEDIO: `rewriteUploadUrl` (Android) usaba `indexOf("/uploads/")` sobre la cadena completa -> reescribia falsos positivos con `/uploads/` en el query y no bloqueaba `..`. Ahora `uploadPathOrNull` parsea con `java.net.URI`, toma solo el path, rechaza `..` y exige prefijo `/uploads/chat/` o `/uploads/chat_thumbnails/`.
+  - BAJO: `saveChatImageToGallery` no comprobaba el resultado de `resolver.update(IS_PENDING=0)`. Ahora si devuelve 0 lanza error y el catch borra el `uri` y falla la operacion (sin "guardada" enganoso).
+  - BAJO: visor Desktop no cancelaba al cerrar; añadido flag `closed` en `setOnHidden` que salta el `runLater` si el dialogo ya cerro.
+  - BAJO (regla CLAUDE.md): `Files.write` corria en el hilo JavaFX; movido a hilo virtual, volviendo a FX solo para `onStatus`.
+- Gemini (1 medio valido + 1 polish):
+  - MEDIO (Android, no era FP): `ChatScreen` hace `return` antes del `Scaffold`/`SnackbarHost` global de `RecetasApp`, asi que los avisos (guardar imagen, borrar chat, errores export) no se veian con el chat abierto. Añadido `SnackbarHost` propio en `ChatScreen` que colecta `userMessage`; el colector global de `RecetasApp` se guarda con `rememberUpdatedState(chatOpen)` para no encolar un snackbar rezagado.
+  - Polish (Desktop): visor usa `ProgressIndicator` en carga y label de error con estilo `chat-attachment-placeholder`.
+  - Descartados como backlog (no scope): icono MoreVert vs "Opciones" en Desktop, animaciones de acciones de mensaje, contentDescription con caption en `ImageView` Desktop.
+- Revalidacion: Android `assembleDebug` BUILD SUCCESSFUL (3 warnings preexistentes de tooltip deprecado, ajenos al sprint); Desktop `mvn test` 12/0.
+- Seguridad: el endurecimiento de `rewriteUploadUrl` cierra el vector de reescritura por query y traversal; sin nuevos hallazgos.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
