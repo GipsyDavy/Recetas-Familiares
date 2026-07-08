@@ -152,7 +152,7 @@ No cambiar sin revisar Backend, Android, Desktop e iOS:
 - `RecipeStepResponse`: `position`, `instruction`, `timerMinutes`.
 - Entidades sincronizables: `id`, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
 - Ownership familiar obligatorio en backend aunque el cliente oculte acciones.
-- Chat familiar texto (2026-07-07) e imagenes (Fase 3, 2026-07-08) integrados y committeados en `main` (backend + Android + Desktop). Edicion/borrado propio implementado localmente el 2026-07-08, pendiente de commit/push. Modulo independiente bajo `/api/v1/families/{familyId}/chat`.
+- Chat familiar texto (2026-07-07), imagenes (Fase 3, 2026-07-08) y edicion/borrado propio (2026-07-08) integrados y publicados en `main` (backend + Android + Desktop). Modulo independiente bajo `/api/v1/families/{familyId}/chat`.
   - `GET /messages?before=<id>&limit=<=50` → `{ items[], hasMore, nextBefore }` (desc por cursor, filtrado por limpieza del usuario).
   - `POST /messages` `{ id?, body }` (id de cliente idempotente, `body` <=2000) → `ChatMessageResponse` + broadcast WS.
   - `POST /messages/images` multipart `id?`, `body?`, `files[]` (JPEG/PNG/WebP, max 5, 8 MB por archivo, validacion fuerte) → `ChatMessageResponse.attachments[]` + broadcast WS.
@@ -317,7 +317,7 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Tras Chat Fase 1, Chat Desktop Fase 2, remediacion OWASP, Chat Fase 3 imagenes y edicion/borrado propio (cierre local 2026-07-08), el chat de texto/imagenes/edicion queda implementado en backend/Android/Desktop con build/tests verdes en sesion. Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
+Tras Chat Fase 1, Chat Desktop Fase 2, remediacion OWASP, Chat Fase 3 imagenes y edicion/borrado propio (publicado en `main` el 2026-07-08), el chat de texto/imagenes/edicion queda implementado en backend/Android/Desktop con build/tests verdes en sesion. Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
 Prioridad propuesta para el siguiente sprint no autorizado:
 
@@ -806,7 +806,8 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
   - Desktop `mvn -f desktop\pom.xml test` -> 12 tests, 0 fallos.
   - Android `.\gradlew.bat test assembleDebug` -> BUILD SUCCESS.
 - Riesgos residuales: sin prueba manual GUI de los menus/dialogos en Android/Desktop; sin tests UI automatizados Compose/JavaFX; borrado admin/owner de mensajes ajenos queda fuera de alcance por decision de "individual propio".
-- Punto de retoma: ejecutar `git diff --check`, revisar `git status`, decidir commit/push. Siguiente sprint recomendado: validacion manual GUI del chat completo (imagenes + edicion/borrado) o fase 4 video/push con redisenio de storage.
+- Commit publicado: `2c18a9f feat: editar y borrar mensajes propios en chat`.
+- Punto de retoma: revisar `git status`. Queda una carpeta no versionada `herztner/` ajena a este sprint, no tocada. Siguiente sprint recomendado: validacion manual GUI del chat completo (imagenes + edicion/borrado) o fase 4 video/push con redisenio de storage.
 
 ### Chequeo obligatorio de cierre
 

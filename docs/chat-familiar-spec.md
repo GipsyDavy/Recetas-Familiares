@@ -1,6 +1,6 @@
 # Especificación: Chat Familiar por Fases
 
-Estado: **chat con texto, imágenes y edición/borrado propio integrado localmente (backend + Android + Desktop, 2026-07-08)**. Fase 4 (vídeo + push) e iOS siguen pendientes.
+Estado: **chat con texto, imágenes y edición/borrado propio integrado en `main` (backend + Android + Desktop, 2026-07-08)**. Fase 4 (vídeo + push) e iOS siguen pendientes.
 Sprint de origen: 43 (2026-07-05). Fase 1 backend+Android y fase 2 Desktop se ejecutaron el 2026-07-07; fase 3 imágenes y edición/borrado propio el 2026-07-08; ver §10-§13.
 
 Referencias: `CONTINUAR.md` §6 y §7 (contrato y estado por plataforma), `CLAUDE.md` (seguridad, sincronización, contratos API).
@@ -261,7 +261,7 @@ Integrada en `main` y publicada tras el endurecimiento de Chat Fase 3. Implement
 
 ## 13. Estado de implementación — Edición/borrado propio (2026-07-08)
 
-Integración local pendiente de commit/push. Implementada en backend, Android y Desktop sobre el contrato existente de chat.
+Integrada en `main` y publicada en `origin/main` (`2c18a9f`). Implementada en backend, Android y Desktop sobre el contrato existente de chat.
 
 ### Backend
 - Nuevo DTO `EditChatMessageRequest`.
