@@ -860,7 +860,8 @@ Documento redactado como ingeniero senior experto en programacion para retomar s
   - Validado: `mvn test` -> 116 tests, 0 fallos (aun sobre H2 en MODE=MySQL).
 
 - FASE 2 — SIGUIENTE, NO empezada. Alcance exacto:
-  - Traducir `backend/src/main/resources/db/migration/V1..V14` a sintaxis PostgreSQL: eliminar `ON UPDATE CURRENT_TIMESTAMP(6)` (la app fija `updated_at` via `@PreUpdate`); `DEFAULT CURRENT_TIMESTAMP(6)` -> `now()` o quitar default; `TIMESTAMP(6)` -> `timestamptz` (UTC; ya hay `hibernate.jdbc.time_zone: UTC`); mantener `CHAR(36)`; indices/PK/FK/UNIQUE sin cambios. Revisar V13 `ensure_family_owner_members` por sintaxis especifica.
+  - CORRECCION al plan: hay **15 migraciones (V1..V15)**, no 14. El plan `docs/migracion-*.md` §2 dice 14 porque es anterior al chat; el chat anadio `V14__create_chat_schema.sql` y `V15__create_chat_attachments.sql`. Traducir las 15.
+  - Traducir `backend/src/main/resources/db/migration/V1..V15` a sintaxis PostgreSQL: eliminar `ON UPDATE CURRENT_TIMESTAMP(6)` (la app fija `updated_at` via `@PreUpdate`); `DEFAULT CURRENT_TIMESTAMP(6)` -> `now()` o quitar default; `TIMESTAMP(6)` -> `timestamptz` (UTC; ya hay `hibernate.jdbc.time_zone: UTC`); mantener `CHAR(36)`; indices/PK/FK/UNIQUE/CHECK sin cambios.
   - ACOPLAMIENTO CRITICO: los tests usan H2 en `MODE=MySQL` con `ddl-auto=validate` (`backend/src/test/resources/application-test.yml`, y `DevDataSeederTest` con url H2 inline). Al pasar las migraciones a sintaxis Postgres, H2 deja de servir. Por eso Fase 2 DEBE incluir el cambio de tests a Testcontainers-Postgres EN EL MISMO COMMIT para no dejar un commit rojo. Anadir dependencia Testcontainers-postgresql (scope test), base class con `@Container PostgreSQLContainer` + `@DynamicPropertySource`, y quitar la config H2.
   - REQUISITO DE ENTORNO: Fase 2 necesita **Docker** en la maquina (Testcontainers arranca `postgres:16`). PREGUNTA ABIERTA al usuario sin responder: si hay Docker Desktop instalado/corriendo. Alternativas si no: Postgres local levantado por el usuario, o validar solo compilacion y aplazar la ejecucion de tests.
   - Criterio de cierre Fase 2: `mvn test` verde contra Postgres real + arranque con `ddl-auto=validate` sin desajustes entidad/columna.
@@ -870,9 +871,39 @@ Documento redactado como ingeniero senior experto en programacion para retomar s
 - Metodo de trabajo pactado: commitear POR FASE (por si se agota cuota de IA), verificar build/tests reales en cada fase, no marcar nada como validado sin ejecutarlo. Rollback: MySQL actual intacto hasta Fase 7; todo en rama.
 
 #### Primer paso de la proxima sesion
-1. `git checkout feat/migracion-postgresql` y confirmar `git log -1` = `2514c29`.
+1. `git checkout feat/migracion-postgresql` y confirmar `git log -1` = `fc3fc22` (Fase 1 en `2514c29`).
 2. Confirmar disponibilidad de Docker (Fase 2). Si no hay, decidir alternativa.
-3. Ejecutar Fase 2 (traducir V1..V14 + Testcontainers) y commitear al quedar verde.
+3. Ejecutar Fase 2 (traducir V1..V15 + Testcontainers) y commitear al quedar verde.
+
+#### Guia ejecutable Fase 2 (autosuficiente para cualquier agente IA)
+
+NOTA PARA AGENTES IA QUE RETOMEN: la memoria de Claude en `~/.claude` es privada y NO esta en el repo. Las fuentes de verdad en el repositorio son `CLAUDE.md` (reglas), este `CONTINUAR.md` (estado) y `docs/migracion-mysql-a-postgresql-plan.md` (plan). No asumir contexto de sesiones anteriores fuera de estos archivos y del historial de git.
+
+Inventario real de idioms MySQL a traducir (verificado por grep el 2026-07-09):
+- `ON UPDATE CURRENT_TIMESTAMP(6)` y `DEFAULT CURRENT_TIMESTAMP(6)`: en V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V14, V15. (V11, V12, V13 no los tienen.)
+- `TINYINT`: solo en `V10__create_ratings_schema.sql` (`stars TINYINT NOT NULL`) -> Postgres `smallint`. Su `CHECK (stars BETWEEN 1 AND 5)` es valido en Postgres, sin cambio.
+- No hay `ENGINE=`, `AUTO_INCREMENT`, `UNSIGNED`, `ENUM(` en ninguna migracion (los UUID son `CHAR(36)` generados por la app).
+- V11 y V12 son ALTER TABLE (avatar_url, storage_path). V13 (`ensure_family_owner_members`) tiene logica INSERT/UPDATE con subconsultas: revisar que la sintaxis sea ANSI/Postgres (evitar extensiones MySQL); traducir si hace falta.
+
+Reglas de traduccion (aplicar a cada archivo):
+1. Quitar el fragmento ` ON UPDATE CURRENT_TIMESTAMP(6)` (dejar la columna como `... NOT NULL`). La app fija `updated_at` en `@PreUpdate`.
+2. `DEFAULT CURRENT_TIMESTAMP(6)` -> `DEFAULT now()`.
+3. `TIMESTAMP(6)` -> `timestamptz` (la app ya opera en UTC con `hibernate.jdbc.time_zone: UTC`).
+4. `CHAR(36)` se mantiene (decision: minimo cambio).
+5. En V10: `TINYINT` -> `smallint`.
+6. No tocar indices, PK, FK, UNIQUE ni CHECK salvo sintaxis incompatible.
+7. Editar V1..V15 IN SITU (no crear V16 de conversion): el esquema Postgres se crea desde cero, aun no hay Postgres productivo con estas migraciones aplicadas.
+
+Cambio de tests a Testcontainers-Postgres (mismo commit, obligatorio):
+- `backend/pom.xml` (dependencyManagement o version directa): anadir `org.testcontainers:junit-jupiter` y `org.testcontainers:postgresql` (scope test). Testcontainers publica BOM `org.testcontainers:testcontainers-bom`; fijar version (p.ej. la vigente estable) en `<properties>`.
+- Sustituir la config H2 de `backend/src/test/resources/application-test.yml` por Postgres via `@DynamicPropertySource`. Crear una base class abstracta anotada con `@Testcontainers` y un `@Container static PostgreSQLContainer<?> pg = new PostgreSQLContainer<>("postgres:16")`, e inyectar `spring.datasource.url/username/password` con `@DynamicPropertySource`. Mantener `ddl-auto: validate` y Flyway activo (que aplique V1..V15 sobre el contenedor).
+- Revisar `DevDataSeederTest` (tiene URL H2 `MODE=MySQL` inline en `@TestPropertySource`/`@DynamicPropertySource`): migrar tambien a Postgres o marcar su estrategia; no debe quedar apuntando a H2 si el resto va a Postgres.
+- Comprobar Docker antes: `docker version` (o `docker info`). Sin Docker, Testcontainers falla al arrancar el contenedor.
+
+Validacion de cierre Fase 2:
+- `cd backend && mvn test` -> verde contra Postgres real (Testcontainers levanta `postgres:16`; Flyway aplica V1..V15; Hibernate `validate` sin desajustes entidad/columna).
+- Si `validate` reporta mismatch, iterar en `columnDefinition` de entidades o en el tipo de la migracion hasta 0 errores (el punto delicado es `CHAR(36)` vs el tipo de la columna, y `timestamptz` vs `TIMESTAMP(6)` de las entidades).
+- Commit por fase: mensaje `chore(db): fase 2 migracion postgres - traduccion V1..V15 + testcontainers`. No marcar validado sin ejecutar `mvn test` realmente.
 
 ### Chequeo obligatorio de cierre
 
