@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.chat;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,7 @@ public class ChatService {
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_BODY_LENGTH = 2000;
     private static final int MAX_IMAGE_ATTACHMENTS = 5;
+    private static final Duration EDIT_WINDOW = Duration.ofMinutes(15);
 
     private final ChatMessageRepository messageRepository;
     private final ChatMessageClearRepository clearRepository;
@@ -178,6 +180,37 @@ public class ChatService {
         }
     }
 
+    @Transactional
+    public ChatMessageResponse editMessage(
+            String familyId,
+            String userId,
+            String messageId,
+            EditChatMessageRequest request
+    ) {
+        requireMembership(familyId, userId);
+        ChatMessageEntity message = findOwnEditableMessage(familyId, userId, messageId);
+        if (message.getCreatedAt().plus(EDIT_WINDOW).isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Message edit window has expired");
+        }
+
+        message.editBody(normalizeRequiredBody(request.body()));
+        ChatMessageEntity saved = messageRepository.save(message);
+        ChatMessageResponse response = ChatMessageResponse.from(saved);
+        publishAfterCommit(response, null);
+        return response;
+    }
+
+    @Transactional
+    public ChatMessageResponse deleteMessage(String familyId, String userId, String messageId) {
+        requireMembership(familyId, userId);
+        ChatMessageEntity message = findOwnEditableMessage(familyId, userId, messageId);
+        message.softDelete();
+        ChatMessageEntity saved = messageRepository.save(message);
+        ChatMessageResponse response = ChatMessageResponse.from(saved);
+        publishAfterCommit(response, null);
+        return response;
+    }
+
     /**
      * Publica el mensaje por WebSocket solo si la transaccion confirma, y limpia
      * los archivos escritos si termina en rollback. Evita broadcasts fantasma y
@@ -281,8 +314,28 @@ public class ChatService {
         return text;
     }
 
+    private String normalizeRequiredBody(String body) {
+        if (body == null || body.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message body is blank");
+        }
+        String text = body.trim();
+        if (text.length() > MAX_BODY_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message body is too long");
+        }
+        return text;
+    }
+
     private String normalizeClientId(String id) {
         return id == null || id.isBlank() ? null : id.trim();
+    }
+
+    private ChatMessageEntity findOwnEditableMessage(String familyId, String userId, String messageId) {
+        ChatMessageEntity message = messageRepository.findByIdAndFamily_IdAndDeletedFalse(messageId, familyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
+        if (!message.getAuthorUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found");
+        }
+        return message;
     }
 
     private ChatMessageEntity findExistingMessage(String clientId, String familyId, String userId) {

@@ -89,6 +89,32 @@ public class ChatRepository {
                 ChatDtos.ChatMessage.class);
     }
 
+    public ChatDtos.ChatMessage edit(String messageId, String body) throws ApiException {
+        String family = requireFamily();
+        String text = body == null ? "" : body.trim();
+        if (messageId == null || messageId.isBlank()) {
+            throw new IllegalArgumentException("Mensaje no valido");
+        }
+        if (text.isEmpty()) {
+            throw new IllegalArgumentException("El mensaje no puede estar vacio");
+        }
+        if (text.length() > MAX_BODY_LENGTH) {
+            throw new IllegalArgumentException("El mensaje es demasiado largo");
+        }
+        var request = new ChatDtos.EditChatMessageRequest(text);
+        return api.put("api/v1/families/" + family + "/chat/messages/" + messageId.trim(),
+                request, ChatDtos.ChatMessage.class);
+    }
+
+    public ChatDtos.ChatMessage delete(String messageId) throws ApiException {
+        String family = requireFamily();
+        if (messageId == null || messageId.isBlank()) {
+            throw new IllegalArgumentException("Mensaje no valido");
+        }
+        return api.delete("api/v1/families/" + family + "/chat/messages/" + messageId.trim(),
+                ChatDtos.ChatMessage.class);
+    }
+
     public void clear() throws ApiException {
         api.post("api/v1/families/" + requireFamily() + "/chat/clear", "{}", Void.class);
     }

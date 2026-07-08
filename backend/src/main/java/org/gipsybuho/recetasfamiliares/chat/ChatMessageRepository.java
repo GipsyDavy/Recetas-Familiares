@@ -24,7 +24,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessageEntity, 
     @Query("""
             SELECT m FROM ChatMessageEntity m
             WHERE m.family.id = :familyId
-              AND m.deleted = false
               AND m.createdAt > :clearedBefore
               AND (
                     :beforeCreatedAt IS NULL
@@ -47,7 +46,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessageEntity, 
     @Query("""
             SELECT m FROM ChatMessageEntity m
             WHERE m.family.id = :familyId
-              AND m.deleted = false
               AND m.createdAt > :clearedBefore
             ORDER BY m.createdAt ASC, m.id ASC
             """)

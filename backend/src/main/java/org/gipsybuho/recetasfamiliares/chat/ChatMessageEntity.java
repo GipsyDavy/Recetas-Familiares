@@ -144,6 +144,14 @@ public class ChatMessageEntity {
         return deleted;
     }
 
+    public void editBody(String body) {
+        if (!deleted) {
+            this.body = body;
+            updatedAt = Instant.now();
+            syncVersion++;
+        }
+    }
+
     public void softDelete() {
         if (!deleted) {
             deleted = true;

@@ -555,6 +555,37 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    fun editChatMessage(message: ChatMessageDto, body: String, onDone: () -> Unit = {}) {
+        val text = body.trim()
+        if (message.deleted || message.authorUserId != myUserId) return
+        if (text.isEmpty()) return
+        if (text.length > CHAT_MAX_BODY_LENGTH) {
+            viewModelScope.launch { _userMessage.emit("El mensaje no puede superar $CHAT_MAX_BODY_LENGTH caracteres") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { container.chatRepository.edit(message.id, text) }
+                .onSuccess { updated ->
+                    _chatMessages.update { mergeChat(it, listOf(updated)) }
+                    _userMessage.emit("Mensaje editado")
+                    onDone()
+                }
+                .onFailure { _userMessage.emit("No se pudo editar el mensaje") }
+        }
+    }
+
+    fun deleteChatMessage(message: ChatMessageDto) {
+        if (message.deleted || message.authorUserId != myUserId) return
+        viewModelScope.launch {
+            runCatching { container.chatRepository.delete(message.id) }
+                .onSuccess { updated ->
+                    _chatMessages.update { mergeChat(it, listOf(updated)) }
+                    _userMessage.emit("Mensaje eliminado")
+                }
+                .onFailure { _userMessage.emit("No se pudo eliminar el mensaje") }
+        }
+    }
+
     fun loadOlderChat() {
         if (!_chatHasMoreOlder.value) return
         val cursor = chatOldestCursor ?: return

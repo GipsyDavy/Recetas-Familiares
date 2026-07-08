@@ -79,4 +79,10 @@ public final class ChatDtos {
             String body
     ) {
     }
+
+    /** Edicion de mensaje propio dentro de la ventana permitida por backend. */
+    public record EditChatMessageRequest(
+            String body
+    ) {
+    }
 }

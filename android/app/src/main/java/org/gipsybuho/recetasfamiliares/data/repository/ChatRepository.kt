@@ -11,6 +11,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatExportDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatHistoryDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.EditChatMessageRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SendChatMessageRequestDto
 import java.util.UUID
 
@@ -68,6 +69,21 @@ class ChatRepository(
         val id = UUID.randomUUID().toString().toRequestBody(TEXT_PLAIN)
         val bodyPart = text.takeIf { it.isNotEmpty() }?.toRequestBody(TEXT_PLAIN)
         return api.sendChatImageMessage(family, id, bodyPart, parts)
+    }
+
+    suspend fun edit(messageId: String, body: String): ChatMessageDto {
+        val family = requireFamily()
+        val text = body.trim()
+        require(messageId.isNotBlank()) { "Chat message id is blank" }
+        require(text.isNotEmpty()) { "Chat message body is blank" }
+        require(text.length <= CHAT_MAX_BODY_LENGTH) { "Chat message body is too long" }
+        return api.editChatMessage(family, messageId, EditChatMessageRequestDto(text))
+    }
+
+    suspend fun delete(messageId: String): ChatMessageDto {
+        val family = requireFamily()
+        require(messageId.isNotBlank()) { "Chat message id is blank" }
+        return api.deleteChatMessage(family, messageId)
     }
 
     suspend fun clear() {

@@ -101,6 +101,15 @@ public class ApiClient {
         executeVoid(request);
     }
 
+    public <T> T delete(String path, Class<T> responseType) throws ApiException {
+        Request request = new Request.Builder()
+                .url(baseUrl + path)
+                .header("Authorization", "Bearer " + session.getAccessToken())
+                .delete()
+                .build();
+        return execute(request, responseType);
+    }
+
     public <T> T postMultipart(String path, File file, String partName, Class<T> responseType) throws ApiException {
         RequestBody fileBody = RequestBody.create(file, mediaTypeForImage(file.getName()));
         MultipartBody multipart = new MultipartBody.Builder()

@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -83,6 +85,9 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
 
     var menuOpen by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    var editingMessage by remember { mutableStateOf<ChatMessageDto?>(null) }
+    var editDraft by remember { mutableStateOf("") }
+    var deletingMessage by remember { mutableStateOf<ChatMessageDto?>(null) }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -197,7 +202,15 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = Spacing.md)
                         ) {
                             items(messages, key = { it.id }) { message ->
-                                MessageBubble(message, isMine = message.authorUserId == myUserId)
+                                MessageBubble(
+                                    message = message,
+                                    isMine = message.authorUserId == myUserId,
+                                    onEdit = { selected ->
+                                        editDraft = selected.body.orEmpty()
+                                        editingMessage = selected
+                                    },
+                                    onDelete = { selected -> deletingMessage = selected }
+                                )
                             }
                         }
                     }
@@ -240,14 +253,70 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
             }
         )
     }
+
+    editingMessage?.let { message ->
+        val text = editDraft.trim()
+        AlertDialog(
+            onDismissRequest = { editingMessage = null },
+            title = { Text("Editar mensaje") },
+            text = {
+                OutlinedTextField(
+                    value = editDraft,
+                    onValueChange = { editDraft = it.take(CHAT_MAX_BODY_LENGTH) },
+                    supportingText = { Text("${editDraft.length}/$CHAT_MAX_BODY_LENGTH") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 5
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = text.isNotEmpty() && text != message.body.orEmpty(),
+                    onClick = {
+                        viewModel.editChatMessage(message, text) {
+                            editingMessage = null
+                        }
+                    }
+                ) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingMessage = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    deletingMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { deletingMessage = null },
+            title = { Text("Eliminar mensaje") },
+            text = { Text("Se mostrará como mensaje eliminado para todos los miembros.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.deleteChatMessage(message)
+                    deletingMessage = null
+                }) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingMessage = null }) { Text("Cancelar") }
+            }
+        )
+    }
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessageDto, isMine: Boolean) {
+private fun MessageBubble(
+    message: ChatMessageDto,
+    isMine: Boolean,
+    onEdit: (ChatMessageDto) -> Unit,
+    onDelete: (ChatMessageDto) -> Unit
+) {
+    var actionsOpen by remember(message.id) { mutableStateOf(false) }
     val time = formatTime(message.createdAt)
     val attachments = message.attachments.orEmpty()
     val bodyText = message.body?.takeIf { it.isNotBlank() }
     val deletedText = if (message.deleted) "(mensaje eliminado)" else null
+    val canDelete = isMine && !message.deleted
+    val canEdit = canDelete && bodyText != null
     val attachmentText = when (attachments.size) {
         0 -> null
         1 -> "1 imagen"
@@ -274,6 +343,39 @@ private fun MessageBubble(message: ChatMessageDto, isMine: Boolean) {
             modifier = Modifier.widthIn(max = 320.dp)
         ) {
             Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
+                if (canDelete) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                        IconButton(
+                            onClick = { actionsOpen = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Opciones del mensaje")
+                        }
+                        DropdownMenu(
+                            expanded = actionsOpen,
+                            onDismissRequest = { actionsOpen = false }
+                        ) {
+                            if (canEdit) {
+                                DropdownMenuItem(
+                                    text = { Text("Editar") },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                    onClick = {
+                                        actionsOpen = false
+                                        onEdit(message)
+                                    }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Eliminar") },
+                                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                                onClick = {
+                                    actionsOpen = false
+                                    onDelete(message)
+                                }
+                            )
+                        }
+                    }
+                }
                 if (!isMine) {
                     Text(
                         message.authorDisplayName,

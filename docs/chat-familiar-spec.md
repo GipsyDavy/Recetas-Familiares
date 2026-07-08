@@ -1,7 +1,7 @@
 # Especificación: Chat Familiar por Fases
 
-Estado: **chat con texto e imágenes integrado localmente (backend + Android + Desktop, 2026-07-08)**. Fase 4 (vídeo + push), edición/borrado individual e iOS siguen pendientes.
-Sprint de origen: 43 (2026-07-05). Fase 1 backend+Android y fase 2 Desktop se ejecutaron el 2026-07-07; fase 3 imágenes el 2026-07-08; ver §10-§12.
+Estado: **chat con texto, imágenes y edición/borrado propio integrado localmente (backend + Android + Desktop, 2026-07-08)**. Fase 4 (vídeo + push) e iOS siguen pendientes.
+Sprint de origen: 43 (2026-07-05). Fase 1 backend+Android y fase 2 Desktop se ejecutaron el 2026-07-07; fase 3 imágenes y edición/borrado propio el 2026-07-08; ver §10-§13.
 
 Referencias: `CONTINUAR.md` §6 y §7 (contrato y estado por plataforma), `CLAUDE.md` (seguridad, sincronización, contratos API).
 
@@ -27,10 +27,10 @@ Principios:
 - Indicador básico de mensajes nuevos (badge). Sin read-receipts por usuario en fase 1.
 - Cliente: Android primero. Envío offline **no permitido** en fase 1 (botón deshabilitado sin red; simplifica el modelo, sin cola local).
 
-### Fase 2 — Desktop — implementada parcialmente
+### Fase 2 — Desktop + edición/borrado propio — implementada
 - Cliente Desktop JavaFX con el mismo contrato REST + WebSocket/STOMP.
 - Implementado: historial, envío, recepción en tiempo real, limpiar/exportar por usuario.
-- Pendiente: editar/borrar mensajes individuales propios (soft delete, tombstone visible: "mensaje eliminado") y ventana de edición de 15 minutos.
+- Implementado: editar/borrar mensajes individuales propios. La edición está limitada a 15 minutos desde `createdAt`; el borrado es soft delete y deja tombstone visible: "mensaje eliminado".
 
 ### Fase 3 — Imágenes — implementada
 - Adjuntos de imagen reutilizando la infraestructura de uploads (allowlist JPEG/PNG/WebP, magic bytes, 8 MB, ownership familiar por controller — misma política que `/uploads/**`).
@@ -56,8 +56,8 @@ Módulo independiente de notas. Base: `/api/v1/families/{familyId}/chat`.
 GET    /api/v1/families/{familyId}/chat/messages?before=<id>&limit=50   → historial paginado (desc)
 POST   /api/v1/families/{familyId}/chat/messages                        → { body }               (fase 1)
 POST   /api/v1/families/{familyId}/chat/messages/images                 → multipart id?, body?, files[] (fase 3)
-PUT    /api/v1/families/{familyId}/chat/messages/{id}                   → { body }               (fase 2, autor, <15 min)
-DELETE /api/v1/families/{familyId}/chat/messages/{id}                   → soft delete            (fase 2, autor o ADMIN/OWNER)
+PUT    /api/v1/families/{familyId}/chat/messages/{id}                   → { body }               (autor, <15 min)
+DELETE /api/v1/families/{familyId}/chat/messages/{id}                   → soft delete            (autor)
 WS     /ws  (STOMP)  topic: /topic/families/{familyId}/chat             → entrega en tiempo real (fase 1)
 ```
 
@@ -83,6 +83,7 @@ Reglas de contrato:
 - Entidad sincronizable estándar: `id`, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
 - El chat NO entra en `sync/pull` (volumen y semántica distintos); tiene su propio cursor de historial.
 - Idempotencia de envío: el cliente genera el `id` (UUID v4) y el POST lo acepta; reintento con el mismo id no duplica.
+- Edición/borrado: solo el autor puede modificar su mensaje; las comprobaciones de ownership son server-side. Un mensaje borrado se sigue devolviendo como tombstone (`deleted=true`, `body=null`, `attachments=[]`) en historial/export mientras no quede oculto por la limpieza por usuario.
 
 ---
 
@@ -164,8 +165,8 @@ Revisado: `pom.xml` backend, `FileStorageService`, `UploadController`, `AuthRate
 5. **iOS**: bloqueado hasta COD-1/COD-2, como ya indica esta spec.
 
 ### Conclusión y orden recomendado
-- Viable **por fases**, no de una tacada. Fase 1, Desktop y fase 3 imágenes ya están integrados localmente; lo siguiente natural es prueba GUI manual de imágenes, edición/borrado individual o fase 4.
-- Orden actualizado: prueba GUI Desktop/Android con imágenes si se desea → edición/borrado individual o reevaluar vídeo con límites más humildes (p. ej. 30 s / 20 MB) y streaming a disco antes que ffmpeg.
+- Viable **por fases**, no de una tacada. Fase 1, Desktop, fase 3 imágenes y edición/borrado propio ya están integrados localmente; lo siguiente natural es prueba GUI manual de imágenes/edición/borrado o fase 4.
+- Orden actualizado: prueba GUI Desktop/Android con imágenes y edición/borrado si se desea → reevaluar vídeo con límites más humildes (p. ej. 30 s / 20 MB) y streaming a disco antes que ffmpeg.
 - Push FCM: intercalar antes o durante fase 4 si importa el tiempo real con app cerrada.
 
 ---
@@ -197,7 +198,7 @@ Integrado en `main` y publicado en `origin/main`. La rama temporal `feat/chat-fa
 - STOMP sin heartbeats reales; Android reconecta por cierre/fallo y el polling cubre la entrega mientras tanto.
 - No se ejecutó TalkBack ni prueba de historial largo con lectura manual prolongada.
 - iOS bloqueado (COD-1/COD-2, sin macOS).
-- Reacciones, edición/borrado por mensaje, vídeo+push e iOS siguen pendientes.
+- Reacciones, vídeo+push e iOS siguen pendientes.
 
 ---
 
@@ -221,7 +222,7 @@ Integrado en `main` y publicado en `origin/main` mediante `merge: integrar chat 
 
 ## 12. Estado de implementación — Fase 3 imágenes (2026-07-08)
 
-Integración local pendiente de commit/push. Implementada en backend, Android y Desktop sobre el contrato existente de chat.
+Integrada en `main` y publicada tras el endurecimiento de Chat Fase 3. Implementada en backend, Android y Desktop sobre el contrato existente de chat.
 
 ### Backend
 - Migración `V15__create_chat_attachments.sql` con tabla `chat_attachments` enlazada a `chat_messages`.
@@ -255,3 +256,36 @@ Integración local pendiente de commit/push. Implementada en backend, Android y 
 - Sin antivirus o sandbox externo para adjuntos; pendiente para producción seria.
 - No se ejecutó prueba manual GUI de Android/Desktop enviando imágenes reales contra backend dev.
 - WebP se acepta como entrada, pero se almacena como JPEG para compatibilidad y stripping de metadata.
+
+---
+
+## 13. Estado de implementación — Edición/borrado propio (2026-07-08)
+
+Integración local pendiente de commit/push. Implementada en backend, Android y Desktop sobre el contrato existente de chat.
+
+### Backend
+- Nuevo DTO `EditChatMessageRequest`.
+- `PUT /api/v1/families/{familyId}/chat/messages/{messageId}`: solo autor, mensaje no borrado, body trim no vacío y <=2000, ventana de 15 minutos desde `createdAt`.
+- `DELETE /api/v1/families/{familyId}/chat/messages/{messageId}`: solo autor, soft delete de mensaje y adjuntos, respuesta `ChatMessageResponse` con tombstone.
+- Ambas mutaciones publican por WebSocket solo tras commit usando el mecanismo `afterCommit` existente.
+- Historial/export incluyen tombstones para que recargas y export sean coherentes con los eventos WS.
+
+### Android
+- Retrofit/DTO/repositorio con `editChatMessage` y `deleteChatMessage`.
+- `RecetasViewModel` fusiona respuestas por id igual que los mensajes WS.
+- `ChatScreen` muestra acciones en mensajes propios no borrados, diálogo de edición y confirmación de borrado.
+
+### Desktop
+- `ApiClient` añade `DELETE` con respuesta.
+- `ChatRepository` expone `edit()` y `delete()`.
+- `ChatView` cambia a upsert por id para que REST/WS reemplacen mensajes existentes y añade botón visible de opciones y menú contextual en burbujas propias no borradas.
+
+### Validación
+- Backend `mvn -f backend\pom.xml test` -> 116 tests, 0 fallos.
+- Desktop `mvn -f desktop\pom.xml test` -> 12 tests, 0 fallos.
+- Android `.\gradlew.bat test assembleDebug` -> BUILD SUCCESS.
+
+### Riesgos residuales
+- No se hizo prueba manual GUI de Android/Desktop para clicks/diálogos.
+- No hay tests UI automatizados de Compose/JavaFX para los menús.
+- Borrado admin/owner de mensajes ajenos queda fuera de alcance por decisión de "individual propio".

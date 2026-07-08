@@ -8,6 +8,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.AuthResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatExportDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatHistoryDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.EditChatMessageRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SendChatMessageRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRecipeRequestDto
@@ -286,6 +287,19 @@ interface RecetasApi {
         @Part("id") id: RequestBody,
         @Part("body") body: RequestBody? = null,
         @Part files: List<MultipartBody.Part>
+    ): ChatMessageDto
+
+    @PUT("api/v1/families/{familyId}/chat/messages/{messageId}")
+    suspend fun editChatMessage(
+        @Path("familyId") familyId: String,
+        @Path("messageId") messageId: String,
+        @Body request: EditChatMessageRequestDto
+    ): ChatMessageDto
+
+    @DELETE("api/v1/families/{familyId}/chat/messages/{messageId}")
+    suspend fun deleteChatMessage(
+        @Path("familyId") familyId: String,
+        @Path("messageId") messageId: String
     ): ChatMessageDto
 
     @POST("api/v1/families/{familyId}/chat/clear")

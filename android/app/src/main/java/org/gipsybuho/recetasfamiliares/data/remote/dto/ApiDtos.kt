@@ -485,6 +485,10 @@ data class SendChatMessageRequestDto(
     val body: String
 )
 
+data class EditChatMessageRequestDto(
+    val body: String
+)
+
 data class ChatHistoryDto(
     val items: List<ChatMessageDto>,
     val hasMore: Boolean,

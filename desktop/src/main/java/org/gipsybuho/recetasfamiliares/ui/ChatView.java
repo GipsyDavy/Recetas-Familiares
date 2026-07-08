@@ -4,8 +4,11 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -37,9 +40,8 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -73,7 +75,6 @@ public class ChatView extends VBox {
 
     // Estado en orden ascendente (el mas antiguo primero) para renderizar arriba->abajo.
     private final List<ChatDtos.ChatMessage> messages = new ArrayList<>();
-    private final Set<String> knownIds = new HashSet<>();
 
     private ChatSocket socket;
     private boolean connected = false;
@@ -251,11 +252,10 @@ public class ChatView extends VBox {
                 Platform.runLater(() -> {
                     loading = false;
                     messages.clear();
-                    knownIds.clear();
                     // items viene descendente: se invierte a ascendente para mostrar.
                     List<ChatDtos.ChatMessage> items = page.items() != null ? page.items() : List.of();
                     for (int i = items.size() - 1; i >= 0; i--) {
-                        addAscending(items.get(i));
+                        upsertAscending(items.get(i));
                     }
                     hasMoreOlder = page.hasMore();
                     nextBefore = page.nextBefore();
@@ -289,19 +289,16 @@ public class ChatView extends VBox {
                     loading = false;
                     loadOlderBtn.setDisable(false);
                     List<ChatDtos.ChatMessage> items = page.items() != null ? page.items() : List.of();
-                    // Se anteponen en orden ascendente conservando la posicion de lectura.
-                    List<ChatDtos.ChatMessage> older = new ArrayList<>();
+                    boolean changed = false;
                     for (int i = items.size() - 1; i >= 0; i--) {
-                        ChatDtos.ChatMessage message = items.get(i);
-                        if (message != null && message.id() != null && knownIds.add(message.id())) {
-                            older.add(message);
-                        }
+                        changed |= upsertAscending(items.get(i));
                     }
-                    messages.addAll(0, older);
                     hasMoreOlder = page.hasMore();
                     nextBefore = page.nextBefore();
                     updateLoadOlderBtn();
-                    renderMessages();
+                    if (changed) {
+                        renderMessages();
+                    }
                     updateStatusLabel();
                 });
             } catch (Exception ex) {
@@ -321,7 +318,7 @@ public class ChatView extends VBox {
             return;
         }
         boolean nearBottom = scrollPane.getVvalue() >= NEAR_BOTTOM_THRESHOLD;
-        if (addAscending(message)) {
+        if (upsertAscending(message)) {
             renderMessages();
             updateStatusLabel();
             boolean mine = isMine(message);
@@ -331,13 +328,27 @@ public class ChatView extends VBox {
         }
     }
 
-    /** Anade en orden ascendente evitando duplicados por id. Devuelve true si se agrego. */
-    private boolean addAscending(ChatDtos.ChatMessage message) {
-        if (message == null || message.id() == null || !knownIds.add(message.id())) {
+    /** Inserta o reemplaza por id y mantiene orden cronologico ascendente. */
+    private boolean upsertAscending(ChatDtos.ChatMessage message) {
+        if (message == null || message.id() == null) {
             return false;
         }
+        for (int i = 0; i < messages.size(); i++) {
+            if (message.id().equals(messages.get(i).id())) {
+                messages.set(i, message);
+                sortMessages();
+                return true;
+            }
+        }
         messages.add(message);
+        sortMessages();
         return true;
+    }
+
+    private void sortMessages() {
+        messages.sort(Comparator
+                .comparing(ChatDtos.ChatMessage::createdAt, Comparator.nullsLast(String::compareTo))
+                .thenComparing(ChatDtos.ChatMessage::id, Comparator.nullsLast(String::compareTo)));
     }
 
     // ── Envio ────────────────────────────────────────────────────────────────────
@@ -369,7 +380,7 @@ public class ChatView extends VBox {
                     setSending(false);
                     input.clear();
                     // El eco por WS llegara despues; el dedupe por id evita duplicar.
-                    if (addAscending(saved)) {
+                    if (upsertAscending(saved)) {
                         renderMessages();
                         updateStatusLabel();
                         scrollToBottom();
@@ -408,7 +419,7 @@ public class ChatView extends VBox {
                 Platform.runLater(() -> {
                     setSending(false);
                     input.clear();
-                    if (addAscending(saved)) {
+                    if (upsertAscending(saved)) {
                         renderMessages();
                         updateStatusLabel();
                         scrollToBottom();
@@ -420,6 +431,94 @@ public class ChatView extends VBox {
                     // Sin exponer detalles tecnicos del error al usuario.
                     onStatus.accept("No pudimos enviar tu imagen. Comprueba que sea una foto valida e intentalo de nuevo.");
                 });
+            }
+        });
+    }
+
+    // ── Edicion / borrado individual ─────────────────────────────────────────────
+
+    private void showEditDialog(ChatDtos.ChatMessage message) {
+        if (!isOwnMutableMessage(message) || message.body() == null || message.body().isBlank()) {
+            return;
+        }
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Editar mensaje");
+        dialog.setHeaderText("Actualiza el texto del mensaje.");
+
+        TextArea editor = new TextArea(message.body());
+        editor.setWrapText(true);
+        editor.setPrefRowCount(4);
+        editor.setMaxWidth(420);
+
+        ButtonType saveType = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().setAll(saveType, ButtonType.CANCEL);
+        dialog.getDialogPane().setContent(editor);
+        DialogStyler.apply(dialog);
+
+        Button saveButton = (Button) dialog.getDialogPane().lookupButton(saveType);
+        Runnable updateSaveState = () -> {
+            String text = editor.getText() == null ? "" : editor.getText().trim();
+            saveButton.setDisable(text.isEmpty()
+                    || text.equals(message.body())
+                    || text.length() > ChatRepository.MAX_BODY_LENGTH);
+        };
+        editor.textProperty().addListener((obs, old, value) -> updateSaveState.run());
+        updateSaveState.run();
+
+        dialog.setResultConverter(type -> type == saveType ? editor.getText() : null);
+        dialog.showAndWait()
+                .map(String::trim)
+                .filter(text -> !text.isEmpty())
+                .ifPresent(text -> editMessage(message, text));
+    }
+
+    private void editMessage(ChatDtos.ChatMessage message, String body) {
+        onStatus.accept("Guardando mensaje...");
+        Thread.ofVirtual().start(() -> {
+            try {
+                ChatDtos.ChatMessage updated = context.getChatRepository().edit(message.id(), body);
+                Platform.runLater(() -> {
+                    upsertAscending(updated);
+                    renderMessages();
+                    updateStatusLabel();
+                    onStatus.accept("Mensaje editado.");
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> onStatus.accept("No se pudo editar el mensaje."));
+            }
+        });
+    }
+
+    private void confirmDeleteMessage(ChatDtos.ChatMessage message) {
+        if (!isOwnMutableMessage(message)) {
+            return;
+        }
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Eliminar mensaje");
+        confirm.setHeaderText("¿Eliminar este mensaje?");
+        confirm.setContentText("Se mostrara como mensaje eliminado para todos los miembros.");
+        confirm.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        DialogStyler.apply(confirm);
+        confirm.showAndWait().ifPresent(type -> {
+            if (type == ButtonType.OK) {
+                deleteMessage(message);
+            }
+        });
+    }
+
+    private void deleteMessage(ChatDtos.ChatMessage message) {
+        onStatus.accept("Eliminando mensaje...");
+        Thread.ofVirtual().start(() -> {
+            try {
+                ChatDtos.ChatMessage updated = context.getChatRepository().delete(message.id());
+                Platform.runLater(() -> {
+                    upsertAscending(updated);
+                    renderMessages();
+                    updateStatusLabel();
+                    onStatus.accept("Mensaje eliminado.");
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> onStatus.accept("No se pudo eliminar el mensaje."));
             }
         });
     }
@@ -492,7 +591,6 @@ public class ChatView extends VBox {
                 context.getChatRepository().clear();
                 Platform.runLater(() -> {
                     messages.clear();
-                    knownIds.clear();
                     hasMoreOlder = false;
                     nextBefore = null;
                     updateLoadOlderBtn();
@@ -525,6 +623,16 @@ public class ChatView extends VBox {
         VBox bubble = new VBox(6);
         bubble.getStyleClass().add(mine ? "chat-bubble-mine" : "chat-bubble-other");
         bubble.setMaxWidth(440);
+        if (isOwnMutableMessage(message)) {
+            ContextMenu menu = buildMessageMenu(message);
+            bubble.setOnContextMenuRequested(e -> {
+                e.consume();
+                menu.show(bubble, e.getScreenX(), e.getScreenY());
+            });
+            HBox actions = new HBox(buildMessageMenuButton(message));
+            actions.setAlignment(Pos.CENTER_RIGHT);
+            bubble.getChildren().add(actions);
+        }
 
         if (!mine) {
             Label author = new Label(safe(message.authorDisplayName()));
@@ -555,6 +663,33 @@ public class ChatView extends VBox {
         row.setFillHeight(false);
         row.setAlignment(mine ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
         return row;
+    }
+
+    private MenuButton buildMessageMenuButton(ChatDtos.ChatMessage message) {
+        MenuButton button = new MenuButton("...");
+        button.getStyleClass().add("action-button-secondary");
+        button.getItems().addAll(buildMessageMenuItems(message));
+        return button;
+    }
+
+    private ContextMenu buildMessageMenu(ChatDtos.ChatMessage message) {
+        ContextMenu menu = new ContextMenu();
+        menu.getItems().addAll(buildMessageMenuItems(message));
+        DialogStyler.apply(menu);
+        return menu;
+    }
+
+    private List<MenuItem> buildMessageMenuItems(ChatDtos.ChatMessage message) {
+        List<MenuItem> items = new ArrayList<>();
+        if (message.body() != null && !message.body().isBlank()) {
+            MenuItem editItem = new MenuItem("Editar");
+            editItem.setOnAction(e -> showEditDialog(message));
+            items.add(editItem);
+        }
+        MenuItem deleteItem = new MenuItem("Eliminar");
+        deleteItem.setOnAction(e -> confirmDeleteMessage(message));
+        items.add(deleteItem);
+        return items;
     }
 
     private StackPane buildAttachmentNode(ChatDtos.ChatAttachment attachment) {
@@ -597,6 +732,10 @@ public class ChatView extends VBox {
 
     private boolean isMine(ChatDtos.ChatMessage message) {
         return myUserId != null && myUserId.equals(message.authorUserId());
+    }
+
+    private boolean isOwnMutableMessage(ChatDtos.ChatMessage message) {
+        return message != null && !message.deleted() && isMine(message);
     }
 
     private void scrollToBottom() {

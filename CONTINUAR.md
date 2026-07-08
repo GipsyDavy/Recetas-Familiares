@@ -28,7 +28,7 @@ No abrir como proyecto principal:
 
 ## 2. Estado Actual Consolidado
 
-Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros, sincronizacion y chat familiar con texto e imagenes en tiempo real. Las fases futuras del chat son video/push, edicion/borrado individual e iOS.
+Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros, sincronizacion y chat familiar con texto, imagenes y edicion/borrado propio en tiempo real. Las fases futuras del chat son video/push e iOS.
 
 Plataformas:
 - `backend/`: Spring Boot + MySQL + Flyway + JWT.
@@ -38,7 +38,7 @@ Plataformas:
 - `shared/`: objetivo para logica compartida Android/iOS cuando aplique. Aun no existe como modulo en el repo; iOS mantiene su propia copia de DTOs y logica bajo `ios/composeApp/`.
 
 Estado conocido a partir de la documentacion previa:
-- Backend: 111 tests, 0 fallos en la ultima validacion documentada de chat con imagenes.
+- Backend: 116 tests, 0 fallos en la ultima validacion documentada de chat con edicion/borrado propio.
 - Android: funcional, con offline-first, UI avanzada y chat texto validado en AVD.
 - Desktop: funcional, instalador Windows v1.1 generado, ajustes como vista central y chat texto validado a nivel de protocolo.
 - iOS: funcional parcialmente; metadata KMP compila en Windows, pero el target iOS nativo sigue con deuda de compilacion/paridad.
@@ -152,10 +152,12 @@ No cambiar sin revisar Backend, Android, Desktop e iOS:
 - `RecipeStepResponse`: `position`, `instruction`, `timerMinutes`.
 - Entidades sincronizables: `id`, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
 - Ownership familiar obligatorio en backend aunque el cliente oculte acciones.
-- Chat familiar texto (2026-07-07) e imagenes (Fase 3, 2026-07-08) integrados y committeados en `main` (backend + Android + Desktop); push remoto pendiente de autorizacion: modulo independiente bajo `/api/v1/families/{familyId}/chat`.
+- Chat familiar texto (2026-07-07) e imagenes (Fase 3, 2026-07-08) integrados y committeados en `main` (backend + Android + Desktop). Edicion/borrado propio implementado localmente el 2026-07-08, pendiente de commit/push. Modulo independiente bajo `/api/v1/families/{familyId}/chat`.
   - `GET /messages?before=<id>&limit=<=50` → `{ items[], hasMore, nextBefore }` (desc por cursor, filtrado por limpieza del usuario).
   - `POST /messages` `{ id?, body }` (id de cliente idempotente, `body` <=2000) → `ChatMessageResponse` + broadcast WS.
   - `POST /messages/images` multipart `id?`, `body?`, `files[]` (JPEG/PNG/WebP, max 5, 8 MB por archivo, validacion fuerte) → `ChatMessageResponse.attachments[]` + broadcast WS.
+  - `PUT /messages/{messageId}` `{ body }` → edita solo mensajes propios no borrados, `body` trim no vacio <=2000, ventana 15 minutos, broadcast WS afterCommit.
+  - `DELETE /messages/{messageId}` → soft delete solo de mensaje propio, devuelve tombstone (`deleted=true`, `body=null`, `attachments=[]`) y broadcast WS afterCommit.
   - Adjuntos servidos por `/uploads/chat/{filename}` y `/uploads/chat_thumbnails/{filename}` con ownership familiar y 404 fail-closed.
   - `POST /clear` → 204 (limpieza por usuario, marca `cleared_before`, no borra para otros).
   - `GET /export` → copia del usuario en orden ascendente.
@@ -194,9 +196,9 @@ Endurecido tras revision Codex/Gemini post-Sprint 43 (2026-07-05):
 - `sync/pull` devuelve `serverTime` capturado antes de consultar para evitar saltos por cambios concurrentes.
 
 Chat familiar:
-- Texto/emojis e imagenes ya integrados en backend, Android y Desktop.
-- REST para historial paginado, envio inicial/fallback, envio de imagenes multipart, limpiar/exportar por usuario y WebSocket/STOMP operativo.
-- Fases pendientes: edicion/borrado individual, videos, push notifications e iOS.
+- Texto/emojis, imagenes y edicion/borrado propio ya integrados en backend, Android y Desktop.
+- REST para historial paginado, envio inicial/fallback, envio de imagenes multipart, editar/borrar mensajes propios, limpiar/exportar por usuario y WebSocket/STOMP operativo.
+- Fases pendientes: videos, push notifications e iOS.
 - Storage protegido para imagenes y videos; no guardar binarios pesados directamente en MySQL.
 - Imagenes fase 3: JPEG/PNG/WebP, max 5 por mensaje, max 8 MB, extension + `Content-Type` + magic bytes + parseo real, stripping de metadata por re-encode, thumbnails backend y cleanup best-effort de fallos parciales.
 - Produccion seria deberia contemplar mover miniaturas a worker si sube volumen y analisis antivirus o servicio equivalente para adjuntos.
@@ -237,9 +239,10 @@ Resuelto en Sprint 45 (2026-07-05):
 Chat familiar:
 - Fase texto/emojis implementada y validada en AVD con backend real: historial, envio/recepcion en vivo, fallback/reconexion, limpiar/exportar por usuario y bloqueo offline sin `POST`.
 - Fase imagenes implementada: selector del sistema, caption opcional, compresion JPEG fuera del hilo principal, envio multipart y render de thumbnails con Coil + OkHttp autenticado.
+- Edicion/borrado propio implementado: menu en mensaje propio, dialogo de edicion, confirmacion de borrado y merge por id de respuestas REST/WS.
 - Envio offline no permitido en fase texto; sin cola local.
 - Pendiente menor: export Android usa fechas ISO/UTC en vez de formato local legible.
-- Fases posteriores: video/push, edicion/borrado individual, progreso explicito de subida si se detecta necesidad UX.
+- Fases posteriores: video/push y progreso explicito de subida si se detecta necesidad UX.
 
 ### Desktop
 
@@ -277,7 +280,7 @@ Resuelto en Sprint 46 (2026-07-06):
 - Fix menor preexistente: `style.css` tenia `-fx-max-width: Double.MAX_VALUE` (CSS invalido del hotfix de registro que rompia el parseo del stylesheet); movido a codigo en `LoginView`.
 
 Chat familiar:
-- Texto e imagenes ya implementados (ver trazabilidad). Desktop<->Android texto validado a nivel de protocolo; queda prueba manual GUI si se quiere cerrar UX visual de imagenes.
+- Texto, imagenes y edicion/borrado propio ya implementados (ver trazabilidad). Desktop<->Android texto validado a nivel de protocolo; queda prueba manual GUI si se quiere cerrar UX visual de imagenes y menus de edicion/borrado.
 - Videos/push quedan como fase 4.
 
 ### iOS
@@ -314,12 +317,12 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Tras Chat Fase 1, Chat Desktop Fase 2, remediacion OWASP y Chat Fase 3 imagenes (cierre 2026-07-08), el chat de texto e imagenes queda committeado en `main` (backend/Android/Desktop) con build/tests verdes en sesion y backend/desktop pasan Dependency-Check con umbral CVSS >= 7. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
+Tras Chat Fase 1, Chat Desktop Fase 2, remediacion OWASP, Chat Fase 3 imagenes y edicion/borrado propio (cierre local 2026-07-08), el chat de texto/imagenes/edicion queda implementado en backend/Android/Desktop con build/tests verdes en sesion. Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
 Prioridad propuesta para el siguiente sprint no autorizado:
 
-1. Validacion manual de UI pendiente: Chat GUI Desktop/Android con imagenes reales, onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
-2. Chat siguiente capa: edicion/borrado individual propio, o fase 4 video/push si el usuario prioriza multimedia/notificaciones. Video requiere redisenar storage a streaming a disco/Range y antivirus o servicio equivalente.
+1. Validacion manual de UI pendiente: Chat GUI Desktop/Android con imagenes reales y menus de edicion/borrado, onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
+2. Chat siguiente capa: fase 4 video/push si el usuario prioriza multimedia/notificaciones. Video requiere redisenar storage a streaming a disco/Range y antivirus o servicio equivalente.
 3. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01 y sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista; monitorizar PDFBox porque 3.0.7 sigue con CVEs medias y no hay 3.0.x posterior en Maven Central a 2026-07-08.
 4. PostgreSQL en Hetzner: migracion MySQL -> PostgreSQL con backend Spring intacto. Plan completo en `docs/migracion-mysql-a-postgresql-plan.md`; requiere resolver las 5 decisiones de §4 del plan antes de arrancar.
 5. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
@@ -778,6 +781,32 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Validacion en sesion: backend `mvn test` **112 tests 0 fallos** (+1 SEND denegado); Desktop `mvn test` 12 tests 0 fallos; Android `gradlew test assembleDebug` BUILD SUCCESSFUL.
 - Hallazgos diferidos (backlog, no en este alcance): indicador de progreso de subida y visor de imagen a tamano completo (Gemini, features nuevas); cobertura de tests de casos limite backend (rollback, mismatch magic byte, exceso dimensiones); tope de tamano en export; pulido visual de placeholders de carga.
 - Riesgo residual: sin prueba manual GUI de envio real de imagenes; push remoto pendiente de autorizacion.
+
+### Chat edicion/borrado individual propio (2026-07-08)
+
+- Objetivo autorizado por el usuario: continuar con el siguiente sprint recomendado tras Chat Fase 3, implementando edicion y borrado individual de mensajes propios en backend, Android y Desktop.
+- Agente de esta sesion: Codex. VibeSec usado como checklist por tocar endpoints autenticados, ownership, soft delete y clientes. Bloque Gemini preparado para revision copy-paste segun regla del usuario; integrar hallazgos externos solo si el usuario pega respuesta y se verifican contra codigo.
+- Backend implementado:
+  - Nuevo `EditChatMessageRequest`.
+  - `PUT /api/v1/families/{familyId}/chat/messages/{messageId}`: solo autor, mensaje no borrado, `body` trim no vacio <=2000, ventana de edicion de 15 minutos desde `createdAt`, respuesta `ChatMessageResponse`.
+  - `DELETE /api/v1/families/{familyId}/chat/messages/{messageId}`: solo autor, soft delete de mensaje y adjuntos, respuesta tombstone (`deleted=true`, `body=null`, `attachments=[]`).
+  - Ambas mutaciones publican por WS mediante `publishAfterCommit`, coherente con el endurecimiento anterior.
+  - Historial/export ya no filtran `deleted=false`; asi los tombstones sobreviven a recarga/export hasta que la limpieza por usuario los oculte por `cleared_before`.
+- Android implementado:
+  - Retrofit/DTO/repositorio con `editChatMessage` y `deleteChatMessage`.
+  - `RecetasViewModel` valida cliente, llama backend y mergea por id.
+  - `ChatScreen` incorpora menu en mensajes propios no borrados, dialogo de edicion y confirmacion de borrado.
+- Desktop implementado:
+  - `ApiClient.delete(path, responseType)`, DTO de edicion, `ChatRepository.edit/delete`.
+  - `ChatView` cambia dedupe por upsert ordenado para que REST/WS reemplacen mensajes existentes.
+  - Boton visible de opciones y menu contextual en burbujas propias no borradas para editar/eliminar.
+- Tests nuevos backend: editar propio reciente, bloqueo 404 a otro miembro de la misma familia, rechazo de edicion tras 15 minutos y tombstone persistente en historial/export.
+- Validacion ejecutada:
+  - Backend `mvn -f backend\pom.xml test` -> 116 tests, 0 fallos.
+  - Desktop `mvn -f desktop\pom.xml test` -> 12 tests, 0 fallos.
+  - Android `.\gradlew.bat test assembleDebug` -> BUILD SUCCESS.
+- Riesgos residuales: sin prueba manual GUI de los menus/dialogos en Android/Desktop; sin tests UI automatizados Compose/JavaFX; borrado admin/owner de mensajes ajenos queda fuera de alcance por decision de "individual propio".
+- Punto de retoma: ejecutar `git diff --check`, revisar `git status`, decidir commit/push. Siguiente sprint recomendado: validacion manual GUI del chat completo (imagenes + edicion/borrado) o fase 4 video/push con redisenio de storage.
 
 ### Chequeo obligatorio de cierre
 

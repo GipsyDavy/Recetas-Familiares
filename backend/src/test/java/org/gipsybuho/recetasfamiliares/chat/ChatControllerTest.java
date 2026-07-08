@@ -1,7 +1,9 @@
 package org.gipsybuho.recetasfamiliares.chat;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,6 +12,8 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -25,6 +29,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -38,6 +43,9 @@ class ChatControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private ChatMessageRepository messageRepository;
 
     @Test
     void sendsListsWithEmojiAndIsIdempotentByClientId() throws Exception {
@@ -179,6 +187,106 @@ class ChatControllerTest {
         collectIds(page1, paged);
         collectIds(page2, paged);
         Assertions.assertEquals(sent, paged, "las paginas deben cubrir exactamente los mensajes enviados");
+    }
+
+    @Test
+    void editsOwnRecentMessageAndHistoryReflectsUpdate() throws Exception {
+        RegisteredUser user = register("chat-edit-owner@example.com", "Familia Edit");
+        String messageId = read(send(user, null, "Antes").andReturn(), "id");
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/chat/messages/{messageId}",
+                                user.familyId(), messageId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"body": "  Despues  "}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(messageId))
+                .andExpect(jsonPath("$.body").value("Despues"))
+                .andExpect(jsonPath("$.syncVersion").value(1))
+                .andExpect(jsonPath("$.deleted").value(false));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/chat/messages", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(messageId))
+                .andExpect(jsonPath("$.items[0].body").value("Despues"));
+    }
+
+    @Test
+    void blocksEditingOrDeletingAnotherMembersMessage() throws Exception {
+        RegisteredUser owner = register("chat-edit-owner-block@example.com", "Familia Edit Block");
+        RegisteredUser guest = registerAndJoin("chat-edit-guest-block@example.com", owner);
+        String messageId = read(send(owner, null, "Mensaje del owner").andReturn(), "id");
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/chat/messages/{messageId}",
+                                owner.familyId(), messageId)
+                        .header("Authorization", "Bearer " + guest.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"body": "Intento ajeno"}
+                                """))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(delete("/api/v1/families/{familyId}/chat/messages/{messageId}",
+                                owner.familyId(), messageId)
+                        .header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/chat/messages", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].body").value("Mensaje del owner"))
+                .andExpect(jsonPath("$.items[0].deleted").value(false));
+    }
+
+    @Test
+    void rejectsEditAfterFifteenMinuteWindow() throws Exception {
+        RegisteredUser user = register("chat-edit-expired@example.com", "Familia Edit Expired");
+        String messageId = read(send(user, null, "Mensaje antiguo").andReturn(), "id");
+        ChatMessageEntity message = messageRepository.findById(messageId).orElseThrow();
+        ReflectionTestUtils.setField(message, "createdAt", Instant.now().minus(Duration.ofMinutes(16)));
+        messageRepository.saveAndFlush(message);
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/chat/messages/{messageId}",
+                                user.familyId(), messageId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"body": "Tarde"}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void softDeletesOwnMessageAndKeepsTombstoneInHistoryAndExport() throws Exception {
+        RegisteredUser user = register("chat-delete-owner@example.com", "Familia Delete");
+        String messageId = read(send(user, null, "Quitar").andReturn(), "id");
+
+        mockMvc.perform(delete("/api/v1/families/{familyId}/chat/messages/{messageId}",
+                                user.familyId(), messageId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(messageId))
+                .andExpect(jsonPath("$.deleted").value(true))
+                .andExpect(jsonPath("$.attachments.length()").value(0));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/chat/messages", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(messageId))
+                .andExpect(jsonPath("$.items[0].deleted").value(true))
+                .andExpect(jsonPath("$.items[0].attachments.length()").value(0));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/chat/export", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMessages").value(1))
+                .andExpect(jsonPath("$.messages[0].id").value(messageId))
+                .andExpect(jsonPath("$.messages[0].deleted").value(true));
     }
 
     @Test
