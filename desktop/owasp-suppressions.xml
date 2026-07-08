@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <suppress until="2026-10-01Z">
+        <notes><![CDATA[
+        CVE-2026-53914 applies to JetBrains Kotlin versions before 2.4.20 and
+        describes unsafe deserialization in Kotlin build cache metadata. The
+        desktop app consumes kotlin-stdlib as runtime support for OkHttp; it
+        does not execute Kotlin compiler/build-cache tooling. As of 2026-07-08,
+        Kotlin 2.4.0 is the latest stable release and 2.4.20 is planned for
+        September 2026, so this suppression must be revisited when a stable
+        fixed release is published.
+        ]]></notes>
+        <gav regex="true">^org\.jetbrains\.kotlin:kotlin-stdlib:2\.4\.0$</gav>
+        <cve>CVE-2026-53914</cve>
+    </suppress>
+</suppressions>

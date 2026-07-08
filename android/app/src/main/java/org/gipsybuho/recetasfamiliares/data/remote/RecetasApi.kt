@@ -279,6 +279,15 @@ interface RecetasApi {
         @Body request: SendChatMessageRequestDto
     ): ChatMessageDto
 
+    @Multipart
+    @POST("api/v1/families/{familyId}/chat/messages/images")
+    suspend fun sendChatImageMessage(
+        @Path("familyId") familyId: String,
+        @Part("id") id: RequestBody,
+        @Part("body") body: RequestBody? = null,
+        @Part files: List<MultipartBody.Part>
+    ): ChatMessageDto
+
     @POST("api/v1/families/{familyId}/chat/clear")
     suspend fun clearChat(
         @Path("familyId") familyId: String

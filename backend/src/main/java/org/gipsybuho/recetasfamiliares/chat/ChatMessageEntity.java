@@ -1,14 +1,19 @@
 package org.gipsybuho.recetasfamiliares.chat;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -55,6 +60,10 @@ public class ChatMessageEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @OneToMany(mappedBy = "message", cascade = CascadeType.ALL)
+    @OrderBy("createdAt ASC, id ASC")
+    private List<ChatAttachmentEntity> attachments = new ArrayList<>();
+
     protected ChatMessageEntity() {
     }
 
@@ -100,6 +109,19 @@ public class ChatMessageEntity {
         return deleted ? null : body;
     }
 
+    public List<ChatAttachmentEntity> getAttachments() {
+        if (deleted) {
+            return List.of();
+        }
+        return attachments.stream()
+                .filter(attachment -> !attachment.isDeleted())
+                .toList();
+    }
+
+    public void addAttachment(ChatAttachmentEntity attachment) {
+        attachments.add(attachment);
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -120,6 +142,7 @@ public class ChatMessageEntity {
         if (!deleted) {
             deleted = true;
             body = null;
+            attachments.forEach(ChatAttachmentEntity::softDelete);
             deletedAt = Instant.now();
             updatedAt = Instant.now();
             syncVersion++;

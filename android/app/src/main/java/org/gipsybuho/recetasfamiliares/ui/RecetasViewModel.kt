@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.gipsybuho.recetasfamiliares.core.AppContainer
 import org.gipsybuho.recetasfamiliares.data.remote.ChatSocket
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
@@ -529,6 +530,31 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    fun sendChatImage(context: Context, uri: Uri, caption: String, onSent: () -> Unit = {}) {
+        val text = caption.trim()
+        if (!_chatConnected.value) {
+            viewModelScope.launch { _userMessage.emit("Sin conexión en tiempo real") }
+            return
+        }
+        if (text.length > CHAT_MAX_BODY_LENGTH) {
+            viewModelScope.launch { _userMessage.emit("El mensaje no puede superar $CHAT_MAX_BODY_LENGTH caracteres") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val image = compressImage(context, uri)
+                    container.chatRepository.sendImages(text, listOf(image))
+                }
+            }.onSuccess { msg ->
+                _chatMessages.update { mergeChat(it, listOf(msg)) }
+                onSent()
+            }.onFailure {
+                _userMessage.emit("No se pudo enviar la imagen")
+            }
+        }
+    }
+
     fun loadOlderChat() {
         if (!_chatHasMoreOlder.value) return
         val cursor = chatOldestCursor ?: return
@@ -564,7 +590,15 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                         export.messages.forEach { m ->
                             append(m.createdAt).append(" — ")
                             append(m.authorDisplayName).append(": ")
-                            append(m.body ?: "(mensaje eliminado)").append("\n")
+                            val attachments = m.attachments.orEmpty()
+                            append(m.body ?: if (attachments.isEmpty()) "(mensaje eliminado)" else "")
+                            if (attachments.isNotEmpty()) {
+                                if (!m.body.isNullOrBlank()) append(" ")
+                                append("[${attachments.size} imagen")
+                                if (attachments.size != 1) append("es")
+                                append("]")
+                            }
+                            append("\n")
                         }
                     }
                     onReady(text.trim())

@@ -6,7 +6,10 @@ import okhttp3.*;
 import org.gipsybuho.recetasfamiliares.api.dto.AuthDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class ApiClient {
@@ -98,7 +101,7 @@ public class ApiClient {
         executeVoid(request);
     }
 
-    public <T> T postMultipart(String path, java.io.File file, String partName, Class<T> responseType) throws ApiException {
+    public <T> T postMultipart(String path, File file, String partName, Class<T> responseType) throws ApiException {
         RequestBody fileBody = RequestBody.create(file, mediaTypeForImage(file.getName()));
         MultipartBody multipart = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
@@ -108,6 +111,38 @@ public class ApiClient {
                 .url(baseUrl + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .post(multipart)
+                .build();
+        return execute(request, responseType);
+    }
+
+    public <T> T postMultipart(
+            String path,
+            Map<String, String> fields,
+            List<File> files,
+            String partName,
+            Class<T> responseType
+    ) throws ApiException {
+        MultipartBody.Builder multipart = new MultipartBody.Builder().setType(MultipartBody.FORM);
+        if (fields != null) {
+            fields.forEach((name, value) -> {
+                if (name != null && !name.isBlank() && value != null) {
+                    multipart.addFormDataPart(name, value);
+                }
+            });
+        }
+        if (files != null) {
+            for (File file : files) {
+                if (file == null) {
+                    continue;
+                }
+                RequestBody fileBody = RequestBody.create(file, mediaTypeForImage(file.getName()));
+                multipart.addFormDataPart(partName, file.getName(), fileBody);
+            }
+        }
+        Request request = new Request.Builder()
+                .url(baseUrl + path)
+                .header("Authorization", "Bearer " + session.getAccessToken())
+                .post(multipart.build())
                 .build();
         return execute(request, responseType);
     }

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.gipsybuho.recetasfamiliares.chat.ChatAttachmentRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class UploadController {
 
     private final Path uploadDir;
     private final RecipePhotoRepository photoRepository;
+    private final ChatAttachmentRepository chatAttachmentRepository;
     private final UserRepository userRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final String uploadBaseUrl;
@@ -42,12 +44,14 @@ public class UploadController {
             @Value("${app.upload.dir:./uploads}") String uploadDirPath,
             @Value("${app.upload.base-url:http://localhost:8080}") String uploadBaseUrl,
             RecipePhotoRepository photoRepository,
+            ChatAttachmentRepository chatAttachmentRepository,
             UserRepository userRepository,
             FamilyMemberRepository familyMemberRepository
     ) {
         this.uploadDir = Path.of(uploadDirPath).toAbsolutePath().normalize();
         this.uploadBaseUrl = trimTrailingSlash(uploadBaseUrl);
         this.photoRepository = photoRepository;
+        this.chatAttachmentRepository = chatAttachmentRepository;
         this.userRepository = userRepository;
         this.familyMemberRepository = familyMemberRepository;
     }
@@ -82,6 +86,20 @@ public class UploadController {
         return serveFile(uploadDir.resolve("avatars").resolve(filename), filename);
     }
 
+    @GetMapping("/uploads/chat/{filename}")
+    public ResponseEntity<byte[]> chatImage(@PathVariable String filename, Authentication authentication) {
+        requireSafeFilename(filename);
+        requireChatAttachmentAccess("/uploads/chat/" + filename, authentication.getName());
+        return serveFile(uploadDir.resolve("chat").resolve(filename), filename);
+    }
+
+    @GetMapping("/uploads/chat_thumbnails/{filename}")
+    public ResponseEntity<byte[]> chatThumbnail(@PathVariable String filename, Authentication authentication) {
+        requireSafeFilename(filename);
+        requireChatAttachmentAccess("/uploads/chat_thumbnails/" + filename, authentication.getName());
+        return serveFile(uploadDir.resolve("chat_thumbnails").resolve(filename), filename);
+    }
+
     private boolean sharesFamilyWithAny(String requesterId, List<String> ownerIds) {
         if (ownerIds.isEmpty()) {
             return false;
@@ -93,6 +111,16 @@ public class UploadController {
         return ownerIds.stream()
                 .anyMatch(ownerId -> familyMemberRepository.findFamilyIdsByUserId(ownerId).stream()
                         .anyMatch(requesterFamilies::contains));
+    }
+
+    private void requireChatAttachmentAccess(String storagePath, String requesterId) {
+        List<String> owningFamilyIds = chatAttachmentRepository.findOwningFamilyIdsByStoragePath(storagePath);
+        boolean allowed = owningFamilyIds.stream()
+                .anyMatch(familyId -> familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(
+                        familyId, requesterId));
+        if (!allowed) {
+            throw notFound();
+        }
     }
 
     private ResponseEntity<byte[]> serveFile(Path file, String filename) {

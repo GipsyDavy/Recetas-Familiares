@@ -17,6 +17,9 @@
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.2.5</version>
+        <configuration>
+          <useModulePath>false</useModulePath>
+        </configuration>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
@@ -95,6 +98,9 @@
               <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
               <failBuildOnCVSS>${dependency-check.fail-build-on-cvss}</failBuildOnCVSS>
               <failOnError>true</failOnError>
+              <suppressionFiles>
+                <suppressionFile>${project.basedir}/owasp-suppressions.xml</suppressionFile>
+              </suppressionFiles>
               <formats>
                 <format>HTML</format>
                 <format>JSON</format>
@@ -176,11 +182,28 @@
         </exclusion>
       </exclusions>
     </dependency>
+    <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>mockwebserver</artifactId>
+      <version>5.4.0</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>mockwebserver3</artifactId>
+          <groupId>com.squareup.okhttp3</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>junit</artifactId>
+          <groupId>junit</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
+    <kotlin.version>2.4.0</kotlin.version>
     <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
-    <okhttp.version>4.12.0</okhttp.version>
+    <okhttp.version>5.4.0</okhttp.version>
     <gson.version>2.10.1</gson.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javafx.version>21.0.2</javafx.version>

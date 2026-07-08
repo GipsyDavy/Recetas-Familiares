@@ -5,6 +5,10 @@ out/
 .gradle/
 desktop/output/
 
+# Runtime upload storage (user data, never version)
+uploads/
+backend/uploads/
+
 # Maven / Gradle wrappers: keep wrapper jars if they are added intentionally
 !.mvn/wrapper/maven-wrapper.jar
 !gradle/wrapper/gradle-wrapper.jar

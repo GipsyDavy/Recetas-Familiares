@@ -1109,6 +1109,21 @@
     -fx-opacity: 0.7;
 }
 
+.chat-attachment-frame {
+    -fx-background-color: recetas-surface-alt;
+    -fx-background-radius: 8;
+    -fx-border-color: recetas-surface-border;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-alignment: center;
+    -fx-padding: 4;
+}
+
+.chat-attachment-placeholder {
+    -fx-font-size: 12px;
+    -fx-text-fill: recetas-text-muted;
+}
+
 .chat-input {
     -fx-font-size: 14px;
     -fx-pref-row-count: 1;

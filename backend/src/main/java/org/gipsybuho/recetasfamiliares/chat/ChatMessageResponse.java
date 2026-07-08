@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.chat;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * DTO de mensaje de chat. {@code body} es null cuando el mensaje esta borrado.
@@ -12,6 +13,7 @@ public record ChatMessageResponse(
         String authorUserId,
         String authorDisplayName,
         String body,
+        List<ChatAttachmentResponse> attachments,
         Instant createdAt,
         Instant updatedAt,
         long syncVersion,
@@ -24,6 +26,7 @@ public record ChatMessageResponse(
                 message.getAuthorUserId(),
                 message.getAuthorDisplayName(),
                 message.getBody(),
+                message.getAttachments().stream().map(ChatAttachmentResponse::from).toList(),
                 message.getCreatedAt(),
                 message.getUpdatedAt(),
                 message.getSyncVersion(),

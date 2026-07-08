@@ -1,11 +1,14 @@
 package org.gipsybuho.recetasfamiliares.chat;
 
+import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.gipsybuho.recetasfamiliares.families.FamilyEntity;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
+import org.gipsybuho.recetasfamiliares.photos.FileStorageService;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.data.domain.PageRequest;
@@ -13,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -20,6 +24,8 @@ public class ChatService {
 
     private static final int MAX_LIMIT = 50;
     private static final int DEFAULT_LIMIT = 30;
+    private static final int MAX_BODY_LENGTH = 2000;
+    private static final int MAX_IMAGE_ATTACHMENTS = 5;
 
     private final ChatMessageRepository messageRepository;
     private final ChatMessageClearRepository clearRepository;
@@ -28,6 +34,7 @@ public class ChatService {
     private final UserRepository userRepository;
     private final ChatSendRateLimiter rateLimiter;
     private final ChatRealtimePublisher realtimePublisher;
+    private final FileStorageService fileStorageService;
 
     public ChatService(
             ChatMessageRepository messageRepository,
@@ -36,7 +43,8 @@ public class ChatService {
             FamilyMemberRepository familyMemberRepository,
             UserRepository userRepository,
             ChatSendRateLimiter rateLimiter,
-            ChatRealtimePublisher realtimePublisher
+            ChatRealtimePublisher realtimePublisher,
+            FileStorageService fileStorageService
     ) {
         this.messageRepository = messageRepository;
         this.clearRepository = clearRepository;
@@ -45,6 +53,7 @@ public class ChatService {
         this.userRepository = userRepository;
         this.rateLimiter = rateLimiter;
         this.realtimePublisher = realtimePublisher;
+        this.fileStorageService = fileStorageService;
     }
 
     @Transactional(readOnly = true)
@@ -108,6 +117,66 @@ public class ChatService {
     }
 
     @Transactional
+    public ChatMessageResponse sendImageMessage(
+            String familyId,
+            String userId,
+            String id,
+            String body,
+            List<MultipartFile> files
+    ) {
+        requireMembership(familyId, userId);
+        List<MultipartFile> images = normalizeImageFiles(files);
+        String clientId = normalizeClientId(id);
+        ChatMessageEntity existing = findExistingMessage(clientId, familyId, userId);
+        if (existing != null) {
+            return ChatMessageResponse.from(existing);
+        }
+
+        String normalizedBody = normalizeOptionalBody(body);
+        if (!rateLimiter.tryAcquire(userId)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many messages, slow down");
+        }
+
+        FamilyEntity family = familyRepository.findById(familyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
+        UserEntity author = userRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        ChatMessageEntity message = new ChatMessageEntity(clientId, family, author, normalizedBody);
+        List<FileStorageService.StoredFile> storedFiles = new ArrayList<>();
+        try {
+            for (MultipartFile file : images) {
+                FileStorageService.StoredFile stored = storeChatImage(file);
+                storedFiles.add(stored);
+                message.addAttachment(new ChatAttachmentEntity(
+                        message,
+                        stored.url(),
+                        stored.thumbnailUrl(),
+                        stored.storagePath(),
+                        stored.thumbnailStoragePath(),
+                        stored.contentType(),
+                        stored.sizeBytes(),
+                        stored.width(),
+                        stored.height()
+                ));
+            }
+        } catch (RuntimeException e) {
+            cleanupStoredFiles(storedFiles);
+            throw e;
+        }
+
+        try {
+            ChatMessageEntity saved = messageRepository.save(message);
+            ChatMessageResponse response = ChatMessageResponse.from(saved);
+            realtimePublisher.publishMessage(response);
+            return response;
+        } catch (RuntimeException e) {
+            cleanupStoredFiles(storedFiles);
+            throw e;
+        }
+    }
+
+    @Transactional
     public void clearForUser(String familyId, String userId) {
         requireMembership(familyId, userId);
         Instant now = Instant.now();
@@ -155,6 +224,67 @@ public class ChatService {
     private void requireMembership(String familyId, String userId) {
         if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family access denied");
+        }
+    }
+
+    private List<MultipartFile> normalizeImageFiles(List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one image is required");
+        }
+        List<MultipartFile> images = files.stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .toList();
+        if (images.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one image is required");
+        }
+        if (images.size() > MAX_IMAGE_ATTACHMENTS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 5 images per message");
+        }
+        return images;
+    }
+
+    private String normalizeOptionalBody(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        String text = body.trim();
+        if (text.length() > MAX_BODY_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message body is too long");
+        }
+        return text;
+    }
+
+    private String normalizeClientId(String id) {
+        return id == null || id.isBlank() ? null : id.trim();
+    }
+
+    private ChatMessageEntity findExistingMessage(String clientId, String familyId, String userId) {
+        if (clientId == null) {
+            return null;
+        }
+        ChatMessageEntity existing = messageRepository.findById(clientId).orElse(null);
+        if (existing == null) {
+            return null;
+        }
+        if (existing.getFamilyId().equals(familyId) && existing.getAuthorUserId().equals(userId)) {
+            return existing;
+        }
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Message id already used");
+    }
+
+    private FileStorageService.StoredFile storeChatImage(MultipartFile file) {
+        try {
+            return fileStorageService.storeWithThumbnail(file, "chat", "chat_thumbnails");
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to store uploaded image");
+        }
+    }
+
+    private void cleanupStoredFiles(List<FileStorageService.StoredFile> storedFiles) {
+        for (FileStorageService.StoredFile stored : storedFiles) {
+            fileStorageService.deleteStoredPath(stored.storagePath());
+            fileStorageService.deleteStoredPath(stored.thumbnailStoragePath());
         }
     }
 }

@@ -6,8 +6,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+
+import javax.imageio.ImageIO;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,10 +32,6 @@ import org.springframework.test.web.servlet.MvcResult;
 })
 @AutoConfigureMockMvc
 class UploadControllerTest {
-
-    private static final byte[] MINIMAL_JPEG = {
-            (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 0, 0, 0, 0, 0, 0, 0
-    };
 
     @Autowired
     private MockMvc mockMvc;
@@ -88,7 +88,7 @@ class UploadControllerTest {
         java.nio.file.Path orphan = java.nio.file.Path.of("target/test-uploads",
                 "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg");
         java.nio.file.Files.createDirectories(orphan.getParent());
-        java.nio.file.Files.write(orphan, MINIMAL_JPEG);
+        java.nio.file.Files.write(orphan, validJpeg());
 
         mockMvc.perform(get("/uploads/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg")
                         .header("Authorization", "Bearer " + user.accessToken()))
@@ -116,9 +116,9 @@ class UploadControllerTest {
 
     private String uploadRecipePhoto(RegisteredUser user, String recipeId) throws Exception {
         MvcResult result = mockMvc.perform(multipart(
-                                "/api/v1/families/{familyId}/recipes/{recipeId}/photos/upload",
-                                user.familyId(), recipeId)
-                        .file(new MockMultipartFile("file", "foto.jpg", "image/jpeg", MINIMAL_JPEG))
+                        "/api/v1/families/{familyId}/recipes/{recipeId}/photos/upload",
+                        user.familyId(), recipeId)
+                        .file(new MockMultipartFile("file", "foto.jpg", "image/jpeg", validJpeg()))
                         .header("Authorization", "Bearer " + user.accessToken()))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -144,7 +144,7 @@ class UploadControllerTest {
 
     private String uploadAvatar(RegisteredUser user) throws Exception {
         MvcResult result = mockMvc.perform(multipart("/api/v1/users/me/avatar")
-                        .file(new MockMultipartFile("file", "avatar.jpg", "image/jpeg", MINIMAL_JPEG))
+                        .file(new MockMultipartFile("file", "avatar.jpg", "image/jpeg", validJpeg()))
                         .header("Authorization", "Bearer " + user.accessToken()))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -195,6 +195,15 @@ class UploadControllerTest {
     private String read(MvcResult result, String field) throws Exception {
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         return response.get(field).asText();
+    }
+
+    private byte[] validJpeg() throws Exception {
+        BufferedImage image = new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        if (!ImageIO.write(image, "jpg", out)) {
+            throw new IllegalStateException("No JPEG writer available");
+        }
+        return out.toByteArray();
     }
 
     private record RegisteredUser(String accessToken, String familyId) {

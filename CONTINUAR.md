@@ -28,7 +28,7 @@ No abrir como proyecto principal:
 
 ## 2. Estado Actual Consolidado
 
-Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros y sincronizacion. El chat familiar en tiempo real queda registrado como funcionalidad futura, no implementada todavia.
+Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros, sincronizacion y chat familiar con texto e imagenes en tiempo real. Las fases futuras del chat son video/push, edicion/borrado individual e iOS.
 
 Plataformas:
 - `backend/`: Spring Boot + MySQL + Flyway + JWT.
@@ -38,9 +38,9 @@ Plataformas:
 - `shared/`: objetivo para logica compartida Android/iOS cuando aplique. Aun no existe como modulo en el repo; iOS mantiene su propia copia de DTOs y logica bajo `ios/composeApp/`.
 
 Estado conocido a partir de la documentacion previa:
-- Backend: 92 tests, 0 fallos en la ultima validacion documentada.
-- Android: funcional, con offline-first y UI avanzada.
-- Desktop: funcional, instalador Windows v1.1 generado, ajustes como vista central.
+- Backend: 111 tests, 0 fallos en la ultima validacion documentada de chat con imagenes.
+- Android: funcional, con offline-first, UI avanzada y chat texto validado en AVD.
+- Desktop: funcional, instalador Windows v1.1 generado, ajustes como vista central y chat texto validado a nivel de protocolo.
 - iOS: funcional parcialmente; metadata KMP compila en Windows, pero el target iOS nativo sigue con deuda de compilacion/paridad.
 
 Antes de afirmar estado actual, ejecutar validaciones reales en la sesion.
@@ -152,13 +152,15 @@ No cambiar sin revisar Backend, Android, Desktop e iOS:
 - `RecipeStepResponse`: `position`, `instruction`, `timerMinutes`.
 - Entidades sincronizables: `id`, `createdAt`, `updatedAt`, `syncVersion`, `deleted`.
 - Ownership familiar obligatorio en backend aunque el cliente oculte acciones.
-- Chat familiar (fase 1 implementada en rama `feat/chat-fase-1`, 2026-07-07): modulo independiente bajo `/api/v1/families/{familyId}/chat`.
+- Chat familiar texto (2026-07-07) e imagenes (Fase 3, 2026-07-08) integrados y committeados en `main` (backend + Android + Desktop); push remoto pendiente de autorizacion: modulo independiente bajo `/api/v1/families/{familyId}/chat`.
   - `GET /messages?before=<id>&limit=<=50` → `{ items[], hasMore, nextBefore }` (desc por cursor, filtrado por limpieza del usuario).
   - `POST /messages` `{ id?, body }` (id de cliente idempotente, `body` <=2000) → `ChatMessageResponse` + broadcast WS.
+  - `POST /messages/images` multipart `id?`, `body?`, `files[]` (JPEG/PNG/WebP, max 5, 8 MB por archivo, validacion fuerte) → `ChatMessageResponse.attachments[]` + broadcast WS.
+  - Adjuntos servidos por `/uploads/chat/{filename}` y `/uploads/chat_thumbnails/{filename}` con ownership familiar y 404 fail-closed.
   - `POST /clear` → 204 (limpieza por usuario, marca `cleared_before`, no borra para otros).
   - `GET /export` → copia del usuario en orden ascendente.
   - WS `/ws` (STOMP, broker simple), topic `/topic/families/{familyId}/chat` (solo entrega); JWT en el CONNECT, ownership en el SUBSCRIBE, rate limit de envio por usuario.
-  - No entra en `sync/pull`: cursor propio. Borrado/export es POR USUARIO, no global. Detalle completo en `docs/chat-familiar-spec.md` §10.
+  - No entra en `sync/pull`: cursor propio. Borrado/export es POR USUARIO, no global. Detalle completo en `docs/chat-familiar-spec.md` §10-§12.
 
 ---
 
@@ -191,13 +193,13 @@ Endurecido tras revision Codex/Gemini post-Sprint 43 (2026-07-05):
 - `/uploads/**` ya no autoriza fotos por sufijo `LIKE` ni por URL publica exacta; las fotos locales se sirven solo si la fila tiene `storage_path` interno generado por `FileStorageService`.
 - `sync/pull` devuelve `serverTime` capturado antes de consultar para evitar saltos por cambios concurrentes.
 
-Funcionalidad futura documentada:
-- Chat familiar por fases: texto/emojis en tiempo real, imagenes, videos y push notifications.
-- REST para historial paginado, envio inicial/fallback y operaciones de lectura.
-- WebSocket/STOMP o equivalente para entrega en tiempo real con reconexion y fallback por polling.
+Chat familiar:
+- Texto/emojis e imagenes ya integrados en backend, Android y Desktop.
+- REST para historial paginado, envio inicial/fallback, envio de imagenes multipart, limpiar/exportar por usuario y WebSocket/STOMP operativo.
+- Fases pendientes: edicion/borrado individual, videos, push notifications e iOS.
 - Storage protegido para imagenes y videos; no guardar binarios pesados directamente en MySQL.
-- Requiere validar ownership familiar en cada operacion y aplicar limites de longitud, tamano, MIME, extension y rate limit.
-- Produccion seria deberia contemplar miniaturas/previews, limpieza de archivos huerfanos y analisis antivirus o servicio equivalente para adjuntos.
+- Imagenes fase 3: JPEG/PNG/WebP, max 5 por mensaje, max 8 MB, extension + `Content-Type` + magic bytes + parseo real, stripping de metadata por re-encode, thumbnails backend y cleanup best-effort de fallos parciales.
+- Produccion seria deberia contemplar mover miniaturas a worker si sube volumen y analisis antivirus o servicio equivalente para adjuntos.
 
 ### Android
 
@@ -232,11 +234,12 @@ Resuelto en Sprint 44 (2026-07-05):
 Resuelto en Sprint 45 (2026-07-05):
 - COD-8 ampliado en Android con `RecipeRepositoryOfflineTest` y `FavoriteAndNoteRepositoryOfflineTest`: recetas, ingredientes, pasos, favoritos y notas cubren creado offline `syncVersion=0`, dirty negativo conservando version base, tombstones y borrado local de entidades creadas offline; tambien se cubre que `CancellationException` no haga fallback local silencioso.
 
-Funcionalidad futura documentada:
-- Primera pantalla candidata para chat familiar tras cerrar contrato backend.
-- Primera fase recomendada: historial paginado, envio de texto/emojis, indicador basico de nuevos mensajes y WebSocket con polling configurable como fallback.
-- Fases posteriores: selector de imagen/video, subida segura, previews y control de progreso.
-- Decidir antes de implementar si se permite envio offline con cola local.
+Chat familiar:
+- Fase texto/emojis implementada y validada en AVD con backend real: historial, envio/recepcion en vivo, fallback/reconexion, limpiar/exportar por usuario y bloqueo offline sin `POST`.
+- Fase imagenes implementada: selector del sistema, caption opcional, compresion JPEG fuera del hilo principal, envio multipart y render de thumbnails con Coil + OkHttp autenticado.
+- Envio offline no permitido en fase texto; sin cola local.
+- Pendiente menor: export Android usa fechas ISO/UTC en vez de formato local legible.
+- Fases posteriores: video/push, edicion/borrado individual, progreso explicito de subida si se detecta necesidad UX.
 
 ### Desktop
 
@@ -246,7 +249,7 @@ Implementado/documentado:
 - Modo cocina, exportaciones, notificaciones, sonidos opcionales.
 - Temas, ajustes como vista central, diagnostico e instalador Windows v1.1.
 - Gestion de miembros y avatar upload.
-- Chat familiar fase 1: historial paginado, envio y recepcion en tiempo real (WebSocket/STOMP), borrar/exportar por usuario (implementado 2026-07-07, sin prueba manual E2E).
+- Chat familiar texto e imagenes: historial paginado, envio/recepcion en tiempo real (WebSocket/STOMP), limpiar/exportar por usuario, selector JPG/PNG/WebP y render de thumbnails autenticados. Texto validado a nivel de protocolo contra backend real; pendiente prueba manual de renderizado/clics GUI JavaFX con imagenes.
 
 Resuelto en Sprint 42 (2026-07-02):
 - Tokens cifrados con Windows DPAPI (`TokenVault`, JNA) con migracion automatica de valores legado (SEC-2).
@@ -273,9 +276,9 @@ Resuelto en Sprint 46 (2026-07-06):
 - Ayuda contextual MVP: `HelpDialog` con consejos por vista activa (F1 y boton Ayuda en sidebar); la guia de bienvenida es reabrible desde el perfil y desde el propio dialogo de ayuda (antes solo admins via Ajustes).
 - Fix menor preexistente: `style.css` tenia `-fx-max-width: Double.MAX_VALUE` (CSS invalido del hotfix de registro que rompia el parseo del stylesheet); movido a codigo en `LoginView`.
 
-Funcionalidad futura documentada:
-- Chat familiar fase 1 ya implementado (ver trazabilidad); pendiente prueba manual E2E Desktop<->Android.
-- Imagenes/videos en chat despues de cerrar storage protegido y limites de adjuntos (fases 3-4).
+Chat familiar:
+- Texto e imagenes ya implementados (ver trazabilidad). Desktop<->Android texto validado a nivel de protocolo; queda prueba manual GUI si se quiere cerrar UX visual de imagenes.
+- Videos/push quedan como fase 4.
 
 ### iOS
 
@@ -303,30 +306,30 @@ Riesgos pendientes a verificar:
 - Paridad con Android: busqueda, filtros, skeletons y UX de listas (UX-3).
 
 Funcionalidad futura documentada:
-- Chat familiar despues de estabilizar backend y al menos un cliente.
+- Chat familiar iOS despues de estabilizar backend y clientes Android/Desktop.
 - Evitar abrir este frente antes de resolver refresh 401, push sync y paridad basica.
-- Tiempo real y adjuntos en iOS deben llegar despues de tener contrato backend estable, previews definidos y estrategia de push notifications.
+- Tiempo real y adjuntos en iOS deben llegar despues de tener runtime macOS/dispositivo, contrato backend estable y estrategia de push notifications.
 
 ---
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Sprint 46 (2026-07-06) cerro UX-5 y la ayuda contextual MVP en Desktop. El runtime iOS/macOS sigue bloqueado en esta maquina Windows (ver seccion 10) y COD-8 sigue parcial: no hay pruebas iOS ni pruebas de UI/manuales.
+Tras Chat Fase 1, Chat Desktop Fase 2, remediacion OWASP y Chat Fase 3 imagenes (cierre 2026-07-08), el chat de texto e imagenes queda committeado en `main` (backend/Android/Desktop) con build/tests verdes en sesion y backend/desktop pasan Dependency-Check con umbral CVSS >= 7. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
-Prioridad propuesta para Sprint 47:
+Prioridad propuesta para el siguiente sprint no autorizado:
 
-1. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
-2. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop `ApiClient` refresh 401 y proteccion de imagenes con servidor HTTP fake si aporta valor sin fragilizar tests.
-3. Producto: chat familiar fase 1. Viabilidad analizada 2026-07-06 (`docs/chat-familiar-spec.md` §9): fase 1 lista para arrancar en cuanto el usuario resuelva las 5 decisiones de §7; unico trabajo nuevo real es WebSocket/STOMP con auth. Video (fase 4) es el hueco serio; posponer.
-4. Validacion manual de UI pendiente: onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
-5. UX-14 (nuevo, sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
+1. Validacion manual de UI pendiente: Chat GUI Desktop/Android con imagenes reales, onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
+2. Chat siguiente capa: edicion/borrado individual propio, o fase 4 video/push si el usuario prioriza multimedia/notificaciones. Video requiere redisenar storage a streaming a disco/Range y antivirus o servicio equivalente.
+3. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01 y sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista; monitorizar PDFBox porque 3.0.7 sigue con CVEs medias y no hay 3.0.x posterior en Maven Central a 2026-07-08.
+4. PostgreSQL en Hetzner: migracion MySQL -> PostgreSQL con backend Spring intacto. Plan completo en `docs/migracion-mysql-a-postgresql-plan.md`; requiere resolver las 5 decisiones de §4 del plan antes de arrancar.
+5. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
+6. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+7. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
    - Desktop: ayuda contextual en TODOS los modulos, dialogos y formularios (crear/editar receta, stock, menu, compra, notas, miembros, exportaciones, busqueda global, diagnostico), cada pestaña de Ajustes, modo cocina y onboarding; tooltips en todos los controles sin label visible (formato `Accion (Ctrl+X)`, delay 400ms); foco y orden de tabulacion documentados en formularios.
    - Android: sistema de ayuda equivalente (pantalla o bottom sheet de ayuda por seccion, accesible desde TopAppBar), con `contentDescription` completo y ayuda del modo cocina/manos libres.
    - iOS: mismo patron cuando el runtime este desbloqueado (COD-1/COD-2).
    - Contenido: microcopy calido y no tecnico, cubriendo cada opcion, atajo, gesto y estado (vacio/error/offline), de forma que el usuario pueda usar toda la aplicacion sin ayuda externa.
    - Criterio de cierre: inventario de pantallas/dialogos vs temas de ayuda al 100%, revision Gemini de textos, accesibilidad verificada (TalkBack/tooltips).
-
-6. Infra (candidato, NO autorizado): migracion de base de datos **MySQL -> PostgreSQL** con backend Spring intacto y DB en Hetzner. Analizada 2026-07-08: viable y acotada (queries JPQL sin SQL nativo, timestamps por app, tests en H2, clientes sin tocar). Plan completo en `docs/migracion-mysql-a-postgresql-plan.md`. Descartado el "full Supabase" (reescritura de backend + 3 clientes). Requiere que el usuario resuelva las 5 decisiones de §4 del plan (hosting gestionado vs autogestionado, tipo UUID, migrar datos, tests Testcontainers, pooler) antes de arrancar.
 
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
@@ -687,6 +690,82 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Entregable: `docs/migracion-mysql-a-postgresql-plan.md` con decision, evidencia, alcance, 5 decisiones pendientes del usuario, plan paso a paso (deps, traduccion de las 14 migraciones, entidades/validate, config, tests Testcontainers, migracion de datos, infra Hetzner), validacion esperada, riesgos y rollback.
 - Gotcha principal a decidir: Postgres autogestionado en Hetzner implica backups/PITR/hardening propios (Hetzner no da Postgres gestionado nativo).
 - Estado: sprint de migracion NO autorizado. Documentado para arrancar en frio cuando el usuario lo autorice. Sin cambios en el codigo del backend ni en la DB.
+
+### Limpieza documental + OWASP Dependency-Check (2026-07-08)
+
+- Objetivo autorizado por el usuario: `LIMPIEZA/DOCS+OWASP`.
+- Agente de esta sesion: Codex. No se usaron subagentes/multi-IA ni Gemini porque el alcance fue acotado a documentacion y ejecucion local de auditoria. VibeSec usado como checklist de seguridad por tratarse de auditoria de dependencias y cierre documental. `security-review` no aplica: no se modificaron endpoints, auth, Spring Security, JWT, CORS, ownership ni codigo funcional backend.
+- Limpieza documental aplicada: `docs/chat-familiar-spec.md` deja de decir que Desktop esta pendiente; ahora refleja chat texto integrado en `main` para backend + Android + Desktop, con fase 3 imagenes, fase 4 video/push e iOS pendientes. `CONTINUAR.md` actualiza estado consolidado, contrato critico de chat, secciones Backend/Android/Desktop y prioridades de siguiente sprint.
+- OWASP Backend ejecutado: `mvn -f backend\pom.xml -DskipTests verify -P security-audit`. Resultado: BUILD FAILURE por vulnerabilidades con CVSS >= 7. Reportes generados en `backend/target/dependency-check-report.html` y `.json`.
+  - Criticos/altos principales: `spring-core-6.2.18` (incluye CVE-2026-41855, 9.8), `tomcat-embed-core-10.1.54` (incluye CVE-2026-41293/CVE-2026-43512, 9.8), `spring-security-core-6.5.10` (incluye CVE-2026-47838, 8.1), `jackson-databind-2.21.2` (CVE-2026-54512/CVE-2026-54513, 8.1). Tambien aparecen medios en `commons-lang3`, `log4j-api` y `swagger-ui`/DOMPurify.
+- OWASP Desktop ejecutado: `mvn -f desktop\pom.xml -DskipTests verify -P security-audit`. Resultado: BUILD FAILURE por vulnerabilidades con CVSS >= 7. Reportes generados en `desktop/target/dependency-check-report.html` y `.json`.
+  - Criticos/altos principales: `kotlin-stdlib-1.8.21` y `kotlin-stdlib-common-1.9.10` por CVE-2026-53914 (9.8). `pdfbox-3.0.3` aparece con CVEs medias.
+- Observacion de auditoria: Sonatype OSS Index quedo deshabilitado por falta de credenciales/token; la auditoria se basa en NVD/CISA y analizadores locales de Dependency-Check.
+- No se actualizaron dependencias ni se tocaron POMs funcionales en este sprint. Siguiente accion recomendada: autorizar un sprint separado de remediacion de dependencias para backend y desktop, con upgrades controlados, `mvn test`, `mvn -DskipTests package/compile`, smoke de backend y nueva ejecucion OWASP hasta PASS o supresion justificada de falsos positivos.
+- Riesgo residual vivo: hasta remediar, la auditoria OWASP queda en rojo para backend y desktop. Los reportes estan en `target/` y no se versionan.
+
+### Remediacion OWASP dependencias backend/desktop (2026-07-08)
+
+- Objetivo autorizado por el usuario: continuar tras `LIMPIEZA/DOCS+OWASP` y dejar backend/desktop en verde con OWASP Dependency-Check.
+- Agente de esta sesion: Codex. No se usaron subagentes/multi-IA ni Gemini porque el alcance fue acotado a dependencias Maven y verificacion local. VibeSec usado como checklist. `security-review` no disponible como herramienta callable en esta sesion y no era critico porque no se modificaron endpoints, auth, ownership ni flujo funcional.
+- Fuentes/criterio: Maven Central metadata para versiones disponibles; NVD y documentacion oficial Kotlin para CVE-2026-53914. Se evito saltar a Spring Boot 4 y se mantuvo Spring Boot 3.5.x.
+- Backend actualizado:
+  - Spring Boot parent `3.5.14` -> `3.5.15`.
+  - Overrides de BOM/propiedades: Tomcat `10.1.57`, Log4j `2.26.1`, Jackson BOM `2.22.1`, Commons Lang `3.20.0`.
+  - Override de `org.webjars:swagger-ui` a `5.32.8` via `dependencyManagement`.
+- Desktop actualizado:
+  - OkHttp `4.12.0` -> `5.4.0`, usando artefacto JVM explicito `okhttp-jvm` para mantener JPMS `requires okhttp3`.
+  - `kotlin-stdlib` fijado directo a `2.4.0`.
+  - PDFBox `3.0.3` -> `3.0.7`.
+  - Nueva supresion acotada `desktop/owasp-suppressions.xml` para `org.jetbrains.kotlin:kotlin-stdlib:2.4.0` + `CVE-2026-53914`, con caducidad `2026-10-01Z`. Justificacion: la CVE afecta metadata de build cache Kotlin; Desktop solo consume el runtime por OkHttp. A 2026-07-08 Kotlin `2.4.0` es la ultima estable y Kotlin `2.4.20` estable esta planificado para septiembre de 2026.
+- Validacion ejecutada:
+  - Backend `mvn -f backend\pom.xml test` -> 107 tests, 0 fallos.
+  - Desktop `mvn -f desktop\pom.xml test` -> 12 tests, 0 fallos.
+  - Backend `mvn -f backend\pom.xml -DskipTests verify -P security-audit` -> BUILD SUCCESS; reportes en `backend/target/dependency-check-report.html` y `.json`.
+  - Desktop `mvn -f desktop\pom.xml -DskipTests verify -P security-audit` -> BUILD SUCCESS; reportes en `desktop/target/dependency-check-report.html` y `.json`.
+- Observaciones de auditoria: Sonatype OSS Index sigue deshabilitado por falta de credenciales/token; Dependency-Check uso NVD/CISA y analizadores locales. Desktop conserva aviso no bloqueante en `pdfbox-3.0.7` (CVE-2026-23907, CVE-2026-33929) porque no existe version 3.0.x posterior en Maven Central a 2026-07-08. Backend conserva warnings de tests sobre Mockito dynamic agent y SpringDoc endpoints habilitados por defecto en perfil test.
+- Punto de retoma historico: revisar `git status`, decidir commit/push. Ese punto fue continuado en el sprint Chat Fase 3 imagenes. Dependencias: revisar Kotlin >= 2.4.20 estable antes de que caduque la supresion.
+
+### Chat Fase 3 — Imagenes con validacion fuerte de adjuntos (2026-07-08)
+
+- Objetivo autorizado por el usuario: `Chat fase 3 imagenes con validacion fuerte de adjuntos`.
+- Agente de esta sesion: Codex. VibeSec usado como checklist por tocar uploads, ownership y clientes. `security-review` requerido por criterio de seguridad, pero no disponible como herramienta callable en esta sesion (`tool_search` no encontro herramienta equivalente); se documento la limitacion y se aplico revision manual VibeSec/OWASP sobre el diff.
+- Backend implementado:
+  - Dependencia `com.twelvemonkeys.imageio:imageio-webp:3.13.1` para lectura WebP.
+  - Migracion `V15__create_chat_attachments.sql`.
+  - Nuevos `ChatAttachmentEntity`, `ChatAttachmentRepository`, `ChatAttachmentResponse`; `ChatMessageResponse.attachments[]`.
+  - Endpoint `POST /api/v1/families/{familyId}/chat/messages/images` multipart (`id?`, `body?`, `files[]`).
+  - Rutas protegidas `GET /uploads/chat/{filename}` y `GET /uploads/chat_thumbnails/{filename}` con ownership familiar y 404 fail-closed.
+  - `FileStorageService` endurecido: allowlist JPEG/PNG/WebP, extension + `Content-Type` + magic bytes, parseo real por ImageIO, limite 8 MB, limites de dimensiones/pixeles, re-encode para stripping de metadata, WebP normalizado a JPEG, thumbnails JPEG 512px, nombres UUID y subdirectorios controlados.
+  - Limpieza best-effort de archivos ya escritos si falla thumbnail, validacion posterior, persistencia o publicacion antes del commit.
+- Android implementado:
+  - DTO `ChatAttachmentDto`, endpoint multipart Retrofit, `ChatRepository.sendImages()`.
+  - `RecetasViewModel.sendChatImage()` comprime a JPEG en `Dispatchers.IO`, conserva caption opcional y mergea sin duplicados.
+  - `ChatScreen` incluye selector de imagen del sistema, boton de adjunto, render de thumbnails con Coil/OkHttp autenticado y export con contador de imagenes.
+- Desktop implementado:
+  - DTO `ChatAttachment`, multipart con campos y archivos repetidos en `ApiClient`, `ChatRepository.sendImage()`.
+  - `ChatView` incluye selector JPG/PNG/WebP, caption opcional, render async de thumbnails con `fetchImage()` autenticado y export con contador.
+- Validacion ejecutada:
+  - Backend enfocado: `mvn -f backend\pom.xml "-Dtest=ChatControllerTest,FileStorageServiceTest,UploadControllerTest" test` -> 18 tests, 0 fallos.
+  - Backend completo final: `mvn -f backend\pom.xml test` -> 111 tests, 0 fallos.
+  - Android `.\gradlew.bat :app:compileDebugKotlin` -> BUILD SUCCESS.
+  - Android `.\gradlew.bat testDebugUnitTest assembleDebug` -> BUILD SUCCESS.
+  - Desktop `mvn -f desktop\pom.xml test` -> 12 tests, 0 fallos.
+  - OWASP backend `mvn -f backend\pom.xml -DskipTests verify -P security-audit` -> BUILD SUCCESS.
+  - OWASP desktop `mvn -f desktop\pom.xml -DskipTests verify -P security-audit` -> BUILD SUCCESS; conserva warning no bloqueante de PDFBox 3.0.7 (CVE-2026-23907, CVE-2026-33929).
+- Seguridad revisada manualmente: ownership por familia en DB, no path traversal (`SAFE_FILENAME`, `toRealPath`, subdirs controlados), no MIME sniffing en serving (`nosniff`), bearer Desktop solo al origen API, Compose/JavaFX renderizan captions/body como texto plano, archivos huerfanos inaccesibles y limpieza best-effort en fallos parciales.
+- Riesgos residuales: thumbnails se generan sincronicamente en la request; no hay antivirus/sandbox de adjuntos; no se hizo prueba manual GUI enviando imagenes reales en Android/Desktop; WebP se acepta como entrada pero se almacena como JPEG. Pendiente commit/push.
+- Punto de retoma: revisar `git status`, ejecutar `git diff --check`, decidir commit/push. Siguiente sprint recomendado: prueba manual GUI de imagenes, edicion/borrado individual de mensajes, o fase 4 video/push con redisenio de storage.
+
+### Cierre Chat Fase 3 — commit del trabajo sin publicar (2026-07-08)
+
+- Objetivo: sacar de riesgo el trabajo de Chat Fase 3 (imagenes) que una sesion previa dejo en el arbol sin commitear; revision de seguridad + validacion real + commit de cierre. Sin features nuevas.
+- Agente lider: Claude Code en solitario para el codigo; apoyo multi-IA (Codex tecnico, Gemini UX) autorizado y entregado como bloques copy-paste para el chat IDE (no CLI, regla del usuario). Hallazgos externos pendientes de integrar solo si se verifican.
+- Seguridad ejecutada en sesion: skill VibeSec + revision manual del diff. Superficie solida: ownership de adjuntos entre familias (`chat_attachments.storage_path` + membership), path traversal (`SAFE_FILENAME` UUID+ext, `toRealPath`, symlinks bloqueados), magic bytes vs extension vs Content-Type, EXIF stripping por re-encode, limites 8MB/8000px/16MP, 404 fail-closed, WS sin fuga entre familias (SUBSCRIBE valida membership), JPQL parametrizado, rate limit por usuario. Sin hallazgos de severidad alta.
+- Hallazgo MEDIO (correctness, no seguridad): `spring.servlet.multipart.max-request-size=12MB` es menor que la capacidad anunciada (5 imagenes x 8MB). Enviar >12MB por mensaje lo rechaza Tomcat antes de la validacion de la app. Decision pendiente del usuario: subir el limite (aumenta DoS) o documentar/reducir el maximo real. No se toco en este cierre.
+- Validacion ejecutada en sesion: backend `mvn test` 111 tests 0 fallos + `mvn -DskipTests package` OK (jar generado, V15 validada); Desktop `mvn test` 12 tests 0 fallos; Android `gradlew test assembleDebug` BUILD SUCCESSFUL. iOS no aplica (chat iOS es fase futura, sin runtime macOS en Windows).
+- Archivos nuevos committeados: `chat/ChatAttachmentEntity/Repository/Response.java`, migracion `V15__create_chat_attachments.sql`, `desktop/owasp-suppressions.xml`.
+- Riesgos residuales: sin prueba manual GUI de envio real de imagenes en Android/Desktop; decodificacion de imagen en request thread (deuda diferida documentada); Desktop `sendImage` solo envia 1 archivo; mismatch multipart pendiente de decision; push remoto pendiente de autorizacion explicita.
 
 ### Chequeo obligatorio de cierre
 

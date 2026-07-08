@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.14</version>
+        <version>3.5.15</version>
         <relativePath/>
     </parent>
 
@@ -21,10 +21,26 @@
         <java.version>21</java.version>
         <springdoc.version>2.8.17</springdoc.version>
         <jjwt.version>0.12.7</jjwt.version>
+        <tomcat.version>10.1.57</tomcat.version>
+        <log4j2.version>2.26.1</log4j2.version>
+        <jackson-bom.version>2.22.1</jackson-bom.version>
+        <commons-lang3.version>3.20.0</commons-lang3.version>
+        <swagger-ui.version>5.32.8</swagger-ui.version>
+        <twelvemonkeys.imageio.version>3.13.1</twelvemonkeys.imageio.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
         <dependency-check.fail-build-on-cvss>7.0</dependency-check.fail-build-on-cvss>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>swagger-ui</artifactId>
+                <version>${swagger-ui.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -46,6 +62,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>${twelvemonkeys.imageio.version}</version>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

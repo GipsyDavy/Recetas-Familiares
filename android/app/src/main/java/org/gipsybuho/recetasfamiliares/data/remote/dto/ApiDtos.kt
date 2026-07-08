@@ -457,12 +457,23 @@ data class UpdateStockItemRequestDto(
 
 // ── Chat familiar (fase 1) ──────────────────────────────────────────────────────
 
+data class ChatAttachmentDto(
+    val id: String,
+    val url: String,
+    val thumbnailUrl: String?,
+    val contentType: String,
+    val sizeBytes: Long,
+    val width: Int? = null,
+    val height: Int? = null
+)
+
 data class ChatMessageDto(
     val id: String,
     val familyId: String,
     val authorUserId: String,
     val authorDisplayName: String,
     val body: String?,
+    val attachments: List<ChatAttachmentDto>? = emptyList(),
     val createdAt: String,
     val updatedAt: String,
     val syncVersion: Long,

@@ -15,17 +15,33 @@ public final class ChatDtos {
      * Mensaje de chat. {@code body} es null cuando el mensaje esta borrado.
      * Entidad sincronizable estandar: id, createdAt, updatedAt, syncVersion, deleted.
      */
+    public record ChatAttachment(
+            String id,
+            String url,
+            String thumbnailUrl,
+            String contentType,
+            long sizeBytes,
+            Integer width,
+            Integer height
+    ) {
+    }
+
     public record ChatMessage(
             String id,
             String familyId,
             String authorUserId,
             String authorDisplayName,
             String body,
+            List<ChatAttachment> attachments,
             String createdAt,
             String updatedAt,
             long syncVersion,
             boolean deleted
     ) {
+        public List<ChatAttachment> attachmentsOrEmpty() {
+            return attachments != null ? attachments : List.of();
+        }
+
         /** Descarta frames WS incompletos o mal formados antes de mostrarlos. */
         public boolean isUsable() {
             return notBlank(id)

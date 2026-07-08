@@ -2,6 +2,8 @@ package org.gipsybuho.recetasfamiliares.ui
 
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,7 +52,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
@@ -57,6 +62,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatAttachmentDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
 import java.time.OffsetDateTime
@@ -78,6 +85,16 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val caption = draft.trim()
+            viewModel.sendChatImage(context, uri, caption) {
+                if (draft.trim() == caption) {
+                    draft = ""
+                }
+            }
+        }
+    }
 
     // Ciclo de vida de la conexion en tiempo real ligado a la pantalla.
     DisposableEffect(Unit) {
@@ -191,6 +208,7 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
                 draft = draft,
                 connected = connected,
                 onDraftChange = { draft = it.take(CHAT_MAX_BODY_LENGTH) },
+                onPickImage = { imagePicker.launch("image/*") },
                 onSend = {
                     val text = draft.trim()
                     if (text.isNotEmpty()) {
@@ -227,12 +245,22 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
 @Composable
 private fun MessageBubble(message: ChatMessageDto, isMine: Boolean) {
     val time = formatTime(message.createdAt)
-    val bodyText = message.body ?: "(mensaje eliminado)"
+    val attachments = message.attachments.orEmpty()
+    val bodyText = message.body?.takeIf { it.isNotBlank() }
+    val deletedText = if (message.deleted) "(mensaje eliminado)" else null
+    val attachmentText = when (attachments.size) {
+        0 -> null
+        1 -> "1 imagen"
+        else -> "${attachments.size} imágenes"
+    }
+    val semanticText = listOfNotNull(deletedText, bodyText, attachmentText)
+        .ifEmpty { listOf("Mensaje") }
+        .joinToString(", ")
     val speaker = if (isMine) "Tú" else message.authorDisplayName
     Column(
         Modifier
             .fillMaxWidth()
-            .semantics { contentDescription = "$speaker, $time: $bodyText" },
+            .semantics { contentDescription = "$speaker, $time: $semanticText" },
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
     ) {
         Surface(
@@ -254,13 +282,21 @@ private fun MessageBubble(message: ChatMessageDto, isMine: Boolean) {
                     )
                     Spacer(Modifier.height(Spacing.xs))
                 }
-                Text(
-                    bodyText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (isMine) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurface,
-                    fontStyle = if (message.deleted) FontStyle.Italic else FontStyle.Normal
-                )
+                attachments.forEachIndexed { index, attachment ->
+                    if (index > 0) Spacer(Modifier.height(Spacing.sm))
+                    ChatAttachmentImage(attachment, speaker)
+                }
+                val visibleText = deletedText ?: bodyText
+                if (visibleText != null) {
+                    if (attachments.isNotEmpty()) Spacer(Modifier.height(Spacing.sm))
+                    Text(
+                        visibleText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (isMine) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onSurface,
+                        fontStyle = if (message.deleted) FontStyle.Italic else FontStyle.Normal
+                    )
+                }
                 Text(
                     time,
                     style = MaterialTheme.typography.labelSmall,
@@ -273,12 +309,26 @@ private fun MessageBubble(message: ChatMessageDto, isMine: Boolean) {
     }
 }
 
+@Composable
+private fun ChatAttachmentImage(attachment: ChatAttachmentDto, speaker: String) {
+    AsyncImage(
+        model = attachment.thumbnailUrl ?: attachment.url,
+        contentDescription = "Imagen compartida por $speaker",
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .clip(RoundedCornerShape(12.dp))
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatInputBar(
     draft: String,
     connected: Boolean,
     onDraftChange: (String) -> Unit,
+    onPickImage: () -> Unit,
     onSend: () -> Unit
 ) {
     Surface(tonalElevation = 3.dp) {
@@ -291,6 +341,25 @@ private fun ChatInputBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
+            Surface(
+                shape = CircleShape,
+                color = if (connected) MaterialTheme.colorScheme.secondaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.size(48.dp)
+            ) {
+                IconButton(onClick = onPickImage, enabled = connected) {
+                    Icon(
+                        Icons.Outlined.AddPhotoAlternate,
+                        contentDescription = if (connected) {
+                            "Añadir imagen"
+                        } else {
+                            "Sin conexión en tiempo real"
+                        },
+                        tint = if (connected) MaterialTheme.colorScheme.onSecondaryContainer
+                               else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             OutlinedTextField(
                 value = draft,
                 onValueChange = onDraftChange,

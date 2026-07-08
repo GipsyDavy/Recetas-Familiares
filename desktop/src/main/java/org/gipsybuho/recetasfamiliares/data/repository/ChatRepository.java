@@ -7,6 +7,10 @@ import org.gipsybuho.recetasfamiliares.api.ChatSocket;
 import org.gipsybuho.recetasfamiliares.api.dto.ChatDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
 
+import java.io.File;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -18,6 +22,7 @@ import java.util.function.Consumer;
 public class ChatRepository {
 
     public static final int MAX_BODY_LENGTH = 2_000;
+    public static final int MAX_IMAGE_ATTACHMENTS = 5;
     public static final int PAGE_SIZE = 30;
 
     private final ApiClient api;
@@ -60,6 +65,28 @@ public class ChatRepository {
         }
         var request = new ChatDtos.SendChatMessageRequest(UUID.randomUUID().toString(), text);
         return api.post("api/v1/families/" + family + "/chat/messages", request, ChatDtos.ChatMessage.class);
+    }
+
+    public ChatDtos.ChatMessage sendImage(String body, File image) throws ApiException {
+        String family = requireFamily();
+        String text = body == null ? "" : body.trim();
+        if (text.length() > MAX_BODY_LENGTH) {
+            throw new IllegalArgumentException("El mensaje es demasiado largo");
+        }
+        if (image == null || !image.isFile()) {
+            throw new IllegalArgumentException("Selecciona una imagen valida");
+        }
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("id", UUID.randomUUID().toString());
+        if (!text.isEmpty()) {
+            fields.put("body", text);
+        }
+        return api.postMultipart(
+                "api/v1/families/" + family + "/chat/messages/images",
+                fields,
+                List.of(image),
+                "files",
+                ChatDtos.ChatMessage.class);
     }
 
     public void clear() throws ApiException {

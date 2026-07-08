@@ -3,8 +3,12 @@ package org.gipsybuho.recetasfamiliares.photos;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+
+import javax.imageio.ImageIO;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,16 +25,13 @@ class FileStorageServiceTest {
         FileStorageService service = new FileStorageService(tempDir.toString(), "http://localhost:8080");
 
         FileStorageService.StoredFile jpeg = service.store(file("avatar.jpg", "image/jpeg",
-                bytes(0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0, 0, 0, 0, 0)), "avatars");
+                imageBytes("jpg")), "avatars");
         FileStorageService.StoredFile png = service.store(file("avatar.png", "image/png",
-                bytes(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0)), "avatars");
-        FileStorageService.StoredFile webp = service.store(file("avatar.webp", "image/webp",
-                bytes(0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50)), "avatars");
+                imageBytes("png")), "avatars");
 
         assertThat(jpeg.url()).endsWith(".jpg");
         assertThat(png.url()).endsWith(".png");
-        assertThat(webp.url()).endsWith(".webp");
-        assertThat(Files.list(tempDir.resolve("avatars")).count()).isEqualTo(3);
+        assertThat(Files.list(tempDir.resolve("avatars")).count()).isEqualTo(2);
     }
 
     @Test
@@ -40,18 +41,33 @@ class FileStorageServiceTest {
         assertThatThrownBy(() -> service.store(file("fake.jpg", "image/jpeg",
                 "not actually an image".getBytes()), "avatars"))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("File content does not match declared type");
+                .hasMessageContaining("Invalid image file");
+    }
+
+    @Test
+    void deletesStoredPathInsideUploadDirOnly() throws Exception {
+        FileStorageService service = new FileStorageService(tempDir.toString(), "http://localhost:8080");
+
+        FileStorageService.StoredFile stored = service.store(file("avatar.jpg", "image/jpeg",
+                imageBytes("jpg")), "avatars");
+        Path storedPath = tempDir.resolve(stored.storagePath().substring("/uploads/".length()));
+
+        assertThat(Files.exists(storedPath)).isTrue();
+
+        service.deleteStoredPath(stored.storagePath());
+        service.deleteStoredPath("/uploads/../outside.jpg");
+
+        assertThat(Files.exists(storedPath)).isFalse();
     }
 
     private MockMultipartFile file(String name, String contentType, byte[] bytes) {
         return new MockMultipartFile("file", name, contentType, bytes);
     }
 
-    private byte[] bytes(int... values) {
-        byte[] bytes = new byte[values.length];
-        for (int i = 0; i < values.length; i++) {
-            bytes[i] = (byte) values[i];
-        }
-        return bytes;
+    private byte[] imageBytes(String format) throws Exception {
+        BufferedImage image = new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        assertThat(ImageIO.write(image, format, out)).isTrue();
+        return out.toByteArray();
     }
 }

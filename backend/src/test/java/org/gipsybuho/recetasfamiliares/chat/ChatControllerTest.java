@@ -3,11 +3,17 @@ package org.gipsybuho.recetasfamiliares.chat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
+
+import javax.imageio.ImageIO;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -197,6 +204,71 @@ class ChatControllerTest {
         send(user, null, "uno de mas").andExpect(status().isTooManyRequests());
     }
 
+    @Test
+    void sendsImageMessageAndServesAttachmentsOnlyToFamilyMembers() throws Exception {
+        RegisteredUser owner = register("chat-image-owner@example.com", "Familia Imagen");
+        RegisteredUser guest = registerAndJoin("chat-image-guest@example.com", owner);
+        RegisteredUser outsider = register("chat-image-outsider@example.com", "Familia Ajena Imagen");
+
+        MvcResult sent = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                                "/api/v1/families/{familyId}/chat/messages/images", owner.familyId())
+                        .file(new MockMultipartFile("id", "", "text/plain",
+                                "22222222-2222-4222-8222-222222222222".getBytes(StandardCharsets.UTF_8)))
+                        .file(new MockMultipartFile("body", "", "text/plain",
+                                "Mira como quedo la tarta".getBytes(StandardCharsets.UTF_8)))
+                        .file(new MockMultipartFile("files", "tarta.jpg", "image/jpeg", validJpeg()))
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.body").value("Mira como quedo la tarta"))
+                .andExpect(jsonPath("$.attachments.length()").value(1))
+                .andExpect(jsonPath("$.attachments[0].contentType").value("image/jpeg"))
+                .andExpect(jsonPath("$.attachments[0].thumbnailUrl").isNotEmpty())
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(sent.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        String imagePath = URI.create(response.get("attachments").get(0).get("url").asText()).getPath();
+        String thumbnailPath = URI.create(response.get("attachments").get(0).get("thumbnailUrl").asText()).getPath();
+
+        mockMvc.perform(get(imagePath).header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_JPEG));
+        mockMvc.perform(get(thumbnailPath).header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_JPEG));
+        mockMvc.perform(get(imagePath).header("Authorization", "Bearer " + outsider.accessToken()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/chat/messages", owner.familyId())
+                        .header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].attachments.length()").value(1));
+    }
+
+    @Test
+    void rejectsFakeImageAttachmentEvenWithAllowedContentType() throws Exception {
+        RegisteredUser user = register("chat-image-fake@example.com", "Familia Fake Imagen");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                                "/api/v1/families/{familyId}/chat/messages/images", user.familyId())
+                        .file(new MockMultipartFile("files", "fake.jpg", "image/jpeg",
+                                "not actually an image".getBytes(StandardCharsets.UTF_8)))
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsMoreThanFiveImageAttachments() throws Exception {
+        RegisteredUser user = register("chat-image-many@example.com", "Familia Muchas Imagenes");
+        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                "/api/v1/families/{familyId}/chat/messages/images", user.familyId());
+        request.header("Authorization", "Bearer " + user.accessToken());
+        for (int i = 0; i < 6; i++) {
+            request.file(new MockMultipartFile("files", "foto-" + i + ".jpg", "image/jpeg", validJpeg()));
+        }
+
+        mockMvc.perform(request).andExpect(status().isBadRequest());
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private record RegisteredUser(String accessToken, String familyId, String userId) {
@@ -273,5 +345,14 @@ class ChatControllerTest {
         for (JsonNode item : response.get("items")) {
             target.add(item.get("id").asText());
         }
+    }
+
+    private byte[] validJpeg() throws Exception {
+        BufferedImage image = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        if (!ImageIO.write(image, "jpg", out)) {
+            throw new IllegalStateException("No JPEG writer available");
+        }
+        return out.toByteArray();
     }
 }

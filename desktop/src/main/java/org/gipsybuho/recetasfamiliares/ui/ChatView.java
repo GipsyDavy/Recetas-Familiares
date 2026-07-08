@@ -11,19 +11,25 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import org.gipsybuho.recetasfamiliares.api.ChatSocket;
 import org.gipsybuho.recetasfamiliares.api.dto.ChatDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 import org.gipsybuho.recetasfamiliares.data.repository.ChatRepository;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -61,6 +67,7 @@ public class ChatView extends VBox {
     private final Button loadOlderBtn = new Button("Cargar mensajes anteriores");
     private final Label emptyState = buildEmptyState();
     private final TextArea input = new TextArea();
+    private final Button attachBtn = new Button("Imagen");
     private final Button sendBtn = new Button("Enviar");
     private final Label charCounter = new Label();
 
@@ -142,11 +149,14 @@ public class ChatView extends VBox {
         input.addEventFilter(KeyEvent.KEY_PRESSED, this::handleInputKey);
         input.textProperty().addListener((obs, old, val) -> updateCharCounter(val));
 
+        attachBtn.getStyleClass().add("action-button-secondary");
+        attachBtn.setOnAction(e -> chooseAndSendImage());
+
         sendBtn.getStyleClass().add("action-button-primary");
         sendBtn.setDefaultButton(false);
         sendBtn.setOnAction(e -> sendMessage());
 
-        HBox inputRow = new HBox(10, input, sendBtn);
+        HBox inputRow = new HBox(10, attachBtn, input, sendBtn);
         inputRow.setAlignment(Pos.BOTTOM_LEFT);
         inputRow.setPadding(new Insets(12, 0, 0, 0));
 
@@ -351,14 +361,12 @@ public class ChatView extends VBox {
             onStatus.accept("El mensaje supera el limite de " + ChatRepository.MAX_BODY_LENGTH + " caracteres.");
             return;
         }
-        sending = true;
-        sendBtn.setDisable(true);
+        setSending(true);
         Thread.ofVirtual().start(() -> {
             try {
                 ChatDtos.ChatMessage saved = context.getChatRepository().send(text);
                 Platform.runLater(() -> {
-                    sending = false;
-                    sendBtn.setDisable(false);
+                    setSending(false);
                     input.clear();
                     // El eco por WS llegara despues; el dedupe por id evita duplicar.
                     if (addAscending(saved)) {
@@ -369,9 +377,47 @@ public class ChatView extends VBox {
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
-                    sending = false;
-                    sendBtn.setDisable(false);
+                    setSending(false);
                     onStatus.accept("No se pudo enviar el mensaje: " + ex.getMessage());
+                });
+            }
+        });
+    }
+
+    private void chooseAndSendImage() {
+        if (sending) {
+            return;
+        }
+        String caption = input.getText() == null ? "" : input.getText().trim();
+        if (caption.length() > ChatRepository.MAX_BODY_LENGTH) {
+            onStatus.accept("El mensaje supera el limite de " + ChatRepository.MAX_BODY_LENGTH + " caracteres.");
+            return;
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Enviar imagen al chat");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                "Imagenes (JPG, PNG, WebP)", "*.jpg", "*.jpeg", "*.png", "*.webp"));
+        File file = chooser.showOpenDialog(getScene().getWindow());
+        if (file == null) {
+            return;
+        }
+        setSending(true);
+        Thread.ofVirtual().start(() -> {
+            try {
+                ChatDtos.ChatMessage saved = context.getChatRepository().sendImage(caption, file);
+                Platform.runLater(() -> {
+                    setSending(false);
+                    input.clear();
+                    if (addAscending(saved)) {
+                        renderMessages();
+                        updateStatusLabel();
+                        scrollToBottom();
+                    }
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    setSending(false);
+                    onStatus.accept("No se pudo enviar la imagen: " + ex.getMessage());
                 });
             }
         });
@@ -402,10 +448,22 @@ public class ChatView extends VBox {
         StringBuilder builder = new StringBuilder("Chat familiar - export\n\n");
         if (export.messages() != null) {
             for (ChatDtos.ChatMessage message : export.messages()) {
-                String body = message.body() != null ? message.body() : "(mensaje eliminado)";
+                List<ChatDtos.ChatAttachment> attachments = message.attachmentsOrEmpty();
+                String body = message.body() != null ? message.body() : attachments.isEmpty() ? "(mensaje eliminado)" : "";
                 builder.append('[').append(formatTime(message.createdAt())).append("] ")
                         .append(message.authorDisplayName()).append(": ")
-                        .append(body).append('\n');
+                        .append(body);
+                if (!attachments.isEmpty()) {
+                    if (!body.isBlank()) {
+                        builder.append(' ');
+                    }
+                    builder.append('[').append(attachments.size()).append(" imagen");
+                    if (attachments.size() != 1) {
+                        builder.append("es");
+                    }
+                    builder.append(']');
+                }
+                builder.append('\n');
             }
         }
         return builder.toString();
@@ -463,7 +521,7 @@ public class ChatView extends VBox {
     private HBox buildBubbleRow(ChatDtos.ChatMessage message) {
         boolean mine = isMine(message);
 
-        VBox bubble = new VBox(2);
+        VBox bubble = new VBox(6);
         bubble.getStyleClass().add(mine ? "chat-bubble-mine" : "chat-bubble-other");
         bubble.setMaxWidth(440);
 
@@ -473,20 +531,67 @@ public class ChatView extends VBox {
             bubble.getChildren().add(author);
         }
 
-        String bodyText = message.body() != null ? message.body() : "(mensaje eliminado)";
-        Label body = new Label(bodyText);
-        body.setWrapText(true);
-        body.getStyleClass().add(mine ? "chat-body-mine" : "chat-body");
+        List<ChatDtos.ChatAttachment> attachments = message.attachmentsOrEmpty();
+        for (ChatDtos.ChatAttachment attachment : attachments) {
+            bubble.getChildren().add(buildAttachmentNode(attachment));
+        }
+
+        String bodyText = message.body() != null && !message.body().isBlank() ? message.body() : null;
+        String visibleText = message.deleted() ? "(mensaje eliminado)" : bodyText;
+        if (visibleText != null) {
+            Label body = new Label(visibleText);
+            body.setWrapText(true);
+            body.getStyleClass().add(mine ? "chat-body-mine" : "chat-body");
+            bubble.getChildren().add(body);
+        }
 
         Label time = new Label(formatBubbleTime(message.createdAt()));
         time.getStyleClass().add(mine ? "chat-time-mine" : "chat-time");
 
-        bubble.getChildren().addAll(body, time);
+        bubble.getChildren().add(time);
 
         HBox row = new HBox(bubble);
         row.setFillHeight(false);
         row.setAlignment(mine ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
         return row;
+    }
+
+    private StackPane buildAttachmentNode(ChatDtos.ChatAttachment attachment) {
+        StackPane frame = new StackPane();
+        frame.getStyleClass().add("chat-attachment-frame");
+        frame.setMinSize(240, 170);
+        frame.setPrefSize(240, 170);
+        frame.setMaxSize(240, 170);
+
+        Label loading = new Label("Cargando imagen...");
+        loading.getStyleClass().add("chat-attachment-placeholder");
+        frame.getChildren().add(loading);
+
+        String url = attachment.thumbnailUrl() != null && !attachment.thumbnailUrl().isBlank()
+                ? attachment.thumbnailUrl()
+                : attachment.url();
+        if (url == null || url.isBlank()) {
+            loading.setText("Imagen no disponible");
+            return frame;
+        }
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                byte[] bytes = context.getApiClient().fetchImage(url);
+                Image image = new Image(new ByteArrayInputStream(bytes), 240, 170, true, true);
+                Platform.runLater(() -> {
+                    ImageView imageView = new ImageView(image);
+                    imageView.setFitWidth(240);
+                    imageView.setFitHeight(170);
+                    imageView.setPreserveRatio(true);
+                    imageView.setSmooth(true);
+                    frame.getChildren().setAll(imageView);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> loading.setText("Imagen no disponible"));
+            }
+        });
+        return frame;
     }
 
     private boolean isMine(ChatDtos.ChatMessage message) {
@@ -506,6 +611,12 @@ public class ChatView extends VBox {
     private void setConnected(boolean isConnected) {
         this.connected = isConnected;
         updateStatusLabel();
+    }
+
+    private void setSending(boolean isSending) {
+        this.sending = isSending;
+        sendBtn.setDisable(isSending);
+        attachBtn.setDisable(isSending);
     }
 
     private void updateStatusLabel() {
