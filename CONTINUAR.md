@@ -958,26 +958,41 @@ Plan completo de la sesion (fuera del repo): `C:\Users\Gipsy Davy\.claude\plans\
 - RETRACTADO un falso positivo previo de la sesion: el "5432 publico responde" observado al inicio era ruido de ProtonVPN (no habia Postgres). Sin exposicion real.
 - VibeSec sobre config de conexion: PENDIENTE (BLOQUE 7).
 
-#### PUNTO DE RETOMA EXACTO
-Estado por bloque: BLOQUE 1 (codigo) HECHO. BLOQUE 2 (Postgres VPS) HECHO. BLOQUE 3 (WireGuard) HECHO. **BLOQUE 4 (mvn test real) EN CURSO, NO verde.**
+#### Estado real tras continuacion Codex (2026-07-09)
+Estado por bloque: BLOQUE 1 (codigo) HECHO. BLOQUE 2 (Postgres VPS) HECHO. BLOQUE 3 (WireGuard) HECHO. BLOQUE 4 (tests reales) HECHO. BLOQUE 5 (config app) HECHO. BLOQUE 6 (datos) HECHO. **BLOQUE 7 (smoke E2E + seguridad + cierre) PENDIENTE.**
 
-Bloqueante inmediato: la 1a corrida de `mvn test` fallo por `Schema-validation` (CHAR) y dejo Flyway aplicado en `recetas_familiares_test`. Tras editar migraciones, los checksums cambian -> hay que RESETEAR esa DB antes de re-testear.
+Bloque 4 ejecutado por Codex:
+- Reset real de `recetas_familiares_test` en el VPS antes de retestear.
+- Primera corrida Postgres fallo por `Schema-validation` en `recipe_ratings.stars`: Postgres tenia `smallint/int2` y la entidad Java usa `int` validado por Hibernate como `INTEGER`.
+- Ajuste aplicado: `V10__create_ratings_schema.sql` y `RecipeRatingEntity.stars` usan `integer`. Motivo: conservar tipo Java/API `int` y no cambiar logica.
+- Segundo fallo funcional Postgres: query de historial de chat con parametro nullable (`:beforeCreatedAt IS NULL`) daba `could not determine data type of parameter`. Ajuste aplicado: separar query sin cursor y query con cursor.
+- `DevDataSeederTest` ya no asume base global vacia: valida recuentos acotados a la familia sembrada.
+- Validacion real: `mvn test -f backend/pom.xml` con `DB_TEST_URL=jdbc:postgresql://10.10.0.1:5432/recetas_familiares_test` -> `Tests run: 116, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`, `Total time: 04:15 min`.
+- Commit creado: `fe7611f chore(db): fase 2 migracion postgres - tests contra postgres real`.
 
-Pasos exactos para continuar (Windows PowerShell + SSH al VPS):
-1. Confirmar tunel arriba: `Test-NetConnection 10.10.0.1 -Port 5432` -> `TcpTestSucceeded=True`. Si no, activar el tunel `RecetasHetzner` en el cliente WireGuard.
-2. Resetear DB de test (en SSH al VPS): `sudo -u postgres psql -c "DROP DATABASE recetas_familiares_test;" -c "CREATE DATABASE recetas_familiares_test OWNER recetas_app;"`
-3. En PowerShell, exportar env y lanzar tests:
-   `$env:DB_TEST_URL="jdbc:postgresql://10.10.0.1:5432/recetas_familiares_test"; $env:DB_TEST_USERNAME="recetas_app"; $env:DB_TEST_PASSWORD="<password del VPS>"; mvn test -f "backend/pom.xml"`
-4. Si `validate` reporta mas mismatches (posibles: `timestamptz` vs entidad Instant, `smallint` vs int, `numeric(10,3)` vs BigDecimal): ajustar `columnDefinition`/tipo de migracion, RESETEAR la DB de test (paso 2, por checksums Flyway) y re-testear. Iterar hasta 0 errores.
-5. Al quedar verde (esperado ~116 tests): commit `chore(db): fase 2 migracion postgres - tests contra postgres real`. NO marcar validado sin ejecutar de verdad.
-   - Mejora opcional para no depender de SSH en cada iteracion: instalar cliente `psql` local o plugin `flyway:clean` (test) para resetear la DB desde la maquina.
+Bloque 5 ejecutado por Codex:
+- `application.yml` fija `driver-class-name: org.postgresql.Driver`.
+- `application-dev.yml` usa por defecto `jdbc:postgresql://10.10.0.1:5432/recetas_familiares`, usuario `recetas_app` y password por env.
+- `application-prod.yml` deja `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` explicitos por env.
+- Decision SSL: no se fuerza `sslmode=require` dentro de WireGuard porque el tunel ya cifra el trafico DB. Si se usa una ruta fuera de WireGuard o un Postgres gestionado, exigir TLS en `DB_URL`.
+- Documentado arranque dev en §5.
+- Validacion real: `mvn -DskipTests test-compile -f backend/pom.xml` -> `BUILD SUCCESS`.
+- Commit creado: `ca9570c chore(config): fase 5 postgres por wireguard`.
 
-Bloques siguientes (no empezados):
-- BLOQUE 5 — Config app prod: `application.yml`/env apuntando a `10.10.0.1` (`DB_URL/USERNAME/PASSWORD`), decidir SSL. Documentar arranque dev aqui en §5.
-- BLOQUE 6 — Datos: `pgloader` FamilyDemo (MySQL local -> Postgres Hetzner). OJO: pgloader en Windows es problematico; alternativa realista = `mysqldump` compatible o export CSV + cargar en el VPS (`\copy`), o correr pgloader en el propio VPS contra un dump subido. Verificar recuentos por tabla.
-- BLOQUE 7 — Smoke E2E (health UP, Flyway V1..V15, login, CRUD, sync, chat REST+WS) contra Postgres + VibeSec config conexion + cierre docs.
+Bloque 6 ejecutado por Codex:
+- Flyway aplicado en `recetas_familiares` arrancando el backend local contra Postgres Hetzner; `GET /api/v1/health` -> `{"status":"UP",...}`.
+- `flyway_schema_history` en Postgres: V1..V15 con `success=true`.
+- Migracion de datos hecha por copia JDBC directa desde MySQL local a Postgres Hetzner, tabla por tabla, con columnas explicitas. No se importo `flyway_schema_history` de MySQL. MySQL local queda intacto.
+- Recuento origen MySQL antes: `users=2`, `families=1`, `family_members=2`, `refresh_tokens=27`, `chat_messages=3`, `chat_message_clears=1`; resto de tablas funcionales existentes en origen = `0`.
+- Recuento destino Postgres despues: `users=2`, `families=1`, `family_members=2`, `refresh_tokens=27`, `chat_messages=3`, `chat_message_clears=1`; resto de tablas funcionales = `0`; `chat_attachments=0` (tabla nueva V15, no existia en origen).
+- `refresh_tokens.replaced_by_token_id` se cargo en dos pasos por la FK auto-referente: 4 updates aplicados.
 
-Metodo: commit por fase; MySQL local intacto como rollback hasta BLOQUE 7; todo en rama.
+Punto siguiente:
+- BLOQUE 7 — Smoke E2E contra Postgres: health, Flyway V1..V15, registro/login, CRUD, sync pull/push, chat REST+WS.
+- Ejecutar revision tipo VibeSec sobre config de conexion y documentar que `security-review` fuerte no aplica porque no se modificaron endpoints/auth, aunque si se revisan secretos/env/minimo privilegio/5432.
+- Actualizar cierre de `CONTINUAR.md`, crear commit de cierre si todo queda validado y no dejar procesos backend vivos salvo decision explicita.
+
+Metodo: commit por fase; MySQL local intacto como rollback operativo; todo en rama.
 
 ### Chequeo obligatorio de cierre
 
