@@ -9,10 +9,10 @@ CREATE TABLE chat_attachments (
     size_bytes BIGINT NOT NULL,
     width INT NULL,
     height INT NULL,
-    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    deleted_at TIMESTAMP(6) NULL,
+    deleted_at timestamptz NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_chat_attachments_message FOREIGN KEY (message_id) REFERENCES chat_messages (id)
 );

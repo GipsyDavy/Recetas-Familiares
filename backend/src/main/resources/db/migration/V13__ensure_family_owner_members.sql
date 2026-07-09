@@ -1,7 +1,7 @@
 UPDATE family_members
 SET role = 'OWNER',
     sync_version = sync_version + 1,
-    updated_at = CURRENT_TIMESTAMP(6)
+    updated_at = now()
 WHERE id IN (
     SELECT repair.owner_member_id
     FROM (

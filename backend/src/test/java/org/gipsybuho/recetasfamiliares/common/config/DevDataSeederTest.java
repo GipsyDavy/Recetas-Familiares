@@ -16,10 +16,10 @@ import org.springframework.test.context.ActiveProfiles;
 
 @ActiveProfiles("dev")
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:dev_seed_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.url=${DB_TEST_URL:jdbc:postgresql://localhost:5432/recetas_familiares_test}",
+        "spring.datasource.username=${DB_TEST_USERNAME:recetas_app}",
+        "spring.datasource.password=${DB_TEST_PASSWORD:}",
+        "spring.datasource.driver-class-name=org.postgresql.Driver",
         "spring.jpa.hibernate.ddl-auto=validate",
         "app.security.jwt.secret=test-only-change-this-secret-32-bytes-minimum",
         "app.dev.seed-data.enabled=true",

@@ -6,11 +6,11 @@ CREATE TABLE shopping_lists (
     planned_to DATE NULL,
     note VARCHAR(255) NULL,
     completed BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     sync_version BIGINT NOT NULL DEFAULT 0,
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    deleted_at TIMESTAMP(6) NULL,
+    deleted_at timestamptz NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_shopping_lists_family FOREIGN KEY (family_id) REFERENCES families (id)
 );
@@ -24,11 +24,11 @@ CREATE TABLE shopping_list_items (
     unit VARCHAR(40) NULL,
     checked BOOLEAN NOT NULL DEFAULT FALSE,
     note VARCHAR(255) NULL,
-    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     sync_version BIGINT NOT NULL DEFAULT 0,
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    deleted_at TIMESTAMP(6) NULL,
+    deleted_at timestamptz NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_shopping_list_items_list FOREIGN KEY (shopping_list_id) REFERENCES shopping_lists (id)
 );

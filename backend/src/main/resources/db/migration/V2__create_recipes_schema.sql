@@ -7,11 +7,11 @@ CREATE TABLE recipes (
     prep_minutes INT NULL,
     cook_minutes INT NULL,
     difficulty VARCHAR(40) NULL,
-    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     sync_version BIGINT NOT NULL DEFAULT 0,
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    deleted_at TIMESTAMP(6) NULL,
+    deleted_at timestamptz NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_recipes_family FOREIGN KEY (family_id) REFERENCES families (id)
 );

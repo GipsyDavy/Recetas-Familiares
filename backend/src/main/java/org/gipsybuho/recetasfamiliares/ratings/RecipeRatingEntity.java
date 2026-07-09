@@ -37,7 +37,7 @@ public class RecipeRatingEntity {
     @JoinColumn(name = "user_id", nullable = false, columnDefinition = "CHAR(36)")
     private UserEntity user;
 
-    @Column(nullable = false, columnDefinition = "TINYINT")
+    @Column(nullable = false, columnDefinition = "smallint")
     private int stars;
 
     @Column(length = 500)
