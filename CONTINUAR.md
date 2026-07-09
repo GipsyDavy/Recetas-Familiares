@@ -849,7 +849,7 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Seguridad ejecutada: VibeSec y `security-review` aplicados al diff en la sesion. 0 hallazgos de alta confianza. La normalizacion de URL reduce la superficie de fuga de Bearer (una URL hostil solo puede redirigir a la propia API). Path traversal fail-closed sigue en backend; nombre de archivo local generado por el cliente (timestamp).
 - Riesgos residuales:
   - NO se realizo prueba visual real cross-device en esta sesion (no se arrancaron backend/emulador/Desktop GUI). El fix esta verificado por analisis de causa raiz + build/tests, pero falta validacion manual: thumbnail visible, abrir original y guardar Desktop<->Android con imagen real y estado de error ante 404.
-  - Desktop NO normaliza el origen de la URL (depende de que backend y `api.base.url` compartan host). En dev `localhost` funciona; al migrar a Hetzner, si `UPLOAD_BASE_URL` no coincide con el dominio de los clientes, Desktop volveria a fallar (Android ya queda protegido). Considerar replicar la normalizacion en Desktop antes/junto a la migracion PostgreSQL.
+  - Desktop ya normaliza el origen de adjuntos de chat en la continuacion Codex del 2026-07-09 (ver seccion siguiente). Queda pendiente solo la prueba visual real cross-device.
   - Sin tests UI automatizados (Compose/JavaFX), coherente con deuda COD-8.
 
 ### Sprint 47 (cont.) - Integracion hallazgos Codex/Gemini (2026-07-09)
@@ -866,6 +866,26 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
   - Descartados como backlog (no scope): icono MoreVert vs "Opciones" en Desktop, animaciones de acciones de mensaje, contentDescription con caption en `ImageView` Desktop.
 - Revalidacion: Android `assembleDebug` BUILD SUCCESSFUL (3 warnings preexistentes de tooltip deprecado, ajenos al sprint); Desktop `mvn test` 12/0.
 - Seguridad: el endurecimiento de `rewriteUploadUrl` cierra el vector de reescritura por query y traversal; sin nuevos hallazgos.
+
+### Sprint Chat imagenes UX (cont.) - Normalizacion Desktop y revalidacion Codex (2026-07-09)
+
+- Objetivo: cerrar el residual detectado por revision posterior: Android ya reescribia los adjuntos `/uploads/chat*` al origen real del API, pero Desktop dependia de que las URLs absolutas generadas por backend coincidieran con `api.base.url`.
+- Cambio aplicado:
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/api/ApiClient.java`: `fetchImage` normaliza solo rutas `/uploads/chat/` y `/uploads/chat_thumbnails/` al origen configurado del API, elimina query/fragment y rechaza path traversal `..`.
+  - El Bearer se sigue enviando solo si la URL final pertenece al origen del API; URLs externas no permitidas no se reescriben ni reciben Authorization.
+  - `desktop/src/test/java/org/gipsybuho/recetasfamiliares/core/ApiClientHttpTest.java`: tests para reescritura segura de adjuntos de chat y no filtrado de bearer en URLs externas.
+- Validacion ejecutada:
+  - Desktop `mvn test -f desktop/pom.xml` -> `Tests run: 14, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`.
+  - Android `.\gradlew.bat testDebugUnitTest assembleDebug` en `android/` -> `BUILD SUCCESSFUL`; reportes unitarios: `ANDROID_TESTS=27 FAILURES=0 ERRORS=0 SKIPPED=0`.
+  - `git diff --check` OK (solo avisos CRLF normales).
+  - Busqueda de secretos trackeados: `NO_TRACKED_SECRET_MATCHES`.
+- Seguridad/VibeSec:
+  - No se expone token en URL ni en logs.
+  - No se adjunta Authorization a hosts externos.
+  - Reescritura acotada a rutas de adjuntos del chat; no afecta fotos externas de recetas.
+- Riesgo residual:
+  - Sigue pendiente prueba visual real Desktop<->Android con backend arrancado y una imagen real: thumbnail visible, abrir original, guardar/descargar y estado de error ante 404.
+  - Sin tests UI automatizados Compose/JavaFX.
 
 ### Chequeo obligatorio de cierre
 

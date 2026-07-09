@@ -169,8 +169,8 @@ public class ApiClient {
      * propio backend para no filtrarlo a otros hosts.
      */
     public byte[] fetchImage(String absoluteUrl) throws ApiException {
-        HttpUrl requested = HttpUrl.parse(absoluteUrl);
-        Request.Builder builder = new Request.Builder().url(absoluteUrl).get();
+        HttpUrl requested = normalizeBackendImageUrl(absoluteUrl);
+        Request.Builder builder = new Request.Builder().url(requested != null ? requested.toString() : absoluteUrl).get();
         if (requested != null && isApiOrigin(requested)) {
             builder.header("Authorization", "Bearer " + session.getAccessToken());
         }
@@ -280,6 +280,32 @@ public class ApiClient {
                 && requested.scheme().equals(base.scheme())
                 && requested.host().equals(base.host())
                 && requested.port() == base.port();
+    }
+
+    private HttpUrl normalizeBackendImageUrl(String rawUrl) {
+        HttpUrl requested = HttpUrl.parse(rawUrl);
+        if (requested == null || isApiOrigin(requested) || !isChatUploadPath(requested)) {
+            return requested;
+        }
+        HttpUrl base = HttpUrl.parse(baseUrl);
+        return base != null
+                ? base.newBuilder()
+                        .encodedPath(requested.encodedPath())
+                        .encodedQuery(null)
+                        .fragment(null)
+                        .build()
+                : requested;
+    }
+
+    private static boolean isChatUploadPath(HttpUrl requested) {
+        for (String segment : requested.pathSegments()) {
+            if ("..".equals(segment)) {
+                return false;
+            }
+        }
+        String path = requested.encodedPath();
+        return path.startsWith("/uploads/chat/")
+                || path.startsWith("/uploads/chat_thumbnails/");
     }
 
     private static String normalizeBaseUrl(String rawBaseUrl) {

@@ -127,6 +127,37 @@ class ApiClientHttpTest {
         }
     }
 
+    @Test
+    void fetchImageReescribeUploadsDeChatAlOrigenDelApi() throws Exception {
+        session.setTokens("access-token", "refresh-token");
+        server.enqueue(new MockResponse().setResponseCode(200).setBody("chat-image"));
+
+        byte[] bytes = client.fetchImage("http://localhost:8080/uploads/chat/fam-1/message-1.jpg?ignored=1#fragment");
+
+        assertArrayEquals("chat-image".getBytes(StandardCharsets.UTF_8), bytes);
+        RecordedRequest request = server.takeRequest();
+        assertEquals("/uploads/chat/fam-1/message-1.jpg", request.getPath());
+        assertEquals("Bearer access-token", request.getHeader("Authorization"));
+    }
+
+    @Test
+    void fetchImageNoReescribeUrlExternaAunqueUseUploadsNoChat() throws Exception {
+        session.setTokens("access-token", "refresh-token");
+        MockWebServer external = new MockWebServer();
+        external.start();
+        try {
+            external.enqueue(new MockResponse().setResponseCode(200).setBody("external-image"));
+
+            byte[] bytes = client.fetchImage(external.url("/uploads/recipe.jpg").toString());
+
+            assertArrayEquals("external-image".getBytes(StandardCharsets.UTF_8), bytes);
+            assertNull(external.takeRequest().getHeader("Authorization"));
+            assertEquals(0, server.getRequestCount());
+        } finally {
+            external.shutdown();
+        }
+    }
+
     private static MockResponse jsonResponse(String body) {
         return new MockResponse()
                 .setResponseCode(200)
