@@ -935,8 +935,8 @@ Plan completo de la sesion (fuera del repo): `C:\Users\Gipsy Davy\.claude\plans\
 - (Base previa: `2514c29` Fase 1 driver+flyway; `3ed9d7d` docs guia Fase 2.)
 
 #### Cambios de codigo aplicados (backend)
-- 15 migraciones `V1..V15` traducidas a Postgres: `TIMESTAMP(6) [DEFAULT CURRENT_TIMESTAMP(6)] [ON UPDATE...]` -> `timestamptz [DEFAULT now()]`; `TINYINT` -> `smallint` (V10); `CHAR(36)` -> `varchar(36)` (todas); V11 sin `AFTER`; V13 `now()`. V12 sin cambios.
-- `RecipeRatingEntity.stars`: `columnDefinition "TINYINT"` -> `"smallint"`. Todas las entidades: `columnDefinition "CHAR(36)"` -> `"varchar(36)"`.
+- 15 migraciones `V1..V15` traducidas a Postgres: `TIMESTAMP(6) [DEFAULT CURRENT_TIMESTAMP(6)] [ON UPDATE...]` -> `timestamptz [DEFAULT now()]`; `TINYINT` -> `integer` en V10 tras validar Hibernate; `CHAR(36)` -> `varchar(36)` (todas); V11 sin `AFTER`; V13 `now()`. V12 sin cambios.
+- `RecipeRatingEntity.stars`: `columnDefinition "TINYINT"` -> `"integer"`. Todas las entidades: `columnDefinition "CHAR(36)"` -> `"varchar(36)"`.
 - Tests reapuntados a Postgres real (NO hay Docker/Testcontainers en la maquina): `application-test.yml` y `DevDataSeederTest` usan `${DB_TEST_URL/USERNAME/PASSWORD}` con driver `org.postgresql`, `ddl-auto=validate`. Dependencia H2 eliminada del `pom.xml`.
 - DECISION CORREGIDA del plan (`docs/migracion-*.md` decision 2): NO se mantiene `CHAR(36)`; se usa `varchar(36)`. Motivo: Postgres reporta `CHAR` como `bpchar` (Types#CHAR) y Hibernate espera `VARCHAR` para el String id -> `validate` falla. `varchar(36)` ademas evita padding.
 
@@ -956,10 +956,10 @@ Plan completo de la sesion (fuera del repo): `C:\Users\Gipsy Davy\.claude\plans\
 #### Seguridad
 - 5432 NO expuesto a internet (verificado por bind + ufw + pg_hba). Trafico DB cifrado por WireGuard (por eso no se fuerza SSL intra-tunel; decidir si se anade igualmente en prod).
 - RETRACTADO un falso positivo previo de la sesion: el "5432 publico responde" observado al inicio era ruido de ProtonVPN (no habia Postgres). Sin exposicion real.
-- VibeSec sobre config de conexion: PENDIENTE (BLOQUE 7).
+- VibeSec sobre config de conexion: ejecutado por Codex en BLOQUE 7 (ver resultados abajo).
 
 #### Estado real tras continuacion Codex (2026-07-09)
-Estado por bloque: BLOQUE 1 (codigo) HECHO. BLOQUE 2 (Postgres VPS) HECHO. BLOQUE 3 (WireGuard) HECHO. BLOQUE 4 (tests reales) HECHO. BLOQUE 5 (config app) HECHO. BLOQUE 6 (datos) HECHO. **BLOQUE 7 (smoke E2E + seguridad + cierre) PENDIENTE.**
+Estado por bloque: BLOQUE 1 (codigo) HECHO. BLOQUE 2 (Postgres VPS) HECHO. BLOQUE 3 (WireGuard) HECHO. BLOQUE 4 (tests reales) HECHO. BLOQUE 5 (config app) HECHO. BLOQUE 6 (datos) HECHO. BLOQUE 7 (smoke E2E + seguridad + cierre) HECHO.
 
 Bloque 4 ejecutado por Codex:
 - Reset real de `recetas_familiares_test` en el VPS antes de retestear.
@@ -986,11 +986,36 @@ Bloque 6 ejecutado por Codex:
 - Recuento origen MySQL antes: `users=2`, `families=1`, `family_members=2`, `refresh_tokens=27`, `chat_messages=3`, `chat_message_clears=1`; resto de tablas funcionales existentes en origen = `0`.
 - Recuento destino Postgres despues: `users=2`, `families=1`, `family_members=2`, `refresh_tokens=27`, `chat_messages=3`, `chat_message_clears=1`; resto de tablas funcionales = `0`; `chat_attachments=0` (tabla nueva V15, no existia en origen).
 - `refresh_tokens.replaced_by_token_id` se cargo en dos pasos por la FK auto-referente: 4 updates aplicados.
+- Commit creado: `411e584 chore(data): fase 6 migra datos familydemo a postgres`.
 
-Punto siguiente:
-- BLOQUE 7 — Smoke E2E contra Postgres: health, Flyway V1..V15, registro/login, CRUD, sync pull/push, chat REST+WS.
-- Ejecutar revision tipo VibeSec sobre config de conexion y documentar que `security-review` fuerte no aplica porque no se modificaron endpoints/auth, aunque si se revisan secretos/env/minimo privilegio/5432.
-- Actualizar cierre de `CONTINUAR.md`, crear commit de cierre si todo queda validado y no dejar procesos backend vivos salvo decision explicita.
+Bloque 7 ejecutado por Codex:
+- Smoke REST contra backend local apuntando a Postgres Hetzner:
+  - `GET /api/v1/health` -> `UP`.
+  - Flyway en `recetas_familiares`: V1..V15 con `success=true`.
+  - Registro/login con familia temporal `codex-smoke-*` -> OK.
+  - CRUD de `stock-items`: `POST 201`, `GET 200`, `PUT 200`, listado incluye item, `DELETE 204`.
+  - `sync/push` + `sync/pull` con `stockItems` -> item creado offline aparece en pull.
+  - Chat REST: `POST /chat/messages 201` y `GET /chat/messages 200` con el mensaje.
+- Smoke WebSocket/STOMP real:
+  - Conexion a `ws://localhost:8080/ws`, `CONNECT` con header `Authorization: Bearer ...`, `SUBSCRIBE /topic/families/{familyId}/chat`.
+  - Envio por REST tras la suscripcion; se recibio frame `MESSAGE` con el cuerpo esperado -> OK.
+- Limpieza de datos temporales de smoke en Postgres por SQL en orden de FKs. Resultado: `remaining_smoke_users=0`; recuentos volvieron a los migrados (`users=2`, `families=1`, `family_members=2`, `refresh_tokens=27`, `chat_messages=3`, `chat_message_clears=1`, resto funcional `0`, `chat_attachments=0`).
+- VibeSec/config aplicado como checklist:
+  - `git grep` no encontro la credencial DB real ni asignaciones de `DB_PASSWORD` con secretos en archivos trackeados.
+  - `recetas_app`: `rolsuper=false`, `rolcreatedb=false`, `rolcreaterole=false`, `rolreplication=false`, `rolbypassrls=false`.
+  - Postgres escucha en `10.10.0.1:5432`, `127.0.0.1:5432`, `::1:5432`; no escucha en la IP publica.
+  - `ufw`: default deny incoming; `5432/tcp` permitido solo `on wg0`; `22/tcp` y `51820/udp` expuestos por necesidad operativa.
+  - Credenciales por env/placeholders; no secretos versionados; `herztner/` sigue sin versionar.
+  - SSL: no se fuerza dentro de WireGuard; exigir TLS si la ruta deja de ser el tunel.
+- `security-review` fuerte no se ejecuto como herramienta separada: no hay skill/tool disponible en esta sesion y no se modificaron Spring Security, JWT, CORS, ownership ni endpoints/auth. Alternativa aplicada: revision VibeSec/manual de secretos, red, privilegios DB y exposicion de puerto.
+- Documentacion adicional actualizada: `backend/README.md` ya indica PostgreSQL/`varchar(36)` y `docs/migracion-mysql-a-postgresql-plan.md` deja corregida la decision `varchar(36)` frente a `CHAR(36)`.
+
+Riesgos residuales / siguiente operativa:
+- Rotar la credencial dev de `recetas_app` al cerrar el sprint, porque se uso en comandos interactivos de validacion.
+- Backups/PITR y prueba de restore del Postgres autogestionado siguen pendientes antes de tratarlo como produccion real.
+- Backend sigue local; despliegue backend en VPS/API publica queda fuera de esta fase.
+- Flyway 11.7.2 avisa que PostgreSQL 18.4 es mas nuevo que su version soportada probada (hasta PostgreSQL 17). Las migraciones V1..V15 aplicaron y validaron, pero conviene vigilar/actualizar Flyway cuando el BOM lo soporte.
+- La migracion de datos fue por copia JDBC controlada, no pgloader; dataset pequeno validado por recuentos, sin transformacion masiva.
 
 Metodo: commit por fase; MySQL local intacto como rollback operativo; todo en rama.
 

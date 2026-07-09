@@ -8,7 +8,7 @@ API principal de Recetas Familiares.
 - Spring Boot 3
 - Spring Security
 - Spring Data JPA
-- MySQL
+- PostgreSQL
 - Flyway
 - OpenAPI/Swagger
 
@@ -23,7 +23,7 @@ SPRING_PROFILES_ACTIVE=dev
 Variables disponibles:
 
 ```text
-DB_URL=jdbc:mysql://localhost:3306/recetas_familiares?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+DB_URL=jdbc:postgresql://10.10.0.1:5432/recetas_familiares
 DB_USERNAME=recetas_app
 DB_PASSWORD=...
 SERVER_PORT=8080
@@ -199,7 +199,7 @@ DELETE /api/v1/families/{familyId}/recipes/{recipeId}/photos/{photoId}
 ```
 
 Solo se almacenan metadata y URLs: `url`, `thumbnailUrl`, `caption`, `contentType`, `sizeBytes` y `position`.
-No se guardan binarios en MySQL. Se aceptan URLs `http/https` y tipos `image/jpeg`, `image/png`, `image/webp`.
+No se guardan binarios en PostgreSQL. Se aceptan URLs `http/https` y tipos `image/jpeg`, `image/png`, `image/webp`.
 
 Sincronizacion inicial:
 
@@ -234,7 +234,7 @@ Base inicial con:
 - perfil `dev` con valores locales no aptos para produccion;
 - JPA en modo `validate`;
 - Flyway preparado con esquema inicial de usuarios, familias, miembros y refresh tokens;
-- ids UUID como `CHAR(36)` para preparar sincronizacion offline;
+- ids UUID como `varchar(36)` para preparar sincronizacion offline;
 - columnas `created_at`, `updated_at`, `sync_version`, `deleted` y `deleted_at` en entidades sincronizables iniciales;
 - contrato comun inicial de errores y paginacion;
 - metadata OpenAPI con esquema Bearer JWT;
@@ -260,7 +260,7 @@ Base inicial con:
 - generacion de listas de compra desde menus semanales y recetas planificadas;
 - favoritos familiares de recetas;
 - notas familiares con receta opcional;
-- fotos de receta como metadata/URLs, nunca binarios en MySQL;
+- fotos de receta como metadata/URLs, nunca binarios en PostgreSQL;
 - `pull` incremental inicial por familia para recetas, ingredientes, pasos, stock, menus, listas de compra, favoritos, notas y fotos;
 - `push` incremental inicial por familia para recetas, ingredientes, pasos, stock, menus, listas de compra, favoritos, notas y fotos;
 - deteccion opcional de conflictos en `push` mediante `baseSyncVersion`;

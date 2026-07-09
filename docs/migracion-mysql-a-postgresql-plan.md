@@ -4,6 +4,8 @@ Documento de planificación para un sprint **no autorizado todavía**. Sirve par
 
 Fecha de análisis: 2026-07-08. Autor del análisis: Claude Code (solo lectura, sin cambios).
 
+Actualizacion 2026-07-09: la decision 2 quedo corregida durante la ejecucion. En PostgreSQL se usa `varchar(36)`, no `CHAR(36)`, porque Hibernate `ddl-auto=validate` reporta `CHAR` como `bpchar`/`Types#CHAR` y no lo acepta para los ids Java `String`.
+
 ---
 
 ## 1. Decisión y objetivo
@@ -27,8 +29,8 @@ Recogida por inspección del código el 2026-07-08:
 |---|---|---|
 | Queries `@Query` | **Todas JPQL, 0 `nativeQuery=true`** (verificado en repositorios de notes, users, chat, auth, favorites, families, shopping, menus, recipes, stock, photos) | Hibernate genera el SQL según dialecto → **cero reescrituras de consultas** |
 | Timestamps | Entidades fijan `created_at`/`updated_at` con `@PrePersist`/`@PreUpdate` (JPA lifecycle) | El `ON UPDATE CURRENT_TIMESTAMP(6)` del DDL MySQL es redundante → se elimina sin cambio de comportamiento |
-| Tipos SQL | CHAR(36) UUID, VARCHAR, BIGINT, BOOLEAN, TIMESTAMP(6); sin `AUTO_INCREMENT`, `ENGINE=`, `ENUM`, `JSON`, `TINYINT` explícito | Todo mapea a Postgres con traducción mínima |
-| Migraciones | 14 Flyway en `backend/src/main/resources/db/migration/V1..V14` | Traducción mecánica, no reescritura conceptual |
+| Tipos SQL | UUID textuales en `varchar(36)`, VARCHAR, BIGINT, BOOLEAN, TIMESTAMP(6); sin `AUTO_INCREMENT`, `ENGINE=`, `ENUM`, `JSON`, `TINYINT` explícito | Todo mapea a Postgres con traducción mínima |
+| Migraciones | 15 Flyway en `backend/src/main/resources/db/migration/V1..V15` | Traducción mecánica, no reescritura conceptual |
 | Tests | Ya corren en **H2** (`com.h2database:h2` scope test), no MySQL | La suite no depende de MySQL; se puede subir a Testcontainers-Postgres para fidelidad |
 | Config DB | `spring.datasource.url/username/password` ya vía env (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) | Solo apuntar env a Hetzner; sin hardcode |
 | Dialecto Hibernate | No fijado en `application.yml`; autodetección por driver | Cambiar driver basta |
@@ -42,7 +44,7 @@ Recogida por inspección del código el 2026-07-08:
 
 ### Cambia (solo backend)
 - `backend/pom.xml`: driver y plugin Flyway.
-- `backend/src/main/resources/db/migration/V1..V14`: sintaxis Postgres.
+- `backend/src/main/resources/db/migration/V1..V15`: sintaxis Postgres.
 - `backend/src/main/resources/application*.yml`: dialecto/validate si hace falta.
 - Entidades: revisar `columnDefinition` para que `ddl-auto=validate` cuadre en Postgres.
 - Tests: opcional H2 → Testcontainers-Postgres.
@@ -61,12 +63,12 @@ Recogida por inspección del código el 2026-07-08:
 ## 4. Decisiones pendientes del usuario (resolver antes/al inicio del sprint)
 
 1. **Hosting exacto:** ¿Postgres autogestionado en VPS Hetzner (Docker/systemd) o Postgres gestionado de terceros? Autogestionado implica que backups, PITR, parches y hardening son responsabilidad propia.
-2. **Tipo de UUID:** ¿mantener `CHAR(36)` (mínimo cambio) o modernizar a `uuid`/`varchar(36)` nativo Postgres (más idiomático, exige tocar `columnDefinition` de entidades)?
+2. **Tipo de UUID:** resuelto el 2026-07-09: usar `varchar(36)` para los ids textuales. No usar `CHAR(36)` en PostgreSQL; Hibernate validate lo ve como `bpchar`/`Types#CHAR`.
 3. **Datos:** ¿migrar datos actuales (la familia real `FamilyDemo` y su contenido) o empezar con base limpia?
 4. **Tests:** ¿mantener H2 o subir a Testcontainers-Postgres (recomendado; requiere Docker en la máquina/CI)?
 5. **Pooler:** ¿se usará pgbouncer/pooler delante de Postgres? Si sí, en modo transacción hay que cuidar prepared statements en Flyway (usar conexión directa para migraciones).
 
-Recomendación por defecto si el usuario delega: CHAR(36) se mantiene (menor riesgo), datos migrados con `pgloader`, tests a Testcontainers-Postgres, conexión directa para migraciones.
+Recomendación por defecto si el usuario delega: `varchar(36)` para ids textuales, datos migrados con `pgloader` o copia controlada, tests contra Postgres real/Testcontainers según entorno, conexión directa para migraciones.
 
 ---
 
@@ -77,19 +79,19 @@ Recomendación por defecto si el usuario delega: CHAR(36) se mantiene (menor rie
 - Quitar `org.flywaydb:flyway-mysql`; añadir `org.flywaydb:flyway-database-postgresql` (o dejar solo `flyway-core`, que soporta Postgres).
 - Hibernate autodetecta `PostgreSQLDialect`. Si se quiere explícito: `spring.jpa.properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect`.
 
-### Paso 2 — Traducir las 14 migraciones Flyway
+### Paso 2 — Traducir las 15 migraciones Flyway
 Cambios mecánicos por archivo:
 - Eliminar `ON UPDATE CURRENT_TIMESTAMP(6)` (la app fija `updated_at`).
 - `DEFAULT CURRENT_TIMESTAMP(6)` → `DEFAULT now()` (o dejar que la app lo fije y quitar el default).
 - `TIMESTAMP(6)` → `timestamp(6)` (o `timestamptz` si se decide UTC explícito; la app ya trabaja en UTC, valorar `timestamptz`).
 - `BOOLEAN NOT NULL DEFAULT FALSE` → válido en Postgres tal cual.
-- `CHAR(36)` → mantener, o `uuid`/`varchar(36)` según decisión 2.
+- `CHAR(36)` → `varchar(36)` según decisión 2 corregida.
 - Índices, PK, FK, UNIQUE: sintaxis idéntica, sin cambios.
 - Revisar V13 (`ensure_family_owner_members`) por si tiene UPDATE/subconsultas con sintaxis específica; traducir a Postgres si hace falta.
-- **Estrategia recomendada:** como aún no hay Postgres productivo con estas migraciones aplicadas, se pueden **editar las V1..V14 in situ** (no crear V15 de conversión) porque el esquema Postgres se crea desde cero. Si ya existiera un Postgres con estas migraciones aplicadas, NO editar históricas y usar nuevas versiones.
+- **Estrategia recomendada:** como aún no hay Postgres productivo con estas migraciones aplicadas, se pueden **editar las V1..V15 in situ** (no crear V16 de conversión) porque el esquema Postgres se crea desde cero. Si ya existiera un Postgres con estas migraciones aplicadas, NO editar históricas y usar nuevas versiones.
 
 ### Paso 3 — Entidades y `ddl-auto=validate`
-- Revisar cada `@Column(columnDefinition = "CHAR(36)")`: en Postgres `CHAR(36)` valida; si se moderniza a `uuid`, cambiar `columnDefinition` y el tipo Java si procede (String sigue funcionando con `uuid` vía Hibernate, pero conviene validar).
+- Revisar cada `@Column(columnDefinition = "CHAR(36)")`: en Postgres debe quedar como `varchar(36)` para validar contra los ids Java `String`.
 - Confirmar que `TIMESTAMP(6)` de entidades valida contra el tipo elegido en las migraciones.
 - Ejecutar el arranque con `validate` para detectar desajustes.
 
@@ -120,7 +122,7 @@ Cambios mecánicos por archivo:
 
 - `mvn -f backend/pom.xml test` verde contra Postgres (Testcontainers o Postgres real).
 - `mvn -f backend/pom.xml -DskipTests package` OK.
-- Arranque real contra Postgres Hetzner: `GET /api/v1/health` = UP, Flyway aplica V1..V14 sin error.
+- Arranque real contra Postgres Hetzner: `GET /api/v1/health` = UP, Flyway aplica V1..V15 sin error.
 - Smoke E2E de contrato (mismo método usado en el chat): registro/login, CRUD de una entidad, sync pull/push, y chat REST+WS. Reutilizar el enfoque de `docs` de la sesión de chat (curl + cliente WS Node).
 - Verificar recuentos de datos migrados si aplica.
 - `git diff --check` OK.
@@ -132,7 +134,7 @@ Cambios mecánicos por archivo:
 
 - **Riesgo ops (principal):** Postgres autogestionado en Hetzner = backups/PITR/hardening/parches son responsabilidad propia. Mitigación: automatizar backups y documentar restore antes de producción; o usar Postgres gestionado.
 - **`ddl-auto=validate`:** desajustes de tipo entre entidad y columna Postgres. Mitigación: iterar con `validate` en local hasta 0 errores antes de tocar Hetzner.
-- **CHAR vs uuid:** `CHAR(36)` en Postgres rellena con espacios en comparaciones si el valor no midiera 36; los UUID miden exactamente 36, sin padding, pero conviene decidir `varchar(36)`/`uuid` para evitar sorpresas futuras.
+- **varchar vs uuid:** se eligio `varchar(36)` para minimizar cambios en Java/clientes y evitar el padding/tipo `bpchar` de `CHAR(36)`. Migrar a `uuid` nativo queda como mejora futura con validacion multiplataforma.
 - **Zona horaria:** decidir `timestamp` vs `timestamptz`. La app ya usa UTC (`hibernate.jdbc.time_zone: UTC`); `timestamptz` es más robusto.
 - **Rollback:** el backend MySQL actual sigue funcionando; la migración se hace en rama. Si falla, no se despliega y se conserva MySQL. Reversible mientras no se apaguen los datos MySQL de origen.
 
