@@ -884,8 +884,45 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
   - No se adjunta Authorization a hosts externos.
   - Reescritura acotada a rutas de adjuntos del chat; no afecta fotos externas de recetas.
 - Riesgo residual:
-  - Sigue pendiente prueba visual real Desktop<->Android con backend arrancado y una imagen real: thumbnail visible, abrir original, guardar/descargar y estado de error ante 404.
+  - CERRADO en la continuacion "Validacion visual real Desktop/Android" del 2026-07-09: thumbnail visible, abrir original, guardar/descargar y estado de error ante 404 validados con backend real y clientes GUI.
   - Sin tests UI automatizados Compose/JavaFX.
+
+### Sprint Chat imagenes UX (cont.) - Validacion visual real Desktop/Android (2026-07-09)
+
+- Objetivo: cerrar el residual del Sprint 47 con prueba visual real cross-device, sin cambios de codigo: Android <-> Desktop, thumbnails, visor, guardar/descargar y estado de error ante 404.
+- Herramientas/agentes usados:
+  - Codex tecnico en esta sesion.
+  - Skill VibeSec como checklist manual de superficie de uploads/chat (Bearer, ownership, path traversal, 404 fail-closed).
+  - No se ejecuto Gemini/Claude CLI ni OWASP en esta continuacion porque no hubo cambio de codigo ni dependencias; se verifico el comportamiento runtime ya implementado.
+- Entorno levantado:
+  - MySQL local accesible en `localhost:3306`; DB temporal `recetas_chat_visual_test` recreada.
+  - Backend real Spring Boot desde `backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar`, perfil `dev`, `SERVER_PORT=8080`, `UPLOAD_DIR=backend\target\visual-uploads`, `UPLOAD_BASE_URL=http://localhost:8080`.
+  - Android Emulator `Pixel_9_Pro`, app debug instalada, API via `10.0.2.2:8080`.
+  - Desktop JavaFX lanzado con `mvn javafx:run` desde `desktop/`, API default `http://localhost:8080/`.
+- Comandos/resultados relevantes:
+  - `mvn -DskipTests package -f backend/pom.xml` -> `BUILD SUCCESS`.
+  - `DROP DATABASE IF EXISTS recetas_chat_visual_test; CREATE DATABASE recetas_chat_visual_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;` -> `MYSQL_VISUAL_DB_RESET_OK`.
+  - `GET http://localhost:8080/api/v1/health` -> `{"status":"UP","checkedAt":"2026-07-09T22:01:22.281966900Z"}`.
+  - Flyway backend dev aplico V1..V15 sobre `recetas_chat_visual_test` (log `backend/target/chat-visual-backend.out.log`).
+  - `adb install -r android\app\build\outputs\apk\debug\app-debug.apk` -> `Success`.
+  - `POST /api/v1/families/{familyId}/chat/messages/images` multipart con `backend\target\chat-visual-image.png` -> `HTTP_STATUS=201`, `attachmentCount=1`, URLs `/uploads/chat/...` y `/uploads/chat_thumbnails/...`.
+  - `GET /uploads/chat_thumbnails/5a19101f-6711-49d9-b576-90168d1f68f2.jpg` con Bearer para adjunto roto controlado -> `BROKEN_THUMB_HTTP_STATUS=404`.
+- Evidencia visual real capturada en `backend/target/` (no versionada):
+  - Android recibio imagen API/WS y renderizo thumbnail: `android-chat-after-api-image.png`.
+  - Android abrio visor full-screen y guardo en galeria: `android-chat-image-viewer.png`, `android-chat-image-save-toast.png`; MediaStore mostro `recetas-chat-1783635083850.png` en `Pictures/RecetasFamiliares/`.
+  - Desktop cargo historial con thumbnail: `desktop-chat-after-api-image.png`.
+  - Desktop abrio visor y guardo a disco: `desktop-chat-image-viewer.png`, `desktop-chat-save-result.png`; archivo generado `backend\target\desktop-chat-saved.png` (6885 bytes).
+  - Desktop -> Android: enviado desde boton `Imagen` de Desktop; Desktop `2 mensajes`, Android recibio thumbnail sin recargar: `desktop-chat-after-desktop-send.png`, `android-chat-after-desktop-send.png`.
+  - Android -> Desktop: enviado desde selector de imagen Android/MediaStore; Android mostro tercer mensaje y Desktop recibio por realtime/historial abierto: `android-chat-after-android-send.png`, `desktop-chat-after-android-send.png`.
+  - 404/error state: insercion temporal en DB con attachment a rutas `/uploads/chat*` inexistentes pero ownership valido; Desktop y Android mostraron `Imagen no disponible`: `desktop-chat-404-state-scrolled.png`, `android-chat-reloaded-for-404-3.png`.
+- Seguridad/VibeSec:
+  - No se publico 5432 ni se toco infra.
+  - No se versionaron tokens/credenciales ni capturas; sesion temporal quedo solo en `backend/target/chat-visual-session.json`.
+  - El 404 se valido por ruta autenticada con membership real y fichero inexistente; no se abrieron rutas publicas ni URLs con token.
+  - `herztner/` sigue sin versionar y no se toco.
+- Riesgos residuales:
+  - Sin tests UI automatizados Compose/JavaFX; esta validacion es manual/visual con capturas.
+  - Los datos de prueba quedan solo en `recetas_chat_visual_test` y `backend/target/visual-uploads`; no afectan MySQL local original ni ramas de PostgreSQL.
 
 ### Chequeo obligatorio de cierre
 
