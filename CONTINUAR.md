@@ -924,7 +924,7 @@ Validacion de cierre Fase 2:
 - Si `validate` reporta mismatch, iterar en `columnDefinition` de entidades o en el tipo de la migracion hasta 0 errores (el punto delicado es `CHAR(36)` vs el tipo de la columna, y `timestamptz` vs `TIMESTAMP(6)` de las entidades).
 - Commit por fase: mensaje `chore(db): fase 2 migracion postgres - traduccion V1..V15 + testcontainers`. No marcar validado sin ejecutar `mvn test` realmente.
 
-### Sprint Fase 2 Postgres + infra Hetzner/WireGuard — SESION 2026-07-09 (EN CURSO, NO cerrado)
+### Sprint Fase 2 Postgres + infra Hetzner/WireGuard — SESION 2026-07-09 (CERRADO)
 
 Agente lider: Claude Code (Opus 4.8), en solitario. Sprint pausado por cuota; continua otro agente IA.
 Plan completo de la sesion (fuera del repo): `C:\Users\Gipsy Davy\.claude\plans\replicated-scribbling-petal.md`.
@@ -1011,13 +1011,74 @@ Bloque 7 ejecutado por Codex:
 - Documentacion adicional actualizada: `backend/README.md` ya indica PostgreSQL/`varchar(36)` y `docs/migracion-mysql-a-postgresql-plan.md` deja corregida la decision `varchar(36)` frente a `CHAR(36)`.
 
 Riesgos residuales / siguiente operativa:
-- Rotar la credencial dev de `recetas_app` al cerrar el sprint, porque se uso en comandos interactivos de validacion.
-- Backups/PITR y prueba de restore del Postgres autogestionado siguen pendientes antes de tratarlo como produccion real.
+- Rotacion de la credencial dev de `recetas_app`: resuelta en el sprint operativo posterior (ver seccion siguiente).
+- Backups/PITR y prueba de restore: baseline resuelto en el sprint operativo posterior (ver seccion siguiente). Queda pendiente copia offsite cifrada y ensayo PITR completo en cluster aislado.
 - Backend sigue local; despliegue backend en VPS/API publica queda fuera de esta fase.
 - Flyway 11.7.2 avisa que PostgreSQL 18.4 es mas nuevo que su version soportada probada (hasta PostgreSQL 17). Las migraciones V1..V15 aplicaron y validaron, pero conviene vigilar/actualizar Flyway cuando el BOM lo soporte.
 - La migracion de datos fue por copia JDBC controlada, no pgloader; dataset pequeno validado por recuentos, sin transformacion masiva.
 
 Metodo: commit por fase; MySQL local intacto como rollback operativo; todo en rama.
+
+### Sprint Operacion PostgreSQL Hetzner — SESION 2026-07-09 (CERRADO)
+
+Objetivo autorizado por el usuario: ejecutar el siguiente sprint recomendado tras la migracion PostgreSQL, centrado en operacion minima segura de la DB autogestionada: backups, restore, rotacion de credencial y documentacion.
+
+Agente/herramientas:
+- Agente ejecutor: Codex.
+- VibeSec aplicado como guia/checklist por tocar secretos, red, base de datos y datos familiares.
+- Multi-IA/subagentes: no usados; el usuario no autorizo delegacion paralela explicita en esta orden y el sprint manejaba secretos operativos.
+- Gemini: no hay conector directo callable en esta sesion; no usado.
+- `security-review`: no disponible como herramienta callable en esta sesion; alternativa aplicada: revision manual VibeSec + comprobaciones de secretos, privilegios, bind de red y restore.
+- OWASP Dependency-Check: no aplica en este sprint porque no hubo cambios de dependencias ni codigo ejecutable de la app.
+
+Infra aplicada en el VPS:
+- Directorios creados con permisos restringidos:
+  - `/var/backups/recetas-postgres/logical`
+  - `/var/backups/recetas-postgres/base`
+  - `/var/backups/recetas-postgres/wal`
+- Scripts instalados:
+  - `/usr/local/sbin/recetas-postgres-logical-backup`
+  - `/usr/local/sbin/recetas-postgres-basebackup`
+- Timers systemd habilitados:
+  - `recetas-postgres-logical-backup.timer`: diario 03:15 UTC, `pg_dump --format=custom`, retencion 14 dias.
+  - `recetas-postgres-basebackup.timer`: domingo 04:15 UTC, `pg_basebackup`, retencion 21 dias.
+- WAL archiving activado en `/etc/postgresql/18/main/conf.d/recetas-archive.conf`:
+  - `archive_mode=on`
+  - `archive_timeout=15min`
+  - `archive_command` copia WAL a `/var/backups/recetas-postgres/wal/%f`
+- PostgreSQL reiniciado tras activar `archive_mode`; validado despues.
+
+Validacion ejecutada:
+- Tunneling DB: `Test-NetConnection 10.10.0.1 -Port 5432` -> `TcpTestSucceeded=True`.
+- Estado Postgres: cluster `18/main` online; escucha en `10.10.0.1:5432`, `127.0.0.1:5432`, `::1:5432`; no escucha en IP publica.
+- Privilegios: `recetas_app|false|false|false|false|false` para `rolsuper`, `rolcreatedb`, `rolcreaterole`, `rolreplication`, `rolbypassrls`.
+- Espacio: `/` con 34G libres aprox.; DBs pequenas (`recetas_familiares` ~9 MB, `recetas_familiares_test` ~10 MB).
+- Backup logico manual: `recetas-postgres-logical-backup.service` -> SUCCESS; dump creado en `/var/backups/recetas-postgres/logical/recetas_familiares_20260709T212925Z.dump`.
+- Base backup manual: `recetas-postgres-basebackup.service` -> SUCCESS; backup creado en `/var/backups/recetas-postgres/base/base_20260709T212950Z`.
+- WAL archiving: `pg_switch_wal()` -> `0/5000000`; `pg_stat_archiver` -> `archived_count=3`, `failed_count=0`.
+- Restore logico real en base aislada `recetas_familiares_restore_check`:
+  - Recuentos restaurados: `flyway=15`, `users=2`, `families=1`, `family_members=2`, `refresh_tokens=27`, `chat_messages=3`, `chat_message_clears=1`.
+  - Base de restore eliminada despues; verificacion final `0`.
+- Rotacion credencial `recetas_app`:
+  - Se hizo una primera rotacion, pero la validacion local con JShell echo el valor; se considero credencial quemada y se roto de nuevo inmediatamente.
+  - Segunda rotacion validada sin imprimir secreto desde VPS y desde la maquina local por JDBC contra `recetas_familiares` y `recetas_familiares_test`.
+  - Nueva credencial guardada solo en `herztner/recetas_app.env` (no versionado).
+- Busqueda de secretos trackeados: sin matches para credenciales DB reales fuera de `herztner/`.
+
+Documentacion/cambios versionables:
+- `.gitignore`: anadido `herztner/` para evitar commits accidentales de claves/config local sensible.
+- `docs/postgres-operacion-runbook.md`: runbook operativo de backup, restore, PITR, rotacion y riesgos.
+- `CONTINUAR.md`: cierre de sprint y resultados reales.
+
+Riesgos residuales:
+- Backups y WAL estan en el mismo VPS/disco. Falta copia offsite cifrada para cubrir perdida total del servidor.
+- PITR queda configurado con base backup + WAL, pero falta ensayo completo en cluster aislado.
+- Backend sigue local; despliegue backend en VPS/API publica queda como siguiente sprint infra si se prioriza produccion real.
+- Flyway 11.7.2 sigue avisando que PostgreSQL 18.4 es mas nuevo que su version soportada probada.
+
+Siguiente sprint recomendado:
+- Si se sigue infra: `Sprint Backend en VPS/API publica`, con systemd para el jar, env secrets, uploads persistentes, reverse proxy/TLS/dominio o decision explicita de acceso por IP/tunel, smoke E2E y VibeSec/security-review.
+- Si se vuelve a producto: `Sprint Chat imagenes UX`, merge/prueba visual real de `feat/chat-imagenes-ux`, thumbnails fiables, visor original y guardar/descargar en Android/Desktop.
 
 ### Chequeo obligatorio de cierre
 
