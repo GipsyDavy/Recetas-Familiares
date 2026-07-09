@@ -33,9 +33,13 @@ class ChatRepository(
     val familyId: String? get() = sessionStore.familyId
     val myUserId: String? get() = sessionStore.userId
 
+    // Origen del API tal como lo ve este cliente (emulador: 10.0.2.2, dispositivo: IP LAN).
+    private val apiOrigin = baseUrl.trimEnd('/')
+
     suspend fun loadHistory(before: String? = null, limit: Int = PAGE_SIZE): ChatHistoryDto {
         val family = requireFamily()
-        return api.chatMessages(family, before, limit)
+        val history = api.chatMessages(family, before, limit)
+        return history.copy(items = history.items.map(::normalizeAttachments))
     }
 
     suspend fun send(body: String): ChatMessageDto {
@@ -44,7 +48,7 @@ class ChatRepository(
         require(text.isNotEmpty()) { "Chat message body is blank" }
         require(text.length <= CHAT_MAX_BODY_LENGTH) { "Chat message body is too long" }
         val request = SendChatMessageRequestDto(id = UUID.randomUUID().toString(), body = text)
-        return api.sendChatMessage(family, request)
+        return normalizeAttachments(api.sendChatMessage(family, request))
     }
 
     suspend fun sendImages(
@@ -68,7 +72,7 @@ class ChatRepository(
         }
         val id = UUID.randomUUID().toString().toRequestBody(TEXT_PLAIN)
         val bodyPart = text.takeIf { it.isNotEmpty() }?.toRequestBody(TEXT_PLAIN)
-        return api.sendChatImageMessage(family, id, bodyPart, parts)
+        return normalizeAttachments(api.sendChatImageMessage(family, id, bodyPart, parts))
     }
 
     suspend fun edit(messageId: String, body: String): ChatMessageDto {
@@ -77,13 +81,13 @@ class ChatRepository(
         require(messageId.isNotBlank()) { "Chat message id is blank" }
         require(text.isNotEmpty()) { "Chat message body is blank" }
         require(text.length <= CHAT_MAX_BODY_LENGTH) { "Chat message body is too long" }
-        return api.editChatMessage(family, messageId, EditChatMessageRequestDto(text))
+        return normalizeAttachments(api.editChatMessage(family, messageId, EditChatMessageRequestDto(text)))
     }
 
     suspend fun delete(messageId: String): ChatMessageDto {
         val family = requireFamily()
         require(messageId.isNotBlank()) { "Chat message id is blank" }
-        return api.deleteChatMessage(family, messageId)
+        return normalizeAttachments(api.deleteChatMessage(family, messageId))
     }
 
     suspend fun clear() {
@@ -91,7 +95,8 @@ class ChatRepository(
     }
 
     suspend fun export(): ChatExportDto {
-        return api.exportChat(requireFamily())
+        val export = api.exportChat(requireFamily())
+        return export.copy(messages = export.messages.map(::normalizeAttachments))
     }
 
     /**
@@ -109,7 +114,7 @@ class ChatRepository(
             sessionStore = sessionStore,
             familyId = family,
             gson = gson,
-            onMessage = onMessage,
+            onMessage = { msg -> onMessage(normalizeAttachments(msg)) },
             onConnectionChange = onConnectionChange
         )
         socket.connect()
@@ -118,6 +123,47 @@ class ChatRepository(
 
     private fun requireFamily(): String =
         familyId ?: throw IllegalStateException("No family in session")
+
+    /**
+     * Reescribe el origen de las URLs de adjunto de uploads al host del API que
+     * ve este cliente. El backend las genera con app.upload.base-url (por defecto
+     * http:localhost:8080), inalcanzable y de host distinto al API desde el
+     * emulador o dispositivo: sin esta reescritura el AuthInterceptor no adjunta
+     * el Bearer (host distinto) y la imagen no carga. Las URLs externas que no
+     * apuntan a la ruta de uploads se dejan intactas.
+     */
+    private fun normalizeAttachments(message: ChatMessageDto): ChatMessageDto {
+        val attachments = message.attachments
+        if (attachments.isNullOrEmpty()) return message
+        return message.copy(
+            attachments = attachments.map { attachment ->
+                attachment.copy(
+                    url = rewriteUploadUrl(attachment.url),
+                    thumbnailUrl = attachment.thumbnailUrl?.let(::rewriteUploadUrl)
+                )
+            }
+        )
+    }
+
+    private fun rewriteUploadUrl(raw: String): String {
+        val path = uploadPathOrNull(raw) ?: return raw
+        return apiOrigin + path
+    }
+
+    // Extrae solo el path (sin query ni fragment) y lo acepta unicamente si
+    // apunta a los directorios de adjuntos del chat. Evita reescrituras falsas
+    // por una URL externa con /uploads/ en el query y bloquea traversal (..).
+    private fun uploadPathOrNull(raw: String): String? {
+        val path = try {
+            java.net.URI(raw).path
+        } catch (e: Exception) {
+            return null
+        }
+        if (path.isNullOrBlank() || path.contains("..")) return null
+        val allowed = path.startsWith("/uploads/chat/") ||
+            path.startsWith("/uploads/chat_thumbnails/")
+        return if (allowed) path else null
+    }
 
     private fun normalizeImageContentType(contentType: String): String {
         val normalized = contentType.lowercase().trim()

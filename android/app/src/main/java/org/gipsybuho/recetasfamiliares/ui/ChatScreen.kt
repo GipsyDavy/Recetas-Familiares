@@ -1,9 +1,14 @@
 package org.gipsybuho.recetasfamiliares.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -40,6 +46,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -64,7 +73,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
+import coil3.compose.SubcomposeAsyncImage
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatAttachmentDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
@@ -88,8 +100,16 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
     var editingMessage by remember { mutableStateOf<ChatMessageDto?>(null) }
     var editDraft by remember { mutableStateOf("") }
     var deletingMessage by remember { mutableStateOf<ChatMessageDto?>(null) }
+    var viewingAttachment by remember { mutableStateOf<ChatAttachmentDto?>(null) }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    // El chat se muestra con return propio antes del Scaffold global de RecetasApp,
+    // asi que necesita su propio host para que los avisos (guardar imagen, borrar,
+    // errores de export) sean visibles mientras el chat esta abierto.
+    LaunchedEffect(Unit) {
+        viewModel.userMessage.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             val caption = draft.trim()
@@ -132,6 +152,7 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 navigationIcon = {
@@ -209,7 +230,8 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
                                         editDraft = selected.body.orEmpty()
                                         editingMessage = selected
                                     },
-                                    onDelete = { selected -> deletingMessage = selected }
+                                    onDelete = { selected -> deletingMessage = selected },
+                                    onImageClick = { attachment -> viewingAttachment = attachment }
                                 )
                             }
                         }
@@ -301,6 +323,14 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
             }
         )
     }
+
+    viewingAttachment?.let { attachment ->
+        ChatImageViewer(
+            attachment = attachment,
+            onDismiss = { viewingAttachment = null },
+            onSave = { viewModel.saveChatImageToGallery(context, attachment.url) }
+        )
+    }
 }
 
 @Composable
@@ -308,7 +338,8 @@ private fun MessageBubble(
     message: ChatMessageDto,
     isMine: Boolean,
     onEdit: (ChatMessageDto) -> Unit,
-    onDelete: (ChatMessageDto) -> Unit
+    onDelete: (ChatMessageDto) -> Unit,
+    onImageClick: (ChatAttachmentDto) -> Unit
 ) {
     var actionsOpen by remember(message.id) { mutableStateOf(false) }
     val time = formatTime(message.createdAt)
@@ -386,7 +417,7 @@ private fun MessageBubble(
                 }
                 attachments.forEachIndexed { index, attachment ->
                     if (index > 0) Spacer(Modifier.height(Spacing.sm))
-                    ChatAttachmentImage(attachment, speaker, bodyText)
+                    ChatAttachmentImage(attachment, speaker, bodyText, onClick = { onImageClick(attachment) })
                 }
                 val visibleText = deletedText ?: bodyText
                 if (visibleText != null) {
@@ -412,20 +443,115 @@ private fun MessageBubble(
 }
 
 @Composable
-private fun ChatAttachmentImage(attachment: ChatAttachmentDto, speaker: String, caption: String?) {
-    AsyncImage(
+private fun ChatAttachmentImage(
+    attachment: ChatAttachmentDto,
+    speaker: String,
+    caption: String?,
+    onClick: () -> Unit
+) {
+    val base = if (caption.isNullOrBlank()) {
+        "Imagen compartida por $speaker"
+    } else {
+        "Imagen compartida por $speaker: $caption"
+    }
+    SubcomposeAsyncImage(
         model = attachment.thumbnailUrl ?: attachment.url,
-        contentDescription = if (caption.isNullOrBlank()) {
-            "Imagen compartida por $speaker"
-        } else {
-            "Imagen compartida por $speaker: $caption"
-        },
+        contentDescription = "$base. Toca para ampliar.",
         contentScale = ContentScale.Crop,
         modifier = Modifier
             .fillMaxWidth()
             .height(180.dp)
             .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        loading = {
+            Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+            }
+        },
+        error = {
+            Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Imagen no disponible",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     )
+}
+
+/**
+ * Visor a tamaño completo del adjunto (imagen original) con opción de guardar en
+ * la galería. En API < 29 solicita WRITE_EXTERNAL_STORAGE antes de descargar.
+ */
+@Composable
+private fun ChatImageViewer(
+    attachment: ChatAttachmentDto,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit
+) {
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) onSave() }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f))
+        ) {
+            SubcomposeAsyncImage(
+                model = attachment.url,
+                contentDescription = "Imagen a tamaño completo",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(Spacing.md),
+                loading = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                },
+                error = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No se pudo cargar la imagen", color = Color.White)
+                    }
+                }
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(Spacing.md),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = "Cerrar", tint = Color.White)
+                }
+                TextButton(
+                    onClick = {
+                        val needsPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                            ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                            ) != PackageManager.PERMISSION_GRANTED
+                        if (needsPermission) {
+                            permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        } else {
+                            onSave()
+                        }
+                    }
+                ) {
+                    Text("Guardar", color = Color.White)
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

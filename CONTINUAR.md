@@ -1094,7 +1094,120 @@ Conclusiones integradas:
 Decision tras revision:
 - Siguiente sprint recomendado si se prioriza producto: `Sprint Chat imagenes UX`.
 - Mantener vivos para infra: copia offsite cifrada, ensayo PITR completo y despliegue backend/API publica.
+### Sprint 47 - Chat imagenes UX: render fiable, visor y descarga (2026-07-09)
 
+- Objetivo: cerrar la brecha funcional de imagenes del chat (render Android, abrir original y guardar/descargar en Android y Desktop). Autorizado por el usuario; sin cambios de backend.
+- Agente lider: Claude Code en solitario. Codex y Gemini NO ejecutados en la sesion; se dejan bloques de verificacion copy-paste (solo lectura) para el usuario, segun regla de bloques IDE.
+- Causa raiz del render Android (diagnosticada, no solo parcheada): el backend genera URLs de adjunto absolutas con `app.upload.base-url` (por defecto `http://localhost:8080`). En emulador el host del API es `10.0.2.2`, asi que `AuthInterceptor` no adjuntaba el Bearer (host distinto) y `localhost` apuntaba al propio emulador -> el thumbnail nunca cargaba. Desktop funcionaba porque corre en el mismo host `localhost` que el backend.
+- Android implementado:
+  - `ChatRepository`: nueva normalizacion de origen de las URLs de adjunto (`/uploads/**`) al host del API del cliente (`apiOrigin`), aplicada en un unico punto que cubre REST y WS (historial, envio, envio imagen, editar, borrar, export y `openRealtime`). URLs externas sin `/uploads/` se dejan intactas.
+  - `ChatScreen`: `SubcomposeAsyncImage` con estados loading/error, thumbnail clicable y `ChatImageViewer` a pantalla completa (Dialog full-screen, cerrar y guardar).
+  - `RecetasViewModel`: `saveChatImageToGallery` descarga el original con el `httpClient` autenticado y escribe en MediaStore (API 29+ sin permiso; en API<29 el visor solicita `WRITE_EXTERNAL_STORAGE`).
+  - `AndroidManifest.xml`: `WRITE_EXTERNAL_STORAGE` con `maxSdkVersion=28`.
+- Desktop implementado:
+  - `ChatView`: thumbnail clicable (cursor mano + tooltip) abre `openAttachmentViewer` (dialogo modal con el original a tamano completo, fetch autenticado una sola vez) y `saveAttachmentToDisk` con `FileChooser`, reutilizando los bytes ya descargados.
+- Validacion ejecutada en la sesion:
+  - Android `./gradlew assembleDebug` -> BUILD SUCCESSFUL; `compileDebugKotlin` sin warnings ni errores.
+  - Desktop `mvn test` -> 12 tests, 0 fallos; `mvn -DskipTests compile` OK.
+  - Backend no tocado; no re-ejecutado.
+- Seguridad ejecutada: VibeSec y `security-review` aplicados al diff en la sesion. 0 hallazgos de alta confianza. La normalizacion de URL reduce la superficie de fuga de Bearer (una URL hostil solo puede redirigir a la propia API). Path traversal fail-closed sigue en backend; nombre de archivo local generado por el cliente (timestamp).
+- Riesgos residuales:
+  - NO se realizo prueba visual real cross-device en esta sesion (no se arrancaron backend/emulador/Desktop GUI). El fix esta verificado por analisis de causa raiz + build/tests, pero falta validacion manual: thumbnail visible, abrir original y guardar Desktop<->Android con imagen real y estado de error ante 404.
+  - Desktop ya normaliza el origen de adjuntos de chat en la continuacion Codex del 2026-07-09 (ver seccion siguiente). Queda pendiente solo la prueba visual real cross-device.
+  - Sin tests UI automatizados (Compose/JavaFX), coherente con deuda COD-8.
+
+### Sprint 47 (cont.) - Integracion hallazgos Codex/Gemini (2026-07-09)
+
+- El usuario ejecuto los bloques copy-paste; hallazgos verificados contra codigo antes de integrar. Solo se aplico lo confirmado.
+- Codex (4 confirmados):
+  - MEDIO: `rewriteUploadUrl` (Android) usaba `indexOf("/uploads/")` sobre la cadena completa -> reescribia falsos positivos con `/uploads/` en el query y no bloqueaba `..`. Ahora `uploadPathOrNull` parsea con `java.net.URI`, toma solo el path, rechaza `..` y exige prefijo `/uploads/chat/` o `/uploads/chat_thumbnails/`.
+  - BAJO: `saveChatImageToGallery` no comprobaba el resultado de `resolver.update(IS_PENDING=0)`. Ahora si devuelve 0 lanza error y el catch borra el `uri` y falla la operacion (sin "guardada" enganoso).
+  - BAJO: visor Desktop no cancelaba al cerrar; añadido flag `closed` en `setOnHidden` que salta el `runLater` si el dialogo ya cerro.
+  - BAJO (regla CLAUDE.md): `Files.write` corria en el hilo JavaFX; movido a hilo virtual, volviendo a FX solo para `onStatus`.
+- Gemini (1 medio valido + 1 polish):
+  - MEDIO (Android, no era FP): `ChatScreen` hace `return` antes del `Scaffold`/`SnackbarHost` global de `RecetasApp`, asi que los avisos (guardar imagen, borrar chat, errores export) no se veian con el chat abierto. Añadido `SnackbarHost` propio en `ChatScreen` que colecta `userMessage`; el colector global de `RecetasApp` se guarda con `rememberUpdatedState(chatOpen)` para no encolar un snackbar rezagado.
+  - Polish (Desktop): visor usa `ProgressIndicator` en carga y label de error con estilo `chat-attachment-placeholder`.
+  - Descartados como backlog (no scope): icono MoreVert vs "Opciones" en Desktop, animaciones de acciones de mensaje, contentDescription con caption en `ImageView` Desktop.
+- Revalidacion: Android `assembleDebug` BUILD SUCCESSFUL (3 warnings preexistentes de tooltip deprecado, ajenos al sprint); Desktop `mvn test` 12/0.
+- Seguridad: el endurecimiento de `rewriteUploadUrl` cierra el vector de reescritura por query y traversal; sin nuevos hallazgos.
+
+### Sprint Chat imagenes UX (cont.) - Normalizacion Desktop y revalidacion Codex (2026-07-09)
+
+- Objetivo: cerrar el residual detectado por revision posterior: Android ya reescribia los adjuntos `/uploads/chat*` al origen real del API, pero Desktop dependia de que las URLs absolutas generadas por backend coincidieran con `api.base.url`.
+- Cambio aplicado:
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/api/ApiClient.java`: `fetchImage` normaliza solo rutas `/uploads/chat/` y `/uploads/chat_thumbnails/` al origen configurado del API, elimina query/fragment y rechaza path traversal `..`.
+  - El Bearer se sigue enviando solo si la URL final pertenece al origen del API; URLs externas no permitidas no se reescriben ni reciben Authorization.
+  - `desktop/src/test/java/org/gipsybuho/recetasfamiliares/core/ApiClientHttpTest.java`: tests para reescritura segura de adjuntos de chat y no filtrado de bearer en URLs externas.
+- Validacion ejecutada:
+  - Desktop `mvn test -f desktop/pom.xml` -> `Tests run: 14, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`.
+  - Android `.\gradlew.bat testDebugUnitTest assembleDebug` en `android/` -> `BUILD SUCCESSFUL`; reportes unitarios: `ANDROID_TESTS=27 FAILURES=0 ERRORS=0 SKIPPED=0`.
+  - `git diff --check` OK (solo avisos CRLF normales).
+  - Busqueda de secretos trackeados: `NO_TRACKED_SECRET_MATCHES`.
+- Seguridad/VibeSec:
+  - No se expone token en URL ni en logs.
+  - No se adjunta Authorization a hosts externos.
+  - Reescritura acotada a rutas de adjuntos del chat; no afecta fotos externas de recetas.
+- Riesgo residual:
+  - CERRADO en la continuacion "Validacion visual real Desktop/Android" del 2026-07-09: thumbnail visible, abrir original, guardar/descargar y estado de error ante 404 validados con backend real y clientes GUI.
+  - Sin tests UI automatizados Compose/JavaFX.
+
+### Sprint Chat imagenes UX (cont.) - Validacion visual real Desktop/Android (2026-07-09)
+
+- Objetivo: cerrar el residual del Sprint 47 con prueba visual real cross-device, sin cambios de codigo: Android <-> Desktop, thumbnails, visor, guardar/descargar y estado de error ante 404.
+- Herramientas/agentes usados:
+  - Codex tecnico en esta sesion.
+  - Skill VibeSec como checklist manual de superficie de uploads/chat (Bearer, ownership, path traversal, 404 fail-closed).
+  - No se ejecuto Gemini/Claude CLI ni OWASP en esta continuacion porque no hubo cambio de codigo ni dependencias; se verifico el comportamiento runtime ya implementado.
+- Entorno levantado:
+  - MySQL local accesible en `localhost:3306`; DB temporal `recetas_chat_visual_test` recreada.
+  - Backend real Spring Boot desde `backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar`, perfil `dev`, `SERVER_PORT=8080`, `UPLOAD_DIR=backend\target\visual-uploads`, `UPLOAD_BASE_URL=http://localhost:8080`.
+  - Android Emulator `Pixel_9_Pro`, app debug instalada, API via `10.0.2.2:8080`.
+  - Desktop JavaFX lanzado con `mvn javafx:run` desde `desktop/`, API default `http://localhost:8080/`.
+- Comandos/resultados relevantes:
+  - `mvn -DskipTests package -f backend/pom.xml` -> `BUILD SUCCESS`.
+  - `DROP DATABASE IF EXISTS recetas_chat_visual_test; CREATE DATABASE recetas_chat_visual_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;` -> `MYSQL_VISUAL_DB_RESET_OK`.
+  - `GET http://localhost:8080/api/v1/health` -> `{"status":"UP","checkedAt":"2026-07-09T22:01:22.281966900Z"}`.
+  - Flyway backend dev aplico V1..V15 sobre `recetas_chat_visual_test` (log `backend/target/chat-visual-backend.out.log`).
+  - `adb install -r android\app\build\outputs\apk\debug\app-debug.apk` -> `Success`.
+  - `POST /api/v1/families/{familyId}/chat/messages/images` multipart con `backend\target\chat-visual-image.png` -> `HTTP_STATUS=201`, `attachmentCount=1`, URLs `/uploads/chat/...` y `/uploads/chat_thumbnails/...`.
+  - `GET /uploads/chat_thumbnails/5a19101f-6711-49d9-b576-90168d1f68f2.jpg` con Bearer para adjunto roto controlado -> `BROKEN_THUMB_HTTP_STATUS=404`.
+- Evidencia visual real capturada en `backend/target/` (no versionada):
+  - Android recibio imagen API/WS y renderizo thumbnail: `android-chat-after-api-image.png`.
+  - Android abrio visor full-screen y guardo en galeria: `android-chat-image-viewer.png`, `android-chat-image-save-toast.png`; MediaStore mostro `recetas-chat-1783635083850.png` en `Pictures/RecetasFamiliares/`.
+  - Desktop cargo historial con thumbnail: `desktop-chat-after-api-image.png`.
+  - Desktop abrio visor y guardo a disco: `desktop-chat-image-viewer.png`, `desktop-chat-save-result.png`; archivo generado `backend\target\desktop-chat-saved.png` (6885 bytes).
+  - Desktop -> Android: enviado desde boton `Imagen` de Desktop; Desktop `2 mensajes`, Android recibio thumbnail sin recargar: `desktop-chat-after-desktop-send.png`, `android-chat-after-desktop-send.png`.
+  - Android -> Desktop: enviado desde selector de imagen Android/MediaStore; Android mostro tercer mensaje y Desktop recibio por realtime/historial abierto: `android-chat-after-android-send.png`, `desktop-chat-after-android-send.png`.
+  - 404/error state: insercion temporal en DB con attachment a rutas `/uploads/chat*` inexistentes pero ownership valido; Desktop y Android mostraron `Imagen no disponible`: `desktop-chat-404-state-scrolled.png`, `android-chat-reloaded-for-404-3.png`.
+- Seguridad/VibeSec:
+  - No se publico 5432 ni se toco infra.
+  - No se versionaron tokens/credenciales ni capturas; sesion temporal quedo solo en `backend/target/chat-visual-session.json`.
+  - El 404 se valido por ruta autenticada con membership real y fichero inexistente; no se abrieron rutas publicas ni URLs con token.
+  - `herztner/` sigue sin versionar y no se toco.
+- Riesgos residuales:
+  - Sin tests UI automatizados Compose/JavaFX; esta validacion es manual/visual con capturas.
+  - Los datos de prueba quedan solo en `recetas_chat_visual_test` y `backend/target/visual-uploads`; no afectan MySQL local original ni ramas de PostgreSQL.
+
+### Sprint Integracion Chat imagenes UX - cierre tecnico de rama (2026-07-10)
+
+- Objetivo: cerrar la rama `feat/chat-imagenes-ux` antes de publicarla/integrarla, revalidando en la sesion actual los cambios ya implementados y documentados el 2026-07-09.
+- Agente lider: Codex. Skill VibeSec leida y usada como checklist manual por tratar URLs de adjuntos, Bearer, ownership de uploads y estado de cierre. Multiagente no ejecutado: no habia incertidumbre tecnica nueva tras la validacion visual real ya documentada. Gemini no disponible como herramienta directa; no se preparo bloque nuevo porque no hubo cambios funcionales nuevos. OWASP Dependency-Check no ejecutado: no cambiaron dependencias ni backend; se mantiene como herramienta para auditorias con `NVD_API_KEY`.
+- Estado de rama antes de integrar:
+  - `feat/chat-imagenes-ux` estaba 2 commits por delante de `origin/feat/chat-imagenes-ux`.
+  - `main` y `origin/main` estaban en `e346970`.
+  - `herztner/` seguia sin versionar y no se toco.
+- Validacion ejecutada en esta sesion:
+  - `mvn -f desktop\pom.xml test` -> `Tests run: 14, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`.
+  - `.\gradlew.bat testDebugUnitTest assembleDebug --rerun-tasks` en `android/` -> `BUILD SUCCESSFUL`, 46 tareas ejecutadas; reportes unitarios: `ANDROID_TESTS=27 FAILURES=0 ERRORS=0 SKIPPED=0`.
+  - `git diff --check main..HEAD` -> sin salida, OK.
+  - Busqueda de secretos en el diff de la rama (`DB_TEST_PASSWORD`, `DB_PASSWORD`, `JWT_SECRET`, private keys) -> sin coincidencias.
+- Seguridad/VibeSec:
+  - Confirmado que la normalizacion de adjuntos se acota a `/uploads/chat/` y `/uploads/chat_thumbnails/`.
+  - Confirmado que Desktop no envia `Authorization` a hosts externos y que Android reescribe solo rutas de uploads aceptadas al origen del API.
+  - No se versionaron capturas, tokens, credenciales ni artefactos de `backend/target`.
+- Riesgos residuales:
+  - Sin tests UI automatizados Compose/JavaFX; cubierto por validacion visual manual real del 2026-07-09 y tests unitarios/build actuales.
+  - Warnings Android preexistentes durante `compileDebugKotlin`: deprecaciones de tooltip/MenuAnchor, `Icons.Filled.Sort` y un safe-call innecesario en `TokenRefreshAuthenticator`.
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
