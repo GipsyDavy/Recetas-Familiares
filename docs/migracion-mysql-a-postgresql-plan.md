@@ -6,7 +6,7 @@ Fecha de análisis: 2026-07-08. Autor del análisis: Claude Code (solo lectura, 
 
 Actualizacion 2026-07-09: la decision 2 quedo corregida durante la ejecucion. En PostgreSQL se usa `varchar(36)`, no `CHAR(36)`, porque Hibernate `ddl-auto=validate` reporta `CHAR` como `bpchar`/`Types#CHAR` y no lo acepta para los ids Java `String`.
 
-Actualizacion 2026-07-10: la migracion, los tests contra PostgreSQL real, la migracion de datos `FamilyDemo`, la operacion base de backups locales y el despliegue del backend/API publica HTTPS temporal en Hetzner quedaron ejecutados en `feat/migracion-postgresql`. Quedan vivos: copia offsite cifrada, ensayo PITR completo, dominio propio estable y CI/CD/rollback del backend.
+Actualizacion 2026-07-10: la migracion, los tests contra PostgreSQL real, la migracion de datos `FamilyDemo`, la operacion base de backups locales y el despliegue del backend/API publica HTTPS temporal en Hetzner quedaron ejecutados en `feat/migracion-postgresql` e integrados en `main`. Quedan vivos: copia offsite cifrada, ensayo PITR completo, dominio propio estable y CI/CD/rollback del backend.
 
 ---
 

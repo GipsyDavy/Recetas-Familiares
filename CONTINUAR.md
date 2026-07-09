@@ -340,7 +340,7 @@ Funcionalidad futura documentada:
 
 Estado actualizado el 2026-07-10:
 - Chat imagenes UX ya esta implementado, validado visualmente Desktop<->Android, integrado y publicado en `main`.
-- PostgreSQL en Hetzner, migracion de datos, operacion base de backups locales y backend/API publica HTTPS temporal estan cerrados en `feat/migracion-postgresql`; la rama queda recomendada para merge a `main`.
+- PostgreSQL en Hetzner, migracion de datos, operacion base de backups locales y backend/API publica HTTPS temporal quedaron integrados en `main` desde `feat/migracion-postgresql`.
 - El riesgo critico vivo ya no es producto/chat, sino operacion de datos: backups de PostgreSQL sin copia offsite cifrada.
 - Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
@@ -1263,10 +1263,11 @@ Decision tras revision:
   - Flyway 11.7.2 sigue avisando que PostgreSQL 18.4 es mas nuevo que su soporte probado.
   - Caddy 2.6.2 viene del repo Ubuntu; vigilar parches.
 
-### Revision Gemini pre-merge PostgreSQL/API publica - SESION 2026-07-10
+### Revision Gemini y merge PostgreSQL/API publica - SESION 2026-07-10
 
 - Gemini reviso en solo lectura lo implementado en la sesion: Chat imagenes UX integrado en `main`, migracion PostgreSQL, operacion DB, despliegue backend/API publica HTTPS temporal, runbooks y riesgos residuales.
-- Recomendacion recibida: `feat/migracion-postgresql` esta tecnicamente lista para fusionarse a `main`.
+- Recomendacion recibida: `feat/migracion-postgresql` estaba tecnicamente lista para fusionarse a `main`.
+- Accion ejecutada: merge fast-forward de `feat/migracion-postgresql` a `main` y push a `origin/main`.
 - Cambios documentales aplicados antes del merge:
   - `CONTINUAR.md`: la seccion de bloqueantes deja de marcar Chat imagenes UX como pendiente y establece como siguiente sprint `Backups offsite cifrados PostgreSQL`.
   - `CONTINUAR.md`: los puntos historicos de Chat imagenes UX y migracion PostgreSQL quedan marcados como superados/cerrados, evitando instrucciones obsoletas.
