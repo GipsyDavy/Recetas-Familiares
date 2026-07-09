@@ -11,6 +11,7 @@ Runbook operativo para el PostgreSQL autogestionado de Recetas Familiares en Het
 - Red DB: Postgres escucha en `10.10.0.1:5432`, `127.0.0.1:5432` y `::1:5432`; no debe escuchar en la IP publica.
 - Conexion normal de la app: `jdbc:postgresql://10.10.0.1:5432/recetas_familiares` via WireGuard.
 - Secretos locales: `herztner/recetas_app.env` queda fuera de Git.
+- Backend desplegado en el mismo VPS como `recetas-backend.service`, detras de Caddy/TLS. Ver `docs/backend-vps-deploy-runbook.md`.
 
 ## Backup Configurado
 
@@ -105,5 +106,5 @@ PGPASSWORD='<nueva-clave>' psql -h 10.10.0.1 -U recetas_app -d recetas_familiare
 
 - Los backups estan en el mismo VPS/disco. Falta copia offsite cifrada para cubrir perdida total del servidor.
 - El PITR esta configurado a nivel de base backup + WAL, pero falta ensayo completo en cluster aislado.
-- El backend sigue sin despliegue productivo en VPS/API publica.
+- El backend ya esta desplegado en VPS/API publica HTTPS temporal; falta dominio propio estable y estrategia de rollback/CI-CD.
 - Flyway 11.7.2 avisa que PostgreSQL 18.4 es mas nuevo que su soporte probado actual.

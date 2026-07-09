@@ -1208,6 +1208,50 @@ Decision tras revision:
 - Riesgos residuales:
   - Sin tests UI automatizados Compose/JavaFX; cubierto por validacion visual manual real del 2026-07-09 y tests unitarios/build actuales.
   - Warnings Android preexistentes durante `compileDebugKotlin`: deprecaciones de tooltip/MenuAnchor, `Icons.Filled.Sort` y un safe-call innecesario en `TokenRefreshAuthenticator`.
+
+### Sprint Backend en VPS/API publica - SESION 2026-07-10 (CERRADO)
+
+- Objetivo autorizado: continuar infra tras PostgreSQL/operacion y desplegar el backend Spring Boot en el VPS con API publica segura, sin cambiar logica backend.
+- Rama: `feat/migracion-postgresql`. Antes de desplegar se integro `main` por merge commit `40a81be`, resolviendo conflicto solo documental en `CONTINUAR.md` y conservando trazabilidad PostgreSQL + Chat imagenes UX.
+- Arquitectura desplegada:
+  - URL publica HTTPS temporal: `https://recetas.167.233.213.242.sslip.io`.
+  - Caddy en `80/443`, con redireccion HTTP -> HTTPS y reverse proxy a `127.0.0.1:8080`.
+  - Backend systemd `recetas-backend.service`, usuario sin login `recetas-backend`, jar en `/opt/recetas-familiares/backend/recetas-familiares-backend.jar`.
+  - Env/secrets fuera de Git en `/etc/recetas-familiares/backend.env` (`0640 root:recetas-backend`).
+  - Uploads persistentes en `/var/lib/recetas-familiares/uploads`.
+  - DB por `jdbc:postgresql://10.10.0.1:5432/recetas_familiares`; `5432` sigue no publico.
+- Provisioning aplicado en VPS:
+  - Instalado `openjdk-21-jre-headless` (`21.0.11`) y Caddy (`2.6.2`) desde repo Ubuntu.
+  - `ufw`: `22/tcp`, `51820/udp`, `80/tcp`, `443/tcp`; `5432/tcp` solo `on wg0`; `8080` no abierto.
+  - Servicio endurecido con `NoNewPrivileges=true`, `PrivateTmp=true`, `ProtectSystem=strict`, `ProtectHome=true`, `ReadWritePaths=/var/lib/recetas-familiares/uploads`.
+- Validacion ejecutada:
+  - Build local: `mvn -f backend\pom.xml -DskipTests package` -> `BUILD SUCCESS`, jar generado.
+  - Servicios VPS: `recetas-backend`, `caddy`, `postgresql@18-main` -> `active`.
+  - `GET https://recetas.167.233.213.242.sslip.io/api/v1/health` -> `200 OK`, `{"status":"UP",...}`.
+  - HTTP plano `http://recetas.167.233.213.242.sslip.io/api/v1/health` -> `308 Permanent Redirect` a HTTPS.
+  - `GET /swagger-ui.html` en prod -> `404 Not Found`.
+  - Flyway prod: `flyway_schema_history` -> 15 migraciones `success=true`, versiones V1..V15.
+  - Puertos publicos: `443` accesible; `5432` y `8080` desde IP publica -> timeout/no acceso. En VPS: Caddy escucha `*:80/*:443`, backend solo `[::ffff:127.0.0.1]:8080`, Postgres `10.10.0.1/127.0.0.1/::1:5432`.
+  - Smoke REST publico: registro/login temporal, CRUD stock, `sync/push`, `sync/pull`, chat REST `POST` + historial -> `SMOKE_REST_OK`.
+  - Smoke WS publico: `wss://.../ws`, `CONNECT` con JWT en frame STOMP, `SUBSCRIBE /topic/families/{familyId}/chat`, envio REST y recepcion `MESSAGE` -> `SMOKE_WS_OK`.
+  - Limpieza smoke: `remaining_smoke_users=0`, `remaining_smoke_families=0`.
+  - Suite backend contra PostgreSQL real: tras reset de `recetas_familiares_test`, `mvn -f backend\pom.xml test` -> `Tests run: 116, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`, `Total time: 04:10 min`.
+- Seguridad/VibeSec:
+  - VibeSec usado como checklist por tocar red, secretos, JWT, uploads y servicio publico.
+  - No se imprimieron secretos; la credencial DB se paso al VPS por stdin y se elimino el temporal.
+  - Busqueda de secretos trackeados sin coincidencias reales fuera de placeholders/documentacion y `herztner/` no versionado.
+  - `security-review` no disponible como herramienta callable; alternativa aplicada: revision manual VibeSec + smoke auth/ownership + puertos/permisos.
+  - OWASP Dependency-Check no ejecutado: no cambiaron dependencias Maven/Gradle; el sprint fue despliegue/runtime.
+- Documentacion:
+  - Nuevo `docs/backend-vps-deploy-runbook.md`.
+  - `docs/postgres-operacion-runbook.md` actualizado: backend ya desplegado; riesgos infra vivos ajustados.
+- Riesgos residuales:
+  - Hostname `sslip.io` es temporal y depende de DNS externo; sustituir por dominio propio antes de uso estable.
+  - Sin CI/CD ni rollback automatizado de jar.
+  - Backups DB siguen sin copia offsite cifrada y PITR completo no ensayado.
+  - Flyway 11.7.2 sigue avisando que PostgreSQL 18.4 es mas nuevo que su soporte probado.
+  - Caddy 2.6.2 viene del repo Ubuntu; vigilar parches.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
