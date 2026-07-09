@@ -102,11 +102,30 @@ Apoyo IA recomendado:
 
 ### Backend
 
-Ejemplo usando placeholders. Sustituir valores localmente sin escribir secretos reales en documentacion versionable:
+Desarrollo con PostgreSQL en Hetzner via WireGuard. El trafico DB viaja por el tunel cifrado (`10.10.0.1:5432`); no se fuerza `sslmode=require` dentro del tunel. Si en el futuro se usa un Postgres gestionado o una ruta fuera de WireGuard, exigir TLS en `DB_URL`.
+
+PowerShell:
+
+```powershell
+$env:DB_URL="jdbc:postgresql://10.10.0.1:5432/recetas_familiares"
+$env:DB_USERNAME="recetas_app"
+$env:DB_PASSWORD="<DB_PASSWORD>"
+$env:JWT_SECRET="<JWT_SECRET_32_BYTES_MINIMO>"
+$env:DEV_SEED_DATA_ENABLED="true"
+$env:DEV_SEED_EMAIL="demo@recetas.local"
+$env:DEV_SEED_PASSWORD="<DEMO_PASSWORD>"
+$env:DEV_SEED_DISPLAY_NAME="Demo"
+$env:DEV_SEED_FAMILY_NAME="FamiliaDemo"
+mvn -f backend/pom.xml spring-boot:run "-Dspring-boot.run.profiles=dev"
+```
+
+Ejemplo `java -jar` usando placeholders. Sustituir valores localmente sin escribir secretos reales en documentacion versionable:
 
 ```bash
 java -jar backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar \
   --spring.profiles.active=dev \
+  "--spring.datasource.url=jdbc:postgresql://10.10.0.1:5432/recetas_familiares" \
+  "--spring.datasource.username=recetas_app" \
   "--spring.datasource.password=<DB_PASSWORD>" \
   "--app.security.jwt.secret=<JWT_SECRET_32_BYTES_MINIMO>" \
   "--app.dev.seed-data.enabled=true" \

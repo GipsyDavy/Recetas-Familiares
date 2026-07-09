@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/recetas_familiares?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    url: ${DB_URL:jdbc:postgresql://10.10.0.1:5432/recetas_familiares}
     username: ${DB_USERNAME:recetas_app}
     password: ${DB_PASSWORD:}
 
