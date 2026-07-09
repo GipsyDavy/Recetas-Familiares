@@ -87,6 +87,61 @@ No ejecutar un PITR sobre el cluster activo sin ventana de mantenimiento y copia
 4. Definir `recovery_target_time` si se busca un punto concreto.
 5. Arrancar el cluster aislado y validar recuentos/datos.
 
+## Plan Backups Offsite Cifrados
+
+Estado actual: pendiente. Los backups logicos, base backups y WAL existen solo en el VPS/disco local. El siguiente sprint debe copiar estos artefactos a un destino offsite con cifrado antes de salida.
+
+Decision requerida antes de implementar: destino offsite y credenciales. Opciones validas incluyen S3 compatible, Backblaze B2, Cloudflare R2, AWS S3, Hetzner Storage Box/SFTP o un destino equivalente aportado por el usuario.
+
+Enfoque recomendado:
+
+1. Usar `restic` como capa de cifrado/repositorio.
+2. Usar el backend nativo de `restic` o `rclone` solo como transporte si el proveedor lo requiere.
+3. Guardar secretos solo en el VPS, por ejemplo:
+
+```bash
+/etc/recetas-familiares/offsite-backup.env
+```
+
+Permisos esperados:
+
+```bash
+chown root:root /etc/recetas-familiares/offsite-backup.env
+chmod 600 /etc/recetas-familiares/offsite-backup.env
+```
+
+Servicios esperados a crear:
+
+```bash
+/usr/local/sbin/recetas-postgres-offsite-backup
+/etc/systemd/system/recetas-postgres-offsite-backup.service
+/etc/systemd/system/recetas-postgres-offsite-backup.timer
+```
+
+Validacion minima del sprint:
+
+```bash
+systemctl start recetas-postgres-offsite-backup.service
+systemctl status recetas-postgres-offsite-backup.service --no-pager
+restic snapshots
+restic check
+```
+
+Restore offsite minimo:
+
+1. Restaurar desde el repositorio offsite a un directorio temporal aislado.
+2. Comprobar que aparecen `logical/`, `base/` y `wal/`.
+3. Ejecutar `pg_restore --list` contra el dump logico mas reciente restaurado.
+4. Si es viable, restaurar el dump en una DB aislada y comparar recuentos basicos (`flyway_schema_history`, `users`, `families`, `family_members`, `chat_messages`).
+5. Eliminar la DB/directorio temporal al terminar.
+
+Reglas de seguridad:
+
+- No imprimir secretos en terminal compartida, logs ni documentacion.
+- No subir secretos a Git.
+- No abrir `5432/tcp` a internet para resolver backups.
+- Fallar cerrado si el destino offsite no esta disponible; mantener backups locales funcionando.
+
 ## Rotacion De Credenciales
 
 Generar una clave aleatoria nueva, aplicar:

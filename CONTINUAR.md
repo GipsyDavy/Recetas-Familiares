@@ -1275,6 +1275,100 @@ Decision tras revision:
 - VibeSec usado como checklist manual de cierre por tratar sprint con red, secretos, uploads, datos familiares y despliegue publico. No se tocaron secretos ni `herztner/`.
 - Siguiente sprint recomendado tras merge: `Backups offsite cifrados PostgreSQL`, porque es el riesgo critico vivo.
 
+### Cierre de sesion Codex - 2026-07-10
+
+Objetivo del cierre:
+- Dejar el repositorio y la documentacion listos para que Codex, Claude Code, Gemini u otro agente retomen sin memoria externa.
+- No se implemento runtime nuevo en este cierre; solo documentacion de estado y plan de continuacion.
+
+Estado Git al cerrar:
+- Rama activa esperada: `main`.
+- `main`, `origin/main`, `feat/migracion-postgresql` y `origin/feat/migracion-postgresql` estaban alineadas tras el merge de PostgreSQL/API publica. El commit funcional/documental previo al cierre era `610ed6f docs: registrar merge postgres a main`.
+- `feat/chat-imagenes-ux` queda historica en `3adef78`; su contenido ya esta integrado en `main`.
+- `herztner/` sigue fuera de Git y no debe versionarse.
+
+Estado actual del producto/proyecto:
+- Backend Spring Boot mantiene la logica original; el cambio de motor MySQL -> PostgreSQL ya esta integrado en `main`.
+- PostgreSQL Hetzner esta operativo en el VPS, accesible por WireGuard/local VPS en `10.10.0.1:5432`, y no debe exponerse a internet.
+- DBs operativas: `recetas_familiares` y `recetas_familiares_test`; rol `recetas_app` con privilegios minimos.
+- Migraciones Flyway V1..V15 estan traducidas a PostgreSQL y validadas; ids textuales en `varchar(36)`, no `CHAR(36)`.
+- Tests backend apuntan a PostgreSQL real por env `DB_TEST_URL`, `DB_TEST_USERNAME`, `DB_TEST_PASSWORD`; H2 fue eliminado del backend.
+- Datos `FamilyDemo` fueron migrados desde MySQL local a PostgreSQL Hetzner con recuentos antes/despues; MySQL local queda como rollback historico.
+- Backups locales DB configurados: `pg_dump` diario, `pg_basebackup` semanal, WAL archiving local y restore logico probado. Todo sigue en el mismo VPS/disco.
+- Backend esta desplegado en VPS como `recetas-backend.service`, detras de Caddy/TLS en la URL temporal `https://recetas.167.233.213.242.sslip.io`.
+- Chat imagenes UX esta cerrado: thumbnails, visor, guardar/descargar y error 404 validados visualmente Desktop<->Android; integrado en `main`.
+
+Validaciones ya ejecutadas en la sesion/sprints cerrados:
+- Desktop chat imagenes: `mvn -f desktop\pom.xml test` -> 14 tests, 0 fallos.
+- Android chat imagenes: `.\gradlew.bat testDebugUnitTest assembleDebug --rerun-tasks` -> BUILD SUCCESS; reportes unitarios 27 tests, 0 fallos.
+- Backend PostgreSQL real: tras reset de `recetas_familiares_test`, `mvn -f backend\pom.xml test` -> 116 tests, 0 fallos, `BUILD SUCCESS`.
+- Backend package para VPS: `mvn -f backend\pom.xml -DskipTests package` -> `BUILD SUCCESS`.
+- Smoke publico API: health HTTPS 200/UP, HTTP -> 308 HTTPS, Swagger prod 404, Flyway V1..V15, registro/login, CRUD stock, sync push/pull, chat REST y chat WS/STOMP.
+- Seguridad runtime: `5432` y `8080` no accesibles desde IP publica; backend escucha solo loopback; Caddy en 80/443; Postgres en WireGuard/loopback.
+- Limpieza smoke: usuarios/familias temporales eliminados.
+- Escaneo de secretos trackeados en los cierres: sin secretos reales; solo placeholders documentales.
+
+Herramientas/agentes disponibles y uso recomendado:
+- Codex: agente tecnico principal en esta sesion; puede ejecutar shell, editar repo, validar Maven/Gradle, hacer commits y preparar bloques para otros agentes.
+- Gemini: no hay herramienta directa callable; usar bloques copy-paste para revision transversal producto/documentacion/UX.
+- VibeSec-Skill: disponible y debe usarse como checklist si se toca red, secretos, JWT, uploads, datos familiares, permisos o cierre de sprint.
+- `security-review`: no disponible como herramienta callable en esta sesion; usar alternativa manual VibeSec y documentar la limitacion.
+- OWASP Dependency-Check: perfiles existen en backend/desktop; ejecutar cuando cambien dependencias o en auditoria dedicada, preferiblemente con `NVD_API_KEY`.
+- Multiagente Codex: disponible si el usuario autoriza delegacion paralela; no usar por ceremonia si el sprint maneja secretos operativos.
+
+Riesgos vivos que NO deben borrarse:
+- Critico: backups PostgreSQL sin copia offsite cifrada; backups logicos, base backups y WAL siguen en el mismo VPS/disco.
+- Medio: PITR completo no ensayado en cluster aislado.
+- Medio: hostname `sslip.io` temporal; falta dominio propio estable.
+- Medio: no hay CI/CD ni rollback automatizado del jar backend.
+- Medio: Flyway 11.7.2 avisa que PostgreSQL 18.4 es mas nuevo que su soporte probado.
+- Menor/operativo: Caddy 2.6.2 viene del repo Ubuntu; vigilar parches.
+- Menor/calidad: no hay tests UI automatizados Compose/JavaFX; iOS runtime sigue bloqueado sin macOS/dispositivo.
+
+Punto exacto de retoma para el proximo agente:
+1. Ejecutar `git checkout main` y `git pull --ff-only`.
+2. Confirmar `git status --short --branch` limpio y que `origin/main` esta en la cabecera mas reciente.
+3. Leer obligatoriamente `CLAUDE.md`, esta seccion de `CONTINUAR.md`, `docs/postgres-operacion-runbook.md` y `docs/backend-vps-deploy-runbook.md`.
+4. No tocar ni imprimir secretos. No versionar `herztner/`. No exponer `5432` ni `8080` al publico.
+5. Antes de arrancar el siguiente sprint, confirmar con el usuario el destino offsite y credenciales disponibles. Sin destino/credenciales, no se puede cerrar el sprint de backups offsite.
+
+Siguiente sprint recomendado y plan establecido:
+
+`Sprint Backups offsite cifrados PostgreSQL`
+
+Objetivo:
+- Eliminar el riesgo critico de perdida total de datos si se pierde el VPS/disco, copiando backups PostgreSQL fuera del VPS con cifrado antes de salida y restore verificable.
+
+Plan por fases:
+1. Preflight:
+   - Verificar WireGuard/SSH, servicios `postgresql@18-main`, timers locales de backup, `pg_stat_archiver`, backups recientes y espacio.
+   - Confirmar que `5432` sigue solo en WireGuard/loopback y que no hay secretos en Git.
+2. Decision de destino offsite:
+   - Preferencia tecnica: repositorio `restic` cifrado sobre destino S3 compatible, Backblaze B2, Cloudflare R2, AWS S3, Hetzner Storage Box/SFTP o destino equivalente que proporcione el usuario.
+   - Guardar credenciales solo en el VPS, por ejemplo `/etc/recetas-familiares/offsite-backup.env` con permisos `0600 root:root`.
+3. Implementacion:
+   - Instalar/configurar herramienta de copia cifrada (`restic` recomendado; `rclone` solo como backend/transporte si aplica).
+   - Crear script root-only `/usr/local/sbin/recetas-postgres-offsite-backup` para copiar `/var/backups/recetas-postgres` al repositorio cifrado.
+   - Crear `recetas-postgres-offsite-backup.service` y `.timer`, programado despues de los backups locales.
+   - Aplicar politica de retencion offsite compatible con local: al menos 14 dias logicos, 21 dias base backups, WAL suficiente para la ventana PITR definida.
+4. Validacion obligatoria:
+   - Ejecutar backup offsite manual y comprobar snapshot/listado remoto.
+   - Ejecutar `restic check` o verificacion equivalente.
+   - Restaurar desde offsite a un directorio temporal aislado.
+   - Validar al menos `pg_restore --list` del dump mas reciente y, si es viable, restaurar en DB aislada y comparar recuentos basicos.
+   - Confirmar logs sin secretos y permisos correctos.
+5. Documentacion y cierre:
+   - Actualizar `docs/postgres-operacion-runbook.md` con comandos reales de backup/restore offsite y rotacion de credenciales.
+   - Actualizar `CONTINUAR.md` con comandos ejecutados, salidas reales, riesgos residuales y siguiente sprint.
+   - Commit por fase con mensaje sugerido: `chore(infra): backups offsite cifrados postgres`.
+
+Sprints posteriores recomendados:
+1. Ensayo PITR completo en cluster aislado.
+2. Dominio propio/API estable y actualizacion de Caddy/CORS/WS origins.
+3. CI/CD y rollback automatizado del backend.
+4. Auditoria dependencias/OWASP y actualizacion Flyway cuando soporte PostgreSQL 18.x oficialmente.
+5. Tests UI automatizados Compose/JavaFX para flujos criticos.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
