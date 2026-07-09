@@ -1080,6 +1080,21 @@ Siguiente sprint recomendado:
 - Si se sigue infra: `Sprint Backend en VPS/API publica`, con systemd para el jar, env secrets, uploads persistentes, reverse proxy/TLS/dominio o decision explicita de acceso por IP/tunel, smoke E2E y VibeSec/security-review.
 - Si se vuelve a producto: `Sprint Chat imagenes UX`, merge/prueba visual real de `feat/chat-imagenes-ux`, thumbnails fiables, visor original y guardar/descargar en Android/Desktop.
 
+### Revision Gemini post-PostgreSQL/operacion — SESION 2026-07-09
+
+Gemini reviso en solo lectura la rama `feat/migracion-postgresql`, los sprints de migracion/operacion y la documentacion relacionada.
+
+Conclusiones integradas:
+- Critico antes de produccion real: backups sin copia offsite. Los backups logicos, fisicos y WAL estan en el mismo VPS/disco.
+- Medio: PITR no ensayado en cluster aislado.
+- Medio: `Sprint Chat imagenes UX` sigue siendo la deuda funcional mas visible; Android no renderiza thumbnails de forma fiable y Desktop/Android necesitan abrir original y guardar/descargar.
+- Medio: Flyway 11.7.2 aun no soporta oficialmente PostgreSQL 18.4.
+- Menor: `docs/migracion-mysql-a-postgresql-plan.md` tenia decisiones antiguas marcadas como pendientes; corregido por Codex tras la revision.
+
+Decision tras revision:
+- Siguiente sprint recomendado si se prioriza producto: `Sprint Chat imagenes UX`.
+- Mantener vivos para infra: copia offsite cifrada, ensayo PITR completo y despliegue backend/API publica.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:

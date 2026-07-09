@@ -60,15 +60,17 @@ Recogida por inspección del código el 2026-07-08:
 
 ---
 
-## 4. Decisiones pendientes del usuario (resolver antes/al inicio del sprint)
+## 4. Decisiones cerradas
 
-1. **Hosting exacto:** ¿Postgres autogestionado en VPS Hetzner (Docker/systemd) o Postgres gestionado de terceros? Autogestionado implica que backups, PITR, parches y hardening son responsabilidad propia.
+Estado actualizado el 2026-07-09 tras la ejecucion del sprint:
+
+1. **Hosting exacto:** Postgres autogestionado en VPS Hetzner, instalado como paquete del sistema (`18/main`) y accesible por WireGuard. Autogestionado implica que backups, PITR, parches y hardening son responsabilidad propia.
 2. **Tipo de UUID:** resuelto el 2026-07-09: usar `varchar(36)` para los ids textuales. No usar `CHAR(36)` en PostgreSQL; Hibernate validate lo ve como `bpchar`/`Types#CHAR`.
-3. **Datos:** ¿migrar datos actuales (la familia real `FamilyDemo` y su contenido) o empezar con base limpia?
-4. **Tests:** ¿mantener H2 o subir a Testcontainers-Postgres (recomendado; requiere Docker en la máquina/CI)?
-5. **Pooler:** ¿se usará pgbouncer/pooler delante de Postgres? Si sí, en modo transacción hay que cuidar prepared statements en Flyway (usar conexión directa para migraciones).
+3. **Datos:** se migro `FamilyDemo` desde MySQL local a PostgreSQL Hetzner por copia JDBC controlada, con recuentos antes/despues. MySQL local queda intacto como rollback operativo.
+4. **Tests:** se eliminó H2 del backend y la suite corre contra PostgreSQL real por WireGuard mediante `DB_TEST_URL`, `DB_TEST_USERNAME` y `DB_TEST_PASSWORD`. No se usa Testcontainers porque no hay Docker disponible.
+5. **Pooler:** no se usa pgbouncer/pooler. La app y Flyway conectan directamente a PostgreSQL por WireGuard.
 
-Recomendación por defecto si el usuario delega: `varchar(36)` para ids textuales, datos migrados con `pgloader` o copia controlada, tests contra Postgres real/Testcontainers según entorno, conexión directa para migraciones.
+Operacion posterior ya aplicada: backups logicos diarios, base backups semanales, WAL archiving local, restore logico probado y rotacion de `recetas_app`. Quedan vivos copia offsite cifrada, ensayo PITR completo y despliegue backend/API publica.
 
 ---
 
