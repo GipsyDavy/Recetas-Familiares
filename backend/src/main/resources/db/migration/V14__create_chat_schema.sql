@@ -1,7 +1,7 @@
 CREATE TABLE chat_messages (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
-    author_user_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
+    author_user_id VARCHAR(36) NOT NULL,
     body VARCHAR(2000) NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -20,9 +20,9 @@ CREATE INDEX ix_chat_messages_author ON chat_messages (author_user_id);
 -- historial sin afectar a los demas. cleared_before marca el corte: solo se
 -- muestran mensajes con created_at estrictamente posterior.
 CREATE TABLE chat_message_clears (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
-    user_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
+    user_id VARCHAR(36) NOT NULL,
     cleared_before timestamptz NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),

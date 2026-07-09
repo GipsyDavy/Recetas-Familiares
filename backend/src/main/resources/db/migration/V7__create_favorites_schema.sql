@@ -1,7 +1,7 @@
 CREATE TABLE favorite_recipes (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
-    recipe_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
+    recipe_id VARCHAR(36) NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     sync_version BIGINT NOT NULL DEFAULT 0,

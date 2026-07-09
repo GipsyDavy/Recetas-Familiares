@@ -1,8 +1,8 @@
 CREATE TABLE recipe_ratings (
-    id CHAR(36) NOT NULL,
-    recipe_id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
-    user_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    recipe_id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
+    user_id VARCHAR(36) NOT NULL,
     stars smallint NOT NULL,
     comment VARCHAR(500) NULL,
     created_at timestamptz NOT NULL DEFAULT now(),

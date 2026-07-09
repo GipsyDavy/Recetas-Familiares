@@ -19,11 +19,11 @@ import jakarta.persistence.Table;
 public class RefreshTokenEntity {
 
     @Id
-    @Column(length = 36, columnDefinition = "CHAR(36)")
+    @Column(length = 36, columnDefinition = "varchar(36)")
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "user_id", nullable = false, columnDefinition = "varchar(36)")
     private UserEntity user;
 
     @Column(name = "token_hash", nullable = false)
@@ -38,7 +38,7 @@ public class RefreshTokenEntity {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
-    @Column(name = "replaced_by_token_id", length = 36, columnDefinition = "CHAR(36)")
+    @Column(name = "replaced_by_token_id", length = 36, columnDefinition = "varchar(36)")
     private String replacedByTokenId;
 
     protected RefreshTokenEntity() {

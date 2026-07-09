@@ -1,6 +1,6 @@
 CREATE TABLE chat_attachments (
-    id CHAR(36) NOT NULL,
-    message_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    message_id VARCHAR(36) NOT NULL,
     url VARCHAR(1024) NOT NULL,
     thumbnail_url VARCHAR(1024) NULL,
     storage_path VARCHAR(512) NOT NULL,

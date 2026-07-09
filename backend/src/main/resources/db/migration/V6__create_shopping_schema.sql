@@ -1,6 +1,6 @@
 CREATE TABLE shopping_lists (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
     name VARCHAR(180) NOT NULL,
     planned_from DATE NULL,
     planned_to DATE NULL,
@@ -16,8 +16,8 @@ CREATE TABLE shopping_lists (
 );
 
 CREATE TABLE shopping_list_items (
-    id CHAR(36) NOT NULL,
-    shopping_list_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    shopping_list_id VARCHAR(36) NOT NULL,
     position INT NOT NULL,
     name VARCHAR(180) NOT NULL,
     quantity DECIMAL(10,3) NULL,

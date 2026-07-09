@@ -1,7 +1,7 @@
 CREATE TABLE menu_items (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
-    recipe_id CHAR(36) NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
+    recipe_id VARCHAR(36) NULL,
     planned_date DATE NOT NULL,
     meal_type VARCHAR(40) NOT NULL,
     note VARCHAR(255) NULL,

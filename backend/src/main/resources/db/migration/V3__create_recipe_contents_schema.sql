@@ -1,6 +1,6 @@
 CREATE TABLE recipe_ingredients (
-    id CHAR(36) NOT NULL,
-    recipe_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    recipe_id VARCHAR(36) NOT NULL,
     position INT NOT NULL,
     name VARCHAR(180) NOT NULL,
     quantity DECIMAL(10,3) NULL,
@@ -19,8 +19,8 @@ CREATE INDEX ix_recipe_ingredients_recipe_active ON recipe_ingredients (recipe_i
 CREATE INDEX ix_recipe_ingredients_sync ON recipe_ingredients (updated_at, sync_version, deleted);
 
 CREATE TABLE recipe_steps (
-    id CHAR(36) NOT NULL,
-    recipe_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    recipe_id VARCHAR(36) NOT NULL,
     position INT NOT NULL,
     instruction VARCHAR(2000) NOT NULL,
     timer_minutes INT NULL,

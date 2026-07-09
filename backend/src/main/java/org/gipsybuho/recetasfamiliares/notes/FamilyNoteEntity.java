@@ -21,15 +21,15 @@ import org.gipsybuho.recetasfamiliares.recipes.RecipeEntity;
 public class FamilyNoteEntity {
 
     @Id
-    @Column(length = 36, columnDefinition = "CHAR(36)")
+    @Column(length = 36, columnDefinition = "varchar(36)")
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "family_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "family_id", nullable = false, columnDefinition = "varchar(36)")
     private FamilyEntity family;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "recipe_id", columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "recipe_id", columnDefinition = "varchar(36)")
     private RecipeEntity recipe;
 
     @Column(nullable = false, length = 180)

@@ -18,11 +18,11 @@ import jakarta.persistence.Table;
 public class ChatAttachmentEntity {
 
     @Id
-    @Column(length = 36, columnDefinition = "CHAR(36)")
+    @Column(length = 36, columnDefinition = "varchar(36)")
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "message_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "message_id", nullable = false, columnDefinition = "varchar(36)")
     private ChatMessageEntity message;
 
     @Column(nullable = false, length = 1024)

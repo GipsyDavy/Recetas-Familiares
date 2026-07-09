@@ -15,7 +15,7 @@ import jakarta.persistence.Table;
 public class FamilyEntity {
 
     @Id
-    @Column(length = 36, columnDefinition = "CHAR(36)")
+    @Column(length = 36, columnDefinition = "varchar(36)")
     private String id;
 
     @Column(nullable = false, length = 120)

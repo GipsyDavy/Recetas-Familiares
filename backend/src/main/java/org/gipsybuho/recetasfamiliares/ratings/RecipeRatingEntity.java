@@ -22,19 +22,19 @@ import org.gipsybuho.recetasfamiliares.users.UserEntity;
 public class RecipeRatingEntity {
 
     @Id
-    @Column(length = 36, columnDefinition = "CHAR(36)")
+    @Column(length = 36, columnDefinition = "varchar(36)")
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "recipe_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "recipe_id", nullable = false, columnDefinition = "varchar(36)")
     private RecipeEntity recipe;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "family_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "family_id", nullable = false, columnDefinition = "varchar(36)")
     private FamilyEntity family;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "user_id", nullable = false, columnDefinition = "varchar(36)")
     private UserEntity user;
 
     @Column(nullable = false, columnDefinition = "smallint")

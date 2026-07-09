@@ -1,6 +1,6 @@
 CREATE TABLE recipes (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
     title VARCHAR(180) NOT NULL,
     description VARCHAR(1000) NULL,
     servings INT NULL,

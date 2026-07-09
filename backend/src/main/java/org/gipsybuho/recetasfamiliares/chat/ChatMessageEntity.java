@@ -33,15 +33,15 @@ import org.gipsybuho.recetasfamiliares.users.UserEntity;
 public class ChatMessageEntity {
 
     @Id
-    @Column(length = 36, columnDefinition = "CHAR(36)")
+    @Column(length = 36, columnDefinition = "varchar(36)")
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "family_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "family_id", nullable = false, columnDefinition = "varchar(36)")
     private FamilyEntity family;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "author_user_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "author_user_id", nullable = false, columnDefinition = "varchar(36)")
     private UserEntity author;
 
     @Column(length = 2000)

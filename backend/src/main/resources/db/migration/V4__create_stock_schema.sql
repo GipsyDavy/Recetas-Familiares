@@ -1,6 +1,6 @@
 CREATE TABLE stock_items (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
     name VARCHAR(180) NOT NULL,
     quantity DECIMAL(10,3) NULL,
     unit VARCHAR(40) NULL,

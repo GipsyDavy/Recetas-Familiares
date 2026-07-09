@@ -1,6 +1,6 @@
 CREATE TABLE recipe_photos (
-    id CHAR(36) NOT NULL,
-    recipe_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    recipe_id VARCHAR(36) NOT NULL,
     position INT NOT NULL,
     url VARCHAR(1000) NOT NULL,
     thumbnail_url VARCHAR(1000) NULL,

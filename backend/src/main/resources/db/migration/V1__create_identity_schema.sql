@@ -1,5 +1,5 @@
 CREATE TABLE users (
-    id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
     email VARCHAR(254) NOT NULL,
     display_name VARCHAR(120) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE families (
-    id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
     name VARCHAR(120) NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -24,9 +24,9 @@ CREATE TABLE families (
 );
 
 CREATE TABLE family_members (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
-    user_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
+    user_id VARCHAR(36) NOT NULL,
     role VARCHAR(40) NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -45,13 +45,13 @@ CREATE INDEX ix_families_sync ON families (updated_at, sync_version, deleted);
 CREATE INDEX ix_family_members_sync ON family_members (updated_at, sync_version, deleted);
 
 CREATE TABLE refresh_tokens (
-    id CHAR(36) NOT NULL,
-    user_id CHAR(36) NOT NULL,
+    id VARCHAR(36) NOT NULL,
+    user_id VARCHAR(36) NOT NULL,
     token_hash VARCHAR(255) NOT NULL,
     issued_at timestamptz NOT NULL DEFAULT now(),
     expires_at timestamptz NOT NULL,
     revoked_at timestamptz NULL,
-    replaced_by_token_id CHAR(36) NULL,
+    replaced_by_token_id VARCHAR(36) NULL,
     PRIMARY KEY (id),
     CONSTRAINT uk_refresh_tokens_token_hash UNIQUE (token_hash),
     CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users (id),

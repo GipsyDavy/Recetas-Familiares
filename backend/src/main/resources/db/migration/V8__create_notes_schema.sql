@@ -1,7 +1,7 @@
 CREATE TABLE family_notes (
-    id CHAR(36) NOT NULL,
-    family_id CHAR(36) NOT NULL,
-    recipe_id CHAR(36) NULL,
+    id VARCHAR(36) NOT NULL,
+    family_id VARCHAR(36) NOT NULL,
+    recipe_id VARCHAR(36) NULL,
     title VARCHAR(180) NOT NULL,
     body VARCHAR(4000) NOT NULL,
     pinned BOOLEAN NOT NULL DEFAULT FALSE,

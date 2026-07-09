@@ -19,11 +19,11 @@ import jakarta.persistence.Table;
 public class ShoppingListItemEntity {
 
     @Id
-    @Column(length = 36, columnDefinition = "CHAR(36)")
+    @Column(length = 36, columnDefinition = "varchar(36)")
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "shopping_list_id", nullable = false, columnDefinition = "CHAR(36)")
+    @JoinColumn(name = "shopping_list_id", nullable = false, columnDefinition = "varchar(36)")
     private ShoppingListEntity shoppingList;
 
     @Column(nullable = false)
