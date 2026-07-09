@@ -338,15 +338,19 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Tras Chat Fase 1, Chat Desktop Fase 2, remediacion OWASP, Chat Fase 3 imagenes y edicion/borrado propio (publicado en `main` el 2026-07-08), el chat de texto/edicion queda implementado en backend/Android/Desktop con build/tests verdes en sesion. Imagenes tienen contrato/backend/storage y envio basico, pero la validacion visual dejo una brecha funcional en clientes: falta visor/descarga y Android no renderiza de forma fiable el adjunto. Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
+Estado actualizado el 2026-07-10:
+- Chat imagenes UX ya esta implementado, validado visualmente Desktop<->Android, integrado y publicado en `main`.
+- PostgreSQL en Hetzner, migracion de datos, operacion base de backups locales y backend/API publica HTTPS temporal estan cerrados en `feat/migracion-postgresql`; la rama queda recomendada para merge a `main`.
+- El riesgo critico vivo ya no es producto/chat, sino operacion de datos: backups de PostgreSQL sin copia offsite cifrada.
+- Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
 Prioridad propuesta para el siguiente sprint no autorizado:
 
-1. Chat imagenes UX (siguiente sprint recomendado): render fiable de imagenes en Android, abrir imagen original a tamano completo en Desktop/Android, guardar/descargar con flujo autenticado, placeholders/error states y validacion cruzada Desktop<->Android con imagen real.
-2. Validacion manual de UI pendiente: menus de edicion/borrado del chat, onboarding y shortcuts modo cocina Desktop, fuentes empaquetadas Android en emulador, perfil y ayuda contextual Desktop.
-3. Chat siguiente capa: fase 4 video/push si el usuario prioriza multimedia/notificaciones. Video requiere redisenar storage a streaming a disco/Range y antivirus o servicio equivalente.
-4. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01 y sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista; monitorizar PDFBox porque 3.0.7 sigue con CVEs medias y no hay 3.0.x posterior en Maven Central a 2026-07-08.
-5. PostgreSQL en Hetzner: migracion MySQL -> PostgreSQL con backend Spring intacto. Plan completo en `docs/migracion-mysql-a-postgresql-plan.md`; requiere resolver las 5 decisiones de §4 del plan antes de arrancar.
+1. Backups offsite cifrados PostgreSQL: copiar fuera del VPS los backups logicos, base backups y WAL necesarios, con cifrado antes de subida, verificacion de integridad y documentacion de restore.
+2. Ensayo PITR completo en cluster aislado: validar recuperacion real a punto en el tiempo sin tocar el cluster activo.
+3. Dominio propio/API estable: sustituir `sslip.io`, ajustar Caddy/CORS/WS/origenes y documentar rotacion.
+4. CI/CD y rollback backend: automatizar build/test/deploy del jar y conservar artefactos versionados para rollback operativo.
+5. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista y monitorizar PDFBox/Caddy/Flyway.
 6. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
 7. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
 8. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
@@ -707,14 +711,16 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 
 ### Analisis migracion MySQL -> PostgreSQL (2026-07-08, solo lectura)
 
+Nota actual 2026-07-10: este analisis es historico. La migracion fue autorizada y ejecutada despues; el estado vigente esta en las secciones de Sprint Fase 2/PostgreSQL, operacion Hetzner y backend/API publica.
+
 - Objetivo: evaluar a peticion del usuario si migrar la DB a Supabase o a Postgres en Hetzner. Sin cambios de codigo de migracion.
 - Agente: Claude Code en solitario (analisis de solo lectura; no aplicaban skills de seguridad ni otros agentes: no habia diff).
 - Aclaracion aportada al usuario: Supabase no es una DB (su motor es Postgres); Hetzner es hosting ortogonal; Supabase Cloud no corre en Hetzner (seria self-hosted). "Full Supabase" = reescritura de backend + 3 clientes + operar stack self-hosted; descartado.
 - Decision acordada: Camino 1 = mantener Spring Boot y migrar solo el motor **MySQL 8.0 -> PostgreSQL**, con la DB en Hetzner. Clientes sin cambios.
-- Evidencia de viabilidad recogida (inspeccion 2026-07-08): todas las `@Query` son JPQL (0 nativeQuery); timestamps por `@PrePersist`/`@PreUpdate` (el `ON UPDATE CURRENT_TIMESTAMP` MySQL es redundante); esquema portable (CHAR(36) UUID, VARCHAR, BIGINT, BOOLEAN, TIMESTAMP(6); sin AUTO_INCREMENT/ENGINE/ENUM/JSON); 14 migraciones Flyway; tests ya en H2; `DB_URL/USERNAME/PASSWORD` externalizados; dialecto Hibernate autodetectado.
-- Entregable: `docs/migracion-mysql-a-postgresql-plan.md` con decision, evidencia, alcance, 5 decisiones pendientes del usuario, plan paso a paso (deps, traduccion de las 14 migraciones, entidades/validate, config, tests Testcontainers, migracion de datos, infra Hetzner), validacion esperada, riesgos y rollback.
+- Evidencia de viabilidad recogida en ese momento (inspeccion 2026-07-08): todas las `@Query` son JPQL (0 nativeQuery); timestamps por `@PrePersist`/`@PreUpdate`; esquema portable; `DB_URL/USERNAME/PASSWORD` externalizados; dialecto Hibernate autodetectado. Estado final posterior: 15 migraciones Flyway, `varchar(36)`, tests contra PostgreSQL real por WireGuard.
+- Entregable original: `docs/migracion-mysql-a-postgresql-plan.md` con decision, evidencia, alcance, decisiones entonces pendientes, plan paso a paso, validacion esperada, riesgos y rollback. Estado actual: decisiones cerradas y plan actualizado como trazabilidad ejecutada.
 - Gotcha principal a decidir: Postgres autogestionado en Hetzner implica backups/PITR/hardening propios (Hetzner no da Postgres gestionado nativo).
-- Estado: sprint de migracion NO autorizado. Documentado para arrancar en frio cuando el usuario lo autorice. Sin cambios en el codigo del backend ni en la DB.
+- Estado original: sprint de migracion no autorizado en ese momento. Estado actual: sprint autorizado, ejecutado y desplegado en `feat/migracion-postgresql`.
 
 ### Limpieza documental + OWASP Dependency-Check (2026-07-08)
 
@@ -831,11 +837,13 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Commit publicado: `2c18a9f feat: editar y borrar mensajes propios en chat`.
 - Punto de retoma: revisar `git status`. Queda una carpeta no versionada `herztner/` ajena a este sprint, no tocada. Siguiente sprint recomendado: validacion manual GUI del chat completo (imagenes + edicion/borrado) o fase 4 video/push con redisenio de storage.
 
-### Sprint pendiente - Chat imagenes UX: visor, descarga y render fiable (2026-07-08)
+### Sprint Chat imagenes UX - origen historico cerrado (2026-07-08; cerrado 2026-07-10)
+
+Estado actual: este bloque ya no es pendiente. El alcance se ejecuto en Sprint 47 y continuaciones, con validacion visual real Desktop<->Android e integracion publicada en `main` el 2026-07-10.
 
 - Origen: durante la prueba visual manual del chat, el usuario confirma que las imagenes enviadas/recibidas en Desktop se quedan dentro del chat sin posibilidad de abrirlas ni descargarlas. En Android no se ve la imagen en el chat; solo aparece el globo de mensaje con adjunto, sin abrir ni descargar.
 - Severidad producto: funcional. El backend y el multipart existen, pero el adjunto no es consumible de forma suficiente por los usuarios.
-- Alcance recomendado:
+- Alcance que dio origen al sprint:
   - Backend: verificar contrato `ChatMessageResponse.attachments[]`, `url`, `thumbnailUrl`, ownership 404 fail-closed y headers de descarga. Si hace falta accion de descarga dedicada, mantenerla autenticada y sin exponer bearer en URLs externas.
   - Android: corregir render de thumbnail autenticado en `ChatScreen`, revisar base URL/URLs relativas, estados loading/error, tap para visor a tamano completo y accion guardar/compartir/descargar.
   - Desktop: hacer click en thumbnail para abrir original en dialogo/ventana, accion guardar con `FileChooser`, placeholder/error/retry y fetch autenticado del original.
@@ -849,29 +857,30 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
 - Punto de retoma operativo: en esta sesion se habian arrancado backend dev/H2, emulador Android y Desktop para pruebas visuales. En una nueva sesion, comprobar procesos vivos y reiniciar limpio si hace falta. No versionar credenciales de prueba; recrear usuarios locales en la misma familia si el backend H2 se reinicia.
 - Recomendacion de orden: hacer este sprint antes de video/push, porque cierre UX de imagenes es deuda de la Fase 3 ya integrada.
 
-### PUNTO DE RETOMA EXACTO — Migracion PostgreSQL en curso (2026-07-09)
+### PUNTO DE RETOMA EXACTO — Migracion PostgreSQL en curso (2026-07-09, historico)
 
 Documento redactado como ingeniero senior experto en programacion para retomar sin ambiguedad en la proxima sesion. Hay DOS hilos abiertos en paralelo, en ramas distintas. Leer entero antes de tocar nada.
 
+Estado actual 2026-07-10: este punto de retoma quedo superado por los sprints posteriores. La rama `feat/migracion-postgresql` ya contiene la migracion PostgreSQL, datos, operacion DB, merge de `main` con Chat imagenes UX y despliegue backend/API publica HTTPS temporal.
+
 #### Estado del repositorio
 - Rama activa al cerrar la sesion: `feat/migracion-postgresql` (creada desde `main`).
-- `main` sigue SIN los cambios del chat: viven solo en `feat/chat-imagenes-ux` (pusheada a origin) y en esta rama de migracion NO estan (salio de main limpio). No mezclar.
+- Historico: en ese momento `main` seguia sin los cambios del chat. Estado actual: Chat imagenes UX ya esta publicado en `main` e integrado en `feat/migracion-postgresql`.
 - Carpeta `herztner/` sin versionar (IP VPS + clave publica + comando ssh). No commitear; considerar `.gitignore` mas adelante.
 
-#### Hilo A — Chat imagenes UX (COMPLETO, pendiente de merge y prueba manual)
-- Rama `feat/chat-imagenes-ux`, commit `ca75ebf`, PUSHEADA a origin. Builds verdes (Android assembleDebug OK, Desktop 12 tests). VibeSec + security-review 0 hallazgos. Hallazgos Codex/Gemini integrados.
-- PR NO creado (no habia `gh`; se instalo, no se autentico y se DESINSTALO por decision del usuario). Crear PR a mano: https://github.com/GipsyDavy/Recetas-Familiares/pull/new/feat/chat-imagenes-ux (base `main`).
-- Residual: falta prueba visual cross-device real (thumbnail, abrir original, guardar Desktop<->Android, error 404). Desktop no normaliza el origen de la URL (riesgo al exponer en Hetzner; Android ya cubierto por `rewriteUploadUrl`).
+#### Hilo A — Chat imagenes UX (historico, ya integrado)
+- Estado actual: `feat/chat-imagenes-ux` fue cerrado, validado visualmente, fusionado a `main` y publicado en remoto el 2026-07-10. Ver secciones "Sprint Chat imagenes UX (cont.)" e "Integracion Chat imagenes UX".
+- El residual de prueba visual cross-device quedo cerrado: thumbnails, abrir original, guardar/descargar y estado 404 fueron validados en Desktop y Android.
 
 #### Hilo B — Migracion MySQL -> PostgreSQL (EN CURSO, Fase 1 hecha)
 - Tipo de migracion confirmado: **MySQL 8 -> PostgreSQL**, backend Spring Boot INTACTO (misma seguridad). NO es Supabase. Plan completo: `docs/migracion-mysql-a-postgresql-plan.md`.
 - Decisiones cerradas (usuario eligio "defaults" + matices):
   - Hosting: Postgres autogestionado en VPS Hetzner (`167.233.213.242`).
-  - UUID: se mantiene `CHAR(36)` (minimo cambio).
+  - UUID: decision corregida despues de validar Hibernate/PostgreSQL: usar `varchar(36)`, no `CHAR(36)`.
   - Datos: migrar `FamilyDemo` con `pgloader` (base no limpia).
   - Tests: subir a Testcontainers-Postgres.
   - Pooler: conexion directa para migraciones.
-  - **Backend LOCAL por ahora** (no en el VPS todavia).
+  - **Backend LOCAL por ahora** era el estado del 2026-07-09. Estado actual: backend desplegado en VPS detras de Caddy/HTTPS temporal.
   - **Red: WireGuard** (no Tailscale, no Cloudflare). Justificacion: con backend local, el trafico critico es backend local -> Postgres Hetzner (TCP crudo), no HTTP; WireGuard es la alternativa directa a Tailscale y no necesita dominio. Postgres escuchara SOLO en la interfaz WireGuard, jamas publico. Cloudflare Tunnel + Zero Trust queda APLAZADO para cuando se exponga la API publica (backend en VPS); ademas requiere un dominio en Cloudflare que el usuario NO tiene (la cuenta/plan es gratis, el nombre de dominio no). No se creo cuenta Cloudflare (accion interactiva del usuario, no automatizable).
 
 - FASE 1 — HECHA y commiteada: commit `2514c29` en `feat/migracion-postgresql`.
@@ -880,12 +889,12 @@ Documento redactado como ingeniero senior experto en programacion para retomar s
 
 - FASE 2 — SIGUIENTE, NO empezada. Alcance exacto:
   - CORRECCION al plan: hay **15 migraciones (V1..V15)**, no 14. El plan `docs/migracion-*.md` §2 dice 14 porque es anterior al chat; el chat anadio `V14__create_chat_schema.sql` y `V15__create_chat_attachments.sql`. Traducir las 15.
-  - Traducir `backend/src/main/resources/db/migration/V1..V15` a sintaxis PostgreSQL: eliminar `ON UPDATE CURRENT_TIMESTAMP(6)` (la app fija `updated_at` via `@PreUpdate`); `DEFAULT CURRENT_TIMESTAMP(6)` -> `now()` o quitar default; `TIMESTAMP(6)` -> `timestamptz` (UTC; ya hay `hibernate.jdbc.time_zone: UTC`); mantener `CHAR(36)`; indices/PK/FK/UNIQUE/CHECK sin cambios.
+  - Traducir `backend/src/main/resources/db/migration/V1..V15` a sintaxis PostgreSQL: eliminar `ON UPDATE CURRENT_TIMESTAMP(6)` (la app fija `updated_at` via `@PreUpdate`); `DEFAULT CURRENT_TIMESTAMP(6)` -> `now()` o quitar default; `TIMESTAMP(6)` -> `timestamptz` (UTC; ya hay `hibernate.jdbc.time_zone: UTC`); usar `varchar(36)`; indices/PK/FK/UNIQUE/CHECK sin cambios.
   - ACOPLAMIENTO CRITICO: los tests usan H2 en `MODE=MySQL` con `ddl-auto=validate` (`backend/src/test/resources/application-test.yml`, y `DevDataSeederTest` con url H2 inline). Al pasar las migraciones a sintaxis Postgres, H2 deja de servir. Por eso Fase 2 DEBE incluir el cambio de tests a Testcontainers-Postgres EN EL MISMO COMMIT para no dejar un commit rojo. Anadir dependencia Testcontainers-postgresql (scope test), base class con `@Container PostgreSQLContainer` + `@DynamicPropertySource`, y quitar la config H2.
   - REQUISITO DE ENTORNO: Fase 2 necesita **Docker** en la maquina (Testcontainers arranca `postgres:16`). PREGUNTA ABIERTA al usuario sin responder: si hay Docker Desktop instalado/corriendo. Alternativas si no: Postgres local levantado por el usuario, o validar solo compilacion y aplazar la ejecucion de tests.
   - Criterio de cierre Fase 2: `mvn test` verde contra Postgres real + arranque con `ddl-auto=validate` sin desajustes entidad/columna.
 
-- FASES POSTERIORES (no empezadas): Fase 3 ya absorbida en Fase 2 (tests). Fase 4 config despliegue (`application*.yml`/env, `sslmode=require`), sin secretos. Fase 5 infra Hetzner (Postgres Docker, usuario minimo privilegio, backups pg_dump/PITR, firewall) + Fase 5b WireGuard (VPS<->maquina local, Postgres bind a wg0, drop publico 5432). Fase 6 datos (`pgloader` FamilyDemo, verificar recuentos). Fase 7 smoke E2E (health UP, Flyway V1..V14, registro/login, CRUD, sync, chat REST+WS) + VibeSec sobre config de conexion + cierre docs.
+- FASES POSTERIORES (estado actual): Fase 3 tests, Fase 4 config, Fase 5 infra/WireGuard, Fase 6 datos y Fase 7 smoke E2E ya quedaron cerradas en esta rama. Quedan como riesgos vivos: copia offsite cifrada, ensayo PITR completo, dominio propio y CI/CD/rollback backend.
 
 - Metodo de trabajo pactado: commitear POR FASE (por si se agota cuota de IA), verificar build/tests reales en cada fase, no marcar nada como validado sin ejecutarlo. Rollback: MySQL actual intacto hasta Fase 7; todo en rama.
 
@@ -901,14 +910,14 @@ NOTA PARA AGENTES IA QUE RETOMEN: la memoria de Claude en `~/.claude` es privada
 Inventario real de idioms MySQL a traducir (verificado por grep el 2026-07-09):
 - `ON UPDATE CURRENT_TIMESTAMP(6)` y `DEFAULT CURRENT_TIMESTAMP(6)`: en V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V14, V15. (V11, V12, V13 no los tienen.)
 - `TINYINT`: solo en `V10__create_ratings_schema.sql` (`stars TINYINT NOT NULL`) -> Postgres `smallint`. Su `CHECK (stars BETWEEN 1 AND 5)` es valido en Postgres, sin cambio.
-- No hay `ENGINE=`, `AUTO_INCREMENT`, `UNSIGNED`, `ENUM(` en ninguna migracion (los UUID son `CHAR(36)` generados por la app).
+- No hay `ENGINE=`, `AUTO_INCREMENT`, `UNSIGNED`, `ENUM(` en ninguna migracion; los UUID textuales quedaron en `varchar(36)` generados por la app.
 - V11 y V12 son ALTER TABLE (avatar_url, storage_path). V13 (`ensure_family_owner_members`) tiene logica INSERT/UPDATE con subconsultas: revisar que la sintaxis sea ANSI/Postgres (evitar extensiones MySQL); traducir si hace falta.
 
 Reglas de traduccion (aplicar a cada archivo):
 1. Quitar el fragmento ` ON UPDATE CURRENT_TIMESTAMP(6)` (dejar la columna como `... NOT NULL`). La app fija `updated_at` en `@PreUpdate`.
 2. `DEFAULT CURRENT_TIMESTAMP(6)` -> `DEFAULT now()`.
 3. `TIMESTAMP(6)` -> `timestamptz` (la app ya opera en UTC con `hibernate.jdbc.time_zone: UTC`).
-4. `CHAR(36)` se mantiene (decision: minimo cambio).
+4. `varchar(36)` se usa para UUID textuales (decision corregida por compatibilidad con Hibernate validate en PostgreSQL).
 5. En V10: `TINYINT` -> `smallint`.
 6. No tocar indices, PK, FK, UNIQUE ni CHECK salvo sintaxis incompatible.
 7. Editar V1..V15 IN SITU (no crear V16 de conversion): el esquema Postgres se crea desde cero, aun no hay Postgres productivo con estas migraciones aplicadas.
@@ -921,7 +930,7 @@ Cambio de tests a Testcontainers-Postgres (mismo commit, obligatorio):
 
 Validacion de cierre Fase 2:
 - `cd backend && mvn test` -> verde contra Postgres real (Testcontainers levanta `postgres:16`; Flyway aplica V1..V15; Hibernate `validate` sin desajustes entidad/columna).
-- Si `validate` reporta mismatch, iterar en `columnDefinition` de entidades o en el tipo de la migracion hasta 0 errores (el punto delicado es `CHAR(36)` vs el tipo de la columna, y `timestamptz` vs `TIMESTAMP(6)` de las entidades).
+- Si `validate` reporta mismatch, iterar en `columnDefinition` de entidades o en el tipo de la migracion hasta 0 errores (puntos delicados: `varchar(36)` para ids Java `String` y `timestamptz` vs `TIMESTAMP(6)` de las entidades).
 - Commit por fase: mensaje `chore(db): fase 2 migracion postgres - traduccion V1..V15 + testcontainers`. No marcar validado sin ejecutar `mvn test` realmente.
 
 ### Sprint Fase 2 Postgres + infra Hetzner/WireGuard — SESION 2026-07-09 (CERRADO)
@@ -1013,7 +1022,7 @@ Bloque 7 ejecutado por Codex:
 Riesgos residuales / siguiente operativa:
 - Rotacion de la credencial dev de `recetas_app`: resuelta en el sprint operativo posterior (ver seccion siguiente).
 - Backups/PITR y prueba de restore: baseline resuelto en el sprint operativo posterior (ver seccion siguiente). Queda pendiente copia offsite cifrada y ensayo PITR completo en cluster aislado.
-- Backend sigue local; despliegue backend en VPS/API publica queda fuera de esta fase.
+- Backend/API publica HTTPS temporal ya desplegado en VPS en el sprint posterior; quedan dominio propio estable y estrategia de rollback/CI-CD.
 - Flyway 11.7.2 avisa que PostgreSQL 18.4 es mas nuevo que su version soportada probada (hasta PostgreSQL 17). Las migraciones V1..V15 aplicaron y validaron, pero conviene vigilar/actualizar Flyway cuando el BOM lo soporte.
 - La migracion de datos fue por copia JDBC controlada, no pgloader; dataset pequeno validado por recuentos, sin transformacion masiva.
 
@@ -1073,12 +1082,11 @@ Documentacion/cambios versionables:
 Riesgos residuales:
 - Backups y WAL estan en el mismo VPS/disco. Falta copia offsite cifrada para cubrir perdida total del servidor.
 - PITR queda configurado con base backup + WAL, pero falta ensayo completo en cluster aislado.
-- Backend sigue local; despliegue backend en VPS/API publica queda como siguiente sprint infra si se prioriza produccion real.
+- Backend/API publica HTTPS temporal ya desplegado en VPS en el sprint posterior; quedan dominio propio estable y estrategia de rollback/CI-CD.
 - Flyway 11.7.2 sigue avisando que PostgreSQL 18.4 es mas nuevo que su version soportada probada.
 
 Siguiente sprint recomendado:
-- Si se sigue infra: `Sprint Backend en VPS/API publica`, con systemd para el jar, env secrets, uploads persistentes, reverse proxy/TLS/dominio o decision explicita de acceso por IP/tunel, smoke E2E y VibeSec/security-review.
-- Si se vuelve a producto: `Sprint Chat imagenes UX`, merge/prueba visual real de `feat/chat-imagenes-ux`, thumbnails fiables, visor original y guardar/descargar en Android/Desktop.
+- `Sprint Backups offsite cifrados PostgreSQL`: copiar fuera del VPS los backups logicos, base backups y WAL necesarios, cifrados antes de salir del servidor, con verificacion de integridad y restore minimo documentado.
 
 ### Revision Gemini post-PostgreSQL/operacion — SESION 2026-07-09
 
@@ -1087,13 +1095,16 @@ Gemini reviso en solo lectura la rama `feat/migracion-postgresql`, los sprints d
 Conclusiones integradas:
 - Critico antes de produccion real: backups sin copia offsite. Los backups logicos, fisicos y WAL estan en el mismo VPS/disco.
 - Medio: PITR no ensayado en cluster aislado.
-- Medio: `Sprint Chat imagenes UX` sigue siendo la deuda funcional mas visible; Android no renderiza thumbnails de forma fiable y Desktop/Android necesitan abrir original y guardar/descargar.
+- Medio: sin CI/CD ni rollback automatizado para el despliegue del backend.
+- Medio: hostname `sslip.io` temporal; falta dominio propio estable.
 - Medio: Flyway 11.7.2 aun no soporta oficialmente PostgreSQL 18.4.
 - Menor: `docs/migracion-mysql-a-postgresql-plan.md` tenia decisiones antiguas marcadas como pendientes; corregido por Codex tras la revision.
 
 Decision tras revision:
-- Siguiente sprint recomendado si se prioriza producto: `Sprint Chat imagenes UX`.
-- Mantener vivos para infra: copia offsite cifrada, ensayo PITR completo y despliegue backend/API publica.
+- `feat/migracion-postgresql` queda recomendada para merge a `main`.
+- Siguiente sprint recomendado: `Sprint Backups offsite cifrados PostgreSQL`.
+- Mantener vivos para infra: copia offsite cifrada, ensayo PITR completo, dominio propio y rollback/CI-CD.
+
 ### Sprint 47 - Chat imagenes UX: render fiable, visor y descarga (2026-07-09)
 
 - Objetivo: cerrar la brecha funcional de imagenes del chat (render Android, abrir original y guardar/descargar en Android y Desktop). Autorizado por el usuario; sin cambios de backend.
@@ -1251,6 +1262,17 @@ Decision tras revision:
   - Backups DB siguen sin copia offsite cifrada y PITR completo no ensayado.
   - Flyway 11.7.2 sigue avisando que PostgreSQL 18.4 es mas nuevo que su soporte probado.
   - Caddy 2.6.2 viene del repo Ubuntu; vigilar parches.
+
+### Revision Gemini pre-merge PostgreSQL/API publica - SESION 2026-07-10
+
+- Gemini reviso en solo lectura lo implementado en la sesion: Chat imagenes UX integrado en `main`, migracion PostgreSQL, operacion DB, despliegue backend/API publica HTTPS temporal, runbooks y riesgos residuales.
+- Recomendacion recibida: `feat/migracion-postgresql` esta tecnicamente lista para fusionarse a `main`.
+- Cambios documentales aplicados antes del merge:
+  - `CONTINUAR.md`: la seccion de bloqueantes deja de marcar Chat imagenes UX como pendiente y establece como siguiente sprint `Backups offsite cifrados PostgreSQL`.
+  - `CONTINUAR.md`: los puntos historicos de Chat imagenes UX y migracion PostgreSQL quedan marcados como superados/cerrados, evitando instrucciones obsoletas.
+  - `docs/migracion-mysql-a-postgresql-plan.md`: actualizado de plan pendiente a trazabilidad ejecutada; mantiene `varchar(36)`, PostgreSQL real por WireGuard, sin Testcontainers y backend/API publica ya desplegado.
+- VibeSec usado como checklist manual de cierre por tratar sprint con red, secretos, uploads, datos familiares y despliegue publico. No se tocaron secretos ni `herztner/`.
+- Siguiente sprint recomendado tras merge: `Backups offsite cifrados PostgreSQL`, porque es el riesgo critico vivo.
 
 ### Chequeo obligatorio de cierre
 

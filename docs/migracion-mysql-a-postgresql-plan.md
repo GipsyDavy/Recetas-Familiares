@@ -1,10 +1,12 @@
 # Plan de migración MySQL → PostgreSQL (backend en Hetzner)
 
-Documento de planificación para un sprint **no autorizado todavía**. Sirve para arrancar en frío: contiene la decisión, la evidencia de viabilidad, el alcance, el plan paso a paso, las decisiones pendientes del usuario, la validación esperada y los riesgos.
+Plan base y trazabilidad de la migración ya ejecutada. Sirve para arrancar en frío o auditar el cambio: contiene la decisión, la evidencia de viabilidad, el alcance, el plan paso a paso, las decisiones cerradas, la validación esperada y los riesgos vivos.
 
 Fecha de análisis: 2026-07-08. Autor del análisis: Claude Code (solo lectura, sin cambios).
 
 Actualizacion 2026-07-09: la decision 2 quedo corregida durante la ejecucion. En PostgreSQL se usa `varchar(36)`, no `CHAR(36)`, porque Hibernate `ddl-auto=validate` reporta `CHAR` como `bpchar`/`Types#CHAR` y no lo acepta para los ids Java `String`.
+
+Actualizacion 2026-07-10: la migracion, los tests contra PostgreSQL real, la migracion de datos `FamilyDemo`, la operacion base de backups locales y el despliegue del backend/API publica HTTPS temporal en Hetzner quedaron ejecutados en `feat/migracion-postgresql`. Quedan vivos: copia offsite cifrada, ensayo PITR completo, dominio propio estable y CI/CD/rollback del backend.
 
 ---
 
@@ -31,7 +33,7 @@ Recogida por inspección del código el 2026-07-08:
 | Timestamps | Entidades fijan `created_at`/`updated_at` con `@PrePersist`/`@PreUpdate` (JPA lifecycle) | El `ON UPDATE CURRENT_TIMESTAMP(6)` del DDL MySQL es redundante → se elimina sin cambio de comportamiento |
 | Tipos SQL | UUID textuales en `varchar(36)`, VARCHAR, BIGINT, BOOLEAN, TIMESTAMP(6); sin `AUTO_INCREMENT`, `ENGINE=`, `ENUM`, `JSON`, `TINYINT` explícito | Todo mapea a Postgres con traducción mínima |
 | Migraciones | 15 Flyway en `backend/src/main/resources/db/migration/V1..V15` | Traducción mecánica, no reescritura conceptual |
-| Tests | Ya corren en **H2** (`com.h2database:h2` scope test), no MySQL | La suite no depende de MySQL; se puede subir a Testcontainers-Postgres para fidelidad |
+| Tests | H2 fue eliminado del backend; la suite corre contra PostgreSQL real por WireGuard con `DB_TEST_URL`, `DB_TEST_USERNAME` y `DB_TEST_PASSWORD` | La validacion usa el motor real; no se usa Testcontainers porque no hay Docker disponible |
 | Config DB | `spring.datasource.url/username/password` ya vía env (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) | Solo apuntar env a Hetzner; sin hardcode |
 | Dialecto Hibernate | No fijado en `application.yml`; autodetección por driver | Cambiar driver basta |
 | Clientes | Android/Desktop/iOS hablan con Spring vía HTTP, **no con la DB** | **Cero cambios de cliente**; contrato multiplataforma intacto |
@@ -47,7 +49,7 @@ Recogida por inspección del código el 2026-07-08:
 - `backend/src/main/resources/db/migration/V1..V15`: sintaxis Postgres.
 - `backend/src/main/resources/application*.yml`: dialecto/validate si hace falta.
 - Entidades: revisar `columnDefinition` para que `ddl-auto=validate` cuadre en Postgres.
-- Tests: opcional H2 → Testcontainers-Postgres.
+- Tests: H2 eliminado; suite apuntada a PostgreSQL real por WireGuard.
 - Infra: Postgres en Hetzner + variables de entorno de despliegue.
 
 ### NO cambia
@@ -70,7 +72,7 @@ Estado actualizado el 2026-07-09 tras la ejecucion del sprint:
 4. **Tests:** se eliminó H2 del backend y la suite corre contra PostgreSQL real por WireGuard mediante `DB_TEST_URL`, `DB_TEST_USERNAME` y `DB_TEST_PASSWORD`. No se usa Testcontainers porque no hay Docker disponible.
 5. **Pooler:** no se usa pgbouncer/pooler. La app y Flyway conectan directamente a PostgreSQL por WireGuard.
 
-Operacion posterior ya aplicada: backups logicos diarios, base backups semanales, WAL archiving local, restore logico probado y rotacion de `recetas_app`. Quedan vivos copia offsite cifrada, ensayo PITR completo y despliegue backend/API publica.
+Operacion posterior ya aplicada: backups logicos diarios, base backups semanales, WAL archiving local, restore logico probado, rotacion de `recetas_app` y despliegue backend/API publica HTTPS temporal. Quedan vivos copia offsite cifrada, ensayo PITR completo, dominio propio estable y CI/CD/rollback del backend.
 
 ---
 
@@ -98,13 +100,13 @@ Cambios mecánicos por archivo:
 - Ejecutar el arranque con `validate` para detectar desajustes.
 
 ### Paso 4 — Configuración
-- `application.yml`: sin cambios de estructura; los env `DB_URL/USERNAME/PASSWORD` apuntan a Postgres Hetzner con SSL (`?sslmode=require`).
+- `application.yml`: sin cambios de estructura; los env `DB_URL/USERNAME/PASSWORD` apuntan a Postgres Hetzner por WireGuard. No se fuerza SSL dentro del tunel; exigir TLS si la ruta deja de ser WireGuard.
 - `application-dev.yml`: defaults locales para un Postgres de desarrollo.
 - Documentar en `CONTINUAR.md` §5 el nuevo arranque dev (Postgres local o contra Hetzner).
 
 ### Paso 5 — Tests
-- Si se sube a Testcontainers-Postgres: añadir dependencia test, base class con `@Container PostgreSQLContainer`, `@DynamicPropertySource` para inyectar URL/credenciales.
-- Correr `mvn test` (107+ tests) contra Postgres para validar que las migraciones y el mapeo funcionan en el motor real.
+- Estado aplicado: no se usa Testcontainers por ausencia de Docker; `application-test.yml` usa `DB_TEST_URL`, `DB_TEST_USERNAME` y `DB_TEST_PASSWORD` contra PostgreSQL real.
+- Correr `mvn test` contra Postgres para validar que las migraciones y el mapeo funcionan en el motor real.
 
 ### Paso 6 — Migración de datos (si decisión 3 = migrar)
 - Dataset pequeño (app familiar). Opciones:
@@ -122,7 +124,7 @@ Cambios mecánicos por archivo:
 
 ## 6. Validación esperada (ejecutar en la sesión del sprint)
 
-- `mvn -f backend/pom.xml test` verde contra Postgres (Testcontainers o Postgres real).
+- `mvn -f backend/pom.xml test` verde contra Postgres real.
 - `mvn -f backend/pom.xml -DskipTests package` OK.
 - Arranque real contra Postgres Hetzner: `GET /api/v1/health` = UP, Flyway aplica V1..V15 sin error.
 - Smoke E2E de contrato (mismo método usado en el chat): registro/login, CRUD de una entidad, sync pull/push, y chat REST+WS. Reutilizar el enfoque de `docs` de la sesión de chat (curl + cliente WS Node).
