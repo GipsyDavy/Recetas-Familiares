@@ -924,6 +924,27 @@ No convertir este archivo en un historial completo de todos los sprints. Para ca
   - Sin tests UI automatizados Compose/JavaFX; esta validacion es manual/visual con capturas.
   - Los datos de prueba quedan solo en `recetas_chat_visual_test` y `backend/target/visual-uploads`; no afectan MySQL local original ni ramas de PostgreSQL.
 
+### Sprint Integracion Chat imagenes UX - cierre tecnico de rama (2026-07-10)
+
+- Objetivo: cerrar la rama `feat/chat-imagenes-ux` antes de publicarla/integrarla, revalidando en la sesion actual los cambios ya implementados y documentados el 2026-07-09.
+- Agente lider: Codex. Skill VibeSec leida y usada como checklist manual por tratar URLs de adjuntos, Bearer, ownership de uploads y estado de cierre. Multiagente no ejecutado: no habia incertidumbre tecnica nueva tras la validacion visual real ya documentada. Gemini no disponible como herramienta directa; no se preparo bloque nuevo porque no hubo cambios funcionales nuevos. OWASP Dependency-Check no ejecutado: no cambiaron dependencias ni backend; se mantiene como herramienta para auditorias con `NVD_API_KEY`.
+- Estado de rama antes de integrar:
+  - `feat/chat-imagenes-ux` estaba 2 commits por delante de `origin/feat/chat-imagenes-ux`.
+  - `main` y `origin/main` estaban en `e346970`.
+  - `herztner/` seguia sin versionar y no se toco.
+- Validacion ejecutada en esta sesion:
+  - `mvn -f desktop\pom.xml test` -> `Tests run: 14, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`.
+  - `.\gradlew.bat testDebugUnitTest assembleDebug --rerun-tasks` en `android/` -> `BUILD SUCCESSFUL`, 46 tareas ejecutadas; reportes unitarios: `ANDROID_TESTS=27 FAILURES=0 ERRORS=0 SKIPPED=0`.
+  - `git diff --check main..HEAD` -> sin salida, OK.
+  - Busqueda de secretos en el diff de la rama (`DB_TEST_PASSWORD`, `DB_PASSWORD`, `JWT_SECRET`, private keys) -> sin coincidencias.
+- Seguridad/VibeSec:
+  - Confirmado que la normalizacion de adjuntos se acota a `/uploads/chat/` y `/uploads/chat_thumbnails/`.
+  - Confirmado que Desktop no envia `Authorization` a hosts externos y que Android reescribe solo rutas de uploads aceptadas al origen del API.
+  - No se versionaron capturas, tokens, credenciales ni artefactos de `backend/target`.
+- Riesgos residuales:
+  - Sin tests UI automatizados Compose/JavaFX; cubierto por validacion visual manual real del 2026-07-09 y tests unitarios/build actuales.
+  - Warnings Android preexistentes durante `compileDebugKotlin`: deprecaciones de tooltip/MenuAnchor, `Icons.Filled.Sort` y un safe-call innecesario en `TokenRefreshAuthenticator`.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
