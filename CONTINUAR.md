@@ -905,6 +905,61 @@ Validacion de cierre Fase 2:
 - Si `validate` reporta mismatch, iterar en `columnDefinition` de entidades o en el tipo de la migracion hasta 0 errores (el punto delicado es `CHAR(36)` vs el tipo de la columna, y `timestamptz` vs `TIMESTAMP(6)` de las entidades).
 - Commit por fase: mensaje `chore(db): fase 2 migracion postgres - traduccion V1..V15 + testcontainers`. No marcar validado sin ejecutar `mvn test` realmente.
 
+### Sprint Fase 2 Postgres + infra Hetzner/WireGuard — SESION 2026-07-09 (EN CURSO, NO cerrado)
+
+Agente lider: Claude Code (Opus 4.8), en solitario. Sprint pausado por cuota; continua otro agente IA.
+Plan completo de la sesion (fuera del repo): `C:\Users\Gipsy Davy\.claude\plans\replicated-scribbling-petal.md`.
+
+#### Commits de esta sesion (rama `feat/migracion-postgresql`)
+- `c1f2680` chore(db): fase 2 - traduccion V1..V15 a PostgreSQL.
+- `1a55d48` fix(db): CHAR(36) -> varchar(36) para validate en Postgres.
+- (Base previa: `2514c29` Fase 1 driver+flyway; `3ed9d7d` docs guia Fase 2.)
+
+#### Cambios de codigo aplicados (backend)
+- 15 migraciones `V1..V15` traducidas a Postgres: `TIMESTAMP(6) [DEFAULT CURRENT_TIMESTAMP(6)] [ON UPDATE...]` -> `timestamptz [DEFAULT now()]`; `TINYINT` -> `smallint` (V10); `CHAR(36)` -> `varchar(36)` (todas); V11 sin `AFTER`; V13 `now()`. V12 sin cambios.
+- `RecipeRatingEntity.stars`: `columnDefinition "TINYINT"` -> `"smallint"`. Todas las entidades: `columnDefinition "CHAR(36)"` -> `"varchar(36)"`.
+- Tests reapuntados a Postgres real (NO hay Docker/Testcontainers en la maquina): `application-test.yml` y `DevDataSeederTest` usan `${DB_TEST_URL/USERNAME/PASSWORD}` con driver `org.postgresql`, `ddl-auto=validate`. Dependencia H2 eliminada del `pom.xml`.
+- DECISION CORREGIDA del plan (`docs/migracion-*.md` decision 2): NO se mantiene `CHAR(36)`; se usa `varchar(36)`. Motivo: Postgres reporta `CHAR` como `bpchar` (Types#CHAR) y Hibernate espera `VARCHAR` para el String id -> `validate` falla. `varchar(36)` ademas evita padding.
+
+#### Infra creada y DURABLE (verificada en sesion)
+- VPS Hetzner CX23, Ubuntu (codename `resolute`), IP publica `167.233.213.242`. Acceso `ssh root@167.233.213.242`.
+- WireGuard operativo (ping PC->10.10.0.1 OK):
+  - VPS `wg0` = `10.10.0.1/24`, `ListenPort 51820/udp`. Server pubkey `Kuu5/clk/xmMD7C4428zGFsGogs1vf3a9NlTAXFa5z0=`.
+  - PC Windows peer = `10.10.0.2/32`, pubkey `/PBRk+zF/9uJHVabGkEH38KjzCeEfI5f5TJccU8/WXE=`. Cliente WireGuard instalado por winget; servicio `WireGuardTunnel$RecetasHetzner` en Running (persiste tras reboot). Split-tunnel (`AllowedIPs = 10.10.0.1/32`) para convivir con ProtonVPN activo.
+  - `ufw` VPS: OpenSSH + `51820/udp` permitidos; `5432` permitido SOLO entrando por `wg0` (`ufw allow in on wg0 to any port 5432`).
+- PostgreSQL 18 en el VPS (`apt` distro):
+  - DBs: `recetas_familiares` (prod, VACIA) y `recetas_familiares_test`. Rol `recetas_app` (LOGIN, minimo privilegio, owner de ambas DBs).
+  - `listen_addresses = 'localhost,10.10.0.1'` via `/etc/postgresql/18/main/conf.d/wireguard.conf`. VERIFICADO con `ss`: escucha en `10.10.0.1`, `127.0.0.1`, `::1` — NO en IP publica.
+  - `pg_hba.conf`: `host recetas_familiares[_test] recetas_app 10.10.0.0/24 scram-sha-256`.
+  - systemd drop-in `postgresql@18-main` con `Wants/After=wg-quick@wg0.service` (bind a 10.10.0.1 tras reboot).
+- CREDENCIAL DB `recetas_app`: generada aleatoria EN EL VPS (openssl). NO versionada, NO en este archivo. La tiene el usuario. Proveer por env (`DB_TEST_PASSWORD` para tests; `DB_PASSWORD` para prod). Rotar si se filtro en algun log.
+
+#### Seguridad
+- 5432 NO expuesto a internet (verificado por bind + ufw + pg_hba). Trafico DB cifrado por WireGuard (por eso no se fuerza SSL intra-tunel; decidir si se anade igualmente en prod).
+- RETRACTADO un falso positivo previo de la sesion: el "5432 publico responde" observado al inicio era ruido de ProtonVPN (no habia Postgres). Sin exposicion real.
+- VibeSec sobre config de conexion: PENDIENTE (BLOQUE 7).
+
+#### PUNTO DE RETOMA EXACTO
+Estado por bloque: BLOQUE 1 (codigo) HECHO. BLOQUE 2 (Postgres VPS) HECHO. BLOQUE 3 (WireGuard) HECHO. **BLOQUE 4 (mvn test real) EN CURSO, NO verde.**
+
+Bloqueante inmediato: la 1a corrida de `mvn test` fallo por `Schema-validation` (CHAR) y dejo Flyway aplicado en `recetas_familiares_test`. Tras editar migraciones, los checksums cambian -> hay que RESETEAR esa DB antes de re-testear.
+
+Pasos exactos para continuar (Windows PowerShell + SSH al VPS):
+1. Confirmar tunel arriba: `Test-NetConnection 10.10.0.1 -Port 5432` -> `TcpTestSucceeded=True`. Si no, activar el tunel `RecetasHetzner` en el cliente WireGuard.
+2. Resetear DB de test (en SSH al VPS): `sudo -u postgres psql -c "DROP DATABASE recetas_familiares_test;" -c "CREATE DATABASE recetas_familiares_test OWNER recetas_app;"`
+3. En PowerShell, exportar env y lanzar tests:
+   `$env:DB_TEST_URL="jdbc:postgresql://10.10.0.1:5432/recetas_familiares_test"; $env:DB_TEST_USERNAME="recetas_app"; $env:DB_TEST_PASSWORD="<password del VPS>"; mvn test -f "backend/pom.xml"`
+4. Si `validate` reporta mas mismatches (posibles: `timestamptz` vs entidad Instant, `smallint` vs int, `numeric(10,3)` vs BigDecimal): ajustar `columnDefinition`/tipo de migracion, RESETEAR la DB de test (paso 2, por checksums Flyway) y re-testear. Iterar hasta 0 errores.
+5. Al quedar verde (esperado ~116 tests): commit `chore(db): fase 2 migracion postgres - tests contra postgres real`. NO marcar validado sin ejecutar de verdad.
+   - Mejora opcional para no depender de SSH en cada iteracion: instalar cliente `psql` local o plugin `flyway:clean` (test) para resetear la DB desde la maquina.
+
+Bloques siguientes (no empezados):
+- BLOQUE 5 — Config app prod: `application.yml`/env apuntando a `10.10.0.1` (`DB_URL/USERNAME/PASSWORD`), decidir SSL. Documentar arranque dev aqui en §5.
+- BLOQUE 6 — Datos: `pgloader` FamilyDemo (MySQL local -> Postgres Hetzner). OJO: pgloader en Windows es problematico; alternativa realista = `mysqldump` compatible o export CSV + cargar en el VPS (`\copy`), o correr pgloader en el propio VPS contra un dump subido. Verificar recuentos por tabla.
+- BLOQUE 7 — Smoke E2E (health UP, Flyway V1..V15, login, CRUD, sync, chat REST+WS) contra Postgres + VibeSec config conexion + cierre docs.
+
+Metodo: commit por fase; MySQL local intacto como rollback hasta BLOQUE 7; todo en rama.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
