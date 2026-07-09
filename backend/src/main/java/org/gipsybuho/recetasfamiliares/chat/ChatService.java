@@ -78,8 +78,9 @@ public class ChatService {
 
         // Se pide una fila extra para detectar si hay pagina anterior.
         Pageable pageable = PageRequest.of(0, pageSize + 1);
-        List<ChatMessageEntity> rows = messageRepository.findHistory(
-                familyId, clearedBefore, beforeCreatedAt, beforeId, pageable);
+        List<ChatMessageEntity> rows = beforeCreatedAt == null
+                ? messageRepository.findHistory(familyId, clearedBefore, pageable)
+                : messageRepository.findHistoryBefore(familyId, clearedBefore, beforeCreatedAt, beforeId, pageable);
 
         boolean hasMore = rows.size() > pageSize;
         List<ChatMessageEntity> pageRows = hasMore ? rows.subList(0, pageSize) : rows;

@@ -3,7 +3,7 @@ CREATE TABLE recipe_ratings (
     recipe_id VARCHAR(36) NOT NULL,
     family_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
-    stars smallint NOT NULL,
+    stars integer NOT NULL,
     comment VARCHAR(500) NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),

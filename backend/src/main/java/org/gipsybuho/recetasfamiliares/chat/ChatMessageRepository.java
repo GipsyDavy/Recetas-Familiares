@@ -17,22 +17,34 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessageEntity, 
 
     /**
      * Historial descendente (mas reciente primero) filtrado por la marca de
-     * limpieza del usuario. Con {@code beforeCreatedAt} null devuelve la pagina
-     * mas reciente; con cursor devuelve mensajes estrictamente anteriores usando
-     * {@code (createdAt, id)} como orden estable.
+     * limpieza del usuario.
+     */
+    @Query("""
+            SELECT m FROM ChatMessageEntity m
+            WHERE m.family.id = :familyId
+              AND m.createdAt > :clearedBefore
+            ORDER BY m.createdAt DESC, m.id DESC
+            """)
+    List<ChatMessageEntity> findHistory(
+            @Param("familyId") String familyId,
+            @Param("clearedBefore") Instant clearedBefore,
+            Pageable pageable
+    );
+
+    /**
+     * Pagina anterior al cursor usando {@code (createdAt, id)} como orden estable.
      */
     @Query("""
             SELECT m FROM ChatMessageEntity m
             WHERE m.family.id = :familyId
               AND m.createdAt > :clearedBefore
               AND (
-                    :beforeCreatedAt IS NULL
-                    OR m.createdAt < :beforeCreatedAt
+                    m.createdAt < :beforeCreatedAt
                     OR (m.createdAt = :beforeCreatedAt AND m.id < :beforeId)
               )
             ORDER BY m.createdAt DESC, m.id DESC
             """)
-    List<ChatMessageEntity> findHistory(
+    List<ChatMessageEntity> findHistoryBefore(
             @Param("familyId") String familyId,
             @Param("clearedBefore") Instant clearedBefore,
             @Param("beforeCreatedAt") Instant beforeCreatedAt,
