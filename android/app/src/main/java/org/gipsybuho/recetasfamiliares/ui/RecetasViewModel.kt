@@ -141,6 +141,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun logout() {
+        stopChatBadge()
         container.authRepository.logout()
         _isLoggedIn.value = false
         _displayName.value = null
@@ -161,6 +162,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _serverBaseUrl.value = normalized
         if (before != normalized && _isLoggedIn.value) {
             closeChat()
+            stopChatBadge()
             container.sessionStore.clear()
             _isLoggedIn.value = false
             _displayName.value = null
@@ -178,6 +180,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _serverBaseUrl.value = after
         if (before != after && _isLoggedIn.value) {
             closeChat()
+            stopChatBadge()
             container.sessionStore.clear()
             _isLoggedIn.value = false
             _displayName.value = null
@@ -527,8 +530,54 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private var chatSocket: ChatSocket? = null
     private var chatPollingJob: Job? = null
 
+    // ── Aviso de mensajes no leidos (badge del icono de chat) ────────────────
+
+    private val _chatUnread = MutableStateFlow(0)
+    val chatUnread: StateFlow<Int> = _chatUnread.asStateFlow()
+
+    private var chatBadgeSocket: ChatSocket? = null
+    private var chatScreenOpen = false
+    // Ids ya contados: evita que ediciones/borrados (que reutilizan id) o
+    // duplicados de reconexion inflen el contador.
+    private val chatBadgeSeenIds = object : LinkedHashSet<String>() {
+        override fun add(element: String): Boolean {
+            val added = super.add(element)
+            if (size > 500) iterator().let { it.next(); it.remove() }
+            return added
+        }
+    }
+
+    /**
+     * Conexion en tiempo real ligera, viva mientras hay sesion, solo para
+     * contar mensajes nuevos de otros miembros con el chat cerrado.
+     */
+    fun startChatBadge() {
+        if (chatBadgeSocket != null || !_isLoggedIn.value) return
+        chatBadgeSocket = container.chatRepository.openRealtime(
+            onMessage = { msg ->
+                // Registrar el id SIEMPRE (tambien con el chat abierto): una
+                // edicion posterior del mismo mensaje no debe contar como nuevo.
+                val firstTime = chatBadgeSeenIds.add(msg.id)
+                val fromOther = msg.authorUserId != null && msg.authorUserId != myUserId
+                if (firstTime && !chatScreenOpen && fromOther && !msg.deleted) {
+                    _chatUnread.update { it + 1 }
+                }
+            },
+            onConnectionChange = {}
+        )
+    }
+
+    fun stopChatBadge() {
+        chatBadgeSocket?.disconnect()
+        chatBadgeSocket = null
+        chatBadgeSeenIds.clear()
+        _chatUnread.value = 0
+    }
+
     /** Abre el chat: carga la pagina reciente, conecta en tiempo real y arranca el polling de respaldo. */
     fun openChat() {
+        chatScreenOpen = true
+        _chatUnread.value = 0
         _chatLoading.value = true
         viewModelScope.launch {
             runCatching { container.chatRepository.loadHistory() }
@@ -548,6 +597,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun closeChat() {
+        chatScreenOpen = false
         chatSocket?.disconnect()
         chatSocket = null
         chatPollingJob?.cancel()

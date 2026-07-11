@@ -41,6 +41,8 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -99,6 +101,9 @@ fun RecetasApp(viewModel: RecetasViewModel, initialRecipeId: String? = null) {
         if (isLoggedIn) {
             viewModel.scheduleSync(WorkManager.getInstance(context))
             viewModel.refresh()
+            viewModel.startChatBadge()
+        } else {
+            viewModel.stopChatBadge()
         }
     }
 
@@ -211,6 +216,7 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     val selectedTheme  by viewModel.selectedTheme.collectAsState()
     val themeMode      by viewModel.themeMode.collectAsState()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
+    val chatUnread     by viewModel.chatUnread.collectAsState()
     var navigateToRecipeId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -292,7 +298,24 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                             state = rememberTooltipState()
                         ) {
                             IconButton(onClick = { chatOpen = true }) {
-                                Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "Chat familiar")
+                                BadgedBox(
+                                    badge = {
+                                        if (chatUnread > 0) {
+                                            Badge {
+                                                Text(if (chatUnread > 9) "9+" else "$chatUnread")
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.ChatBubbleOutline,
+                                        contentDescription = if (chatUnread > 0) {
+                                            "Chat familiar, $chatUnread mensajes nuevos"
+                                        } else {
+                                            "Chat familiar"
+                                        }
+                                    )
+                                }
                             }
                         }
                         TooltipBox(
