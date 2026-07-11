@@ -249,7 +249,7 @@ El proyecto es un ecosistema distribuido compuesto por:
 - Aplicacion Desktop JavaFX.
 - Aplicacion iOS (Kotlin Multiplatform + Compose Multiplatform).
 - Modulo compartido KMP `shared/`.
-- Base de datos MySQL.
+- Base de datos PostgreSQL (en Hetzner; migrada desde MySQL en julio 2026).
 - Sincronizacion multiplataforma.
 
 La experiencia debe sentirse:
@@ -299,7 +299,7 @@ El foco principal es:
 - Java 21+.
 - Spring Security.
 - Spring Data JPA.
-- MySQL.
+- PostgreSQL.
 - JWT.
 - Flyway o Liquibase.
 - OpenAPI/Swagger.
@@ -343,7 +343,7 @@ El foco principal es:
 
 ## Base de Datos
 
-- MySQL como base principal.
+- PostgreSQL como base principal (en Hetzner via WireGuard; migrada desde MySQL en julio 2026).
 - Nunca depender de SQLite como fuente maestra.
 - Las aplicaciones cliente deben comunicarse mediante API HTTP.
 
@@ -492,7 +492,7 @@ validar impacto simultaneo en:
 - Desktop,
 - iOS,
 - `shared/`,
-- MySQL,
+- PostgreSQL,
 - Room o SQLDelight cuando aplique.
 
 Nunca asumir que un cambio backend es transparente para Android, Desktop o iOS.
@@ -592,7 +592,7 @@ Ningun usuario debe poder:
 
 ## Reglas
 
-- Nunca almacenar imagenes completas en MySQL salvo requerimiento explicito y diseno de almacenamiento/cifrado.
+- Nunca almacenar imagenes completas en la base de datos salvo requerimiento explicito y diseno de almacenamiento/cifrado.
 - Backend almacena URLs, metadata y referencias.
 - Usar storage controlado, no rutas arbitrarias proporcionadas por usuario.
 - Separar originales, thumbnails y temporales.

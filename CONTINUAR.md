@@ -31,7 +31,7 @@ No abrir como proyecto principal:
 Recetas Familiares es una aplicacion premium multiplataforma para familias: recetas, stock, menus, lista de compra, notas, fotos, miembros, sincronizacion y chat familiar con texto, adjuntos de imagen basicos y edicion/borrado propio en tiempo real. Las fases futuras del chat son cerrar UX de imagenes, video/push e iOS.
 
 Plataformas:
-- `backend/`: Spring Boot + MySQL + Flyway + JWT.
+- `backend/`: Spring Boot + PostgreSQL (Hetzner via WireGuard) + Flyway + JWT.
 - `android/`: Kotlin + Compose + Room + WorkManager.
 - `desktop/`: JavaFX + Maven + HTTP API client.
 - `ios/`: KMP + Compose Multiplatform + Ktor + SQLDelight.
@@ -197,7 +197,7 @@ Implementado/documentado:
 - Favoritos, notas, fotos, valoraciones.
 - Sync pull/push con tombstones y conflictos.
 - `GET /api/v1/families/{id}/stats`: `totalRecipes`, `totalMembers`, `totalStockItems`, `lastActivityAt`.
-- Flyway y MySQL como base principal.
+- Flyway y PostgreSQL como base principal (migrada desde MySQL en julio 2026).
 
 Resuelto en Sprint 42 (2026-07-02):
 - Fallback de secreto JWT eliminado: dev exige `JWT_SECRET` (SEC-1).
@@ -219,7 +219,7 @@ Chat familiar:
 - REST para historial paginado, envio inicial/fallback, envio de imagenes multipart, editar/borrar mensajes propios, limpiar/exportar por usuario y WebSocket/STOMP operativo.
 - Imagenes Fase 3 tiene backend/contrato/storage y miniaturas, pero queda abierto un sprint funcional de UX: en Desktop las imagenes quedan en el chat sin abrirse ni descargarse; en Android se ha observado mensaje con globo/adjunto sin thumbnail visible y tampoco hay abrir/descargar.
 - Fases pendientes: cerrar UX de imagenes, videos, push notifications e iOS.
-- Storage protegido para imagenes y videos; no guardar binarios pesados directamente en MySQL.
+- Storage protegido para imagenes y videos; no guardar binarios pesados directamente en la base de datos.
 - Imagenes fase 3: JPEG/PNG/WebP, max 5 por mensaje, max 8 MB, extension + `Content-Type` + magic bytes + parseo real, stripping de metadata por re-encode, thumbnails backend y cleanup best-effort de fallos parciales.
 - Produccion seria deberia contemplar mover miniaturas a worker si sube volumen y analisis antivirus o servicio equivalente para adjuntos.
 
@@ -363,8 +363,10 @@ Prioridad propuesta para el siguiente sprint no autorizado (fijada por el usuari
    - Motivo de URL configurable y no horneada: `sslip.io` es temporal; con URL configurable, comprar dominio propio no obligara a redistribuir binarios.
    - Seguridad: VibeSec aplica (red, tokens, URL introducida por usuario).
    - Preflight de dependencias: si el usuario aporta credenciales Sonatype OSS Index, activar y validar el analyzer en backend/desktop. Sin credenciales, mantener OWASP con NVD/CISA y documentar la cobertura reducida.
+   - Añadido por auditoria 2026-07-11 (Claude+Codex+Gemini): iOS tambien lleva URL horneada (`ios/composeApp/.../network/ApiClient.kt:23` = `http://localhost:8080/`); incluir iOS en el alcance de URL configurable aunque su runtime siga bloqueado.
+   - Añadido por auditoria 2026-07-11: Desktop sync incompleto (NUEVO-1, ALTA): `desktop/.../SyncRepository.java` llama a `sync/pull` sin `limit` (descarga delta completo) y NO aplica `familyNotes` ni `recipePhotos` del pull. Portar paginado de Android y aplicar o retirar esos campos. Tras migrar Desktop, imponer `limit` default server-side en `SyncService.pull` (NUEVO-2, MEDIA).
 2. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
-3. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+3. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS. Añadido por auditoria 2026-07-11 (NUEVO-4): `ios/.../sync/SyncRepository.kt:29` captura `Exception` generica y traga `CancellationException` (mismo bug que COD-7 ya corregido en Android); re-lanzar cancelaciones.
 4. Dominio propio/API estable: cuando el usuario compre el dominio (ver nota de aplazamiento arriba).
 5. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
    - Desktop: ayuda contextual en TODOS los modulos, dialogos y formularios (crear/editar receta, stock, menu, compra, notas, miembros, exportaciones, busqueda global, diagnostico), cada pestaña de Ajustes, modo cocina y onboarding; tooltips en todos los controles sin label visible (formato `Accion (Ctrl+X)`, delay 400ms); foco y orden de tabulacion documentados en formularios.
@@ -1595,6 +1597,36 @@ Actualizacion posterior (2026-07-11): el usuario fijo como siguiente sprint `Apu
   - La credencial OSS Index ahora vive en `~/.m2/settings.xml`; proteger ese archivo y rotar el PAT si se expone.
   - La suppression Spring Security debe revisarse antes de 2026-10-01 o cuando exista fix compatible con Spring Boot 3.5 / Spring Security 6.5.x.
   - Flyway/PostgreSQL 18 y suppressions Desktop Kotlin/PDFBox quedan como riesgos ya documentados.
+
+### Estado actual para el siguiente sprint - 2026-07-11 (verificacion Claude Code)
+
+Punto exacto en el que queda el proyecto tras la sesion OSS Index de Codex:
+
+- OSS Index: FUNCIONAL y habilitado. Verificacion independiente de Claude Code en esta fecha: `mvn -DskipTests verify -P security-audit` en backend y desktop -> `Finished Sonatype OSS Index Analyzer` + `BUILD SUCCESS`, sin `401`, sin `invalid credentials`, sin `analyzer disabled`. Credenciales validas solo en `~/.m2/settings.xml` (server `ossindex`), fuera de Git.
+- PENDIENTE DE COMMIT al escribir esto: los cambios de codigo del sprint OSS Index de Codex estaban aun sin commitear en el arbol (`backend/pom.xml` con `ossIndexServerId` + logback 1.5.38, `desktop/pom.xml` con `ossIndexServerId` + gson 2.14.0, `backend/owasp-suppressions.xml` nuevo con CVE-2026-47838, `desktop/dependency-reduced-pom.xml` regenerado). Quien retome debe comprobar `git status`/`git log`: si esos archivos siguen sucios, cerrar ese commit ANTES de empezar otro sprint (el push disparara CI/CD y deploy: verificar run de Actions `success` y health publico 200 despues).
+- Cobertura de auditoria de dependencias vigente: NVD/CISA + OSS Index + analizadores locales. Backend y desktop `vulnerableDeps=0`.
+- Siguiente sprint fijado por el usuario (NO autorizado): `Apuntar clientes a produccion (URL de API configurable)`. Alcance completo en la seccion 8, prioridad 1. Recordatorio del problema: Desktop instalado apunta a `http://localhost:8080/` y el APK a `http://10.0.2.2:8080/`; ningun instalable conecta con Hetzner hasta ejecutar ese sprint.
+- Despues, en orden: COD-8 (SyncWorker e2e), iOS runtime (bloqueado sin macOS), dominio propio (cuando se compre), UX-14.
+
+### Auditoria completa multiagente + fixes alcance (c) - 2026-07-11
+
+- Objetivo: auditoria destructiva completa (Claude Code lider + contraste Codex y Gemini en solo lectura via bloques IDE), seguida de fixes autorizados por el usuario con alcance (c).
+- Skills/seguridad ejecutadas en la sesion: `security-review` (OWASP sistematico sobre backend/infra/clientes) y `VibeSec` (checklist sobre el diff de auth). Codex/Gemini aportaron contraste; todos sus hallazgos nuevos fueron verificados en codigo por Claude Code antes de integrarlos (2 errores de Gemini corregidos: el `.iml` si existia sin trackear, e "imagenes chat" fue lectura erronea suya).
+- Veredicto auditoria: madurez 7/10, riesgo seguridad MEDIO, riesgo operativo MEDIO-ALTO hasta cerrar el sprint de clientes->produccion. Informe completo en la conversacion de la sesion.
+- Fixes aplicados (alcance c):
+  - `AuthService.register`: `saveAndFlush` + catch `DataIntegrityViolationException` -> 409 (carrera de registro duplicado ya no da 500).
+  - `RefreshTokenService.rotate` + `RefreshTokenRepository.revokeIfActive`: rotacion atomica (UPDATE condicional `revoked_at IS NULL`); el perdedor de una carrera de refresh recibe 401 y su reemplazo se descarta sin entregarse.
+  - `FamilyService.parseRole`: error sin reflejar input (COD-10 cerrado).
+  - `application-prod.yml`: `server.address=${SERVER_ADDRESS:127.0.0.1}` (defensa en profundidad, coherente con runbook Caddy loopback).
+  - `.github/workflows/dependency-audit.yml` NUEVO: Dependency-Check semanal (lunes 06:00 UTC) + manual, backend y desktop, requiere secret `NVD_API_KEY` en GitHub (CONFIGURAR ANTES del primer run; OSS Index corre anonimo en CI).
+  - Documental: CLAUDE.md y CONTINUAR.md ahora dicen PostgreSQL (no MySQL); README corregido (chat implementado, 116 tests, PostgreSQL, nota Desktop Windows-only por DPAPI); borrados `auditoria.txt`, `resultado auditoria.txt` (recuperables en git) y `.iml` local.
+  - Hallazgos NUEVO-1/2/4 y URL horneada iOS registrados en seccion 8 para el sprint de clientes.
+- Validacion: `mvn compile` backend OK (exit 0). `mvn test`: 116 tests ejecutados, 105 errores TODOS por entorno (sin PostgreSQL de test local: PSQLException/Flyway al cargar contexto), 11 unitarios en verde (`ChatStompAuthChannelInterceptorTest`, `FileStorageServiceTest`). Los tests de las clases tocadas son de integracion: LOS VALIDARA EL CI en el push (job build con Postgres service). NO hacer push sin vigilar ese run.
+- Riesgos residuales:
+  - Cambios de auth sin test de integracion ejecutado localmente; el gate real es el CI. Si el run falla, revertir o corregir antes de que el deploy automatico avance (el deploy requiere build verde, asi que falla cerrado).
+  - `server.address` loopback por defecto: si algun consumidor accedia al backend por IP WireGuard/no-loopback sin pasar por Caddy, definir `SERVER_ADDRESS` en `backend.env`.
+  - Suppression CVE-2026-47838: Codex indica (fuentes NVD/Spring no verificadas offline) que 6.5.11 esta fuera del rango afectado; revisar y retirar la suppression si se confirma.
+  - Cambios SIN COMMITEAR al cierre de la sesion; el push disparara CI/CD y deploy a produccion.
 
 ### Chequeo obligatorio de cierre
 
