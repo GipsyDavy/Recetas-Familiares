@@ -1622,11 +1622,23 @@ Punto exacto en el que queda el proyecto tras la sesion OSS Index de Codex:
   - Documental: CLAUDE.md y CONTINUAR.md ahora dicen PostgreSQL (no MySQL); README corregido (chat implementado, 116 tests, PostgreSQL, nota Desktop Windows-only por DPAPI); borrados `auditoria.txt`, `resultado auditoria.txt` (recuperables en git) y `.iml` local.
   - Hallazgos NUEVO-1/2/4 y URL horneada iOS registrados en seccion 8 para el sprint de clientes.
 - Validacion: `mvn compile` backend OK (exit 0). `mvn test`: 116 tests ejecutados, 105 errores TODOS por entorno (sin PostgreSQL de test local: PSQLException/Flyway al cargar contexto), 11 unitarios en verde (`ChatStompAuthChannelInterceptorTest`, `FileStorageServiceTest`). Los tests de las clases tocadas son de integracion: LOS VALIDARA EL CI en el push (job build con Postgres service). NO hacer push sin vigilar ese run.
+- Cierre (2026-07-11, misma sesion): commits `4046f38` (fix backend), `3f9b6a9` (ci dependency-audit), `679cd02` (docs) pusheados a `main`. Run `Backend CI/CD` sobre `679cd02`: `Build and test backend` SUCCESS (116 tests contra Postgres en CI, incluidos los de auth modificados) y `Deploy backend` SUCCESS. Health publico verificado: HTTP 200 `{"status":"UP"}` a las 16:24 UTC. Los fixes de auth estan EN PRODUCCION.
 - Riesgos residuales:
-  - Cambios de auth sin test de integracion ejecutado localmente; el gate real es el CI. Si el run falla, revertir o corregir antes de que el deploy automatico avance (el deploy requiere build verde, asi que falla cerrado).
   - `server.address` loopback por defecto: si algun consumidor accedia al backend por IP WireGuard/no-loopback sin pasar por Caddy, definir `SERVER_ADDRESS` en `backend.env`.
   - Suppression CVE-2026-47838: Codex indica (fuentes NVD/Spring no verificadas offline) que 6.5.11 esta fuera del rango afectado; revisar y retirar la suppression si se confirma.
-  - Cambios SIN COMMITEAR al cierre de la sesion; el push disparara CI/CD y deploy a produccion.
+  - Secret `NVD_API_KEY` PENDIENTE de crear en GitHub (Settings > Secrets > Actions); sin el, el workflow `dependency-audit.yml` fallara en su primer run (lunes 06:00 UTC o manual).
+
+### Estado actual para el siguiente sprint - 2026-07-11 tarde (post-auditoria, fixes desplegados)
+
+Punto exacto del proyecto tras la auditoria multiagente y los fixes de alcance (c):
+
+- `main` = `679cd02`, arbol limpio, todo pusheado y DESPLEGADO en produccion (run CI/CD verde, health 200 UP verificado 16:24 UTC).
+- Produccion incluye ahora: registro concurrente→409, rotacion de refresh atomica (single-use real), error de rol sin reflejar input, `server.address` loopback por defecto.
+- Workflow nuevo `.github/workflows/dependency-audit.yml`: Dependency-Check semanal (lunes 06:00 UTC) + manual para backend y desktop. ACCION PENDIENTE DEL USUARIO: crear secret `NVD_API_KEY` en GitHub antes del primer run.
+- Documentacion sincronizada con la realidad: PostgreSQL en CLAUDE.md/CONTINUAR/README, README con estado real (chat implementado, 116 tests, Desktop Windows-only por DPAPI), raiz sin `auditoria.txt`/`resultado auditoria.txt`.
+- SIGUIENTE SPRINT (fijado por el usuario, autorizado para ejecucion por Codex el 2026-07-11): `Apuntar clientes a produccion` — alcance completo en seccion 8, prioridad 1, INCLUYENDO los añadidos de auditoria: URL horneada tambien en iOS (`ios/composeApp/.../network/ApiClient.kt:23`), NUEVO-1 (Desktop sync sin paginar y que descarta `familyNotes`/`recipePhotos`) y NUEVO-2 (limit default server-side tras migrar Desktop).
+- Recordatorio operativo: push a `main` con cambios en `backend/**` = deploy automatico a produccion; verificar run de Actions y health tras cada push.
+- Despues de ese sprint, en orden: COD-8 (SyncWorker e2e), iOS runtime (bloqueado sin macOS; incluye NUEVO-4 CancellationException), dominio propio (cuando se compre), UX-14.
 
 ### Chequeo obligatorio de cierre
 
