@@ -21,6 +21,9 @@ public class FamilyEntity {
     @Column(nullable = false, length = 120)
     private String name;
 
+    @Column(name = "avatar_url", length = 2048)
+    private String avatarUrl;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -65,6 +68,14 @@ public class FamilyEntity {
 
     public String getName() {
         return name;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 
     public void softDelete() {

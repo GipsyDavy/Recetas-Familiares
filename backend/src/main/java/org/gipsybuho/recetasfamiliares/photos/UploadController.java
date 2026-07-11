@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 import org.gipsybuho.recetasfamiliares.chat.ChatAttachmentRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
+import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,7 @@ public class UploadController {
     private final ChatAttachmentRepository chatAttachmentRepository;
     private final UserRepository userRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final FamilyRepository familyRepository;
     private final String uploadBaseUrl;
 
     public UploadController(
@@ -46,7 +48,8 @@ public class UploadController {
             RecipePhotoRepository photoRepository,
             ChatAttachmentRepository chatAttachmentRepository,
             UserRepository userRepository,
-            FamilyMemberRepository familyMemberRepository
+            FamilyMemberRepository familyMemberRepository,
+            FamilyRepository familyRepository
     ) {
         this.uploadDir = Path.of(uploadDirPath).toAbsolutePath().normalize();
         this.uploadBaseUrl = trimTrailingSlash(uploadBaseUrl);
@@ -54,6 +57,7 @@ public class UploadController {
         this.chatAttachmentRepository = chatAttachmentRepository;
         this.userRepository = userRepository;
         this.familyMemberRepository = familyMemberRepository;
+        this.familyRepository = familyRepository;
     }
 
     @GetMapping("/uploads/{filename}")
@@ -84,6 +88,20 @@ public class UploadController {
             throw notFound();
         }
         return serveFile(uploadDir.resolve("avatars").resolve(filename), filename);
+    }
+
+    @GetMapping("/uploads/family_avatars/{filename}")
+    public ResponseEntity<byte[]> familyAvatar(@PathVariable String filename, Authentication authentication) {
+        requireSafeFilename(filename);
+        String requesterId = authentication.getName();
+        String localPath = "/uploads/family_avatars/" + filename;
+        List<String> owningFamilyIds = familyRepository.findIdsByAvatarLocalUrl(localUrl(localPath), localPath);
+        boolean allowed = owningFamilyIds.stream()
+                .anyMatch(familyId -> familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, requesterId));
+        if (!allowed) {
+            throw notFound();
+        }
+        return serveFile(uploadDir.resolve("family_avatars").resolve(filename), filename);
     }
 
     @GetMapping("/uploads/chat/{filename}")

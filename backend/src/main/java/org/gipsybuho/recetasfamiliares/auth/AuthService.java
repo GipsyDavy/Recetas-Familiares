@@ -11,6 +11,7 @@ import org.gipsybuho.recetasfamiliares.families.FamilyMemberEntity;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRole;
+import org.gipsybuho.recetasfamiliares.recipes.StarterRecipeSeeder;
 import org.gipsybuho.recetasfamiliares.security.JwtService;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
@@ -32,6 +33,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final AccountActionTokenService accountActionTokenService;
     private final AccountEmailService accountEmailService;
+    private final StarterRecipeSeeder starterRecipeSeeder;
     private final Duration passwordResetTokenTtl;
     private final Duration emailVerificationTokenTtl;
 
@@ -44,6 +46,7 @@ public class AuthService {
             RefreshTokenService refreshTokenService,
             AccountActionTokenService accountActionTokenService,
             AccountEmailService accountEmailService,
+            StarterRecipeSeeder starterRecipeSeeder,
             @Value("${app.account.password-reset-token-ttl-minutes:30}") long passwordResetTokenTtlMinutes,
             @Value("${app.account.email-verification-token-ttl-hours:24}") long emailVerificationTokenTtlHours
     ) {
@@ -55,6 +58,7 @@ public class AuthService {
         this.refreshTokenService = refreshTokenService;
         this.accountActionTokenService = accountActionTokenService;
         this.accountEmailService = accountEmailService;
+        this.starterRecipeSeeder = starterRecipeSeeder;
         this.passwordResetTokenTtl = Duration.ofMinutes(passwordResetTokenTtlMinutes);
         this.emailVerificationTokenTtl = Duration.ofHours(emailVerificationTokenTtlHours);
     }
@@ -81,6 +85,7 @@ public class AuthService {
         }
         FamilyEntity family = familyRepository.save(new FamilyEntity(request.familyName().trim()));
         familyMemberRepository.save(new FamilyMemberEntity(family, user, FamilyRole.OWNER));
+        starterRecipeSeeder.seedStarterRecipes(family);
         sendEmailVerificationIfEnabled(user);
 
         return issueAuthResponse(user, family);

@@ -48,6 +48,8 @@ class AuthServiceTest {
     private AccountActionTokenService accountActionTokenService;
     @Mock
     private AccountEmailService accountEmailService;
+    @Mock
+    private org.gipsybuho.recetasfamiliares.recipes.StarterRecipeSeeder starterRecipeSeeder;
 
     private AuthService service;
 
@@ -62,6 +64,7 @@ class AuthServiceTest {
                 refreshTokenService,
                 accountActionTokenService,
                 accountEmailService,
+                starterRecipeSeeder,
                 30,
                 24
         );

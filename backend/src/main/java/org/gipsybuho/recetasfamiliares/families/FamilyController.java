@@ -69,6 +69,15 @@ public class FamilyController {
         familyService.removeMember(familyId, userId, authentication.getName());
     }
 
+    @PostMapping("/{familyId}/avatar")
+    public FamilyResponse uploadAvatar(
+            @PathVariable String familyId,
+            @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            Authentication authentication
+    ) {
+        return familyService.uploadAvatar(familyId, authentication.getName(), file);
+    }
+
     @GetMapping("/{familyId}/stats")
     public FamilyStatsResponse getFamilyStats(
             @PathVariable String familyId,

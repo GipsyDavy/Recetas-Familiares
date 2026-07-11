@@ -34,6 +34,7 @@ public class FamilyService {
     private final FamilyNoteRepository familyNoteRepository;
     private final FavoriteRecipeRepository favoriteRecipeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.gipsybuho.recetasfamiliares.photos.FileStorageService fileStorageService;
 
     public FamilyService(
             FamilyMemberRepository familyMemberRepository,
@@ -46,7 +47,8 @@ public class FamilyService {
             ShoppingListRepository shoppingListRepository,
             FamilyNoteRepository familyNoteRepository,
             FavoriteRecipeRepository favoriteRecipeRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            org.gipsybuho.recetasfamiliares.photos.FileStorageService fileStorageService
     ) {
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
@@ -59,6 +61,7 @@ public class FamilyService {
         this.familyNoteRepository = familyNoteRepository;
         this.favoriteRecipeRepository = favoriteRecipeRepository;
         this.passwordEncoder = passwordEncoder;
+        this.fileStorageService = fileStorageService;
     }
 
     @Transactional(readOnly = true)
@@ -68,7 +71,8 @@ public class FamilyService {
                 .map(member -> new FamilyResponse(
                         member.getFamily().getId(),
                         member.getFamily().getName(),
-                        member.getRole()
+                        member.getRole(),
+                        member.getFamily().getAvatarUrl()
                 ))
                 .toList();
     }
@@ -114,6 +118,31 @@ public class FamilyService {
         target.softDelete();
         familyMemberRepository.save(target);
         refreshTokenService.revokeAllForUser(targetUserId);
+    }
+
+    /**
+     * Imagen del grupo familiar (punto 15 del roadmap). Solo OWNER/ADMIN pueden
+     * cambiarla; la validacion real del archivo vive en FileStorageService
+     * (allowlist, magic bytes, re-encode) igual que el avatar de usuario.
+     */
+    @Transactional
+    public FamilyResponse uploadAvatar(String familyId, String callerUserId,
+            org.springframework.web.multipart.MultipartFile file) {
+        requireAdminOrAbove(familyId, callerUserId);
+        FamilyEntity family = familyRepository.findById(familyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
+        try {
+            var stored = fileStorageService.store(file, "family_avatars");
+            family.setAvatarUrl(stored.url());
+            FamilyEntity saved = familyRepository.save(family);
+            FamilyRole callerRole = familyMemberRepository
+                    .findMemberWithUserByFamilyIdAndUserId(familyId, callerUserId)
+                    .map(FamilyMemberEntity::getRole)
+                    .orElse(null);
+            return new FamilyResponse(saved.getId(), saved.getName(), callerRole, saved.getAvatarUrl());
+        } catch (java.io.IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al guardar la imagen");
+        }
     }
 
     @Transactional

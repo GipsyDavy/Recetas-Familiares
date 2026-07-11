@@ -3,6 +3,7 @@ package org.gipsybuho.recetasfamiliares.families;
 public record FamilyResponse(
         String id,
         String name,
-        FamilyRole role
+        FamilyRole role,
+        String avatarUrl
 ) {
 }

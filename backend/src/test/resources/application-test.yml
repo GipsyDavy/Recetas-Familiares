@@ -25,3 +25,6 @@ app:
     rate-limit:
       auth:
         enabled: false
+  # Sin recetas de inicio en tests: los asserts parten de familias vacias
+  starter-recipes:
+    enabled: false
