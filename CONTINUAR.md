@@ -375,6 +375,29 @@ Prioridad propuesta para el siguiente sprint no autorizado (fijada por el usuari
    - Contenido: microcopy calido y no tecnico, cubriendo cada opcion, atajo, gesto y estado (vacio/error/offline), de forma que el usuario pueda usar toda la aplicacion sin ayuda externa.
    - Criterio de cierre: inventario de pantallas/dialogos vs temas de ayuda al 100%, revision Gemini de textos, accesibilidad verificada (TalkBack/tooltips).
 
+### Roadmap funcional aprobado (2026-07-12, decision del usuario sobre `paraImplementar.txt`)
+
+El usuario aporto 21 peticiones funcionales. Analisis contra estado real y decision registrada:
+
+Ya cubiertos (verificar, no reimplementar):
+- (6) Recuperar password: backend CRIT-2 desplegado; cierre en Sprint A.
+- (7) Imagen en receta: fotos con ownership ya existen; verificar portada en listados.
+- (9) Valoraciones: backend ya tiene valoraciones; falta exponer estrellas en clientes.
+- (17) Datos sobreviven a reinstalacion: cumplido por diseño (fuente maestra PostgreSQL + sync).
+- (18) Hetzner + backups: CERRADO 2026-07-11.
+- (19) Listar miembros: Desktop ya lo tiene; falta pantalla Android.
+
+Orden de sprints aprobado:
+- Sprint A (EN CURSO): cerrar CRIT-2 — SMTP produccion + UX cliente reset password, verificar email, borrar cuenta (punto 6).
+- Sprint B (quick wins): (1) boton actualizar notas Android, (2) boton salir Desktop/Android, (10) creador de receta visible, (15) imagen de familia, (19) miembros en Android, (21) 5 recetas por defecto al crear familia (2 faciles, 2 medias, 1 dificil), verificacion de (7) y (9), y (8) SOLO en version simple (abrir busqueda en navegador, sin backend).
+- Sprint C (gestion familiar): (3) editar miembros (rol/expulsar), (5) crear familia solo owner/admin (matiz: usuario nuevo sin familia debe poder crear la primera). VibeSec obligatorio.
+- Sprint D (epica multi-familia): (4)+(13)+(12) son un solo bloque — pertenecer a varias familias, cambiar de familia activa y copiar recetas entre familias. Requiere sprint de diseño previo (brainstorming + Codex/Gemini) antes de codigo. Riesgo principal: fuga de datos entre familias en cache/sync/merge.
+- Posteriores: (20) presencia online + avisos de actividad (limitacion: sin push, solo con app abierta; encaja con chat fase 4), (11) ranking de usuarios (depende de 9 y 10; plantear como gamificacion ligera acorde a filosofia del producto), (14) chat privado 1:1 (despues de chat fase 4/push).
+
+DESCARTADOS TOTALMENTE por decision del usuario (2026-07-12):
+- (16) Comparar recetas con internet + sugerencias IA de modificacion: coste recurrente, consentimiento de datos familiares, complejidad alta para valor incierto. YAGNI.
+- (8) en version integrada (API externa de alimentos/recetas): mismos motivos. Solo sobrevive la version simple (abrir navegador) en Sprint B.
+
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
 ---
@@ -1807,6 +1830,21 @@ Revision final Claude Code (2026-07-11, misma fecha):
   - Si SMTP falla durante envio, se registra warning sin token ni datos sensibles, pero el usuario no recibe el correo; requiere monitorizacion/config operativa.
   - No hay test de integracion completo por DB local ausente; CI tras push debe decidir el gate.
   - CRIT-2 queda **parcial**, no cerrado de producto.
+
+### Sprint A - CRIT-2 UX cliente (2026-07-12, Claude Code)
+
+- Objetivo: cerrar la parte cliente de CRIT-2 — recuperar contraseña, verificar email y borrar cuenta desde Desktop y Android contra los endpoints backend ya desplegados. Autorizado por el usuario junto con el roadmap funcional de `paraImplementar.txt` (ver seccion 8).
+- Contexto leido en la sesion: `CONTINUAR.md` (estado, prioridades, trazabilidad CRIT-2 backend), `CLAUDE.md`, contrato backend real (`AuthController`, DTOs de request, `AuthRateLimitFilter`, `AuthService`) y codigo cliente implicado (LoginView/ProfileView/ApiClient Desktop; RecetasApp/ProfileScreen/RecetasViewModel/Repositories Android).
+- Cambios Desktop: `AuthDtos`/`UserDtos` (+`emailVerified`), `ApiClient.deleteWithBody`, `AuthRepository` (5 metodos de cuenta), `PasswordResetDialog` nuevo (2 pasos, anti-enumeracion en el copy), enlace "¿Has olvidado tu contraseña?" en `LoginView` (solo modo login), card "Cuenta" en `ProfileView` (estado verificacion via `/users/me`, enviar/confirmar codigo, eliminar cuenta con password y aviso irreversible), `MainWindow` pasa `showLogin` como callback de cuenta borrada.
+- Cambios Android: DTOs nuevos + `emailVerified` en `UserResponseDto`, endpoints en `RecetasApi` (DELETE con body via `@HTTP(hasBody=true)`), metodos en `AuthRepository`, `UserRepository.me()`, `RecetasViewModel` (estado `emailVerified`, request/confirm reset, request/confirm verificacion, `deleteAccount` con logout al exito), `ForgotPasswordDialog` en login y seccion "Cuenta" + dialogos en `ProfileScreen`.
+- Fix de seguridad/UX detectado por la revision (VibeSec) y corregido en backend: `deleteAccount` con password incorrecta devolvia 401; el authenticator OkHttp de Desktop/Android reaccionaba al 401 con refresh+retry y terminaba limpiando la sesion local del usuario. Ahora devuelve 403 (bearer valido, accion rechazada); test `deleteAccountRejectsWrongPassword` refuerza el status 403. Clientes mapean 403 -> "Contraseña incorrecta".
+- Seguridad ejecutada en la sesion: VibeSec y security-review invocados sobre el diff. Verificado: rate limit cubre los 5 endpoints nuevos (POST y DELETE), sin secretos ni tokens en logs/UI, campos de password enmascarados, tokens solo en body HTTPS (nunca en URL), copy anti-enumeracion ("si el correo existe..."), minimo 12 caracteres alineado con backend. Sin hallazgos de alta confianza.
+- Validacion ejecutada: backend `mvn -Dtest=AuthServiceTest test` 7 tests 0 fallos (suite completa requiere DB; gate real en GitHub Actions tras push); Desktop `mvn test` 20 tests 0 fallos; Android `gradlew test` 37 tests 0 fallos + `assembleDebug` OK (APK regenerado).
+- Agentes IA: sin Codex/Gemini en esta sesion (cambios cliente siguiendo contrato backend ya revisado por Codex; el usuario autorizo proceder directo con el sprint).
+- PENDIENTE OPERATIVO para cerrar CRIT-2 del todo (requiere accion del usuario):
+  - SMTP real en produccion: definir proveedor y setear `MAIL_ENABLED=true`, `SMTP_HOST`, `SMTP_PORT`, credenciales, `MAIL_FROM`, `APP_PUBLIC_URL` en el entorno del VPS. Sin esto los correos no salen y los flujos cliente no pueden probarse end-to-end.
+  - Prueba manual end-to-end de los 3 flujos con SMTP activo (Desktop y Android).
+- Riesgos residuales: flujos cliente validados por compilacion y tests, sin prueba manual E2E (bloqueada por SMTP); los emails del backend enlazan rutas web (`/reset-password`) que no existen — los clientes piden pegar el codigo, valido pero mejorable cuando haya web o deep links; iOS sin estos flujos (runtime bloqueado, COD-1/COD-2); instalador Windows no regenerado en esta sesion (el .exe vigente no incluye estas pantallas).
 
 ### Chequeo obligatorio de cierre
 
