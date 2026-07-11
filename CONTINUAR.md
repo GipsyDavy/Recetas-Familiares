@@ -1684,6 +1684,14 @@ Punto exacto del proyecto tras la auditoria multiagente y los fixes de alcance (
   - Android mantiene WorkManager programado; tras cambio de servidor/cierre de sesion no se valido manualmente el comportamiento de sync periodico sin token.
   - iOS persistencia en `NSUserDefaults` y flujo de logout tras cambio de URL no se validaron en runtime.
 
+Revision final de seguridad Claude Code (2026-07-11, misma fecha, sesion de auditoria):
+- Verificado contra codigo real (no solo el informe de Codex): commits presentes en `main` (`49ed69c..7c26714`, arbol limpio), run `29160918726` success (build+deploy) y health 200 UP re-verificados via API.
+- Revisados en detalle los puntos criticos de seguridad: `ServerConfig.java` (validacion correcta: allowlist de esquema, sin userinfo/query/fragment/ruta, http solo hosts dev, normalizacion canonica, fallback fail-safe si la preferencia guardada es invalida), `ServerUrlConfig/ServerUrlStore.kt` (reglas equivalentes), `DynamicBaseUrlInterceptor.kt` (reescribe solo peticiones del origen inicial), `TokenRefreshAuthenticator.kt` (compara origen completo scheme+host+port contra el proveedor actual antes de responder credenciales a un 401 y refresca contra la base dinamica), iOS `ApiClient.kt` (Bearer solo al host del API), `SyncService.java` (DEFAULT_PULL_LIMIT=200, modo ilimitado eliminado) y `SyncRepository.java` Desktop (paginado con guarda de cursor estancado, aplica familyNotes/recipePhotos).
+- Grep del diff completo del sprint: sin logging nuevo de URLs/tokens; sin secretos.
+- Veredicto: PASS sobre lo revisado. Alcance de la revision: los archivos de seguridad critica al 100%; el resto del diff (UI, wiring) por muestreo.
+- Riesgo señalado adicional: binarios ANTIGUOS de Desktop (v1.1 previa) contra el backend nuevo ahora reciben pull paginado (200 filas + hasMore que ignoran) en vez de delta completo: sync silenciosamente parcial si una entidad supera 200 filas pendientes. A escala familiar es improbable; se mitiga instalando el instalador regenerado.
+- El sprint sigue ABIERTO hasta las pruebas manuales del usuario (Desktop instalado y APK contra Hetzner: login + sync + chat).
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
