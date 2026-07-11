@@ -75,17 +75,50 @@ sudo -u postgres psql -At -d "$RESTORE_DB" -c "SELECT 'flyway='||COUNT(*) FROM f
 sudo -u postgres dropdb "$RESTORE_DB"
 ```
 
-## PITR
+## PITR (ensayado 2026-07-11 en cluster aislado)
 
-Hay base backups y WAL locales suficientes para una recuperacion a punto en el tiempo dentro de la ventana de retencion, pero el restore PITR debe ensayarse en un directorio/servidor aislado antes de usarlo en produccion.
+Recuperacion a punto en el tiempo validada de extremo a extremo: base backup + WAL archivados permiten recuperar a un instante concreto con precision de transaccion (probado con dos marcadores y `recovery_target_time` entre ambos: el cluster recuperado contenia solo el primero).
 
-No ejecutar un PITR sobre el cluster activo sin ventana de mantenimiento y copia previa. La secuencia segura es:
+No ejecutar un PITR sobre el cluster activo sin ventana de mantenimiento y copia previa. Procedimiento probado (cluster aislado en el propio VPS, solo socket local):
 
-1. Parar un cluster de restore aislado.
-2. Restaurar el ultimo `base.tar.gz` del directorio `base_*`.
-3. Configurar `restore_command` apuntando a `/var/backups/recetas-postgres/wal/%f`.
-4. Definir `recovery_target_time` si se busca un punto concreto.
-5. Arrancar el cluster aislado y validar recuentos/datos.
+```bash
+PITR=/var/tmp/pitr-test
+mkdir -p "$PITR/data"
+tar xzf /var/backups/recetas-postgres/base/base_<FECHA>/base.tar.gz -C "$PITR/data"
+mkdir -p "$PITR/data/pg_wal"
+tar xzf /var/backups/recetas-postgres/base/base_<FECHA>/pg_wal.tar.gz -C "$PITR/data/pg_wal"
+cat > "$PITR/data/postgresql.conf" <<EOF
+listen_addresses = ''
+unix_socket_directories = '$PITR'
+port = 5433
+max_connections = 100
+shared_buffers = 128MB
+archive_mode = off
+restore_command = 'cp /var/backups/recetas-postgres/wal/%f %p'
+recovery_target_time = '<YYYY-MM-DD HH:MM:SS.ffffff+00>'
+recovery_target_action = 'promote'
+EOF
+echo "local all postgres peer" > "$PITR/data/pg_hba.conf"
+touch "$PITR/data/pg_ident.conf" "$PITR/data/recovery.signal"
+chown -R postgres:postgres "$PITR" && chmod 700 "$PITR/data"
+sudo -u postgres /usr/lib/postgresql/18/bin/pg_ctl -D "$PITR/data" -l "$PITR/pitr.log" -w -t 180 start
+# validar
+sudo -u postgres psql -h "$PITR" -p 5433 -At -c "SELECT pg_is_in_recovery();"   # f tras promote
+sudo -u postgres psql -h "$PITR" -p 5433 -d recetas_familiares -At -c "SELECT COUNT(*) FROM users;"
+# limpieza
+sudo -u postgres /usr/lib/postgresql/18/bin/pg_ctl -D "$PITR/data" -w stop
+rm -rf "$PITR"
+```
+
+Trampas comprobadas en el ensayo:
+
+- El base backup NO incluye `postgresql.conf`/`pg_hba.conf`/`pg_ident.conf` (layout Debian: viven en `/etc/postgresql/18/main`); hay que crear una config minima en el data dir restaurado.
+- `max_connections` del cluster de restore debe ser >= al del primario (100); con menos, la recovery aborta con `insufficient parameter settings`.
+- `archive_mode = off` obligatorio en el cluster de ensayo para no contaminar el archivo WAL de produccion.
+- `listen_addresses = ''` + solo socket local: el cluster de ensayo no abre TCP.
+- Es normal ver `cp: cannot stat .../00000002.history` al inicio: PostgreSQL sondea timelines siguientes.
+- Para recuperar TODO el WAL disponible (no un punto concreto), omitir `recovery_target_time`.
+- El cluster promovido queda en timeline 2; es desechable, no reutilizarlo como primario.
 
 ## Backups Offsite Cifrados (implementado 2026-07-11)
 
@@ -165,7 +198,7 @@ PGPASSWORD='<nueva-clave>' psql -h 10.10.0.1 -U recetas_app -d recetas_familiare
 
 ## Riesgos Residuales
 
-- El PITR esta configurado a nivel de base backup + WAL, pero falta ensayo completo en cluster aislado.
+- El ensayo PITR se hizo restaurando desde los backups locales del VPS; un PITR usando exclusivamente el repositorio offsite (restic restore + mismo procedimiento) no se ha ensayado por separado, aunque el restore offsite ya esta validado.
 - La copia offsite depende de una unica Storage Box; si Hetzner pierde VPS y Storage Box a la vez (misma cuenta/proveedor), no hay tercera copia.
 - La passphrase restic tiene una unica copia fuera del VPS (carpeta local del usuario); si se pierden ambas, el repositorio offsite es irrecuperable.
 - El backend ya esta desplegado en VPS/API publica HTTPS temporal; falta dominio propio estable y estrategia de rollback/CI-CD.

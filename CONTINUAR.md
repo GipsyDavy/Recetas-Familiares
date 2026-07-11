@@ -342,17 +342,17 @@ Estado actualizado el 2026-07-11:
 - Chat imagenes UX ya esta implementado, validado visualmente Desktop<->Android, integrado y publicado en `main`.
 - PostgreSQL en Hetzner, migracion de datos, operacion base de backups locales y backend/API publica HTTPS temporal quedaron integrados en `main` desde `feat/migracion-postgresql`.
 - Backups offsite cifrados PostgreSQL: CERRADO 2026-07-11 (restic -> Hetzner Storage Box, restore validado). Ver trazabilidad y `docs/postgres-operacion-runbook.md`.
+- Ensayo PITR en cluster aislado: CERRADO 2026-07-11 (recuperacion a punto en el tiempo con precision de transaccion, produccion intacta). Ver trazabilidad y runbook.
 - Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
 Prioridad propuesta para el siguiente sprint no autorizado:
 
-1. Ensayo PITR completo en cluster aislado: validar recuperacion real a punto en el tiempo sin tocar el cluster activo.
-2. Dominio propio/API estable: sustituir `sslip.io`, ajustar Caddy/CORS/WS/origenes y documentar rotacion.
-3. CI/CD y rollback backend: automatizar build/test/deploy del jar y conservar artefactos versionados para rollback operativo.
-4. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista y monitorizar PDFBox/Caddy/Flyway.
-5. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
-6. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
-7. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
+1. Dominio propio/API estable: sustituir `sslip.io`, ajustar Caddy/CORS/WS/origenes y documentar rotacion.
+2. CI/CD y rollback backend: automatizar build/test/deploy del jar y conservar artefactos versionados para rollback operativo.
+3. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista y monitorizar PDFBox/Caddy/Flyway.
+4. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
+5. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+6. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
    - Desktop: ayuda contextual en TODOS los modulos, dialogos y formularios (crear/editar receta, stock, menu, compra, notas, miembros, exportaciones, busqueda global, diagnostico), cada pestaña de Ajustes, modo cocina y onboarding; tooltips en todos los controles sin label visible (formato `Accion (Ctrl+X)`, delay 400ms); foco y orden de tabulacion documentados en formularios.
    - Android: sistema de ayuda equivalente (pantalla o bottom sheet de ayuda por seccion, accesible desde TopAppBar), con `contentDescription` completo y ayuda del modo cocina/manos libres.
    - iOS: mismo patron cuando el runtime este desbloqueado (COD-1/COD-2).
@@ -1393,6 +1393,24 @@ Sprints posteriores recomendados:
   - Passphrase restic con una unica copia fuera del VPS (`herztner/`); perderla junto al VPS hace irrecuperable el repositorio offsite.
   - PITR completo sigue sin ensayar en cluster aislado (siguiente sprint recomendado).
   - Restore offsite validado con volumen pequeño actual; revalidar cuando el volumen crezca.
+
+### Sprint Ensayo PITR en cluster aislado — CERRADO (2026-07-11)
+
+- Objetivo: validar recuperacion real a punto en el tiempo (base backup + WAL) sin tocar el cluster activo.
+- Agente lider: Claude Code en solitario. Codex/Gemini no aplican (infra operativa con SSH directo al VPS, mismo criterio que el sprint offsite).
+- Metodo:
+  - Marcadores de precision en la DB de mantenimiento `postgres` (tabla temporal `pitr_marker`, sin tocar datos de la app): marcador 1 a las 08:25:16Z, target `T_MID=08:25:19.749326Z`, marcador 2 a las 08:25:22Z; `pg_switch_wal()` tras cada uno (WAL 07 y 08 archivados, failed_count=0).
+  - Cluster aislado en `/var/tmp/pitr-test`: base backup `base_20260709T212950Z` + WAL del archivo local, `recovery_target_time=T_MID`, `recovery_target_action=promote`, sin TCP (solo socket local), `archive_mode=off` para no contaminar el archivo WAL.
+- Resultado:
+  - Recovery paro exactamente antes del commit del marcador 2 (`recovery stopping before commit of transaction 2130`); cluster promovido a timeline 2.
+  - Cluster recuperado contenia SOLO el marcador 1 (produccion tiene ambos): precision de transaccion demostrada.
+  - Recuentos de `recetas_familiares` identicos a produccion (flyway=15, users=2, families=1, family_members=2, chat_messages=3).
+- Trampas documentadas en runbook: configs Debian fuera del basebackup (crear `postgresql.conf`/`pg_hba.conf` minimos), `max_connections` >= primario (con 20 aborta), `archive_mode=off` obligatorio en el ensayo, `cp: cannot stat 00000002.history` es sondeo normal de timelines.
+- Limpieza verificada: cluster parado, `/var/tmp/pitr-test` eliminado, tabla `pitr_marker` borrada de prod.
+- Produccion intacta tras el ensayo: `postgresql@18-main`/`recetas-backend`/`caddy` active, `pg_is_in_recovery()=f`, archiver sin fallos, health publico HTTP 200.
+- Seguridad: sin cambios de codigo, dependencias, secretos ni superficie de red (cluster de ensayo sin TCP y desechado). VibeSec invocado en esta misma sesion (sprint offsite); para este ensayo aplican los mismos controles verificados. `security-review`/Dependency-Check no aplican.
+- Archivos modificados en repo: `docs/postgres-operacion-runbook.md`, `CONTINUAR.md`.
+- Riesgo residual: el ensayo restauro desde los backups locales; falta ensayar el mismo PITR partiendo exclusivamente del repositorio offsite (el restore offsite en si ya esta validado). Recuperacion con volumen de datos pequeño; revalidar cuando crezca.
 
 ### Chequeo obligatorio de cierre
 
