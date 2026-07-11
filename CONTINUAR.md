@@ -343,7 +343,9 @@ Estado actualizado el 2026-07-11:
 - PostgreSQL en Hetzner, migracion de datos, operacion base de backups locales y backend/API publica HTTPS temporal quedaron integrados en `main` desde `feat/migracion-postgresql`.
 - Backups offsite cifrados PostgreSQL: CERRADO 2026-07-11 (restic -> Hetzner Storage Box, restore validado). Ver trazabilidad y `docs/postgres-operacion-runbook.md`.
 - Ensayo PITR en cluster aislado: CERRADO 2026-07-11 (recuperacion a punto en el tiempo con precision de transaccion, produccion intacta). Ver trazabilidad y runbook.
-- Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
+- CI/CD y rollback backend: CERRADO 2026-07-11 por Codex (opcion A: GitHub Actions con deploy SSH restringido, releases versionadas, rollback probado). Ver trazabilidad.
+- Vigilancia dependencias: CERRADO 2026-07-11 por Codex (pgJDBC 42.7.13, suppressions PDFBox/Kotlin acotadas y con caducidad 2026-10-01). Ver trazabilidad.
+- Backend/desktop pasan Dependency-Check `vulnerableDeps=0` tras el sprint de vigilancia. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
 Dominio propio: APLAZADO por decision del usuario (2026-07-11). La app es operativa con `sslip.io`; comprar dominio mas adelante. Riesgos aceptados mientras tanto (documentados aqui para no olvidarlos):
 - sslip.io es DNS de terceros gratuito sin SLA; si cae, la app no resuelve (ir por IP rompe TLS).
@@ -351,14 +353,19 @@ Dominio propio: APLAZADO por decision del usuario (2026-07-11). La app es operat
 - El hostname va acoplado a la IP del VPS; si la IP cambia, hay que reconfigurar todos los clientes.
 Sprint futuro cuando exista dominio (~4-12 EUR/año): registro DNS A -> IP del VPS, hostname en Caddyfile, CORS/WS origins en backend, base URL en Android/Desktop/iOS, y verificar emision/renovacion del certificado nuevo.
 
-Prioridad propuesta para el siguiente sprint no autorizado:
+Prioridad propuesta para el siguiente sprint no autorizado (fijada por el usuario el 2026-07-11):
 
-1. CI/CD y rollback backend: automatizar build/test/deploy del jar y conservar artefactos versionados para rollback operativo.
-2. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista y monitorizar PDFBox/Caddy/Flyway.
-3. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
-4. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
-5. Dominio propio/API estable: cuando el usuario compre el dominio (ver nota de aplazamiento arriba).
-6. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
+1. Apuntar clientes a produccion (URL de API configurable). Problema detectado: los clientes instalables NO conectan con Hetzner tal cual. Desktop usa por defecto `http://localhost:8080/` (`desktop/.../api/ApiClient.java`, solo cambiable con `-Dapi.base.url`, sin UI); el APK Android lleva compilada `http://10.0.2.2:8080/` (emulador) en `DEFAULT_API_BASE_URL` de `android/app/build.gradle.kts`, sin ajuste en runtime. Alcance del sprint:
+   - Desktop: campo de URL del servidor en Ajustes/Login persistido en Preferences, default `https://recetas.167.233.213.242.sslip.io/`; regenerar instalador Windows.
+   - Android: ajuste de URL del servidor en pantalla de configuracion, default produccion; revisar `network_security_config.xml` (cleartext solo para 10.0.2.2; HTTPS produccion no necesita excepcion); regenerar APK.
+   - Ambos: validar esquema https (permitir http solo para hosts de desarrollo), revisar derivacion de URL WebSocket (wss) y comprobar `app.upload.base-url` en el VPS apunta a la URL publica (Desktop no normaliza origen de uploads, residual conocido).
+   - Validacion: login/sync/chat reales contra Hetzner desde Desktop instalado y movil/emulador con el APK nuevo.
+   - Motivo de URL configurable y no horneada: `sslip.io` es temporal; con URL configurable, comprar dominio propio no obligara a redistribuir binarios.
+   - Seguridad: VibeSec aplica (red, tokens, URL introducida por usuario).
+2. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
+3. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+4. Dominio propio/API estable: cuando el usuario compre el dominio (ver nota de aplazamiento arriba).
+5. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
    - Desktop: ayuda contextual en TODOS los modulos, dialogos y formularios (crear/editar receta, stock, menu, compra, notas, miembros, exportaciones, busqueda global, diagnostico), cada pestaña de Ajustes, modo cocina y onboarding; tooltips en todos los controles sin label visible (formato `Accion (Ctrl+X)`, delay 400ms); foco y orden de tabulacion documentados en formularios.
    - Android: sistema de ayuda equivalente (pantalla o bottom sheet de ayuda por seccion, accesible desde TopAppBar), con `contentDescription` completo y ayuda del modo cocina/manos libres.
    - iOS: mismo patron cuando el runtime este desbloqueado (COD-1/COD-2).
@@ -1540,6 +1547,8 @@ Sprints posteriores recomendados (orden vigente de la seccion 8): vigilancia dep
   - Caddy 2.6.2 sigue pendiente de vigilancia de parches del repo Ubuntu.
   - No se actualizaron Android/iOS: se inspeccionaron versiones, pero no habia accion directa en este sprint y no se ejecutaron builds Gradle.
 - Siguiente sprint recomendado (NO autorizado): COD-8 siguiente capa, tests Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory.
+
+Actualizacion posterior (2026-07-11): el usuario fijo como siguiente sprint `Apuntar clientes a produccion (URL de API configurable)`; la recomendacion COD-8 pasa a segundo lugar. Detalle completo del alcance en la seccion 8.
 
 ### Chequeo obligatorio de cierre
 
