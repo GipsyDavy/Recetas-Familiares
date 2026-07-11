@@ -1640,6 +1640,50 @@ Punto exacto del proyecto tras la auditoria multiagente y los fixes de alcance (
 - Recordatorio operativo: push a `main` con cambios en `backend/**` = deploy automatico a produccion; verificar run de Actions y health tras cada push.
 - Despues de ese sprint, en orden: COD-8 (SyncWorker e2e), iOS runtime (bloqueado sin macOS; incluye NUEVO-4 CancellationException), dominio propio (cuando se compre), UX-14.
 
+### Sprint clientes a produccion - ejecucion Codex (2026-07-11)
+
+- Objetivo: clientes instalables apuntan por defecto a produccion y permiten configurar URL de servidor con validacion; Desktop sync deja de descargar delta completo; backend aplica `limit` por defecto si el cliente no lo envia.
+- Contexto leido en la sesion: `CONTINUAR.md` secciones 6, 8 y 10 indicadas por el usuario, `CLAUDE.md`, auditoria/estado post-auditoria en esta seccion, y archivos citados del alcance antes de modificarlos. Skill usada: VibeSec-Skill como checklist manual por tocar clientes HTTP/WS, sync y backend.
+- Commits de implementacion:
+  - `49ed69c feat(desktop): configurar servidor y sync paginado`
+  - `7523a70 feat(android): configurar url de servidor`
+  - `2492c3c feat(ios): configurar url de servidor`
+  - `30381c7 fix(backend): paginar sync sin limit` (commit backend separado; su push disparo CI/CD y deploy).
+- Cambios Desktop:
+  - `desktop/.../core/ServerConfig.java`: proveedor unico de URL con default `https://recetas.167.233.213.242.sslip.io/`, precedencia de `-Dapi.base.url`, persistencia en `Preferences`, normalizacion y validacion (solo `https`; `http` solo para `localhost`, `127.0.0.1`, `10.0.2.2`; rechazo de espacios, query/fragment, ruta extra y credenciales embebidas).
+  - `ApiClient`, `RecipeRepository`, `LoginView`, `MainWindow`, `build-installer.ps1`: eliminan defaults locales duplicados, usan base dinamica, exponen campo de servidor en login/ajustes, y el instalador usa produccion por defecto. WebSocket deriva del mismo origen (`https` -> `wss`).
+  - `SyncRepository` Desktop: `limit=200`, tope 50 paginas, no avanza `lastSyncTime` si el pull queda incompleto; acumula/aplica `familyNotes`, `recipePhotos` y `shoppingListItems` de forma explicita. Donde no hay cache local (`recipePhotos`, shopping lists/items), queda no-op documentado.
+- Cambios Android:
+  - `android/app/build.gradle.kts`: `DEFAULT_API_BASE_URL` pasa a produccion.
+  - `ServerUrlStore.kt`, `DynamicBaseUrlInterceptor.kt`, `AppContainer.kt`, interceptores auth/refresh, `ChatRepository.kt`, login y perfil: URL persistida configurable, validacion equivalente a Desktop, reescritura dinamica de Retrofit/OkHttp, y comparacion de origen completo antes de adjuntar Bearer o refrescar tokens. `network_security_config.xml` no se amplio.
+- Cambios iOS:
+  - `ServerUrlPreference.kt` common + `ServerUrlPreference.ios.kt`: default produccion, validacion comun y persistencia en `NSUserDefaults`.
+  - `ApiClient.kt`, `App.kt`, `LoginScreen.kt`, `MainTabScreen.kt`, `SettingsScreen.kt`: base URL inyectable/dinamica, campo de servidor en login/ajustes y comparacion dinamica de origen para Bearer/refresh.
+- Cambios backend:
+  - `backend/.../sync/SyncService.java`: `pull(..., limit=null)` usa `DEFAULT_PULL_LIMIT=200` y devuelve pagina con `hasMore/nextSince`; clientes antiguos sin `limit` siguen recibiendo contrato paginado.
+  - `SyncControllerTest.java`: caso nuevo para pull sin `limit` con mas de 200 recetas.
+- Validacion ejecutada:
+  - Desktop `mvn test` -> `BUILD SUCCESS`, 20 tests, 0 fallos/errores.
+  - Desktop `mvn -DskipTests compile` -> `BUILD SUCCESS`.
+  - Desktop `.\build-installer.ps1` -> `BUILD COMPLETADO`; instalador `desktop/output/RecetasFamiliares-Instalador-v1.1.exe` (52.724.168 bytes) y app-image regenerados; config contiene `-Dapi.base.url=https://recetas.167.233.213.242.sslip.io/`.
+  - Android `.\gradlew test` -> `BUILD SUCCESS`. Warnings observados: trust store `NUL` no legible, safe call innecesario en `TokenRefreshAuthenticator.kt`, deprecations Compose existentes.
+  - Android `.\gradlew assembleDebug` -> `BUILD SUCCESS`; APK `android/app/build/outputs/apk/debug/app-debug.apk` (23.946.786 bytes).
+  - iOS `.\gradlew compileKotlinMetadata compileKotlinIosX64 compileKotlinIosArm64 compileKotlinIosSimulatorArm64`: primer intento fallo por mismatch `URLBuilder`/`Url` en `ApiClient.kt`; corregido con overload; segundo intento -> `BUILD SUCCESS`. Warnings: expect/actual beta y avisos preexistentes de Keychain/interop.
+  - Backend `mvn test` local -> `BUILD FAILURE` por entorno PostgreSQL/Flyway local, no por compilacion: Surefire 117 tests ejecutados, 0 failures, 106 errors; raiz repetida `Unable to obtain connection from database: The server requested password-based authentication, but no password was provided by plugin null`. Compilacion main/test alcanzo Surefire.
+  - `git diff --check HEAD~4..HEAD` -> sin salida.
+  - Busqueda de hardcodes cliente `http://localhost:8080` / `http://10.0.2.2:8080` en fuentes cliente -> sin matches fuera de tests/config backend no tocada.
+  - Push a `main` hasta `30381c7` -> workflow `Backend CI/CD` run `29160918726`: `Build and test backend` success, `Deploy backend` success. Health publico posterior: HTTP 200 `{"status":"UP","checkedAt":"2026-07-11T17:07:08.697120286Z"}`.
+- Pendientes obligatorios antes de marcar cierre funcional:
+  - Prueba real Desktop instalado contra Hetzner: login + sync + chat. No ejecutada en esta sesion.
+  - Prueba real APK en emulador o movil contra Hetzner: login + sync + chat. No ejecutada en esta sesion.
+  - iOS runtime en macOS/dispositivo. Bloqueado en Windows; solo se compilaron targets Kotlin.
+  - Revision final de seguridad por Claude Code/VibeSec-security-review, segun lo pedido por el usuario.
+- Riesgos residuales:
+  - La URL configurable es una frontera de confianza: la validacion bloquea esquemas peligrosos, credenciales embebidas y `http` no-dev, pero no puede distinguir un servidor HTTPS malicioso elegido por el usuario.
+  - Al cambiar servidor estando logado, Desktop/Android/iOS fuerzan salida/cierre de sesion para no reutilizar tokens en otro origen; queda pendiente prueba manual de esa UX.
+  - Android mantiene WorkManager programado; tras cambio de servidor/cierre de sesion no se valido manualmente el comportamiento de sync periodico sin token.
+  - iOS persistencia en `NSUserDefaults` y flujo de logout tras cambio de URL no se validaron en runtime.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
