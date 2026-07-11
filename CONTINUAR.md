@@ -1755,6 +1755,13 @@ SIGUIENTE SPRINT (fijado, NO autorizado aun): **COD-8 siguiente capa — tests e
   - La validacion de WorkManager tras logout/cambio de servidor es de runner/repositorio (`familyId=null` -> success sin llamadas API), no prueba instrumentada del scheduler Android.
   - No se tocaron Desktop/iOS/backend en este sprint. iOS runtime y tests UI automatizados siguen como deuda.
 
+Revision final Claude Code (2026-07-11, misma fecha):
+- Verificado contra codigo real: commits `cf8abed`/`4a42fb6`/`5a88cce` en `main`, arbol limpio, **0 archivos backend tocados** (sin deploy; confirmado que no hubo run nuevo de Actions).
+- Diff del fix 409 revisado linea a linea: semantica correcta y conservadora. `pullOnce(protectPending=false)` solo sobrescribe pendientes cuya fila cambio en el servidor desde `lastSyncTime` (el pull es incremental), que son exactamente las conflictivas; los pendientes sin conflicto no vienen en el delta, sobreviven y se re-empujan en el siguiente ciclo. `CancellationException` se relanza ANTES del catch de `HttpException`. Coherente con el contrato documentado (409 de lote completo, servidor gana tras pull).
+- Suite re-ejecutada de primera mano por Claude Code: `gradlew test` -> EXIT 0, **37 tests, 0 failures, 0 errors** (conteo desde los XML de test-results; coincide con lo reportado por Codex).
+- Seguridad (VibeSec checklist sobre el diff): sin secretos, sin logging nuevo, sin cambio de superficie de red ni de ownership; el overwrite de conflicto queda acotado al `familyId` de la sesion. PASS.
+- **Sprint COD-8 (capa SyncWorker/colas offline Android): CERRADO.** Riesgos residuales: los listados por Codex (fakes en vez de Room real; sin prueba instrumentada del scheduler). COD-8 global sigue parcial: faltan tests UI/instrumentados e iOS.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
