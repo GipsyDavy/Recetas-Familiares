@@ -1527,6 +1527,7 @@ Sprints posteriores recomendados (orden vigente de la seccion 8): vigilancia dep
   - `mvn -f backend\pom.xml test` inicial fallo por datos residuales en `recetas_familiares_test` (92 fallos `409 Email is already registered`); se recreo SOLO esa DB de test en el VPS.
   - Tras reset de test DB: `mvn -f backend\pom.xml test` -> 116 tests, 0 fallos, `BUILD SUCCESS`.
   - `mvn -f desktop\pom.xml test` -> 14 tests, 0 fallos, `BUILD SUCCESS`.
+  - Push del commit `e2b122b` disparo GitHub Actions `Backend CI/CD` run `29147923334`: jobs `Build and test backend` y `Deploy backend` -> `success`; health publico `200/UP`; `current.jar` en `/opt/recetas-familiares/backend/releases/20260711T093600Z-e2b122b9a011.jar`; servicios `recetas-backend`, `caddy`, `postgresql@18-main` active; 5 releases retenidas.
 - Seguridad/VibeSec:
   - Sin secretos nuevos ni cambios en `herztner/`, GitHub Secrets, Caddy, WireGuard, PostgreSQL, puertos o backups.
   - No se expuso `5432` ni `8080`; el sprint solo cambio declaracion de dependencias y suppressions versionadas.
