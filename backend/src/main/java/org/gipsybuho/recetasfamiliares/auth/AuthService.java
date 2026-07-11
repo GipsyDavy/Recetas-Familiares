@@ -160,7 +160,9 @@ public class AuthService {
         UserEntity user = userRepository.findByIdAndDeletedFalse(userId)
                 .orElseThrow(() -> new AuthException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new AuthException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+            // 403, no 401: el bearer es valido, y un 401 dispararia el refresh+retry
+            // del authenticator OkHttp de los clientes, que acaba limpiando su sesion local
+            throw new AuthException(HttpStatus.FORBIDDEN, "Invalid credentials");
         }
 
         List<FamilyMemberEntity> memberships = familyMemberRepository.findByUser_IdAndDeletedFalse(userId);

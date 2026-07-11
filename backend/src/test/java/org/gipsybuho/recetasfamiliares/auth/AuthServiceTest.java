@@ -137,8 +137,11 @@ class AuthServiceTest {
         when(userRepository.findByIdAndDeletedFalse("user-1")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("bad-password", "hash")).thenReturn(false);
 
+        // 403 y no 401: un 401 haria que el authenticator OkHttp de los clientes
+        // refresque el token, reintente y acabe limpiando su sesion local
         assertThatThrownBy(() -> service.deleteAccount("user-1", new DeleteAccountRequest("bad-password")))
-                .isInstanceOf(AuthException.class);
+                .isInstanceOf(AuthException.class)
+                .satisfies(ex -> assertThat(((AuthException) ex).getStatusCode().value()).isEqualTo(403));
 
         verify(refreshTokenService, never()).revokeAllForUser(anyString());
         verify(userRepository, never()).save(user);
