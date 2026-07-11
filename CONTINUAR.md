@@ -1725,7 +1725,7 @@ PUNTO EXACTO DEL PROYECTO (para retomar en la proxima sesion, cualquier agente):
 - La aplicacion ES un producto funcionando: Desktop y Android instalables conectan a `https://recetas.167.233.213.242.sslip.io/` por defecto, con URL configurable, sync completo, chat en tiempo real entre usuarios y aviso de no leidos.
 - Artefactos regenerados y vigentes: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe` (50,3 MB) y `android/app/build/outputs/apk/debug/app-debug.apk` (con badge).
 - Pendientes operativos del usuario: crear secret `NVD_API_KEY` en GitHub (workflow `dependency-audit.yml`, primer run lunes 06:00 UTC); instalar el .exe regenerado si quiere la copia final en el sistema.
-- Deuda/bloqueos vigentes: iOS runtime (COD-1/COD-2, sin macOS); chat fase 4 (video + push notifications; el aviso de no leidos actual requiere app abierta); dominio propio aplazado; WorkManager tras cambio de servidor sin validacion manual; recuperacion de password/verificacion email/borrado de cuenta (CRIT-2/IMP-6 de la auditoria 2026-07-11) siguen sin existir — el borrado demo de hoy se hizo por SQL precisamente por eso.
+- Deuda/bloqueos vigentes: iOS runtime (COD-1/COD-2, sin macOS); chat fase 4 (video + push notifications; el aviso de no leidos actual requiere app abierta); dominio propio aplazado; WorkManager tras cambio de servidor sin validacion manual; recuperacion de password/verificacion email/borrado de cuenta (CRIT-2/IMP-6 de la auditoria 2026-07-11) con backend API iniciado por Codex en sprint parcial posterior; faltan SMTP/secret y UX cliente para cierre de producto.
 
 SIGUIENTE SPRINT (fijado, NO autorizado aun): **COD-8 siguiente capa — tests e2e de sincronizacion offline Android**
 - Alcance (CONTINUAR §8, prioridad 2): `SyncWorker` y colas offline end-to-end con Room fake o DB in-memory; cubrir pull paginado con tope, push con `baseSyncVersion` (convencion COD-3: dirty = syncVersion negativo), tombstones, conflictos 409 (server gana tras pull) y reintentos de WorkManager. Desktop: tests adicionales solo si aportan valor sin fragilizar.
@@ -1774,6 +1774,35 @@ Revision final Claude Code (2026-07-11, misma fecha):
 - Seguridad: VibeSec-Skill usado como checklist por tratarse del pipeline de auditoria de dependencias; sin secretos versionados, sin logging nuevo, sin cambios de auth/ownership/API/backend.
 - Impacto operativo: no se tocaron `backend/**`, `infra/backend/**`, `scripts/backend/**` ni `.github/workflows/backend-ci-cd.yml`; no deberia disparar deploy automatico de backend. Si un entorno Windows local vuelve a necesitar `Windows-ROOT`, configurarlo fuera del repo via `MAVEN_OPTS` o perfil local de IDE.
 - Verificacion GitHub tras push: workflow manual `Dependency Audit` run `29165213615` sobre `636b557` -> `success`; jobs `Backend dependency audit` y `Desktop dependency audit` completados con `success`. Revalidacion posterior sobre `main` actual `66f7377`: run `29165644055` -> `success`; `Desktop dependency audit` success y `Backend dependency audit` success.
+
+### Sprint CRIT-2 backend auth lifecycle - ejecucion Codex (2026-07-11 noche)
+
+- Objetivo parcial autorizado por `continua`: iniciar CRIT-2/IMP-6 por backend para recuperar password, verificar email y permitir borrado/anomizacion de cuenta sin SQL manual. Alcance real de esta entrada: backend/API/migracion/tests; no se implemento UX cliente en Desktop/Android/iOS.
+- Contexto leido en la sesion: `CONTINUAR.md` secciones de estado/prioridades/trazabilidad 2026-07-11, `CLAUDE.md`, `auditoria.md` en lo relativo a CRIT-2/IMP-6, y codigo backend de auth/security/users/families/OpenAPI. Skill usada: VibeSec-Skill como checklist por tocar auth, tokens y ciclo de cuenta. Sin Gemini/subagentes: no autorizados explicitamente para esta ejecucion.
+- Cambios backend:
+  - Nuevos endpoints: `POST /api/v1/auth/password-reset/request`, `POST /api/v1/auth/password-reset/confirm`, `POST /api/v1/auth/email-verification/request`, `POST /api/v1/auth/email-verification/confirm`, `DELETE /api/v1/auth/account`.
+  - Tokens de accion de cuenta en tabla nueva `account_action_tokens`: token raw aleatorio de 64 bytes, persistencia solo de hash SHA-256 Base64URL, TTL configurable, invalidacion de tokens activos previos del mismo tipo, consumo con lock pesimista y purga programada.
+  - Reset password anti-enumeracion: request responde aceptado aunque el email no exista; si existe y `MAIL_ENABLED=true`, envia email. Confirm cambia hash BCrypt existente y revoca todos los refresh tokens del usuario.
+  - Verificacion email: `users.email_verified` y `email_verified_at`; registro/request generan email si mail esta activo; confirm consume token y marca verificado. Login sigue permitido aunque no verificado para compatibilidad.
+  - Borrado de cuenta autenticado: exige password actual, revoca refresh tokens, anonimiza email/nombre/avatar/password, soft-delete de membership; si borra al unico miembro soft-delete de familia, y si borra al owner promueve ADMIN mas antiguo o miembro mas antiguo.
+  - Mail: `spring-boot-starter-mail` y config por entorno (`MAIL_ENABLED`, `SMTP_*`, `MAIL_FROM`, `APP_PUBLIC_URL`). Con `MAIL_ENABLED=false` no requiere `JavaMailSender`; con `MAIL_ENABLED=true` falla al arrancar si no hay `SMTP_HOST`/sender.
+  - Seguridad/OpenAPI/rate-limit: solo endpoints publicos de reset/verificacion quedan permitidos sin bearer; `DELETE /auth/account` queda autenticado y rate-limited; JWT de usuario ya borrado limpia contexto en vez de romper filtro.
+- Validacion ejecutada en Windows:
+  - `mvn -B -f backend/pom.xml -Dtest=AuthServiceTest test` -> `BUILD SUCCESS`; 7 tests, 0 failures, 0 errors.
+  - `mvn -B -f backend/pom.xml -DskipTests compile` -> `BUILD SUCCESS`.
+  - `mvn -B -f backend/pom.xml -P security-audit -DskipTests verify` -> `BUILD SUCCESS`; Dependency-Check 12.2.2 ejecuto NVD/Sonatype y genero reportes HTML/JSON.
+  - `mvn -B -f backend/pom.xml test` -> `BUILD FAILURE` por entorno local: Flyway no obtiene conexion PostgreSQL porque el servidor pide password y no se proporciono (`The server requested password-based authentication, but no password was provided`). No se marca como suite verde; gate real queda en GitHub Actions con DB de CI.
+  - `git diff --check` -> sin errores; solo avisos LF/CRLF de Windows.
+- Pendiente operativo antes de cerrar CRIT-2:
+  - Push del commit backend dispara deploy automatico: verificar workflow `Backend CI/CD` verde y `/api/v1/health` 200.
+  - Configurar SMTP real y secrets/env en produccion (`MAIL_ENABLED=true`, `SMTP_HOST`, credenciales, `MAIL_FROM`, `APP_PUBLIC_URL`).
+  - Implementar pantallas/flujo cliente: pedir reset, introducir token/nueva password, reenviar/verificar email, borrar cuenta desde perfil con confirmacion.
+  - Decidir politica de producto: si `email_verified=false` solo se informa o si en un sprint futuro se restringen acciones.
+- Riesgos residuales:
+  - Los enlaces de email apuntan a rutas cliente (`/reset-password`, `/verify-email`) que aun no existen como experiencia web/app; API si existe.
+  - Si SMTP falla durante envio, se registra warning sin token ni datos sensibles, pero el usuario no recibe el correo; requiere monitorizacion/config operativa.
+  - No hay test de integracion completo por DB local ausente; CI tras push debe decidir el gate.
+  - CRIT-2 queda **parcial**, no cerrado de producto.
 
 ### Chequeo obligatorio de cierre
 

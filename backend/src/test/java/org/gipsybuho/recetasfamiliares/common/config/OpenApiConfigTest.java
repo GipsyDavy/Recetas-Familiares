@@ -27,7 +27,9 @@ class OpenApiConfigTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.components.securitySchemes", hasKey("bearerAuth")))
                 .andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.security", empty()))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/password-reset/request'].post.security", empty()))
                 .andExpect(jsonPath("$.paths['/api/v1/health'].get.security", empty()))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/account'].delete.security[0]", hasKey("bearerAuth")))
                 .andExpect(jsonPath("$.paths['/api/v1/families'].get.security[0]", hasKey("bearerAuth")));
     }
 
@@ -39,6 +41,11 @@ class OpenApiConfigTest {
                 .andExpect(jsonPath("$.paths", hasKey("/api/v1/auth/login")))
                 .andExpect(jsonPath("$.paths", hasKey("/api/v1/auth/refresh")))
                 .andExpect(jsonPath("$.paths", hasKey("/api/v1/auth/logout")))
+                .andExpect(jsonPath("$.paths", hasKey("/api/v1/auth/password-reset/request")))
+                .andExpect(jsonPath("$.paths", hasKey("/api/v1/auth/password-reset/confirm")))
+                .andExpect(jsonPath("$.paths", hasKey("/api/v1/auth/email-verification/request")))
+                .andExpect(jsonPath("$.paths", hasKey("/api/v1/auth/email-verification/confirm")))
+                .andExpect(jsonPath("$.paths", hasKey("/api/v1/auth/account")))
                 .andExpect(jsonPath("$.paths", hasKey("/api/v1/health")))
                 .andExpect(jsonPath("$.paths", hasKey("/api/v1/families")))
                 .andExpect(jsonPath("$.paths", hasKey("/api/v1/families/{familyId}/recipes")))

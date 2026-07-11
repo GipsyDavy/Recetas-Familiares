@@ -15,6 +15,16 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     private static final String BEARER_SCHEME = "bearerAuth";
+    private static final List<String> PUBLIC_AUTH_PATHS = List.of(
+            "/api/v1/auth/register",
+            "/api/v1/auth/login",
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/logout",
+            "/api/v1/auth/password-reset/request",
+            "/api/v1/auth/password-reset/confirm",
+            "/api/v1/auth/email-verification/request",
+            "/api/v1/auth/email-verification/confirm"
+    );
 
     @Bean
     OpenAPI recetasFamiliaresOpenApi() {
@@ -34,7 +44,7 @@ public class OpenApiConfig {
     OpenApiCustomizer recetasFamiliaresSecurityOpenApiCustomizer() {
         return openApi -> openApi.getPaths().forEach((path, pathItem) ->
                 pathItem.readOperations().forEach(operation -> {
-                    if (path.startsWith("/api/v1/auth") || path.startsWith("/api/v1/health")) {
+                    if (PUBLIC_AUTH_PATHS.contains(path) || path.startsWith("/api/v1/health")) {
                         operation.setSecurity(List.of());
                     } else if (path.startsWith("/api/v1/")) {
                         operation.addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME));

@@ -93,6 +93,14 @@ public class FamilyMemberEntity {
         return role;
     }
 
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
     public void setRole(FamilyRole role) {
         this.role = role;
     }

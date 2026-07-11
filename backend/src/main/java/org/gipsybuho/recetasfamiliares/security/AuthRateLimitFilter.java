@@ -30,7 +30,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             "/api/v1/auth/register",
             "/api/v1/auth/login",
             "/api/v1/auth/refresh",
-            "/api/v1/auth/logout"
+            "/api/v1/auth/logout",
+            "/api/v1/auth/password-reset/request",
+            "/api/v1/auth/password-reset/confirm",
+            "/api/v1/auth/email-verification/request",
+            "/api/v1/auth/email-verification/confirm",
+            "/api/v1/auth/account"
     );
 
     private final Map<String, AttemptWindow> attempts = new ConcurrentHashMap<>();
@@ -117,7 +122,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private boolean shouldLimit(HttpServletRequest request) {
         return enabled
                 && maxRequests > 0
-                && HttpMethod.POST.matches(request.getMethod())
+                && (HttpMethod.POST.matches(request.getMethod()) || HttpMethod.DELETE.matches(request.getMethod()))
                 && LIMITED_PATHS.contains(request.getRequestURI());
     }
 

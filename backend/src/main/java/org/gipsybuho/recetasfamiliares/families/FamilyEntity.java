@@ -66,4 +66,11 @@ public class FamilyEntity {
     public String getName() {
         return name;
     }
+
+    public void softDelete() {
+        if (!deleted) {
+            deleted = true;
+            deletedAt = Instant.now();
+        }
+    }
 }

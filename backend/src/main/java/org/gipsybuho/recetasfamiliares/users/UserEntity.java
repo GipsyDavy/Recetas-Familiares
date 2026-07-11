@@ -30,6 +30,12 @@ public class UserEntity {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -90,6 +96,10 @@ public class UserEntity {
         return deleted;
     }
 
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
     public String getAvatarUrl() {
         return avatarUrl;
     }
@@ -100,5 +110,26 @@ public class UserEntity {
 
     public void setAvatarUrl(String avatarUrl) {
         this.avatarUrl = avatarUrl;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void markEmailVerified() {
+        if (!emailVerified) {
+            emailVerified = true;
+            emailVerifiedAt = Instant.now();
+        }
+    }
+
+    public void softDeleteAnonymized(String passwordHash) {
+        String suffix = id == null ? UUID.randomUUID().toString() : id;
+        email = "deleted+" + suffix + "@deleted.recetas.local";
+        displayName = "Cuenta eliminada";
+        avatarUrl = null;
+        this.passwordHash = passwordHash;
+        deleted = true;
+        deletedAt = Instant.now();
     }
 }

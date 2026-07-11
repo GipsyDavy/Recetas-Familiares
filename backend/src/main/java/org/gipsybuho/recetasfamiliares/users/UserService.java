@@ -51,6 +51,6 @@ public class UserService {
     }
 
     private static UserResponse toResponse(UserEntity u) {
-        return new UserResponse(u.getId(), u.getEmail(), u.getDisplayName(), u.getAvatarUrl());
+        return new UserResponse(u.getId(), u.getEmail(), u.getDisplayName(), u.getAvatarUrl(), u.isEmailVerified());
     }
 }
