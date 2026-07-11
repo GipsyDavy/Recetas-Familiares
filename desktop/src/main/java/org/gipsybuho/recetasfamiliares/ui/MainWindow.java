@@ -104,7 +104,7 @@ public class MainWindow {
 
     private void showLogin() {
         if (chatView != null) {
-            chatView.onHidden();
+            chatView.shutdown();
         }
         LoginView loginView = new LoginView(context, () -> {
             showMain();
@@ -127,6 +127,10 @@ public class MainWindow {
         shoppingListView = new ShoppingListView(context, this::triggerSync);
         notesView = new NotesView(context, this::triggerSync);
         chatView = new ChatView(context, this::setStatus);
+        chatView.setUnreadListener(this::updateChatBadge);
+        // Conexion en segundo plano desde el login: permite avisar en la
+        // sidebar de mensajes nuevos aunque el chat no este abierto.
+        chatView.startRealtime();
         profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus);
         if (context.getSession().isAdmin()) {
             familyMembersView = new FamilyMembersView(context);
@@ -366,7 +370,8 @@ public class MainWindow {
         activeView = view;
         globalSearch.clear();
         navigating = false;
-        // Cerrar la conexion en tiempo real del chat al abandonar la vista.
+        // La conexion del chat sigue viva en segundo plano; solo se marca la
+        // vista como oculta para que los mensajes entrantes cuenten como no leidos.
         if (chatView != null && !"chat".equals(view)) {
             chatView.onHidden();
         }
@@ -496,6 +501,15 @@ public class MainWindow {
             default          -> null;
         };
         if (active != null) active.getStyleClass().add("sidebar-nav-button-active");
+    }
+
+    /** Badge de mensajes de chat no leidos en la sidebar. Llamado en el hilo JavaFX. */
+    private void updateChatBadge(int unread) {
+        if (btnChat == null) {
+            return;
+        }
+        String base = "💬  Chat familiar";
+        btnChat.setText(unread > 0 ? base + "  (" + (unread > 9 ? "9+" : unread) + ")" : base);
     }
 
     private void doLogout() {

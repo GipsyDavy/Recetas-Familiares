@@ -90,6 +90,9 @@ public class ChatView extends VBox {
     private boolean sending = false;
     private boolean hasMoreOlder = false;
     private String nextBefore = null;
+    private boolean viewActive = false;
+    private int unreadCount = 0;
+    private java.util.function.IntConsumer unreadListener;
     private String myUserId;
 
     public ChatView(AppContext context, Consumer<String> onStatus) {
@@ -193,8 +196,19 @@ public class ChatView extends VBox {
 
     // ── Ciclo de vida (invocado desde MainWindow) ──────────────────────────────
 
-    /** Abre la conexion en tiempo real y carga el historial. Idempotente. */
+    /** La vista pasa a ser visible: limpia no leidos y asegura la conexion. */
     public void onShown() {
+        viewActive = true;
+        resetUnread();
+        startRealtime();
+    }
+
+    /**
+     * Abre la conexion en tiempo real y carga el historial. Idempotente.
+     * La conexion permanece abierta aunque la vista no este visible, para
+     * poder contar mensajes no leidos y avisar en la sidebar.
+     */
+    public void startRealtime() {
         if (socket != null) {
             return;
         }
@@ -210,13 +224,38 @@ public class ChatView extends VBox {
         });
     }
 
-    /** Cierra la conexion en tiempo real al abandonar la vista o cerrar sesion. */
+    /** La vista deja de ser visible; la conexion sigue abierta para el aviso de no leidos. */
     public void onHidden() {
+        viewActive = false;
+    }
+
+    /** Cierra la conexion en tiempo real (logout o cierre de la aplicacion). */
+    public void shutdown() {
         if (socket != null) {
             socket.disconnect();
             socket = null;
         }
         setConnected(false);
+        viewActive = false;
+        resetUnread();
+    }
+
+    /** Listener del contador de mensajes no leidos (badge de la sidebar). */
+    public void setUnreadListener(java.util.function.IntConsumer listener) {
+        this.unreadListener = listener;
+    }
+
+    private void resetUnread() {
+        if (unreadCount != 0) {
+            unreadCount = 0;
+            notifyUnread();
+        }
+    }
+
+    private void notifyUnread() {
+        if (unreadListener != null) {
+            unreadListener.accept(unreadCount);
+        }
     }
 
     private void ensureUserIdThen(Runnable afterReady) {
@@ -324,6 +363,13 @@ public class ChatView extends VBox {
     private void onRealtimeMessage(ChatDtos.ChatMessage message) {
         if (message == null || message.id() == null) {
             return;
+        }
+        // Solo cuentan como no leidos los mensajes NUEVOS de otros miembros
+        // recibidos con la vista oculta (las ediciones/borrados reutilizan id).
+        boolean isNew = messages.stream().noneMatch(m -> message.id().equals(m.id()));
+        if (isNew && !viewActive && !message.deleted() && !isMine(message)) {
+            unreadCount++;
+            notifyUnread();
         }
         boolean nearBottom = scrollPane.getVvalue() >= NEAR_BOTTOM_THRESHOLD;
         if (upsertAscending(message)) {
