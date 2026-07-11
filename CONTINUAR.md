@@ -1418,6 +1418,53 @@ Sprints posteriores recomendados:
 - Archivos modificados en repo: `docs/postgres-operacion-runbook.md`, `CONTINUAR.md`.
 - Riesgo residual: el ensayo restauro desde los backups locales; falta ensayar el mismo PITR partiendo exclusivamente del repositorio offsite (el restore offsite en si ya esta validado). Recuperacion con volumen de datos pequeño; revalidar cuando crezca.
 
+### Cierre de sesion Claude Code - 2026-07-11
+
+Objetivo del cierre:
+- Dejar repositorio y documentacion listos para retomar el siguiente sprint sin memoria externa.
+- En este cierre no queda runtime nuevo pendiente; todo lo implementado en la sesion esta validado, documentado y pusheado.
+
+Estado Git al cerrar:
+- Rama `main` alineada con `origin/main` en `6b2c20d`, arbol limpio.
+- Commits de la sesion: `9c8549c` (backups offsite cifrados), `b74c8f4` (ensayo PITR validado), `6b2c20d` (dominio aplazado, prioridades reordenadas).
+
+Cerrado en esta sesion (2026-07-11):
+- Sprint Backups offsite cifrados PostgreSQL: restic -> Hetzner Storage Box `u630198` por SFTP/22 con clave dedicada; timer diario 05:15 UTC; retencion 14d/5w; restore desde offsite validado en DB aislada con recuentos identicos a prod. Passphrase restic: copia unica fuera del VPS en `herztner/restic-offsite-passphrase.env` (Git la ignora; no perderla).
+- Sprint Ensayo PITR en cluster aislado: recuperacion a punto en el tiempo con precision de transaccion demostrada con marcadores; produccion intacta; procedimiento y trampas en `docs/postgres-operacion-runbook.md`.
+- Decision de producto: dominio propio APLAZADO por el usuario; app sigue en `https://recetas.167.233.213.242.sslip.io` con riesgos aceptados documentados en la seccion 8.
+
+Estado operativo del VPS al cerrar:
+- Servicios `postgresql@18-main`, `recetas-backend`, `caddy` active; health publico 200.
+- Backups: local (logico diario 03:15, basebackup domingos 04:15, WAL) + offsite cifrado (05:15). `pg_stat_archiver` sin fallos.
+- WireGuard operativo; la unit `wg-quick@wg0` tuvo estado `failed` cosmetico (restart viejo con `wg0 already exists`), limpiado con `reset-failed`; si reaparece con tunel vivo, no es incidencia.
+- Nada nuevo expuesto: `5432` solo WireGuard/loopback, `8080` solo loopback, Storage Box solo accesible con clave desde el VPS.
+
+Punto exacto de retoma para el proximo agente:
+1. `git checkout main && git pull --ff-only`; confirmar `git status` limpio en `6b2c20d` o posterior.
+2. Leer `CLAUDE.md`, esta seccion, `docs/postgres-operacion-runbook.md` y `docs/backend-vps-deploy-runbook.md`.
+3. No imprimir secretos; no versionar `herztner/`; no exponer `5432`/`8080`; los `.env` de `herztner/` llevan CRLF de Windows (hacer `sed -i 's/\r$//'` si se copian al VPS).
+4. Acceso VPS: `ssh root@167.233.213.242` (clave ya instalada en esta maquina).
+
+Siguiente sprint recomendado (NO autorizado): `CI/CD y rollback backend`
+
+Objetivo:
+- Eliminar el deploy manual del jar y ganar rollback operativo en un comando.
+
+Decision previa que debe tomar el usuario al arrancar:
+- Opcion A (CI/CD completo): GitHub Actions construye, testea y despliega via SSH al VPS. Requiere crear una clave SSH dedicada de deploy (usuario no-root restringido) y guardarla en GitHub Secrets: superficie nueva a valorar con VibeSec.
+- Opcion B (conservadora): pipeline de Actions solo build+test; deploy/rollback mediante script local versionado que ejecuta el usuario desde su PC via SSH. Sin secretos en GitHub.
+- Nota tecnica para ambas: los tests backend requieren PostgreSQL real (`DB_TEST_URL`); en Actions usar service container `postgres:18` (H2 fue eliminado).
+
+Plan por fases:
+1. Estructura de releases en VPS: `/opt/recetas-familiares/backend/releases/<fecha>-<gitsha>.jar` + symlink `current.jar`; `recetas-backend.service` pasa a apuntar al symlink; conservar ultimas 5 releases.
+2. Script de deploy (local o Actions segun opcion): copiar jar nuevo a releases, mover symlink, `systemctl restart recetas-backend`, esperar health 200; si falla, no avanzar el symlink.
+3. Script de rollback `recetas-backend-rollback`: symlink a la release anterior + restart + health check.
+4. Pipeline GitHub Actions: `mvn test` (con Postgres service) + package en cada push a `main`; artefacto jar versionado; deploy segun opcion elegida.
+5. Validacion obligatoria: deploy real de prueba con health 200, rollback real de prueba con health 200, y runbook `docs/backend-vps-deploy-runbook.md` actualizado con ambos flujos.
+6. Cierre: VibeSec (secretos/SSH/CI), trazabilidad en este archivo, commit `chore(infra): ci/cd y rollback backend`.
+
+Sprints posteriores recomendados (orden vigente de la seccion 8): vigilancia dependencias, COD-8 siguiente capa, iOS runtime (bloqueado sin macOS), dominio propio (cuando se compre), UX-14.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
