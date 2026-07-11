@@ -1,0 +1,119 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - backend/**
+      - infra/backend/**
+      - scripts/backend/**
+      - .github/workflows/backend-ci-cd.yml
+  pull_request:
+    paths:
+      - backend/**
+      - infra/backend/**
+      - scripts/backend/**
+      - .github/workflows/backend-ci-cd.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and test backend
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: recetas_familiares_test
+          POSTGRES_USER: recetas_app
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U recetas_app -d recetas_familiares_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_TEST_URL: jdbc:postgresql://localhost:5432/recetas_familiares_test
+      DB_TEST_USERNAME: recetas_app
+      DB_TEST_PASSWORD: postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Test
+        run: mvn -B -f backend/pom.xml test
+
+      - name: Package
+        run: mvn -B -f backend/pom.xml -DskipTests package
+
+      - name: Stage artifact
+        run: |
+          mkdir -p backend-artifact
+          cp backend/target/recetas-familiares-backend-0.1.0-SNAPSHOT.jar backend-artifact/recetas-familiares-backend-${GITHUB_SHA}.jar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: recetas-familiares-backend-${{ github.sha }}
+          path: backend-artifact/*.jar
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    name: Deploy backend
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout deploy scripts
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: recetas-familiares-backend-${{ github.sha }}
+          path: backend-artifact
+
+      - name: Configure SSH key
+        env:
+          BACKEND_DEPLOY_KEY: ${{ secrets.BACKEND_DEPLOY_KEY }}
+        run: |
+          test -n "$BACKEND_DEPLOY_KEY"
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "$BACKEND_DEPLOY_KEY" > ~/.ssh/recetas-backend-deploy
+          chmod 0600 ~/.ssh/recetas-backend-deploy
+
+      - name: Deploy release
+        env:
+          BACKEND_DEPLOY_HOST: ${{ secrets.BACKEND_DEPLOY_HOST }}
+          BACKEND_DEPLOY_USER: ${{ secrets.BACKEND_DEPLOY_USER }}
+          BACKEND_DEPLOY_PORT: ${{ secrets.BACKEND_DEPLOY_PORT }}
+          BACKEND_DEPLOY_KEY_FILE: /home/runner/.ssh/recetas-backend-deploy
+          BACKEND_DEPLOY_KNOWN_HOSTS: ${{ secrets.BACKEND_DEPLOY_KNOWN_HOSTS }}
+          BACKEND_HEALTH_URL: https://recetas.167.233.213.242.sslip.io/api/v1/health
+        run: |
+          jar_path="$(find backend-artifact -maxdepth 1 -type f -name '*.jar' | head -n 1)"
+          test -n "$jar_path"
+          bash scripts/backend/deploy-backend-ci.sh "$jar_path"

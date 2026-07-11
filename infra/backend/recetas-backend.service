@@ -1,0 +1,28 @@
+[Unit]
+Description=Recetas Familiares Spring Boot backend
+Wants=network-online.target wg-quick@wg0.service postgresql@18-main.service
+After=network-online.target wg-quick@wg0.service postgresql@18-main.service
+
+[Service]
+Type=simple
+User=recetas-backend
+Group=recetas-backend
+WorkingDirectory=/opt/recetas-familiares/backend
+EnvironmentFile=/etc/recetas-familiares/backend.env
+ExecStart=/usr/bin/java -jar /opt/recetas-familiares/backend/current.jar
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/recetas-familiares/uploads
+CapabilityBoundingSet=
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

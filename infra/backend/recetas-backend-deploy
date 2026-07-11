@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APP_DIR="/opt/recetas-familiares/backend"
+RELEASES_DIR="${APP_DIR}/releases"
+CURRENT_LINK="${APP_DIR}/current.jar"
+SERVICE_NAME="recetas-backend.service"
+HEALTH_URL="${RECETAS_BACKEND_HEALTH_URL:-http://127.0.0.1:8080/api/v1/health}"
+KEEP_RELEASES="${RECETAS_BACKEND_KEEP_RELEASES:-5}"
+STAGING_DIR="/var/tmp/recetas-backend-deploy"
+
+usage() {
+  echo "usage: recetas-backend-deploy <YYYYMMDDTHHMMSSZ-gitsha> <staged-jar>" >&2
+}
+
+require_root() {
+  if [[ "$(id -u)" != "0" ]]; then
+    echo "recetas-backend-deploy must run as root" >&2
+    exit 1
+  fi
+}
+
+validate_release_id() {
+  local release_id="$1"
+  if [[ ! "$release_id" =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$ ]]; then
+    echo "invalid release id: ${release_id}" >&2
+    exit 2
+  fi
+}
+
+validate_staged_jar() {
+  local jar_path="$1"
+  local resolved
+  resolved="$(realpath -e "$jar_path")"
+
+  if [[ "${resolved}" != "${STAGING_DIR}/"* ]]; then
+    echo "staged jar must be inside ${STAGING_DIR}" >&2
+    exit 2
+  fi
+
+  if [[ ! -f "$resolved" || ! -s "$resolved" ]]; then
+    echo "staged jar is missing or empty" >&2
+    exit 2
+  fi
+
+  local size
+  size="$(stat -c '%s' "$resolved")"
+  if (( size < 1048576 || size > 209715200 )); then
+    echo "staged jar size is outside expected bounds" >&2
+    exit 2
+  fi
+
+  local magic
+  magic="$(head -c 4 "$resolved" | od -An -tx1 | tr -d ' \n')"
+  if [[ "${magic}" != "504b0304" ]]; then
+    echo "staged jar does not look like a jar/zip archive" >&2
+    exit 2
+  fi
+
+  printf '%s\n' "$resolved"
+}
+
+wait_for_health() {
+  local attempt
+  for attempt in $(seq 1 45); do
+    if curl -fsS --max-time 3 "$HEALTH_URL" 2>/dev/null | grep -q '"status"[[:space:]]*:[[:space:]]*"UP"'; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+point_current_to() {
+  local target="$1"
+  local tmp_link
+  tmp_link="$(mktemp -u "${APP_DIR}/.current.jar.XXXXXX")"
+  ln -s "$target" "$tmp_link"
+  mv -Tf "$tmp_link" "$CURRENT_LINK"
+}
+
+prune_releases() {
+  local current_target
+  current_target="$(readlink -f "$CURRENT_LINK")"
+
+  mapfile -t release_paths < <(
+    find "$RELEASES_DIR" -maxdepth 1 -type f -name '*.jar' -printf '%T@ %p\n' |
+      sort -rn |
+      sed 's/^[^ ]* //'
+  )
+
+  local kept=0
+  local release_path
+  for release_path in "${release_paths[@]}"; do
+    if [[ "$release_path" == "$current_target" ]]; then
+      kept=$((kept + 1))
+      continue
+    fi
+
+    kept=$((kept + 1))
+    if (( kept > KEEP_RELEASES )); then
+      rm -f -- "$release_path"
+    fi
+  done
+}
+
+main() {
+  require_root
+
+  if [[ "$#" -ne 2 ]]; then
+    usage
+    exit 2
+  fi
+
+  local release_id="$1"
+  local staged_jar="$2"
+  validate_release_id "$release_id"
+  staged_jar="$(validate_staged_jar "$staged_jar")"
+
+  install -d -o root -g root -m 0755 "$APP_DIR" "$RELEASES_DIR"
+
+  local release_path="${RELEASES_DIR}/${release_id}.jar"
+  if [[ -e "$release_path" ]]; then
+    echo "release already exists: ${release_id}" >&2
+    exit 2
+  fi
+
+  local previous_target=""
+  if [[ -L "$CURRENT_LINK" ]]; then
+    previous_target="$(readlink -f "$CURRENT_LINK")"
+  fi
+
+  install -o root -g root -m 0644 "$staged_jar" "${release_path}.tmp"
+  mv -f "${release_path}.tmp" "$release_path"
+
+  point_current_to "$release_path"
+  systemctl restart "$SERVICE_NAME"
+
+  if wait_for_health; then
+    prune_releases
+    echo "deployed ${release_id}"
+    exit 0
+  fi
+
+  echo "health check failed for ${release_id}; reverting current.jar" >&2
+  if [[ -n "$previous_target" && -f "$previous_target" ]]; then
+    point_current_to "$previous_target"
+    systemctl restart "$SERVICE_NAME"
+    if ! wait_for_health; then
+      echo "previous release did not become healthy after revert" >&2
+      exit 1
+    fi
+  else
+    systemctl stop "$SERVICE_NAME" || true
+  fi
+
+  rm -f -- "$release_path"
+  exit 1
+}
+
+main "$@"

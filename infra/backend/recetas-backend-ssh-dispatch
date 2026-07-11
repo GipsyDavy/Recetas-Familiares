@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+STAGING_DIR="/var/tmp/recetas-backend-deploy"
+MAX_UPLOAD_BYTES="209715200"
+HEALTH_URL="${RECETAS_BACKEND_HEALTH_URL:-http://127.0.0.1:8080/api/v1/health}"
+
+validate_release_id() {
+  local release_id="$1"
+  [[ "$release_id" =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$ ]]
+}
+
+receive_upload() {
+  local target="$1"
+  python3 -c '
+import pathlib
+import sys
+
+target = pathlib.Path(sys.argv[1])
+limit = int(sys.argv[2])
+total = 0
+
+with target.open("xb") as fh:
+    while True:
+        chunk = sys.stdin.buffer.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            raise SystemExit("upload exceeds byte limit")
+        fh.write(chunk)
+
+if total == 0:
+    raise SystemExit("empty upload")
+' "$target" "$MAX_UPLOAD_BYTES"
+}
+
+run_deploy() {
+  local release_id="$1"
+  if ! validate_release_id "$release_id"; then
+    echo "invalid release id" >&2
+    exit 2
+  fi
+
+  install -d -m 0700 "$STAGING_DIR"
+  local staged_jar
+  staged_jar="$(mktemp "${STAGING_DIR}/upload.XXXXXX.jar")"
+  rm -f "$staged_jar"
+  trap '[[ -z "${staged_jar:-}" ]] || rm -f "$staged_jar"' EXIT
+
+  receive_upload "$staged_jar"
+  chmod 0600 "$staged_jar"
+  sudo -n /usr/local/sbin/recetas-backend-deploy "$release_id" "$staged_jar"
+}
+
+case "${SSH_ORIGINAL_COMMAND:-}" in
+  deploy\ *)
+    set -- ${SSH_ORIGINAL_COMMAND}
+    if [[ "$#" -ne 2 ]]; then
+      echo "usage: deploy <release-id>" >&2
+      exit 2
+    fi
+    run_deploy "$2"
+    ;;
+  rollback)
+    sudo -n /usr/local/sbin/recetas-backend-rollback
+    ;;
+  health)
+    curl -fsS --max-time 3 "$HEALTH_URL" >/dev/null
+    echo "healthy"
+    ;;
+  *)
+    echo "command not allowed" >&2
+    exit 126
+    ;;
+esac
