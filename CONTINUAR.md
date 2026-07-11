@@ -1465,6 +1465,50 @@ Plan por fases:
 
 Sprints posteriores recomendados (orden vigente de la seccion 8): vigilancia dependencias, COD-8 siguiente capa, iOS runtime (bloqueado sin macOS), dominio propio (cuando se compre), UX-14.
 
+### Sprint CI/CD y rollback backend — CERRADO (2026-07-11)
+
+- Objetivo: eliminar el deploy manual del jar backend y dejar rollback operativo en un comando.
+- Agente tecnico ejecutor: Codex. Claude Code es el agente principal del proyecto segun la regla operativa, pero no hubo herramienta directa para delegar en Claude/Gemini; no se consultaron otros agentes porque el sprint manejaba SSH, Secrets y VPS productivo. Skill usada: VibeSec-Skill como checklist manual de seguridad.
+- Decision del usuario: opcion A, CI/CD completo con GitHub Actions desplegando por SSH al VPS.
+- Implementado en repo:
+  - `.github/workflows/backend-ci-cd.yml`: en `push` a `main`, service container `postgres:18`, `mvn test`, `mvn -DskipTests package`, artifact jar y deploy automatico.
+  - `scripts/backend/deploy-backend-ci.sh`: deploy por SSH con known_hosts estricto y jar por stdin.
+  - `scripts/backend/rollback-backend.ps1` y `scripts/backend/rollback-backend.sh`: rollback remoto en un comando.
+  - `infra/backend/*`: scripts root-owned para deploy, rollback, dispatcher SSH forzado, sudoers y unit systemd con `current.jar`.
+  - `docs/backend-vps-deploy-runbook.md`: actualizado con CI/CD, rollback, releases, Secrets y riesgos.
+- Implementado en VPS:
+  - Releases versionadas en `/opt/recetas-familiares/backend/releases/<fecha>-<gitsha>.jar`.
+  - Symlink activo `/opt/recetas-familiares/backend/current.jar`; `recetas-backend.service` apunta al symlink.
+  - Release inicial desde jar legado: `20260711T085302Z-abd9030bb3f9.jar`.
+  - Usuario `recetas-deploy` con password bloqueada, shell `/bin/bash` solo para permitir comando forzado, `authorized_keys` con `restrict,command="/usr/local/sbin/recetas-backend-ssh-dispatch"`.
+  - Sudoers limitado a `/usr/local/sbin/recetas-backend-deploy *` y `/usr/local/sbin/recetas-backend-rollback`.
+  - Clave SSH dedicada generada en `herztner/recetas-backend-deploy-ed25519` (fuera de Git) y guardada como `BACKEND_DEPLOY_KEY` en GitHub Secrets. Tambien configurados `BACKEND_DEPLOY_HOST`, `BACKEND_DEPLOY_PORT`, `BACKEND_DEPLOY_USER`, `BACKEND_DEPLOY_KNOWN_HOSTS`.
+- Validacion ejecutada en esta sesion:
+  - `mvn -f backend\pom.xml test` inicialmente fallo porque `recetas_familiares_test` conservaba datos de pruebas anteriores (92 fallos por `409 Email is already registered`); se reseteo SOLO `recetas_familiares_test`.
+  - Tras reset: `mvn -f backend\pom.xml test` -> 116 tests, 0 fallos, `BUILD SUCCESS`.
+  - `mvn -f backend\pom.xml -DskipTests package` -> `BUILD SUCCESS`.
+  - Deploy de prueba por el canal restringido `recetas-deploy`: `20260711T090617Z-abd9030bb3f9.jar` -> comando 0 + health publico `200/UP`.
+  - Rollback real con `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backend\rollback-backend.ps1` -> `rolled back to 20260711T090456Z-abd9030bb3f9` + health publico `200/UP`.
+  - GitHub Actions real tras push de `88f9129`: run `29147299227`, jobs `Build and test backend` y `Deploy backend` completados con `success`.
+  - Tras Actions, `current.jar` apunta a `/opt/recetas-familiares/backend/releases/20260711T091234Z-88f91292cdcd.jar`; health publico `200/UP`; servicios `recetas-backend`, `caddy`, `postgresql@18-main` active.
+  - Retencion: 4 releases presentes, por debajo del maximo de 5.
+  - Seguridad de red verificada: Caddy en `80/443`; backend en loopback `8080`; PostgreSQL en `10.10.0.1/127.0.0.1/::1:5432`; `ufw` solo permite `5432/tcp on wg0`.
+  - Prueba negativa: `ssh recetas-deploy@167.233.213.242 id` con la clave de deploy devuelve `command not allowed` (exit 126).
+- Seguridad/VibeSec:
+  - `git check-ignore` confirma que `herztner/recetas-backend-deploy-ed25519` y `.pub` estan ignoradas.
+  - Busqueda de secretos trackeados sin claves reales; solo placeholders documentales (`DB_PASSWORD=<secret>`, `JWT_SECRET=<secret>`).
+  - `visudo -cf /etc/sudoers.d/recetas-backend-deploy` OK.
+  - El dispatcher valida `release-id`, limita upload a 200 MiB, exige jar/zip por magic bytes, staging bajo `/var/tmp/recetas-backend-deploy` y no permite shell arbitraria.
+  - El deploy cambia temporalmente `current.jar` para arrancar la candidata; si health falla, revierte al symlink anterior, reinicia y borra la candidata. No deja una release no sana como `current.jar`.
+  - `security-review` no disponible como herramienta callable en esta sesion; alternativa aplicada: VibeSec manual + pruebas negativas + revision de puertos/secretos/sudoers.
+- Archivos modificados: `.github/workflows/backend-ci-cd.yml`, `infra/backend/*`, `scripts/backend/*`, `docs/backend-vps-deploy-runbook.md`, `CONTINUAR.md`.
+- Riesgos residuales:
+  - La clave de deploy vive en GitHub Secrets; si se compromete, un atacante podria desplegar un jar malicioso. Mitigacion: usuario no-root, comando forzado, known_hosts fijado, sudoers limitado y rotacion de clave ante sospecha.
+  - `main` despliega automaticamente; si el repo empieza a aceptar contribuciones externas, activar branch protection/reviews obligatorios antes de confiar en CD directo.
+  - El hostname `sslip.io` sigue aplazado por decision del usuario; dominio propio pendiente.
+  - Flyway sigue avisando que PostgreSQL 18.4 es mas nuevo que su soporte probado.
+- Siguiente sprint recomendado (NO autorizado): vigilancia dependencias (revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, monitorizar Kotlin >= 2.4.20 estable cuando exista, PDFBox/Caddy/Flyway).
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
