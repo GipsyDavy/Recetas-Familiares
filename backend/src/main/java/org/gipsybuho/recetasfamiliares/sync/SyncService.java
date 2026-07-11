@@ -55,6 +55,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class SyncService {
 
     private static final Instant DEFAULT_SINCE = Instant.EPOCH;
+    static final int DEFAULT_PULL_LIMIT = 200;
     static final int MAX_PULL_LIMIT = 500;
 
     /** Orden total estable para paginacion por cursor de updatedAt. */
@@ -108,58 +109,8 @@ public class SyncService {
         }
         Instant effectiveSince = since == null ? DEFAULT_SINCE : since;
         Instant serverTime = Instant.now();
-        if (limit != null) {
-            return pagedPull(familyId, effectiveSince, normalizeLimit(limit), serverTime);
-        }
-        return new SyncPullResponse(
-                serverTime,
-                recipeRepository.findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
-                        .stream()
-                        .map(this::toRecipeResponse)
-                        .toList(),
-                ingredientRepository.findByRecipe_Family_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(
-                                familyId,
-                                effectiveSince
-                        )
-                        .stream()
-                        .map(this::toIngredientResponse)
-                        .toList(),
-                stepRepository.findByRecipe_Family_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
-                        .stream()
-                        .map(this::toStepResponse)
-                        .toList(),
-                stockItemRepository.findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
-                        .stream()
-                        .map(this::toStockItemResponse)
-                        .toList(),
-                menuItemRepository.findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
-                        .stream()
-                        .map(this::toMenuItemResponse)
-                        .toList(),
-                shoppingListRepository.findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
-                        .stream()
-                        .map(this::toShoppingListResponse)
-                        .toList(),
-                shoppingListItemRepository.findByShoppingList_Family_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(
-                                familyId,
-                                effectiveSince
-                        )
-                        .stream()
-                        .map(this::toShoppingListItemResponse)
-                        .toList(),
-                favoriteRecipeRepository.findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
-                        .stream()
-                        .map(this::toFavoriteRecipeResponse)
-                        .toList(),
-                familyNoteRepository.findByFamily_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
-                        .stream()
-                        .map(this::toFamilyNoteResponse)
-                        .toList(),
-                photoRepository.findByRecipe_Family_IdAndUpdatedAtAfterOrderByUpdatedAtAsc(familyId, effectiveSince)
-                        .stream()
-                        .map(this::toRecipePhotoResponse)
-                        .toList()
-        );
+        int effectiveLimit = limit == null ? DEFAULT_PULL_LIMIT : normalizeLimit(limit);
+        return pagedPull(familyId, effectiveSince, effectiveLimit, serverTime);
     }
 
     private SyncPullResponse pagedPull(String familyId, Instant since, int limit, Instant serverTime) {

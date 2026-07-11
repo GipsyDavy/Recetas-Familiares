@@ -795,6 +795,28 @@ class SyncControllerTest {
     }
 
     @Test
+    void pullWithoutLimitUsesServerDefaultPageSize() throws Exception {
+        RegisteredUser user = register("sync-default-limit@example.com", "Familia Default Limit");
+        Instant base = Instant.parse("2026-07-11T10:00:00Z");
+        for (int i = 0; i <= SyncService.DEFAULT_PULL_LIMIT; i++) {
+            MvcResult created = createRecipe(user, "Receta default limit " + i).andReturn();
+            jdbcTemplate.update(
+                    "UPDATE recipes SET updated_at = ? WHERE id = ?",
+                    Timestamp.from(base.plusSeconds(i)),
+                    read(created, "id")
+            );
+        }
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipes.length()").value(org.hamcrest.Matchers.lessThan(SyncService.DEFAULT_PULL_LIMIT + 1)))
+                .andExpect(jsonPath("$.recipes.length()").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$.hasMore").value(true))
+                .andExpect(jsonPath("$.nextSince", notNullValue()));
+    }
+
+    @Test
     void rejectsNonPositivePullLimit() throws Exception {
         RegisteredUser user = register("sync-badlimit@example.com", "Familia BadLimit");
 
