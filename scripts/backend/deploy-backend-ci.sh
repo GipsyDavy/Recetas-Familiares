@@ -52,7 +52,19 @@ ssh_opts=(
 ssh "${ssh_opts[@]}" "${BACKEND_DEPLOY_USER}@${BACKEND_DEPLOY_HOST}" "deploy ${release_id}" < "$JAR_PATH"
 
 if [[ -n "${BACKEND_HEALTH_URL:-}" ]]; then
-  curl -fsS --max-time 10 "$BACKEND_HEALTH_URL" >/dev/null
+  health_host="$(printf '%s' "$BACKEND_HEALTH_URL" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://([^/:]+).*#\1#')"
+  health_port=443
+  if [[ "$BACKEND_HEALTH_URL" == http://* ]]; then
+    health_port=80
+  fi
+
+  curl_args=(-fsS --connect-timeout 5 --max-time 15 --retry 3 --retry-delay 2 --retry-all-errors)
+  if [[ "$health_host" =~ ([0-9]{1,3}\.){3}[0-9]{1,3}\.sslip\.io$ ]]; then
+    health_ip="${BASH_REMATCH[0]%.sslip.io}"
+    curl_args+=(--resolve "${health_host}:${health_port}:${health_ip}")
+  fi
+
+  curl "${curl_args[@]}" "$BACKEND_HEALTH_URL" >/dev/null
 fi
 
 echo "release_id=${release_id}"

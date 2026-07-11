@@ -1793,6 +1793,10 @@ Revision final Claude Code (2026-07-11, misma fecha):
   - `mvn -B -f backend/pom.xml -P security-audit -DskipTests verify` -> `BUILD SUCCESS`; Dependency-Check 12.2.2 ejecuto NVD/Sonatype y genero reportes HTML/JSON.
   - `mvn -B -f backend/pom.xml test` -> `BUILD FAILURE` por entorno local: Flyway no obtiene conexion PostgreSQL porque el servidor pide password y no se proporciono (`The server requested password-based authentication, but no password was provided`). No se marca como suite verde; gate real queda en GitHub Actions con DB de CI.
   - `git diff --check` -> sin errores; solo avisos LF/CRLF de Windows.
+- CI/deploy:
+  - Commit backend `0cdeb47` fue pusheado a `main`; job `Build and test backend` de GitHub Actions paso verde.
+  - El deploy de ese run desplego en servidor (`deployed 20260711T203147Z-0cdeb47aaa6d`) y health externo desde Windows devolvio 200/`UP`, pero el job quedo rojo dos veces por timeout DNS del runner resolviendo `sslip.io` en el health check (`curl: (28) Resolving timed out`).
+  - Hotfix aplicado a `scripts/backend/deploy-backend-ci.sh`: para hosts `*.sslip.io`, el health check usa `curl --resolve host:puerto:ip` extrayendo la IP del hostname y mantiene TLS/SNI. Tambien anade connect-timeout y retry corto. Pendiente verificar el siguiente run de Actions tras push del hotfix.
 - Pendiente operativo antes de cerrar CRIT-2:
   - Push del commit backend dispara deploy automatico: verificar workflow `Backend CI/CD` verde y `/api/v1/health` 200.
   - Configurar SMTP real y secrets/env en produccion (`MAIL_ENABLED=true`, `SMTP_HOST`, credenciales, `MAIL_FROM`, `APP_PUBLIC_URL`).
