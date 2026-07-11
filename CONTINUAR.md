@@ -1711,7 +1711,27 @@ Revision final de seguridad Claude Code (2026-07-11, misma fecha, sesion de audi
 - Seguridad: VibeSec (checklist sobre el diff): sin secretos, sin logging nuevo de datos, el socket reutiliza la autenticacion JWT existente en CONNECT, el badge no expone contenido de mensajes. PASS.
 - Validaciones: Desktop `mvn test` SUCCESS; Android `assembleDebug` + `testDebugUnitTest` SUCCESS; instalador Windows regenerado tras los fixes: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe` (50,3 MB, BUILD COMPLETADO, URL de produccion embebida como default); APK con badge en `android/app/build/outputs/apk/debug/app-debug.apk`; prueba visual en vivo de los dos clientes por el usuario: "todo ok". Residual menor: la prueba en vivo se hizo con la app en modo dev (`mvn javafx:run`), mismo codigo que el instalador regenerado; smoke test del exe instalado pendiente si se quiere rigor total.
 - Sprint `Apuntar clientes a produccion`: **CERRADO para Desktop y Android**. iOS queda abierto (runtime bloqueado sin macOS, COD-1/COD-2). Riesgos residuales previos vigentes: WorkManager tras cambio de servidor sin validar manualmente; binarios Desktop antiguos ignoran pull paginado.
-- Recordatorio: los datos demo viven en produccion; borrarlos cuando dejen de ser utiles (cuentas `*@recetas.local`, familia `Los Demo`).
+- Recordatorio: los datos demo viven en produccion; borrarlos cuando dejen de ser utiles (cuentas `*@recetas.local`, familia `Los Demo`). RESUELTO: ver limpieza mas abajo.
+
+### Limpieza de datos demo + estado final de sesion (2026-07-11 noche, Claude Code)
+
+Limpieza demo en produccion:
+- Familia `Los Demo` y las 2 cuentas demo ELIMINADAS de la base de produccion via JDBC (WireGuard, transaccion unica, script fail-closed que abortaba si la familia tenia algun miembro no demo; sin ON DELETE CASCADE en el esquema, borrado en orden inverso de dependencias). Filas: 8 mensajes chat + 1 clear, 3 notas, 5 stock, 3 recetas (12 pasos, 17 ingredientes), 9 refresh tokens, 2 memberships, 2 usuarios, 1 familia. Script temporal borrado tras el uso; credenciales solo desde `herztner/recetas_app.env`, nunca impresas.
+- Verificado: login demo devuelve 401 y `/health` sigue 200 UP.
+- Nota tecnica reutilizable: no hay psql en este PC; el patron que funciona es `java -cp <ruta .m2>/postgresql-42.7.13.jar Script.java` con `DB_URL/DB_USERNAME/DB_PASSWORD` de entorno (quitar CRLF de los .env de Windows).
+
+PUNTO EXACTO DEL PROYECTO (para retomar en la proxima sesion, cualquier agente):
+- `main` limpio y pusheado; produccion desplegada, verde y validada en vivo. Ultimo estado de commits en `git log`.
+- La aplicacion ES un producto funcionando: Desktop y Android instalables conectan a `https://recetas.167.233.213.242.sslip.io/` por defecto, con URL configurable, sync completo, chat en tiempo real entre usuarios y aviso de no leidos.
+- Artefactos regenerados y vigentes: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe` (50,3 MB) y `android/app/build/outputs/apk/debug/app-debug.apk` (con badge).
+- Pendientes operativos del usuario: crear secret `NVD_API_KEY` en GitHub (workflow `dependency-audit.yml`, primer run lunes 06:00 UTC); instalar el .exe regenerado si quiere la copia final en el sistema.
+- Deuda/bloqueos vigentes: iOS runtime (COD-1/COD-2, sin macOS); chat fase 4 (video + push notifications; el aviso de no leidos actual requiere app abierta); dominio propio aplazado; WorkManager tras cambio de servidor sin validacion manual; recuperacion de password/verificacion email/borrado de cuenta (CRIT-2/IMP-6 de la auditoria 2026-07-11) siguen sin existir — el borrado demo de hoy se hizo por SQL precisamente por eso.
+
+SIGUIENTE SPRINT (fijado, NO autorizado aun): **COD-8 siguiente capa — tests e2e de sincronizacion offline Android**
+- Alcance (CONTINUAR §8, prioridad 2): `SyncWorker` y colas offline end-to-end con Room fake o DB in-memory; cubrir pull paginado con tope, push con `baseSyncVersion` (convencion COD-3: dirty = syncVersion negativo), tombstones, conflictos 409 (server gana tras pull) y reintentos de WorkManager. Desktop: tests adicionales solo si aportan valor sin fragilizar.
+- Candidato añadido por la sesion de hoy: incluir la validacion manual pendiente de WorkManager tras cambio de servidor/logout (riesgo residual del sprint de clientes).
+- Alternativa si el usuario prefiere valor de producto antes que tests: CRIT-2 de la auditoria (reset de password + verificacion de email), que es el mayor hueco para usuarios reales.
+- Apoyo IA recomendado: Codex como ejecutor tecnico (tests, build, WorkManager); no requiere Gemini salvo que se toque UX.
 
 ### Chequeo obligatorio de cierre
 
