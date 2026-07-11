@@ -87,58 +87,64 @@ No ejecutar un PITR sobre el cluster activo sin ventana de mantenimiento y copia
 4. Definir `recovery_target_time` si se busca un punto concreto.
 5. Arrancar el cluster aislado y validar recuentos/datos.
 
-## Plan Backups Offsite Cifrados
+## Backups Offsite Cifrados (implementado 2026-07-11)
 
-Estado actual: pendiente. Los backups logicos, base backups y WAL existen solo en el VPS/disco local. El siguiente sprint debe copiar estos artefactos a un destino offsite con cifrado antes de salida.
+Estado: operativo. Copia diaria cifrada de `/var/backups/recetas-postgres` (logical + base + wal) a una Hetzner Storage Box mediante `restic` sobre SFTP.
 
-Decision requerida antes de implementar: destino offsite y credenciales. Opciones validas incluyen S3 compatible, Backblaze B2, Cloudflare R2, AWS S3, Hetzner Storage Box/SFTP o un destino equivalente aportado por el usuario.
+Arquitectura:
 
-Enfoque recomendado:
+- Destino: Hetzner Storage Box (`STORAGEBOX_HOST` en `/etc/recetas-familiares/storagebox.env`), acceso SFTP puerto 22 con clave SSH dedicada `/root/.ssh/storagebox_ed25519` (auth por password ya no se usa; el puerto 23/SSH interactivo esta desactivado en la Storage Box).
+- Repositorio: `restic` (`sftp:storagebox:recetas-postgres-restic`), cifrado extremo a extremo antes de salir del VPS. Alias `storagebox` definido en `/root/.ssh/config`.
+- Secretos (solo en VPS, `0600 root:root`): `/etc/recetas-familiares/storagebox.env` y `/etc/recetas-familiares/offsite-backup.env` (`RESTIC_REPOSITORY`, `RESTIC_PASSWORD`, `RESTIC_CACHE_DIR=/var/cache/restic`).
+- Copia de emergencia de la passphrase restic: fuera del VPS, en carpeta local no versionada del usuario (`herztner/restic-offsite-passphrase.env`). Sin passphrase el repositorio offsite es irrecuperable.
 
-1. Usar `restic` como capa de cifrado/repositorio.
-2. Usar el backend nativo de `restic` o `rclone` solo como transporte si el proveedor lo requiere.
-3. Guardar secretos solo en el VPS, por ejemplo:
-
-```bash
-/etc/recetas-familiares/offsite-backup.env
-```
-
-Permisos esperados:
+Unidades:
 
 ```bash
-chown root:root /etc/recetas-familiares/offsite-backup.env
-chmod 600 /etc/recetas-familiares/offsite-backup.env
-```
-
-Servicios esperados a crear:
-
-```bash
-/usr/local/sbin/recetas-postgres-offsite-backup
+/usr/local/sbin/recetas-postgres-offsite-backup        # 0700 root
 /etc/systemd/system/recetas-postgres-offsite-backup.service
-/etc/systemd/system/recetas-postgres-offsite-backup.timer
+/etc/systemd/system/recetas-postgres-offsite-backup.timer   # diario 05:15 UTC (tras logico 03:15 y basebackup dominical 04:31)
 ```
 
-Validacion minima del sprint:
+El script hace `restic backup` (tag `scheduled`), `restic forget --keep-daily 14 --keep-weekly 5 --prune` y `restic check`. Falla cerrado: si el destino no responde, los backups locales siguen intactos.
+
+Comprobaciones:
 
 ```bash
-systemctl start recetas-postgres-offsite-backup.service
+systemctl list-timers --no-pager | grep offsite
 systemctl status recetas-postgres-offsite-backup.service --no-pager
+set -a; . /etc/recetas-familiares/offsite-backup.env; set +a
 restic snapshots
 restic check
 ```
 
-Restore offsite minimo:
+Restore offsite (probado 2026-07-11):
 
-1. Restaurar desde el repositorio offsite a un directorio temporal aislado.
-2. Comprobar que aparecen `logical/`, `base/` y `wal/`.
-3. Ejecutar `pg_restore --list` contra el dump logico mas reciente restaurado.
-4. Si es viable, restaurar el dump en una DB aislada y comparar recuentos basicos (`flyway_schema_history`, `users`, `families`, `family_members`, `chat_messages`).
-5. Eliminar la DB/directorio temporal al terminar.
+```bash
+set -a; . /etc/recetas-familiares/offsite-backup.env; set +a
+RESTORE_DIR=$(mktemp -d /root/offsite-restore-check-XXXX)
+restic restore latest --target "$RESTORE_DIR"
+# aparecen logical/, base/ y wal/ bajo $RESTORE_DIR/var/backups/recetas-postgres
+LATEST=$(find "$RESTORE_DIR/var/backups/recetas-postgres/logical" -name '*.dump' | sort | tail -1)
+cp "$LATEST" /tmp/offsite_check.dump && chown postgres:postgres /tmp/offsite_check.dump
+sudo -u postgres createdb -O recetas_app recetas_familiares_offsite_check
+sudo -u postgres pg_restore --dbname=recetas_familiares_offsite_check --no-owner --no-acl /tmp/offsite_check.dump
+# comparar recuentos con prod (flyway_schema_history, users, families, family_members, chat_messages)
+sudo -u postgres dropdb recetas_familiares_offsite_check
+rm -rf "$RESTORE_DIR" /tmp/offsite_check.dump
+```
+
+Nota: `pg_restore` no puede leer dumps dentro de `/root` (permisos); copiar antes a `/tmp` con owner `postgres`.
+
+Rotacion de credenciales offsite:
+
+- Clave SSH: generar nueva con `ssh-keygen -t ed25519`, subir `authorized_keys` actualizado por SFTP (puerto 22) y borrar la anterior.
+- Passphrase restic: no rotar a la ligera; requiere `restic key add`/`remove` y actualizar `/etc/recetas-familiares/offsite-backup.env` y la copia local del usuario.
 
 Reglas de seguridad:
 
 - No imprimir secretos en terminal compartida, logs ni documentacion.
-- No subir secretos a Git.
+- No subir secretos a Git (`herztner/` sigue fuera del repo).
 - No abrir `5432/tcp` a internet para resolver backups.
 - Fallar cerrado si el destino offsite no esta disponible; mantener backups locales funcionando.
 
@@ -159,7 +165,8 @@ PGPASSWORD='<nueva-clave>' psql -h 10.10.0.1 -U recetas_app -d recetas_familiare
 
 ## Riesgos Residuales
 
-- Los backups estan en el mismo VPS/disco. Falta copia offsite cifrada para cubrir perdida total del servidor.
 - El PITR esta configurado a nivel de base backup + WAL, pero falta ensayo completo en cluster aislado.
+- La copia offsite depende de una unica Storage Box; si Hetzner pierde VPS y Storage Box a la vez (misma cuenta/proveedor), no hay tercera copia.
+- La passphrase restic tiene una unica copia fuera del VPS (carpeta local del usuario); si se pierden ambas, el repositorio offsite es irrecuperable.
 - El backend ya esta desplegado en VPS/API publica HTTPS temporal; falta dominio propio estable y estrategia de rollback/CI-CD.
 - Flyway 11.7.2 avisa que PostgreSQL 18.4 es mas nuevo que su soporte probado actual.

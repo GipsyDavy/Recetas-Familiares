@@ -338,22 +338,21 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
-Estado actualizado el 2026-07-10:
+Estado actualizado el 2026-07-11:
 - Chat imagenes UX ya esta implementado, validado visualmente Desktop<->Android, integrado y publicado en `main`.
 - PostgreSQL en Hetzner, migracion de datos, operacion base de backups locales y backend/API publica HTTPS temporal quedaron integrados en `main` desde `feat/migracion-postgresql`.
-- El riesgo critico vivo ya no es producto/chat, sino operacion de datos: backups de PostgreSQL sin copia offsite cifrada.
+- Backups offsite cifrados PostgreSQL: CERRADO 2026-07-11 (restic -> Hetzner Storage Box, restore validado). Ver trazabilidad y `docs/postgres-operacion-runbook.md`.
 - Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
 Prioridad propuesta para el siguiente sprint no autorizado:
 
-1. Backups offsite cifrados PostgreSQL: copiar fuera del VPS los backups logicos, base backups y WAL necesarios, con cifrado antes de subida, verificacion de integridad y documentacion de restore.
-2. Ensayo PITR completo en cluster aislado: validar recuperacion real a punto en el tiempo sin tocar el cluster activo.
-3. Dominio propio/API estable: sustituir `sslip.io`, ajustar Caddy/CORS/WS/origenes y documentar rotacion.
-4. CI/CD y rollback backend: automatizar build/test/deploy del jar y conservar artefactos versionados para rollback operativo.
-5. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista y monitorizar PDFBox/Caddy/Flyway.
-6. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
-7. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
-8. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
+1. Ensayo PITR completo en cluster aislado: validar recuperacion real a punto en el tiempo sin tocar el cluster activo.
+2. Dominio propio/API estable: sustituir `sslip.io`, ajustar Caddy/CORS/WS/origenes y documentar rotacion.
+3. CI/CD y rollback backend: automatizar build/test/deploy del jar y conservar artefactos versionados para rollback operativo.
+4. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista y monitorizar PDFBox/Caddy/Flyway.
+5. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
+6. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+7. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
    - Desktop: ayuda contextual en TODOS los modulos, dialogos y formularios (crear/editar receta, stock, menu, compra, notas, miembros, exportaciones, busqueda global, diagnostico), cada pestaña de Ajustes, modo cocina y onboarding; tooltips en todos los controles sin label visible (formato `Accion (Ctrl+X)`, delay 400ms); foco y orden de tabulacion documentados en formularios.
    - Android: sistema de ayuda equivalente (pantalla o bottom sheet de ayuda por seccion, accesible desde TopAppBar), con `contentDescription` completo y ayuda del modo cocina/manos libres.
    - iOS: mismo patron cuando el runtime este desbloqueado (COD-1/COD-2).
@@ -1368,6 +1367,32 @@ Sprints posteriores recomendados:
 3. CI/CD y rollback automatizado del backend.
 4. Auditoria dependencias/OWASP y actualizacion Flyway cuando soporte PostgreSQL 18.x oficialmente.
 5. Tests UI automatizados Compose/JavaFX para flujos criticos.
+
+### Sprint Backups offsite cifrados PostgreSQL — CERRADO (2026-07-11)
+
+- Objetivo: eliminar el riesgo critico de perdida total de datos copiando los backups PostgreSQL fuera del VPS con cifrado antes de salida y restore verificado.
+- Agente lider: Claude Code en solitario. Codex/Gemini no aplican: sprint de infraestructura con secretos operativos y SSH directo al VPS (criterio ya documentado en el cierre 2026-07-10).
+- Destino elegido por el usuario: Hetzner Storage Box (`u630198`). Credenciales aportadas via `herztner/storagebox.env` (fuera de Git).
+- Implementado en el VPS:
+  - restic 0.18.1 (repo Ubuntu) + sshpass (solo para el bootstrap de la clave).
+  - Clave SSH dedicada `/root/.ssh/storagebox_ed25519`; `authorized_keys` subido por SFTP puerto 22 (el puerto 23/SSH de la Storage Box esta desactivado; no hizo falta activarlo). Auth por password ya no se usa tras el bootstrap.
+  - Alias `storagebox` en `/root/.ssh/config`; repositorio restic cifrado `sftp:storagebox:recetas-postgres-restic` (id `0f2acf7603`).
+  - Secretos `0600 root:root`: `/etc/recetas-familiares/storagebox.env` y `/etc/recetas-familiares/offsite-backup.env` (passphrase restic generada en el VPS).
+  - `/usr/local/sbin/recetas-postgres-offsite-backup` (0700): backup tag `scheduled` + `forget --keep-daily 14 --keep-weekly 5 --prune` + `check`. Falla cerrado.
+  - `recetas-postgres-offsite-backup.service` + `.timer` (diario 05:15 UTC, tras logico 03:15 y basebackup dominical 04:31; `Persistent=true`), timer `enabled` y activo.
+  - Copia de emergencia de la passphrase restic guardada fuera del VPS en `herztner/restic-offsite-passphrase.env` (verificado que Git la ignora).
+- Validacion ejecutada (2026-07-11):
+  - Preflight: servicios `postgresql@18-main`/`recetas-backend`/`caddy` active; WireGuard operativo (la unit `wg-quick@wg0` estaba `failed` por un restart viejo `wg0 already exists`; tunel vivo, `reset-failed` aplicado, unit `enabled`); `pg_stat_archiver` failed_count=0; backups locales presentes; 34G libres.
+  - Ejecucion manual del service -> OK en ~5s; `restic snapshots` muestra snapshot `ec451073` (69.7 MiB); `restic check` sin errores.
+  - Restore offsite: `restic restore latest` a directorio aislado -> `logical/`, `base/`, `wal/` presentes; dump mas reciente restaurado en DB aislada `recetas_familiares_offsite_check`; recuentos identicos a produccion (flyway=15, users=2, families=1, family_members=2, chat_messages=3); DB y temporales eliminados.
+  - Nota operativa: `pg_restore --list` fallo dentro de `/root` por permisos del usuario postgres; el restore completo desde `/tmp` valida el dump. Documentado en runbook.
+- Seguridad ejecutada: skill VibeSec invocada en sesion como checklist; verificado: secretos `0600`/`0700` root-only, logs journald sin passwords/passphrases, temporales de bootstrap borrados, `5432` solo WireGuard/loopback y `8080` solo loopback (sin cambios), arbol Git limpio y `herztner/*` ignorado. `security-review`/Dependency-Check no aplican: sin cambios de codigo de aplicacion ni dependencias.
+- Archivos modificados en repo: `docs/postgres-operacion-runbook.md`, `CONTINUAR.md`. Resto del trabajo es configuracion en VPS/Storage Box.
+- Riesgos residuales:
+  - VPS y Storage Box comparten proveedor/cuenta Hetzner; no hay tercera copia en proveedor independiente.
+  - Passphrase restic con una unica copia fuera del VPS (`herztner/`); perderla junto al VPS hace irrecuperable el repositorio offsite.
+  - PITR completo sigue sin ensayar en cluster aislado (siguiente sprint recomendado).
+  - Restore offsite validado con volumen pequeño actual; revalidar cuando el volumen crezca.
 
 ### Chequeo obligatorio de cierre
 
