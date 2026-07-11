@@ -1674,10 +1674,10 @@ Punto exacto del proyecto tras la auditoria multiagente y los fixes de alcance (
   - Busqueda de hardcodes cliente `http://localhost:8080` / `http://10.0.2.2:8080` en fuentes cliente -> sin matches fuera de tests/config backend no tocada.
   - Push a `main` hasta `30381c7` -> workflow `Backend CI/CD` run `29160918726`: `Build and test backend` success, `Deploy backend` success. Health publico posterior: HTTP 200 `{"status":"UP","checkedAt":"2026-07-11T17:07:08.697120286Z"}`.
 - Pendientes obligatorios antes de marcar cierre funcional:
-  - Prueba real Desktop instalado contra Hetzner: login + sync + chat. No ejecutada en esta sesion.
-  - Prueba real APK en emulador o movil contra Hetzner: login + sync + chat. No ejecutada en esta sesion.
-  - iOS runtime en macOS/dispositivo. Bloqueado en Windows; solo se compilaron targets Kotlin.
-  - Revision final de seguridad por Claude Code/VibeSec-security-review, segun lo pedido por el usuario.
+  - Prueba real Desktop instalado contra Hetzner: login + sync + chat. EJECUTADA 2026-07-11 noche (ver entrada de cierre mas abajo). VALIDADA.
+  - Prueba real APK en emulador contra Hetzner: login + sync + chat. EJECUTADA 2026-07-11 noche. VALIDADA.
+  - iOS runtime en macOS/dispositivo. Bloqueado en Windows; solo se compilaron targets Kotlin. SIGUE ABIERTO (COD-1/COD-2).
+  - Revision final de seguridad por Claude Code/VibeSec-security-review: EJECUTADA (PASS, ver entrada anterior).
 - Riesgos residuales:
   - La URL configurable es una frontera de confianza: la validacion bloquea esquemas peligrosos, credenciales embebidas y `http` no-dev, pero no puede distinguir un servidor HTTPS malicioso elegido por el usuario.
   - Al cambiar servidor estando logado, Desktop/Android/iOS fuerzan salida/cierre de sesion para no reutilizar tokens en otro origen; queda pendiente prueba manual de esa UX.
@@ -1691,6 +1691,27 @@ Revision final de seguridad Claude Code (2026-07-11, misma fecha, sesion de audi
 - Veredicto: PASS sobre lo revisado. Alcance de la revision: los archivos de seguridad critica al 100%; el resto del diff (UI, wiring) por muestreo.
 - Riesgo señalado adicional: binarios ANTIGUOS de Desktop (v1.1 previa) contra el backend nuevo ahora reciben pull paginado (200 filas + hasMore que ignoran) en vez de delta completo: sync silenciosamente parcial si una entidad supera 200 filas pendientes. A escala familiar es improbable; se mitiga instalando el instalador regenerado.
 - El sprint sigue ABIERTO hasta las pruebas manuales del usuario (Desktop instalado y APK contra Hetzner: login + sync + chat).
+
+### Cierre del sprint clientes a produccion - pruebas reales + fixes + badge chat (2026-07-11 noche, Claude Code)
+
+- Pruebas manuales guiadas con el usuario contra Hetzner (backend real, familia demo `Los Demo` con 2 usuarios, 3 recetas completas, 5 items de stock con caducidades y 3 notas creados via API):
+  - Desktop: login OK, URL de produccion por defecto OK, recetas con ingredientes/pasos OK, stock con avisos de caducidad OK, notas OK, chat en tiempo real OK.
+  - Android (emulador Pixel 9 Pro, API 36): login OK, sync completo OK, chat cruzado en vivo Desktop<->Android con dos usuarios distintos VALIDADO en ambas direcciones (wss).
+  - Cuentas demo en produccion: `demo.familia@recetas.local` (OWNER) y `demo.abuela@recetas.local` (MEMBER), familia `Los Demo`.
+- Incidencia Android diagnosticada y resuelta SIN tocar codigo: `CertPathValidatorException: Trust anchor not found` en el emulador. Causa raiz: **Avast intercepta el TLS del equipo** y re-firma con su CA (visible via openssl: emisor `Avast Web/Mail Shield`); Windows/Java confian en esa CA pero el emulador no. Solucion: excepcion en Avast para `recetas.167.233.213.242.sslip.io`. Ese MITM de Avast tambien explica los fallos TLS (exit 35) del curl de git-bash en esta maquina.
+- Bugs PREEXISTENTES de Desktop destapados por la primera prueba con datos reales y corregidos (`2d97a15`):
+  - 5 DTOs de pagina en `SyncDtos.java` con formato Spring (`content`/`totalElements`/`number`) en vez del contrato `PageResponse` (`items`/`totalItems`/`page`): notas, favoritos, menus, listas de compra e items deserializaban a null y las vistas quedaban vacias sin error. `RecipePageResponse` ya era correcto (por eso recetas funcionaba).
+  - `StockRepository.load()` esperaba array crudo -> excepcion en el widget "proximo a caducar" del dashboard; la vista de stock lo enmascaraba con la cache de sync.
+  - 3 peticiones con `size=200` frente al `@Max(100)` del backend -> 400 silencioso.
+- Funcionalidad nueva pedida por el usuario e implementada: aviso de mensajes de chat no leidos (`1f52ddb` Desktop, `0b6fff3` Android).
+  - Desktop: conexion WS viva desde el login; contador `(N)`/`9+` en el boton de la sidebar; se limpia al abrir el chat; se cierra en logout.
+  - Android: socket de badge app-scoped mientras hay sesion; `Badge` Material 3 en el icono de chat de la TopAppBar con contentDescription accesible; ids vistos no re-cuentan (ediciones/reconexiones); limpieza al abrir chat; cierre en logout/cambio de servidor.
+  - Validado en vivo por el usuario en ambas direcciones: mensaje con chat oculto -> numerito; abrir chat -> se limpia.
+  - Limitacion documentada: el aviso requiere app abierta (WebSocket); notificaciones push con app cerrada = fase 4 del chat.
+- Seguridad: VibeSec (checklist sobre el diff): sin secretos, sin logging nuevo de datos, el socket reutiliza la autenticacion JWT existente en CONNECT, el badge no expone contenido de mensajes. PASS.
+- Validaciones: Desktop `mvn test` SUCCESS; Android `assembleDebug` + `testDebugUnitTest` SUCCESS; instalador Windows regenerado tras los fixes: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe` (50,3 MB, BUILD COMPLETADO, URL de produccion embebida como default); APK con badge en `android/app/build/outputs/apk/debug/app-debug.apk`; prueba visual en vivo de los dos clientes por el usuario: "todo ok". Residual menor: la prueba en vivo se hizo con la app en modo dev (`mvn javafx:run`), mismo codigo que el instalador regenerado; smoke test del exe instalado pendiente si se quiere rigor total.
+- Sprint `Apuntar clientes a produccion`: **CERRADO para Desktop y Android**. iOS queda abierto (runtime bloqueado sin macOS, COD-1/COD-2). Riesgos residuales previos vigentes: WorkManager tras cambio de servidor sin validar manualmente; binarios Desktop antiguos ignoran pull paginado.
+- Recordatorio: los datos demo viven en produccion; borrarlos cuando dejen de ser utiles (cuentas `*@recetas.local`, familia `Los Demo`).
 
 ### Chequeo obligatorio de cierre
 
