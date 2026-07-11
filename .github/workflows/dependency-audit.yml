@@ -1,0 +1,72 @@
+name: Dependency Audit
+
+# Auditoria semanal de dependencias con OWASP Dependency-Check (perfil
+# security-audit de backend y desktop). No bloquea deploys: es un job
+# independiente del pipeline CI/CD. Requiere el secret NVD_API_KEY.
+# OSS Index corre anonimo en CI (las credenciales Sonatype solo existen
+# en el settings.xml local); la cobertura NVD/CISA no depende de ello.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Dependency-Check backend
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn -B -f backend/pom.xml -P security-audit -DskipTests verify
+
+      - name: Upload backend report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-backend
+          path: backend/target/dependency-check-report.*
+          if-no-files-found: warn
+          retention-days: 30
+
+  desktop:
+    name: Desktop dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Dependency-Check desktop
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn -B -f desktop/pom.xml -P security-audit -DskipTests verify
+
+      - name: Upload desktop report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-desktop
+          path: desktop/target/dependency-check-report.*
+          if-no-files-found: warn
+          retention-days: 30
