@@ -59,6 +59,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncRecipePushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncShoppingListItemPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStepPushItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncStockItemPushItemDto
+import retrofit2.HttpException
 
 /*
  * Convencion de sincronizacion offline (COD-3):
@@ -328,12 +329,16 @@ class SyncRepository(
     private val sessionStore: SessionStore
 ) {
     suspend fun pullOnce() {
+        pullOnce(protectPending = true)
+    }
+
+    private suspend fun pullOnce(protectPending: Boolean) {
         val familyId = sessionStore.familyId ?: return
         var since = sessionStore.lastSyncTime
         var pages = 0
         while (true) {
             val response = api.pullSync(familyId, since, PULL_PAGE_SIZE)
-            applyPullPage(response)
+            applyPullPage(response, protectPending)
             val hasNextPage = response.hasMore == true && response.nextSince != null
             if (!hasNextPage) {
                 // lastSyncTime solo avanza al completar el pull: si se interrumpe,
@@ -349,14 +354,14 @@ class SyncRepository(
         }
     }
 
-    private suspend fun applyPullPage(response: SyncPullDto) {
-        val pendingRecipeIds = database.recipeDao().findPendingIds().toSet()
-        val pendingIngredientIds = database.recipeIngredientDao().findPendingIds().toSet()
-        val pendingStepIds = database.recipeStepDao().findPendingIds().toSet()
-        val pendingStockIds = database.stockDao().findPendingIds().toSet()
-        val pendingShoppingItemIds = database.shoppingListItemDao().findPendingIds().toSet()
-        val pendingFavoriteIds = database.favoriteRecipeDao().findPendingIds().toSet()
-        val pendingNoteIds = database.familyNoteDao().findPendingIds().toSet()
+    private suspend fun applyPullPage(response: SyncPullDto, protectPending: Boolean) {
+        val pendingRecipeIds = if (protectPending) database.recipeDao().findPendingIds().toSet() else emptySet()
+        val pendingIngredientIds = if (protectPending) database.recipeIngredientDao().findPendingIds().toSet() else emptySet()
+        val pendingStepIds = if (protectPending) database.recipeStepDao().findPendingIds().toSet() else emptySet()
+        val pendingStockIds = if (protectPending) database.stockDao().findPendingIds().toSet() else emptySet()
+        val pendingShoppingItemIds = if (protectPending) database.shoppingListItemDao().findPendingIds().toSet() else emptySet()
+        val pendingFavoriteIds = if (protectPending) database.favoriteRecipeDao().findPendingIds().toSet() else emptySet()
+        val pendingNoteIds = if (protectPending) database.familyNoteDao().findPendingIds().toSet() else emptySet()
 
         database.recipeDao().upsertAll(
             response.recipes.orEmpty().withoutPendingIds(pendingRecipeIds) { it.id }.map { it.toEntity() }
@@ -465,7 +470,19 @@ class SyncRepository(
             familyNotes = notePushItems.ifEmpty { null }
         )
 
-        val response = api.pushSync(familyId, pushRequest)
+        val response = try {
+            api.pushSync(familyId, pushRequest)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: HttpException) {
+            if (e.code() == 409) {
+                // Conflicto de lote completo: descartar la version local pendiente
+                // y traer la version canonical del servidor.
+                pullOnce(protectPending = false)
+                return
+            }
+            throw e
+        }
 
         // La respuesta de push solo contiene ACKs de lo empujado, no los cambios de otros
         // miembros: aplicar upserts SIN avanzar lastSyncTime y traer el resto con pullOnce().
