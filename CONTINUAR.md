@@ -1762,6 +1762,19 @@ Revision final Claude Code (2026-07-11, misma fecha):
 - Seguridad (VibeSec checklist sobre el diff): sin secretos, sin logging nuevo, sin cambio de superficie de red ni de ownership; el overwrite de conflicto queda acotado al `familyId` de la sesion. PASS.
 - **Sprint COD-8 (capa SyncWorker/colas offline Android): CERRADO.** Riesgos residuales: los listados por Codex (fakes en vez de Room real; sin prueba instrumentada del scheduler). COD-8 global sigue parcial: faltan tests UI/instrumentados e iOS.
 
+### Hotfix CI Dependency Audit Desktop - 2026-07-11 noche (Codex)
+
+- Contexto: el workflow `Dependency Audit` ya tenia `NVD_API_KEY` configurado en GitHub, pero el job `dependency-check desktop` fallaba antes de ejecutar OWASP al resolver plugins Maven con `java.security.NoSuchAlgorithmException: Error constructing implementation (algorithm: Default, provider: SunJSSE, class: sun.security.ssl.SSLContextImpl$DefaultSSLContext)`.
+- Causa raiz: `desktop/.mvn/jvm.config` estaba versionado con `-Djavax.net.ssl.trustStoreType=Windows-ROOT -Djavax.net.ssl.trustStore=NUL`. Ese ajuste ayuda a Maven en algunos entornos Windows, pero lo lee tambien `mvn -f desktop/pom.xml` en Ubuntu GitHub Actions y rompe el `DefaultSSLContext` antes de descargar dependencias.
+- Cambio aplicado: eliminado `desktop/.mvn/jvm.config` del repo. El instalador/runtime Windows conserva sus opciones especificas en `desktop/build-installer.ps1`; solo se quita la configuracion global de arranque de Maven versionada.
+- Validacion ejecutada en Windows tras retirar el archivo:
+  - `mvn -B -f desktop/pom.xml -DskipTests compile` -> `BUILD SUCCESS`.
+  - `mvn -B -f desktop/pom.xml -P security-audit -DskipTests verify` -> `BUILD SUCCESS`; Dependency-Check 12.2.2 ejecuto NVD y Sonatype OSS Index y genero reportes HTML/JSON.
+  - `git diff --check --cached` -> sin errores.
+- Seguridad: VibeSec-Skill usado como checklist por tratarse del pipeline de auditoria de dependencias; sin secretos versionados, sin logging nuevo, sin cambios de auth/ownership/API/backend.
+- Impacto operativo: no se tocaron `backend/**`, `infra/backend/**`, `scripts/backend/**` ni `.github/workflows/backend-ci-cd.yml`; no deberia disparar deploy automatico de backend. Si un entorno Windows local vuelve a necesitar `Windows-ROOT`, configurarlo fuera del repo via `MAVEN_OPTS` o perfil local de IDE.
+- Pendiente tras push: lanzar o revisar el workflow manual `Dependency Audit` en GitHub y confirmar que el job `dependency-check desktop` pasa en Ubuntu.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
