@@ -1796,9 +1796,9 @@ Revision final Claude Code (2026-07-11, misma fecha):
 - CI/deploy:
   - Commit backend `0cdeb47` fue pusheado a `main`; job `Build and test backend` de GitHub Actions paso verde.
   - El deploy de ese run desplego en servidor (`deployed 20260711T203147Z-0cdeb47aaa6d`) y health externo desde Windows devolvio 200/`UP`, pero el job quedo rojo dos veces por timeout DNS del runner resolviendo `sslip.io` en el health check (`curl: (28) Resolving timed out`).
-  - Hotfix aplicado a `scripts/backend/deploy-backend-ci.sh`: para hosts `*.sslip.io`, el health check usa `curl --resolve host:puerto:ip` extrayendo la IP del hostname y mantiene TLS/SNI. Tambien anade connect-timeout y retry corto. Pendiente verificar el siguiente run de Actions tras push del hotfix.
+  - Hotfix `a7296e5 fix(ci): estabilizar health check backend sslip`: para hosts `*.sslip.io`, el health check usa `curl --resolve host:puerto:ip` extrayendo la IP del hostname y mantiene TLS/SNI. Tambien anade connect-timeout y retry corto.
+  - Verificacion tras hotfix: `Backend CI/CD` run `29167339404` sobre `a7296e5` -> `success`; jobs `Build and test backend` y `Deploy backend` success; health externo `https://recetas.167.233.213.242.sslip.io/api/v1/health` -> 200 `UP` (`checkedAt` 2026-07-11T20:39:22Z).
 - Pendiente operativo antes de cerrar CRIT-2:
-  - Push del commit backend dispara deploy automatico: verificar workflow `Backend CI/CD` verde y `/api/v1/health` 200.
   - Configurar SMTP real y secrets/env en produccion (`MAIL_ENABLED=true`, `SMTP_HOST`, credenciales, `MAIL_FROM`, `APP_PUBLIC_URL`).
   - Implementar pantallas/flujo cliente: pedir reset, introducir token/nueva password, reenviar/verificar email, borrar cuenta desde perfil con confirmacion.
   - Decidir politica de producto: si `email_verified=false` solo se informa o si en un sprint futuro se restringen acciones.
