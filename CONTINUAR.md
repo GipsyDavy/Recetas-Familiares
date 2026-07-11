@@ -1733,6 +1733,28 @@ SIGUIENTE SPRINT (fijado, NO autorizado aun): **COD-8 siguiente capa — tests e
 - Alternativa si el usuario prefiere valor de producto antes que tests: CRIT-2 de la auditoria (reset de password + verificacion de email), que es el mayor hueco para usuarios reales.
 - Apoyo IA recomendado: Codex como ejecutor tecnico (tests, build, WorkManager); no requiere Gemini salvo que se toque UX.
 
+### Sprint COD-8 sync offline Android e2e - ejecucion Codex (2026-07-11)
+
+- Objetivo: ampliar COD-8 con tests e2e/fakes de `SyncRepository`/`SyncWorkerRunner` y colas offline Android, sin tocar backend ni contratos API.
+- Contexto leido en la sesion: `CONTINUAR.md` secciones 7 Android, 8 prioridad 2 y 10 entradas 2026-07-11; `CLAUDE.md`; archivos Android implicados (`Repositories.kt`, `SyncWorker.kt`, DAOs/entidades, DTOs y tests existentes). Skill usada: VibeSec-Skill como checklist manual por tocar sync offline/soft delete/datos familiares. `security-review` final queda para Claude Code segun el reparto indicado por el usuario.
+- Bug real encontrado y corregido en commit separado:
+  - `cf8abed fix(android): resolver conflicto sync 409 con pull`
+  - Causa: `SyncRepository.pushThenPull()` propagaba `HttpException 409` de `pushSync`; WorkManager terminaba en retry y no ejecutaba pull, asi que el servidor no podia ganar el conflicto de lote completo.
+  - Fix: en 409 de push, ejecutar `pullOnce(protectPending=false)` para traer la version canonical del servidor y sobrescribir los pendientes locales conflictivos. `CancellationException` sigue relanzandose.
+- Tests/fakes anadidos:
+  - `4a42fb6 test(android): cubrir sync offline e2e`
+  - Nuevo `SyncRepositoryE2eTest` con fake stateful de DAOs sobre mapas en memoria y API mockeada. Cubre: pull paginado `limit=200`, tope 50 paginas sin avanzar cursor, colas offline COD-3 (`syncVersion=0`, negativos con base), tombstones, borrado local de entidades creadas offline, 409 con servidor ganador tras pull, `CancellationException` relanzada y worker tras logout/cambio de servidor (`familyId=null`) sin push/pull ni crash.
+- Validacion ejecutada:
+  - Primer intento dirigido `.\gradlew testDebugUnitTest --tests "org.gipsybuho.recetasfamiliares.data.repository.SyncRepositoryE2eTest"` -> `BUILD FAILED`, 6 tests, 1 fallo esperado: el test de 409 recibia `retrofit2.HttpException` porque produccion no hacia pull. Este fallo justifico el bugfix de produccion separado.
+  - Tras el fix: el mismo comando dirigido -> `BUILD SUCCESSFUL`.
+  - Android `.\gradlew test` -> `BUILD SUCCESSFUL`; reportes `testDebugUnitTest`: 37 tests, 0 failures, 0 errors, 0 skipped.
+  - Android `.\gradlew assembleDebug` -> `BUILD SUCCESSFUL`; APK regenerado `android/app/build/outputs/apk/debug/app-debug.apk` (23.947.973 bytes).
+  - `git diff --check` -> sin errores; solo avisos LF/CRLF de Windows.
+- Riesgos residuales:
+  - Los tests usan fakes stateful de DAOs, no `Room.inMemoryDatabaseBuilder`; no se anadieron Robolectric/room-testing para evitar dependencias de test nuevas. Cubren la logica del repositorio real, pero no validan SQL generado ni scheduler real de WorkManager.
+  - La validacion de WorkManager tras logout/cambio de servidor es de runner/repositorio (`familyId=null` -> success sin llamadas API), no prueba instrumentada del scheduler Android.
+  - No se tocaron Desktop/iOS/backend en este sprint. iOS runtime y tests UI automatizados siguen como deuda.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
