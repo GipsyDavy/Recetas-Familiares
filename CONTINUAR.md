@@ -1567,6 +1567,35 @@ Actualizacion posterior (2026-07-11): el usuario fijo como siguiente sprint `Apu
   - Resultado: credencial no valida para OSS Index/Guide API en esta sesion. No se modificaron POMs porque versionar el token es inseguro y la configuracion dejaria rojo Dependency-Check; se mantiene NVD/CISA + analizadores locales. El token fue pegado en chat y debe considerarse expuesto: rotar/revocar en Sonatype si procede.
 - Siguiente sprint: si se aportan credenciales, configurar el analyzer preferentemente via Maven `settings.xml`/`ossIndexServerId` o variables de entorno seguras, ejecutar `mvn -f backend\pom.xml -DskipTests verify -P security-audit` y `mvn -f desktop\pom.xml -DskipTests verify -P security-audit`, comprobar en logs/reportes que OSS Index no queda deshabilitado, y mantener sin imprimir secretos. Si no hay credenciales, dejar explicitamente la auditoria como NVD/CISA + analizadores locales.
 
+### Sonatype OSS Index habilitado - Dependency-Check (2026-07-11)
+
+- Objetivo: habilitar Sonatype OSS Index/Guide en OWASP Dependency-Check sin versionar secretos.
+- Configuracion local fuera de Git:
+  - `~/.m2/settings.xml` actualizado con `<server><id>ossindex</id>...</server>`.
+  - Backup local creado antes de editar `settings.xml`.
+  - No se imprimio ni versiono el PAT; busqueda en repo solo encuentra el id `ossindex`, no el token.
+- Cambios versionados:
+  - `backend/pom.xml` y `desktop/pom.xml`: `dependency-check-maven` 12.2.2 mantiene NVD y anade `ossIndexServerId=ossindex`.
+  - `backend/pom.xml`: `logback.version=1.5.38` para cerrar CVE-2026-13006 detectada por OSS Index en `logback-core:1.5.34`.
+  - `backend/owasp-suppressions.xml`: suppression exacta y caducada el 2026-10-01 para `org.springframework.security:spring-security-web:6.5.11` / CVE-2026-47838. Justificacion: la app usa JWT, no X.509/client certificates ni `SubjectDnX509PrincipalExtractor`; Maven Central no tiene 6.5.x posterior a 6.5.11 y 7.x es salto mayor no compatible como cambio quirurgico de Boot 3.5.
+  - `desktop/pom.xml`: `gson.version=2.14.0` para cerrar CVE-2025-53864 detectada por OSS Index en `gson:2.10.1`.
+  - `desktop/dependency-reduced-pom.xml`: actualizado por Maven para reflejar `ossIndexServerId` y Gson 2.14.0.
+- Validacion ejecutada:
+  - `mvn -f backend\pom.xml org.owasp:dependency-check-maven:check -DossIndexServerId=ossindex -DskipTests` -> OSS Index usado sin `401`, `BUILD SUCCESS`; antes de correcciones detecto Logback y Spring Security.
+  - `mvn -f backend\pom.xml -DskipTests verify -P security-audit` -> `BUILD SUCCESS`; OSS Index activo; reporte final backend `vulnerableDeps=0`.
+  - `mvn -f desktop\pom.xml -DskipTests verify -P security-audit` -> `BUILD SUCCESS`; OSS Index activo; reporte final desktop `vulnerableDeps=0`, `suppressed=3` (Kotlin/PDFBox ya documentados).
+  - `mvn -f desktop\pom.xml test` -> 14 tests, 0 fallos.
+  - `mvn -f backend\pom.xml test` fallo inicialmente por DB de test sucia (92 fallos `409 Email is already registered`); se recreo SOLO `recetas_familiares_test`.
+  - Tras reset de test DB: `mvn -f backend\pom.xml test` -> 116 tests, 0 fallos, `BUILD SUCCESS`.
+- Seguridad/VibeSec:
+  - VibeSec usado como checklist manual por tocar dependencias/security-audit y manejo de credenciales locales.
+  - No se pusieron credenciales en POM ni en archivos versionables; `settings.xml` queda local en la maquina del usuario.
+  - `security-review` no disponible como herramienta callable; validacion alternativa: Dependency-Check con NVD + OSS Index + revision manual de alcance de CVE X.509.
+- Riesgos residuales:
+  - La credencial OSS Index ahora vive en `~/.m2/settings.xml`; proteger ese archivo y rotar el PAT si se expone.
+  - La suppression Spring Security debe revisarse antes de 2026-10-01 o cuando exista fix compatible con Spring Boot 3.5 / Spring Security 6.5.x.
+  - Flyway/PostgreSQL 18 y suppressions Desktop Kotlin/PDFBox quedan como riesgos ya documentados.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
