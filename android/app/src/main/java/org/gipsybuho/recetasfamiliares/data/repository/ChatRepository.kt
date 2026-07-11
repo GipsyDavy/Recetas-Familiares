@@ -26,15 +26,12 @@ class ChatRepository(
     private val api: RecetasApi,
     private val httpClient: OkHttpClient,
     private val sessionStore: SessionStore,
-    private val baseUrl: String,
+    private val baseUrlProvider: () -> String,
     private val gson: Gson = Gson()
 ) {
 
     val familyId: String? get() = sessionStore.familyId
     val myUserId: String? get() = sessionStore.userId
-
-    // Origen del API tal como lo ve este cliente (emulador: 10.0.2.2, dispositivo: IP LAN).
-    private val apiOrigin = baseUrl.trimEnd('/')
 
     suspend fun loadHistory(before: String? = null, limit: Int = PAGE_SIZE): ChatHistoryDto {
         val family = requireFamily()
@@ -110,7 +107,7 @@ class ChatRepository(
         val family = familyId ?: return null
         val socket = ChatSocket(
             httpClient = httpClient,
-            baseUrl = baseUrl,
+            baseUrl = baseUrlProvider(),
             sessionStore = sessionStore,
             familyId = family,
             gson = gson,
@@ -147,7 +144,7 @@ class ChatRepository(
 
     private fun rewriteUploadUrl(raw: String): String {
         val path = uploadPathOrNull(raw) ?: return raw
-        return apiOrigin + path
+        return baseUrlProvider().trimEnd('/') + path
     }
 
     // Extrae solo el path (sin query ni fragment) y lo acepta unicamente si

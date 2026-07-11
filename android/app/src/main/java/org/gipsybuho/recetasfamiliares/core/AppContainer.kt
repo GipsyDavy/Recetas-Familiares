@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import org.gipsybuho.recetasfamiliares.BuildConfig
 import org.gipsybuho.recetasfamiliares.data.local.RecetasDatabase
 import org.gipsybuho.recetasfamiliares.data.remote.AuthInterceptor
+import org.gipsybuho.recetasfamiliares.data.remote.DynamicBaseUrlInterceptor
 import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.gipsybuho.recetasfamiliares.data.remote.TokenRefreshAuthenticator
 import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository
@@ -32,6 +33,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 class AppContainer(context: Context) {
 
     val sessionStore = SessionStore(context)
+    val serverUrlStore = ServerUrlStore(context)
 
     val database: RecetasDatabase = Room.databaseBuilder(
         context,
@@ -41,14 +43,16 @@ class AppContainer(context: Context) {
         .addMigrations(MIGRATION_1_2)
         .build()
 
-    private val baseUrl = BuildConfig.DEFAULT_API_BASE_URL
+    private val retrofitBaseUrl = serverUrlStore.baseUrl
+    private val baseUrlProvider: () -> String = { serverUrlStore.baseUrl }
 
     // Expuesto para que Coil cargue imagenes de /uploads/** con Authorization (SEC-3)
     val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .addInterceptor(AuthInterceptor(sessionStore, baseUrl))
-        .authenticator(TokenRefreshAuthenticator(sessionStore, baseUrl))
+        .addInterceptor(DynamicBaseUrlInterceptor(retrofitBaseUrl, baseUrlProvider))
+        .addInterceptor(AuthInterceptor(sessionStore, baseUrlProvider))
+        .authenticator(TokenRefreshAuthenticator(sessionStore, baseUrlProvider))
         .addInterceptor(
             HttpLoggingInterceptor().apply {
                 level = if (BuildConfig.DEBUG) {
@@ -61,7 +65,7 @@ class AppContainer(context: Context) {
         .build()
 
     private val api: RecetasApi = Retrofit.Builder()
-        .baseUrl(baseUrl)
+        .baseUrl(retrofitBaseUrl)
         .client(httpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
@@ -79,7 +83,7 @@ class AppContainer(context: Context) {
     val recipeRatingRepository = RecipeRatingRepository(api, sessionStore)
     val userRepository = UserRepository(api, sessionStore)
     val familyMemberRepository = FamilyMemberRepository(api, sessionStore)
-    val chatRepository = ChatRepository(api, httpClient, sessionStore, baseUrl)
+    val chatRepository = ChatRepository(api, httpClient, sessionStore, baseUrlProvider)
     val themePreference = ThemePreference(context)
     val onboardingPreference = OnboardingPreference(context)
 

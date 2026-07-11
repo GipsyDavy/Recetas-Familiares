@@ -49,6 +49,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
+import org.gipsybuho.recetasfamiliares.core.ServerUrlConfig
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +90,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _avatarUrl = MutableStateFlow(container.sessionStore.avatarUrl)
     val avatarUrl: StateFlow<String?> = _avatarUrl.asStateFlow()
+
+    private val _serverBaseUrl = MutableStateFlow(container.serverUrlStore.baseUrl)
+    val serverBaseUrl: StateFlow<String> = _serverBaseUrl.asStateFlow()
 
     private val _familyStats = MutableStateFlow<FamilyStatsDto?>(null)
     val familyStats: StateFlow<FamilyStatsDto?> = _familyStats.asStateFlow()
@@ -143,6 +147,44 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _email.value = null
         _avatarUrl.value = null
         _familyStats.value = null
+    }
+
+    fun saveServerBaseUrl(rawBaseUrl: String, onError: (String) -> Unit): Boolean {
+        val normalized = try {
+            ServerUrlConfig.normalizeAndValidate(rawBaseUrl)
+        } catch (ex: IllegalArgumentException) {
+            onError(ex.message ?: "URL de servidor no valida")
+            return false
+        }
+        val before = container.serverUrlStore.baseUrl
+        container.serverUrlStore.baseUrl = normalized
+        _serverBaseUrl.value = normalized
+        if (before != normalized && _isLoggedIn.value) {
+            closeChat()
+            container.sessionStore.clear()
+            _isLoggedIn.value = false
+            _displayName.value = null
+            _email.value = null
+            _avatarUrl.value = null
+            _familyStats.value = null
+        }
+        return true
+    }
+
+    fun resetServerBaseUrl() {
+        val before = container.serverUrlStore.baseUrl
+        container.serverUrlStore.reset()
+        val after = container.serverUrlStore.baseUrl
+        _serverBaseUrl.value = after
+        if (before != after && _isLoggedIn.value) {
+            closeChat()
+            container.sessionStore.clear()
+            _isLoggedIn.value = false
+            _displayName.value = null
+            _email.value = null
+            _avatarUrl.value = null
+            _familyStats.value = null
+        }
     }
 
     /** Carga las stats del servidor; si falla (offline) se mantiene el fallback local. */

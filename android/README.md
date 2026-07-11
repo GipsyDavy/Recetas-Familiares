@@ -28,7 +28,7 @@ Primer scaffold Android nativo creado con:
 
 - Gradle Kotlin DSL;
 - Kotlin + Jetpack Compose + Material 3;
-- Retrofit apuntando por defecto a `http://10.0.2.2:8080/`;
+- Retrofit apuntando por defecto a produccion, con URL de servidor configurable y persistida;
 - Room para cache local inicial de recetas y stock;
 - WorkManager para sincronizacion pull periodica;
 - MVVM ligero con repositorios;

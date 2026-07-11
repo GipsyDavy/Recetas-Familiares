@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 
 class TokenRefreshAuthenticator(
     private val sessionStore: SessionStore,
-    private val baseUrl: String
+    private val baseUrlProvider: () -> String
 ) : Authenticator {
 
     private val gson = Gson()
@@ -26,11 +26,9 @@ class TokenRefreshAuthenticator(
         .writeTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    private val apiHost = baseUrl.toHttpUrl().host
-
     override fun authenticate(route: Route?, response: Response): Request? {
         // Nunca responder con credenciales a un 401 de un host ajeno al API
-        if (response.request.url.host != apiHost) {
+        if (!isApiOrigin(response.request.url)) {
             return null
         }
         if (responseCount(response) >= 2) {
@@ -48,7 +46,7 @@ class TokenRefreshAuthenticator(
         val refreshResponse = runCatching {
             client.newCall(
                 Request.Builder()
-                    .url("${baseUrl}api/v1/auth/refresh")
+                    .url("${baseUrlProvider()}api/v1/auth/refresh")
                     .post(body)
                     .build()
             ).execute()
@@ -75,6 +73,11 @@ class TokenRefreshAuthenticator(
         return response.request.newBuilder()
             .header("Authorization", "Bearer ${auth.accessToken}")
             .build()
+    }
+
+    private fun isApiOrigin(url: okhttp3.HttpUrl): Boolean {
+        val api = baseUrlProvider().toHttpUrl()
+        return url.scheme == api.scheme && url.host == api.host && url.port == api.port
     }
 
     private fun responseCount(response: Response): Int {

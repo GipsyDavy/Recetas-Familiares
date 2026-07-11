@@ -62,8 +62,11 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     val email       by viewModel.email.collectAsState()
     val avatarUrl   by viewModel.avatarUrl.collectAsState()
     val isAdmin     by viewModel.isAdmin.collectAsState()
+    val serverBaseUrl by viewModel.serverBaseUrl.collectAsState()
     var editing     by remember { mutableStateOf(false) }
     var editName    by remember { mutableStateOf("") }
+    var serverUrlInput by remember(serverBaseUrl) { mutableStateOf(serverBaseUrl) }
+    var serverUrlError by remember { mutableStateOf<String?>(null) }
     var showInvite  by remember { mutableStateOf(false) }
     val context     = LocalContext.current
 
@@ -206,6 +209,50 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
         if (familyStats != null || recipes.isNotEmpty()) {
             Spacer(Modifier.height(Spacing.lg))
             FamilyStatsSection(recipes = recipes, stats = familyStats)
+        }
+
+        Spacer(Modifier.height(Spacing.lg))
+        Text(
+            "Servidor",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        OutlinedTextField(
+            value = serverUrlInput,
+            onValueChange = {
+                serverUrlInput = it
+                serverUrlError = null
+            },
+            label = { Text("URL") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        serverUrlError?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = {
+                    serverUrlError = null
+                    viewModel.resetServerBaseUrl()
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Por defecto")
+            }
+            Button(
+                onClick = {
+                    viewModel.saveServerBaseUrl(serverUrlInput) { serverUrlError = it }
+                },
+                modifier = Modifier.weight(1f),
+                enabled = serverUrlInput.isNotBlank()
+            ) {
+                Text("Guardar")
+            }
         }
 
         if (isAdmin) {

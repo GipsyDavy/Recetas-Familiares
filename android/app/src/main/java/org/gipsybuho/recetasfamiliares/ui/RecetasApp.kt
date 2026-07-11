@@ -115,8 +115,10 @@ fun RecetasApp(viewModel: RecetasViewModel, initialRecipeId: String? = null) {
 
 @Composable
 private fun LoginScreen(viewModel: RecetasViewModel) {
+    val configuredServerUrl by viewModel.serverBaseUrl.collectAsState()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var serverUrl by remember(configuredServerUrl) { mutableStateOf(configuredServerUrl) }
     var error by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -160,13 +162,23 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
             label = { Text("Contraseña") }, visualTransformation = PasswordVisualTransformation(),
             singleLine = true, modifier = Modifier.fillMaxWidth()
         )
+        Spacer(Modifier.height(Spacing.lg))
+        OutlinedTextField(
+            value = serverUrl, onValueChange = { serverUrl = it },
+            label = { Text("Servidor") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
         error?.let {
             Spacer(Modifier.height(Spacing.lg))
             Text(it, color = MaterialTheme.colorScheme.error)
         }
         Spacer(Modifier.height(Spacing.xxl))
         Button(
-            onClick = { viewModel.login(email, password) { error = it } },
+            onClick = {
+                error = null
+                if (viewModel.saveServerBaseUrl(serverUrl) { error = it }) {
+                    viewModel.login(email, password) { error = it }
+                }
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Entrar")

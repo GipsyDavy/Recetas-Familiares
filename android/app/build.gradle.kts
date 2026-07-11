@@ -15,7 +15,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://10.0.2.2:8080/\"")
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://recetas.167.233.213.242.sslip.io/\"")
     }
 
     compileOptions {

@@ -7,16 +7,14 @@ import okhttp3.Response
 
 class AuthInterceptor(
     private val sessionStore: SessionStore,
-    baseUrl: String
+    private val baseUrlProvider: () -> String
 ) : Interceptor {
 
-    // El token solo se envia al host del API: este cliente tambien lo usa Coil
+    // El token solo se envia al origen del API: este cliente tambien lo usa Coil
     // para imagenes y no debe filtrar el Bearer a otros hosts.
-    private val apiHost = baseUrl.toHttpUrl().host
-
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = sessionStore.accessToken
-        val request = if (token.isNullOrBlank() || chain.request().url.host != apiHost) {
+        val request = if (token.isNullOrBlank() || !isApiOrigin(chain.request().url)) {
             chain.request()
         } else {
             chain.request().newBuilder()
@@ -24,5 +22,10 @@ class AuthInterceptor(
                 .build()
         }
         return chain.proceed(request)
+    }
+
+    private fun isApiOrigin(url: okhttp3.HttpUrl): Boolean {
+        val api = baseUrlProvider().toHttpUrl()
+        return url.scheme == api.scheme && url.host == api.host && url.port == api.port
     }
 }
