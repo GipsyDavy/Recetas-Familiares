@@ -1509,6 +1509,37 @@ Sprints posteriores recomendados (orden vigente de la seccion 8): vigilancia dep
   - Flyway sigue avisando que PostgreSQL 18.4 es mas nuevo que su soporte probado.
 - Siguiente sprint recomendado (NO autorizado): vigilancia dependencias (revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, monitorizar Kotlin >= 2.4.20 estable cuando exista, PDFBox/Caddy/Flyway).
 
+### Sprint Vigilancia dependencias - CERRADO (2026-07-11)
+
+- Objetivo: revisar dependencias criticas y suppressions antes de 2026-10-01, cerrar vulnerabilidades accionables y dejar riesgos residuales trazados.
+- Agente tecnico ejecutor: Codex. No se usaron subagentes ni Gemini: no habia herramienta directa Gemini callable y el alcance era acotado. Skill usada: VibeSec-Skill como checklist manual. `security-review` no estuvo disponible como herramienta callable.
+- Contexto leido en la sesion: `CLAUDE.md`, `CONTINUAR.md`, `docs/backend-vps-deploy-runbook.md`, `docs/postgres-operacion-runbook.md`, manifests Maven/Gradle afectados y `desktop/owasp-suppressions.xml`.
+- Cambios aplicados:
+  - `backend/pom.xml`: override explicito `postgresql.version=42.7.13` para sacar pgJDBC de la rama vulnerable 42.7.4-42.7.11 (CVE-2026-54291).
+  - `desktop/owasp-suppressions.xml`: nota Kotlin actualizada; se mantiene suppression exacta de `kotlin-stdlib:2.4.0` hasta que exista Kotlin 2.4.20 estable.
+  - `desktop/owasp-suppressions.xml`: suppressions exactas y caducadas el 2026-10-01 para `org.apache.pdfbox:pdfbox:3.0.7` y `org.apache.pdfbox:pdfbox-io:3.0.7` por CVE-2026-23907/CVE-2026-33929. Justificacion: Dependency-Check las mapea a PDFBox/ExtractEmbeddedFiles; la app Desktop solo genera PDFs con `PDDocument`/`PDPage`/`PDPageContentStream` y no extrae adjuntos de PDFs de usuario.
+- Validacion ejecutada:
+  - `mvn -f backend\pom.xml -DskipTests verify -P security-audit` inicial -> `BUILD FAILURE` por `org.postgresql:postgresql:42.7.11` / CVE-2026-54291.
+  - Disponibilidad Maven: `org.postgresql:postgresql:42.7.13` disponible; `org.apache.pdfbox:pdfbox:3.0.8` no disponible; `org.jetbrains.kotlin:kotlin-stdlib:2.4.20` no disponible; `2.4.20-Beta1` si disponible.
+  - Tras cambios: `mvn -f backend\pom.xml -DskipTests verify -P security-audit` -> `BUILD SUCCESS`; reporte OWASP backend `vulnerableDeps=0`, `suppressed=0`.
+  - `mvn -f desktop\pom.xml -DskipTests verify -P security-audit` -> `BUILD SUCCESS`; reporte OWASP desktop `vulnerableDeps=0`, `suppressed=3`.
+  - `mvn -f backend\pom.xml dependency:tree -Dincludes=org.postgresql:postgresql` -> `org.postgresql:postgresql:jar:42.7.13:runtime`.
+  - `mvn -f backend\pom.xml test` inicial fallo por datos residuales en `recetas_familiares_test` (92 fallos `409 Email is already registered`); se recreo SOLO esa DB de test en el VPS.
+  - Tras reset de test DB: `mvn -f backend\pom.xml test` -> 116 tests, 0 fallos, `BUILD SUCCESS`.
+  - `mvn -f desktop\pom.xml test` -> 14 tests, 0 fallos, `BUILD SUCCESS`.
+- Seguridad/VibeSec:
+  - Sin secretos nuevos ni cambios en `herztner/`, GitHub Secrets, Caddy, WireGuard, PostgreSQL, puertos o backups.
+  - No se expuso `5432` ni `8080`; el sprint solo cambio declaracion de dependencias y suppressions versionadas.
+  - Suppressions acotadas por GAV exacto, CVE exacto y fecha de expiracion; no se anadio suppression global por CPE.
+  - Dependency-Check avisa que el analyzer Sonatype OSS Index esta deshabilitado por falta de credenciales; aceptado como riesgo de cobertura, NVD si se uso.
+- Archivos modificados: `backend/pom.xml`, `desktop/owasp-suppressions.xml`, `CONTINUAR.md`.
+- Riesgos residuales:
+  - Revisar antes de 2026-10-01: Kotlin 2.4.20 estable, PDFBox 3.0.8+ en Maven Central y mantener o retirar suppressions.
+  - Flyway sigue avisando que PostgreSQL 18.4 es mas nuevo que su soporte probado.
+  - Caddy 2.6.2 sigue pendiente de vigilancia de parches del repo Ubuntu.
+  - No se actualizaron Android/iOS: se inspeccionaron versiones, pero no habia accion directa en este sprint y no se ejecutaron builds Gradle.
+- Siguiente sprint recomendado (NO autorizado): COD-8 siguiente capa, tests Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory.
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:

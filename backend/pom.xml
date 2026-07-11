@@ -25,6 +25,7 @@
         <log4j2.version>2.26.1</log4j2.version>
         <jackson-bom.version>2.22.1</jackson-bom.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
+        <postgresql.version>42.7.13</postgresql.version>
         <swagger-ui.version>5.32.8</swagger-ui.version>
         <twelvemonkeys.imageio.version>3.13.1</twelvemonkeys.imageio.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>

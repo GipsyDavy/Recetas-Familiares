@@ -5,12 +5,36 @@
         CVE-2026-53914 applies to JetBrains Kotlin versions before 2.4.20 and
         describes unsafe deserialization in Kotlin build cache metadata. The
         desktop app consumes kotlin-stdlib as runtime support for OkHttp; it
-        does not execute Kotlin compiler/build-cache tooling. As of 2026-07-08,
-        Kotlin 2.4.0 is the latest stable release and 2.4.20 is planned for
-        September 2026, so this suppression must be revisited when a stable
-        fixed release is published.
+        does not execute Kotlin compiler/build-cache tooling. As of 2026-07-11,
+        Maven Central has 2.4.20-Beta1 but no stable 2.4.20, so this
+        suppression must be revisited when a stable fixed release is published.
         ]]></notes>
         <gav regex="true">^org\.jetbrains\.kotlin:kotlin-stdlib:2\.4\.0$</gav>
         <cve>CVE-2026-53914</cve>
+    </suppress>
+    <suppress until="2026-10-01Z">
+        <notes><![CDATA[
+        CVE-2026-23907 and CVE-2026-33929 affect the PDFBox
+        ExtractEmbeddedFiles example code. Recetas Familiares Desktop only uses
+        PDFBox to create recipe PDFs (PDDocument/PDPage/PDPageContentStream) and
+        does not call or copy ExtractEmbeddedFiles. Apache documents 3.0.8 as
+        the fixed 3.x line for CVE-2026-33929, but as of 2026-07-11
+        org.apache.pdfbox:pdfbox:3.0.8 is not published to Maven Central. Revisit
+        this suppression when 3.0.8 or a later 3.x release is available.
+        ]]></notes>
+        <gav regex="true">^org\.apache\.pdfbox:pdfbox:3\.0\.7$</gav>
+        <cve>CVE-2026-23907</cve>
+        <cve>CVE-2026-33929</cve>
+    </suppress>
+    <suppress until="2026-10-01Z">
+        <notes><![CDATA[
+        Same PDFBox example-code issue as above, detected on the transitive
+        pdfbox-io module because Dependency-Check maps it to the Apache PDFBox
+        CPE. The desktop app does not extract embedded files from user PDFs.
+        Revisit when PDFBox 3.0.8 or a later 3.x release is available.
+        ]]></notes>
+        <gav regex="true">^org\.apache\.pdfbox:pdfbox-io:3\.0\.7$</gav>
+        <cve>CVE-2026-23907</cve>
+        <cve>CVE-2026-33929</cve>
     </suppress>
 </suppressions>
