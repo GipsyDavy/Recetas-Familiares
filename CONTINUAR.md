@@ -345,13 +345,19 @@ Estado actualizado el 2026-07-11:
 - Ensayo PITR en cluster aislado: CERRADO 2026-07-11 (recuperacion a punto en el tiempo con precision de transaccion, produccion intacta). Ver trazabilidad y runbook.
 - Backend/desktop pasan Dependency-Check con umbral CVSS >= 7 en la ultima auditoria documentada. El runtime iOS/macOS sigue bloqueado en esta maquina Windows y COD-8 sigue parcial: no hay pruebas iOS ni pruebas UI automatizadas.
 
+Dominio propio: APLAZADO por decision del usuario (2026-07-11). La app es operativa con `sslip.io`; comprar dominio mas adelante. Riesgos aceptados mientras tanto (documentados aqui para no olvidarlos):
+- sslip.io es DNS de terceros gratuito sin SLA; si cae, la app no resuelve (ir por IP rompe TLS).
+- Las renovaciones Let's Encrypt (~60-90 dias, Caddy automatico) comparten limite de emision con todo `sslip.io`; una renovacion puede fallar por cupo global agotado y dejar el certificado expirado.
+- El hostname va acoplado a la IP del VPS; si la IP cambia, hay que reconfigurar todos los clientes.
+Sprint futuro cuando exista dominio (~4-12 EUR/año): registro DNS A -> IP del VPS, hostname en Caddyfile, CORS/WS origins en backend, base URL en Android/Desktop/iOS, y verificar emision/renovacion del certificado nuevo.
+
 Prioridad propuesta para el siguiente sprint no autorizado:
 
-1. Dominio propio/API estable: sustituir `sslip.io`, ajustar Caddy/CORS/WS/origenes y documentar rotacion.
-2. CI/CD y rollback backend: automatizar build/test/deploy del jar y conservar artefactos versionados para rollback operativo.
-3. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista y monitorizar PDFBox/Caddy/Flyway.
-4. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
-5. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+1. CI/CD y rollback backend: automatizar build/test/deploy del jar y conservar artefactos versionados para rollback operativo.
+2. Vigilancia dependencias: revisar `desktop/owasp-suppressions.xml` antes de 2026-10-01, sustituir Kotlin 2.4.0 por Kotlin >= 2.4.20 estable cuando exista y monitorizar PDFBox/Caddy/Flyway.
+3. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
+4. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
+5. Dominio propio/API estable: cuando el usuario compre el dominio (ver nota de aplazamiento arriba).
 6. UX-14 (sprint posterior dedicado): ayuda TOTALMENTE completa en toda la aplicacion. El MVP de Sprint 46 (HelpDialog Desktop, 9 vistas) es solo la base. Alcance objetivo, por fases si hace falta:
    - Desktop: ayuda contextual en TODOS los modulos, dialogos y formularios (crear/editar receta, stock, menu, compra, notas, miembros, exportaciones, busqueda global, diagnostico), cada pestaña de Ajustes, modo cocina y onboarding; tooltips en todos los controles sin label visible (formato `Accion (Ctrl+X)`, delay 400ms); foco y orden de tabulacion documentados en formularios.
    - Android: sistema de ayuda equivalente (pantalla o bottom sheet de ayuda por seccion, accesible desde TopAppBar), con `contentDescription` completo y ayuda del modo cocina/manos libres.
