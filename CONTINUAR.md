@@ -1559,6 +1559,11 @@ Actualizacion posterior (2026-07-11): el usuario fijo como siguiente sprint `Apu
   - Plugin OWASP verificado con `mvn org.owasp:dependency-check-maven:12.2.2:help -Ddetail=true -Dgoal=check`: parametros disponibles `ossIndexUsername`, `ossIndexPassword`, `ossIndexServerId`, `ossIndexAnalyzerEnabled`, `ossIndexWarnOnlyOnRemoteErrors`.
   - `backend/pom.xml` y `desktop/pom.xml` solo configuran NVD (`nvdApiKeyEnvironmentVariable=NVD_API_KEY`); no hay configuracion OSS Index.
 - Decision aplicada: no tocar `backend/pom.xml` ni `desktop/pom.xml` sin credenciales, porque no se podria validar el analyzer y tocar `backend/**` dispararia CI/CD y deploy a produccion con una mejora no comprobable.
+- Actualizacion tras prueba de credenciales aportadas por el usuario (2026-07-11):
+  - Se probo autenticacion directa sin guardar secretos ni imprimir token.
+  - Endpoint legado `https://ossindex.sonatype.org/api/v3/component-report` con Basic Auth -> `401 Unauthorized`.
+  - Endpoint actual Sonatype Guide `https://api.guide.sonatype.com/api/v3/component-report` con Basic Auth -> `401 Unauthorized` usando el email aportado y tambien username placeholder.
+  - Resultado: credencial no valida para OSS Index/Guide API en esta sesion. No se ejecuto Dependency-Check con OSS Index porque fallaria la autenticacion; se mantiene NVD/CISA + analizadores locales. El token fue pegado en chat y debe considerarse expuesto: rotar/revocar en Sonatype si procede.
 - Siguiente sprint: si se aportan credenciales, configurar el analyzer preferentemente via Maven `settings.xml`/`ossIndexServerId` o variables de entorno seguras, ejecutar `mvn -f backend\pom.xml -DskipTests verify -P security-audit` y `mvn -f desktop\pom.xml -DskipTests verify -P security-audit`, comprobar en logs/reportes que OSS Index no queda deshabilitado, y mantener sin imprimir secretos. Si no hay credenciales, dejar explicitamente la auditoria como NVD/CISA + analizadores locales.
 
 ### Chequeo obligatorio de cierre
