@@ -1859,6 +1859,28 @@ Revision final Claude Code (2026-07-11, misma fecha):
 - Validacion ejecutada: backend `AuthServiceTest` 7/0 + compile OK (suite completa requiere DB; gate en CI tras push); Desktop `mvn test` 20/0; Android `gradlew test` + `assembleDebug` OK.
 - Riesgos residuales: sin prueba manual de UI en esta sesion (flujos validados por compilacion/tests); tests de integracion backend (FamilyController/RecipeController) corren en CI con `starter-recipes.enabled=false` — el seeder en si no tiene test de integracion propio; iOS sin estos cambios (runtime bloqueado); instalador Windows y APK de release no regenerados.
 
+### Cierre de sesion 2026-07-12 (Claude Code) — PUNTO EXACTO DEL PROYECTO
+
+Estado para retomar en la proxima sesion, cualquier agente:
+
+- `main` limpio y pusheado hasta `4d1c6b9`; produccion desplegada y health 200 UP verificado tras el ultimo deploy (incluye migracion V17).
+- Ejecutado en esta sesion (2026-07-11 noche a 2026-07-12):
+  1. **Sprint A CRIT-2 UX cliente** (commits `389dc43`, `f6a9231`, `e1644c9`): reset password, verificar email y borrar cuenta en Desktop y Android; fix backend 401→403 en `DELETE /auth/account` (el 401 hacia que el authenticator OkHttp limpiara la sesion local).
+  2. **Sprint B quick wins** (commits hasta `4d1c6b9`): refresh notas Android, boton salir ambos, buscar receta en web, valoraciones Desktop, miembros en perfil Android, imagen de grupo familiar (V17 + endpoint + serving con ownership), StarterRecipeSeeder (5 recetas al registrar familia).
+  3. Roadmap funcional de 21 puntos documentado en §8 con decision del usuario: (16) y (8-integrado) DESCARTADOS; (10) aplazado a sprint propio por contrato sync.
+- Validaciones de la sesion: backend `AuthServiceTest` 7/0 (suite completa = gate CI con Postgres); Desktop `mvn test` 20/0; Android `gradlew test` + `assembleDebug` OK; health produccion 200 UP tras ambos deploys.
+- Limitacion conocida: sin `gh` CLI en este PC no se verificaron los runs de Actions; confirmar en GitHub → Actions que los 2 ultimos runs de `Backend CI/CD` (post `389dc43` y post `4d1c6b9`) estan verdes. Si el segundo fallara en tests de integracion, sospechar de `FamilyControllerTest`/seeder pese a `starter-recipes.enabled=false` en `application-test.yml`.
+
+PENDIENTES OPERATIVOS DEL USUARIO (bloquean cierres, no el desarrollo):
+- SMTP real en el VPS para cerrar CRIT-2: `MAIL_ENABLED=true`, `SMTP_HOST/PORT`, credenciales, `MAIL_FROM`, `APP_PUBLIC_URL` en `/etc/recetas-familiares/backend.env`; despues prueba E2E de reset/verificacion/borrado desde ambos clientes.
+- Regenerar instalador Windows (`desktop/build-installer.ps1`) y distribuir APK nuevo: los binarios vigentes NO incluyen las pantallas de Sprint A/B.
+
+SIGUIENTE SPRINT (fijado por roadmap §8, NO autorizado aun): **Sprint C — gestion familiar**
+- (3) Editar miembros: UI en clientes para cambiar rol y expulsar (endpoints backend YA existen: `PUT /members/{userId}/role`, `DELETE /members/{userId}`; Desktop tiene `FamilyMembersView` solo admin — revisar que cubra ambos; Android no tiene UI de gestion).
+- (5) Crear familia solo owner/admin: hoy el registro crea familia nueva siempre; decidir producto para "usuario nuevo sin familia" (matiz documentado en §8) y anadir la restriccion en backend + UI.
+- VibeSec y security-review obligatorios (roles/ownership). Codex recomendado como apoyo tecnico.
+- Despues de C: Sprint D epica multi-familia (4+13+12) con sprint de diseño previo obligatorio (brainstorming + Codex/Gemini antes de codigo); luego presencia online (20), ranking (11), chat 1:1 (14, tras chat fase 4 push), y sprint propio para (10) creador de receta (contrato sync + Room).
+
 ### Chequeo obligatorio de cierre
 
 Antes de marcar un sprint como cerrado:
