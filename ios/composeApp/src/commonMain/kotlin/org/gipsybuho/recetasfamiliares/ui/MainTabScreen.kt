@@ -14,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import org.gipsybuho.recetasfamiliares.core.SessionStore
+import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
 import org.gipsybuho.recetasfamiliares.menu.MenuRepository
@@ -43,6 +44,7 @@ fun MainTabScreen(
     selectedTheme: AppTheme,
     themeMode: ThemeMode,
     hapticsEnabled: Boolean,
+    serverUrlPreference: ServerUrlPreference,
     onThemeChange: (AppTheme) -> Unit,
     onModeChange: (ThemeMode) -> Unit,
     onHapticsChange: (Boolean) -> Unit,
@@ -116,6 +118,7 @@ fun MainTabScreen(
                     onHapticsChange = onHapticsChange,
                     onLogout        = onLogout,
                     session         = session,
+                    serverUrlPreference = serverUrlPreference,
                     userRepository  = userRepo,
                     familyMemberRepository = familyMemberRepo
                 )

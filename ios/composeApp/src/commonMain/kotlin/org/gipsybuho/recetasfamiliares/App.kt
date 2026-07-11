@@ -11,6 +11,7 @@ import org.gipsybuho.recetasfamiliares.auth.LoginScreen
 import org.gipsybuho.recetasfamiliares.core.OnboardingPreference
 import org.gipsybuho.recetasfamiliares.ui.OnboardingScreen
 import org.gipsybuho.recetasfamiliares.core.SessionStore
+import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
 import org.gipsybuho.recetasfamiliares.network.ApiClient
 import org.gipsybuho.recetasfamiliares.sync.SyncRepository
@@ -25,7 +26,8 @@ import org.gipsybuho.recetasfamiliares.ui.MainTabScreen
 @Composable
 fun App() {
     val session       = remember { SessionStore() }
-    val apiClient     = remember { ApiClient(session) }
+    val serverUrlPreference = remember { ServerUrlPreference() }
+    val apiClient     = remember { ApiClient(session, serverUrlPreference) }
     val authRepo      = remember { AuthRepository(apiClient, session) }
     val driverFactory = remember { DatabaseDriverFactory() }
     val syncRepo      = remember { SyncRepository(apiClient, session, driverFactory) }
@@ -62,7 +64,11 @@ fun App() {
         if (!onboardingDone) {
             OnboardingScreen(onFinished = { onboardingPref.onboardingDone = true; onboardingDone = true })
         } else if (!isLoggedIn) {
-            LoginScreen(repository = authRepo, onLoginSuccess = { isLoggedIn = true })
+            LoginScreen(
+                repository = authRepo,
+                serverUrlPreference = serverUrlPreference,
+                onLoginSuccess = { isLoggedIn = true }
+            )
         } else {
             MainTabScreen(
                 apiClient       = apiClient,
@@ -72,6 +78,7 @@ fun App() {
                 selectedTheme   = selectedTheme,
                 themeMode       = themeMode,
                 hapticsEnabled  = hapticsEnabled,
+                serverUrlPreference = serverUrlPreference,
                 onThemeChange   = { t -> selectedTheme = t; themePref.selectedTheme = t },
                 onModeChange    = { m -> themeMode = m; themePref.themeMode = m },
                 onHapticsChange = { h -> hapticsEnabled = h; themePref.hapticsEnabled = h },

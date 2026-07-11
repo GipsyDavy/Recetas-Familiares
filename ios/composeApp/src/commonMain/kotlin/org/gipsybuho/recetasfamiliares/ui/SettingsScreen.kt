@@ -47,6 +47,7 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.SessionStore
+import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 import org.gipsybuho.recetasfamiliares.core.rememberImagePickerLauncher
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
@@ -64,6 +65,7 @@ fun SettingsScreen(
     onHapticsChange: (Boolean) -> Unit,
     onLogout: () -> Unit,
     session: SessionStore? = null,
+    serverUrlPreference: ServerUrlPreference? = null,
     userRepository: UserRepository? = null,
     familyMemberRepository: FamilyMemberRepository? = null
 ) {
@@ -72,6 +74,10 @@ fun SettingsScreen(
     var inviteMessage by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
     val familyRole by (session?.familyRoleFlow ?: flowOf(null)).collectAsState(initial = session?.familyRole)
     val isAdmin = familyRole == "ADMIN" || familyRole == "OWNER"
+    var serverUrlInput by androidx.compose.runtime.remember(serverUrlPreference) {
+        mutableStateOf(serverUrlPreference?.baseUrl.orEmpty())
+    }
+    var serverUrlMessage by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
 
     val imagePicker = rememberImagePickerLauncher { bytes ->
         if (bytes != null && userRepository != null) {
@@ -165,6 +171,62 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface)
                     Text(session.email ?: "—", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        if (serverUrlPreference != null) {
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+            Text("Servidor", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(
+                value = serverUrlInput,
+                onValueChange = {
+                    serverUrlInput = it
+                    serverUrlMessage = null
+                },
+                label = { Text("URL") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            serverUrlMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = {
+                        val before = serverUrlPreference.baseUrl
+                        serverUrlPreference.reset()
+                        serverUrlInput = serverUrlPreference.baseUrl
+                        serverUrlMessage = "Servidor por defecto restaurado"
+                        if (before != serverUrlPreference.baseUrl) onLogout()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Por defecto")
+                }
+                Button(
+                    onClick = {
+                        val before = serverUrlPreference.baseUrl
+                        runCatching { serverUrlPreference.baseUrl = serverUrlInput }
+                            .onSuccess {
+                                serverUrlInput = serverUrlPreference.baseUrl
+                                serverUrlMessage = "Servidor actualizado"
+                                if (before != serverUrlPreference.baseUrl) onLogout()
+                            }
+                            .onFailure { serverUrlMessage = it.message ?: "URL no valida" }
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = serverUrlInput.isNotBlank()
+                ) {
+                    Text("Guardar")
                 }
             }
             Spacer(Modifier.height(8.dp))

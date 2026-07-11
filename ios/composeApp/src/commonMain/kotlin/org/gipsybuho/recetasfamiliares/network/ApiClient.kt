@@ -15,17 +15,15 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.gipsybuho.recetasfamiliares.core.SessionStore
+import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 
-class ApiClient(private val session: SessionStore) {
+class ApiClient(
+    private val session: SessionStore,
+    private val serverUrlPreference: ServerUrlPreference = ServerUrlPreference()
+) {
 
-    // Para el emulador iOS en macOS con backend local usar: http://localhost:8080/
-    // Para dispositivo físico en la misma red usar: http://<IP-del-Mac>:8080/
-    val baseUrl: String = "http://localhost:8080/"
-
-    private val apiUrl: Url = Url(baseUrl)
-    private val apiHost: String = apiUrl.host
-    private val apiProtocol = apiUrl.protocol
-    private val apiPort = apiUrl.port
+    val baseUrl: String
+        get() = serverUrlPreference.baseUrl
 
     val http: HttpClient = HttpClient {
         install(ContentNegotiation) {
@@ -44,9 +42,7 @@ class ApiClient(private val session: SessionStore) {
                 // Enviar el Bearer proactivamente solo al host del API: evita el
                 // doble round-trip del challenge 401 y no filtra el token a otros hosts
                 sendWithoutRequest { request ->
-                    request.url.host == apiHost &&
-                        request.url.protocol == apiProtocol &&
-                        request.url.port == apiPort
+                    isApiOrigin(request.url)
                 }
                 loadTokens {
                     session.accessToken?.let { access ->
@@ -56,11 +52,7 @@ class ApiClient(private val session: SessionStore) {
                 refreshTokens {
                     // No refrescar ni reintentar con credenciales ante 401 de hosts
                     // ajenos al API (p.ej. una imagen externa cargada por Coil)
-                    val requestUrl = response.call.request.url
-                    if (requestUrl.host != apiHost ||
-                        requestUrl.protocol != apiProtocol ||
-                        requestUrl.port != apiPort
-                    ) {
+                    if (!isApiOrigin(response.call.request.url)) {
                         return@refreshTokens null
                     }
                     val refresh = session.refreshToken
@@ -99,4 +91,13 @@ class ApiClient(private val session: SessionStore) {
     fun resetAuthTokens() {
         http.authProvider<BearerAuthProvider>()?.clearToken()
     }
+
+    private fun isApiOrigin(requestUrl: Url): Boolean {
+        val apiUrl = Url(baseUrl)
+        return requestUrl.host == apiUrl.host &&
+            requestUrl.protocol == apiUrl.protocol &&
+            requestUrl.port == apiUrl.port
+    }
+
+    private fun isApiOrigin(requestUrl: URLBuilder): Boolean = isApiOrigin(requestUrl.build())
 }

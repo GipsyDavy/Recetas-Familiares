@@ -8,14 +8,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 
 @Composable
 fun LoginScreen(
     repository: AuthRepository,
+    serverUrlPreference: ServerUrlPreference,
     onLoginSuccess: () -> Unit
 ) {
     var email    by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var serverUrl by remember { mutableStateOf(serverUrlPreference.baseUrl) }
     var error    by remember { mutableStateOf<String?>(null) }
     var loading  by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -44,6 +47,15 @@ fun LoginScreen(
             visualTransformation = PasswordVisualTransformation(),
             singleLine = true, modifier = Modifier.fillMaxWidth()
         )
+        Spacer(Modifier.height(16.dp))
+        OutlinedTextField(
+            value = serverUrl, onValueChange = {
+                serverUrl = it
+                error = null
+            },
+            label = { Text("Servidor") },
+            singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
 
         error?.let {
             Spacer(Modifier.height(8.dp))
@@ -56,7 +68,10 @@ fun LoginScreen(
             onClick = {
                 scope.launch {
                     loading = true; error = null
-                    runCatching { repository.login(email, password) }
+                    runCatching {
+                        serverUrlPreference.baseUrl = serverUrl
+                        repository.login(email, password)
+                    }
                         .onSuccess { onLoginSuccess() }
                         .onFailure { error = it.message ?: "Error al iniciar sesión" }
                     loading = false
