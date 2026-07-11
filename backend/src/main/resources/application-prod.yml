@@ -4,6 +4,11 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
+server:
+  # Defensa en profundidad: en produccion el backend solo escucha en loopback
+  # (Caddy hace de reverse proxy TLS). Sobrescribir con SERVER_ADDRESS si cambia.
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
 springdoc:
   api-docs:
     enabled: false

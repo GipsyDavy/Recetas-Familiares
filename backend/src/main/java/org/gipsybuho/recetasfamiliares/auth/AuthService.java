@@ -10,6 +10,7 @@ import org.gipsybuho.recetasfamiliares.families.FamilyRole;
 import org.gipsybuho.recetasfamiliares.security.JwtService;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -48,11 +49,19 @@ public class AuthService {
             throw new AuthException(HttpStatus.CONFLICT, "Email is already registered");
         }
 
-        UserEntity user = userRepository.save(new UserEntity(
-                email,
-                request.displayName().trim(),
-                passwordEncoder.encode(request.password())
-        ));
+        UserEntity user;
+        try {
+            // saveAndFlush fuerza la violacion del unique de email aqui y no en
+            // el commit, para que una carrera con otro registro simultaneo del
+            // mismo email devuelva el mismo 409 que el check previo y no un 500.
+            user = userRepository.saveAndFlush(new UserEntity(
+                    email,
+                    request.displayName().trim(),
+                    passwordEncoder.encode(request.password())
+            ));
+        } catch (DataIntegrityViolationException exception) {
+            throw new AuthException(HttpStatus.CONFLICT, "Email is already registered");
+        }
         FamilyEntity family = familyRepository.save(new FamilyEntity(request.familyName().trim()));
         familyMemberRepository.save(new FamilyMemberEntity(family, user, FamilyRole.OWNER));
 

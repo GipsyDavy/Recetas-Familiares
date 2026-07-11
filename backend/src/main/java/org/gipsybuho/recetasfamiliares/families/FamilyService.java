@@ -180,7 +180,8 @@ public class FamilyService {
         try {
             return FamilyRole.valueOf(roleStr.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role: " + roleStr);
+            // No reflejar el input del cliente en el mensaje de error (COD-10).
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role");
         }
     }
 

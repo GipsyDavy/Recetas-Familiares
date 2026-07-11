@@ -50,8 +50,15 @@ public class RefreshTokenService {
 
     IssuedRefreshToken rotate(RefreshTokenEntity currentToken) {
         IssuedRefreshToken replacement = issue(currentToken.getUser());
-        currentToken.revoke(Instant.now(), replacement.entity().getId());
-        refreshTokenRepository.save(currentToken);
+        // Revocacion condicional atomica: si otro refresh concurrente ya roto
+        // este token, el UPDATE no afecta filas y el reemplazo recien emitido
+        // se descarta sin haberse entregado nunca al cliente.
+        int revoked = refreshTokenRepository.revokeIfActive(
+                currentToken.getId(), Instant.now(), replacement.entity().getId());
+        if (revoked == 0) {
+            refreshTokenRepository.delete(replacement.entity());
+            throw new AuthException(org.springframework.http.HttpStatus.UNAUTHORIZED, "Invalid refresh token");
+        }
         return replacement;
     }
 
