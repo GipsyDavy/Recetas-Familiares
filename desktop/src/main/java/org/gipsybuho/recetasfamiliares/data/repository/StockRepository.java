@@ -44,6 +44,6 @@ public class StockRepository {
     }
 
     public void updateFromSync(List<StockDtos.StockItemDto> items) {
-        if (items != null) cache.replaceAll(items.stream().filter(i -> !i.deleted()).toList());
+        cache.mergeById(items, StockDtos.StockItemDto::id, StockDtos.StockItemDto::deleted);
     }
 }

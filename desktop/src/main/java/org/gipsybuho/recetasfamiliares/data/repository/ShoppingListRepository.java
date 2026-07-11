@@ -46,7 +46,10 @@ public class ShoppingListRepository {
         return api.put(path, req, SyncDtos.ShoppingDtos.ShoppingListItemDto.class);
     }
 
-    public void updateFromSync(List<SyncDtos.ShoppingDtos.ShoppingListDto> lists) {
-        // No cache in ShoppingListRepository yet.
+    public void updateFromSync(
+            List<SyncDtos.ShoppingDtos.ShoppingListDto> lists,
+            List<SyncDtos.ShoppingDtos.ShoppingListItemDto> items
+    ) {
+        // ShoppingListRepository no mantiene cache local: listas e items se cargan bajo demanda.
     }
 }

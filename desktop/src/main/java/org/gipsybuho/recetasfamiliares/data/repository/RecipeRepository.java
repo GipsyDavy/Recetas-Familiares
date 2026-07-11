@@ -12,6 +12,7 @@ import org.gipsybuho.recetasfamiliares.api.ApiClient;
 import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeCreateDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
+import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
 import org.gipsybuho.recetasfamiliares.data.cache.SimpleCache;
 
@@ -22,8 +23,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class RecipeRepository {
-
-    private static final String BASE_URL = System.getProperty("api.base.url", "http://localhost:8080/");
 
     private final ApiClient api;
     private final AppSession session;
@@ -98,7 +97,7 @@ public class RecipeRepository {
     public List<RecipeDtos.RecipePhotoResponse> loadPhotos(String familyId, String recipeId) throws Exception {
         String path = "api/v1/families/" + familyId + "/recipes/" + recipeId + "/photos";
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(api.getBaseUrl() + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .get()
                 .build();
@@ -132,7 +131,7 @@ public class RecipeRepository {
         }
 
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(api.getBaseUrl() + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .post(multipart.build())
                 .build();
@@ -151,7 +150,7 @@ public class RecipeRepository {
     public void deletePhoto(String familyId, String recipeId, String photoId) throws Exception {
         String path = "api/v1/families/" + familyId + "/recipes/" + recipeId + "/photos/" + photoId;
         Request request = new Request.Builder()
-                .url(BASE_URL + path)
+                .url(api.getBaseUrl() + path)
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .delete()
                 .build();
@@ -172,9 +171,13 @@ public class RecipeRepository {
             List<RecipeDtos.RecipeIngredientDto> ingredients,
             List<RecipeDtos.RecipeStepDto> steps
     ) {
-        if (recipes != null) cache.replaceAll(recipes.stream().filter(r -> !r.deleted()).toList());
-        if (ingredients != null) ingredientCache.replaceAll(ingredients.stream().filter(i -> !i.deleted()).toList());
-        if (steps != null) stepCache.replaceAll(steps.stream().filter(s -> !s.deleted()).toList());
+        cache.mergeById(recipes, RecipeDtos.RecipeDto::id, RecipeDtos.RecipeDto::deleted);
+        ingredientCache.mergeById(ingredients, RecipeDtos.RecipeIngredientDto::id, RecipeDtos.RecipeIngredientDto::deleted);
+        stepCache.mergeById(steps, RecipeDtos.RecipeStepDto::id, RecipeDtos.RecipeStepDto::deleted);
+    }
+
+    public void updatePhotosFromSync(List<SyncDtos.PhotoDtos.RecipePhotoDto> photos) {
+        // Desktop no mantiene cache local de fotos: se cargan bajo demanda desde /photos.
     }
 
     public void shutdown() {

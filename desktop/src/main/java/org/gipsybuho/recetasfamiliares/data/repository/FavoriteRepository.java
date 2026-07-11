@@ -57,4 +57,9 @@ public class FavoriteRepository {
         cache.replaceAll(cache.getItems().stream()
                 .filter(f -> !favoriteId.equals(f.id())).toList());
     }
+
+    public void updateFromSync(List<SyncDtos.FavoriteDtos.FavoriteRecipeDto> items) {
+        cache.mergeById(items, SyncDtos.FavoriteDtos.FavoriteRecipeDto::id,
+                SyncDtos.FavoriteDtos.FavoriteRecipeDto::deleted);
+    }
 }

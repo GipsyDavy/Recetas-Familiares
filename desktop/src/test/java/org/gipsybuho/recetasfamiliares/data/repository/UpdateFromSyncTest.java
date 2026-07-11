@@ -43,6 +43,17 @@ class UpdateFromSyncTest {
     }
 
     @Test
+    void updateFromSyncFusionaDeltaYEliminaTombstones() {
+        RecipeRepository repo = new RecipeRepository(null, null);
+        repo.updateFromSync(List.of(recipe("r1", false), recipe("r2", false)), null, null);
+
+        repo.updateFromSync(List.of(recipe("r2", true), recipe("r3", false)), null, null);
+
+        assertEquals(List.of("r1", "r3"),
+                repo.getCache().getItems().stream().map(RecipeDtos.RecipeDto::id).toList());
+    }
+
+    @Test
     void updateFromSyncStockFiltraTombstonesYRespetaNull() {
         StockRepository repo = new StockRepository(null, null);
 

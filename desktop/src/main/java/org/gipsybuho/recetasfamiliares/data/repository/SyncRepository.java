@@ -6,9 +6,15 @@ import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 public class SyncRepository {
+
+    private static final int PULL_PAGE_SIZE = 200;
+    private static final int MAX_PULL_PAGES = 50;
 
     private final ApiClient api;
     private final AppSession session;
@@ -38,29 +44,52 @@ public class SyncRepository {
     /** Pull incremental changes from server and update in-memory caches. */
     public void pull() throws ApiException {
         String familyId = session.getFamilyId();
-        String since = session.getLastSyncTime();
-        String path = "api/v1/families/" + familyId + "/sync/pull"
-                + (since != null ? "?since=" + since : "");
+        String cursor = session.getLastSyncTime();
+        SyncAccumulator accumulator = new SyncAccumulator();
+        boolean completed = false;
+        String serverTime = null;
 
-        SyncDtos.SyncPullResponse response = api.get(path, SyncDtos.SyncPullResponse.class);
+        for (int page = 0; page < MAX_PULL_PAGES; page++) {
+            SyncDtos.SyncPullResponse response = api.get(
+                    buildPullPath(familyId, cursor),
+                    SyncDtos.SyncPullResponse.class);
+            accumulator.add(response);
+            if (response.serverTime() != null) {
+                serverTime = response.serverTime();
+            }
+            if (!response.hasMore()) {
+                completed = true;
+                break;
+            }
+            if (response.nextSince() == null || response.nextSince().isBlank()
+                    || response.nextSince().equals(cursor)) {
+                break;
+            }
+            cursor = response.nextSince();
+        }
+
+        String finalServerTime = serverTime;
+        boolean finalCompleted = completed;
 
         // Las caches son ObservableList enlazadas a la UI: mutarlas solo en el FX thread.
         // pull() se invoca desde hilos de fondo (MainWindow.triggerSync).
         Runnable applyCaches = () -> {
-            recipeRepo.updateFromSync(response.recipes(), response.ingredients(), response.steps());
-            stockRepo.updateFromSync(response.stockItems());
-            menuRepository.updateFromSync(response.menuItems());
-            shoppingListRepository.updateFromSync(response.shoppingLists());
-            favoriteRepository.getCache().replaceAll(response.favoriteRecipes() != null
-                    ? response.favoriteRecipes().stream().filter(f -> !f.deleted()).toList()
-                    : List.of());
+            recipeRepo.updateFromSync(accumulator.recipes, accumulator.ingredients, accumulator.steps);
+            recipeRepo.updatePhotosFromSync(accumulator.recipePhotos);
+            stockRepo.updateFromSync(accumulator.stockItems);
+            menuRepository.updateFromSync(accumulator.menuItems);
+            shoppingListRepository.updateFromSync(accumulator.shoppingLists, accumulator.shoppingListItems);
+            favoriteRepository.updateFromSync(accumulator.favoriteRecipes);
+            noteRepository.updateFromSync(accumulator.familyNotes);
         };
         if (Platform.isFxApplicationThread()) {
             applyCaches.run();
         } else {
             Platform.runLater(applyCaches);
         }
-        session.setLastSyncTime(response.serverTime());
+        if (finalCompleted && finalServerTime != null) {
+            session.setLastSyncTime(finalServerTime);
+        }
     }
 
     /** Push local changes. Currently sends empty collections — offline queue not yet implemented. */
@@ -68,5 +97,48 @@ public class SyncRepository {
         String familyId = session.getFamilyId();
         var request = new SyncDtos.SyncPushRequest(List.of(), List.of(), List.of());
         api.post("api/v1/families/" + familyId + "/sync/push", request, SyncDtos.SyncPullResponse.class);
+    }
+
+    private String buildPullPath(String familyId, String since) {
+        StringBuilder path = new StringBuilder("api/v1/families/")
+                .append(familyId)
+                .append("/sync/pull?limit=")
+                .append(PULL_PAGE_SIZE);
+        if (since != null && !since.isBlank()) {
+            path.append("&since=").append(URLEncoder.encode(since, StandardCharsets.UTF_8));
+        }
+        return path.toString();
+    }
+
+    private static final class SyncAccumulator {
+        private final List<org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos.RecipeDto> recipes = new ArrayList<>();
+        private final List<org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos.RecipeIngredientDto> ingredients = new ArrayList<>();
+        private final List<org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos.RecipeStepDto> steps = new ArrayList<>();
+        private final List<org.gipsybuho.recetasfamiliares.api.dto.StockDtos.StockItemDto> stockItems = new ArrayList<>();
+        private final List<SyncDtos.MenuDtos.MenuItemDto> menuItems = new ArrayList<>();
+        private final List<SyncDtos.ShoppingDtos.ShoppingListDto> shoppingLists = new ArrayList<>();
+        private final List<SyncDtos.ShoppingDtos.ShoppingListItemDto> shoppingListItems = new ArrayList<>();
+        private final List<SyncDtos.FavoriteDtos.FavoriteRecipeDto> favoriteRecipes = new ArrayList<>();
+        private final List<SyncDtos.NoteDtos.FamilyNoteDto> familyNotes = new ArrayList<>();
+        private final List<SyncDtos.PhotoDtos.RecipePhotoDto> recipePhotos = new ArrayList<>();
+
+        private void add(SyncDtos.SyncPullResponse response) {
+            addAll(recipes, response.recipes());
+            addAll(ingredients, response.ingredients());
+            addAll(steps, response.steps());
+            addAll(stockItems, response.stockItems());
+            addAll(menuItems, response.menuItems());
+            addAll(shoppingLists, response.shoppingLists());
+            addAll(shoppingListItems, response.shoppingListItems());
+            addAll(favoriteRecipes, response.favoriteRecipes());
+            addAll(familyNotes, response.familyNotes());
+            addAll(recipePhotos, response.recipePhotos());
+        }
+
+        private static <T> void addAll(List<T> target, List<T> source) {
+            if (source != null) {
+                target.addAll(source);
+            }
+        }
     }
 }

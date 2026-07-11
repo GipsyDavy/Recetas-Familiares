@@ -12,7 +12,7 @@
 # ==============================================================================
 
 param(
-    [string]$ApiUrl = "http://localhost:8080/",
+    [string]$ApiUrl = "https://recetas.167.233.213.242.sslip.io/",
     [string]$JdkPath = "",
     [switch]$AllowNonLtsJdk
 )

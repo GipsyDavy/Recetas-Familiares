@@ -23,6 +23,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 import org.gipsybuho.recetasfamiliares.core.FamilyRole;
+import org.gipsybuho.recetasfamiliares.core.ServerConfig;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -519,6 +520,7 @@ public class MainWindow {
 
         TabPane tabs = new TabPane(
                 new Tab("Apariencia", buildAppearanceTab(cbSounds)),
+                new Tab("Servidor", buildServerTab()),
                 new Tab("Acerca de", buildAboutTab()),
                 new Tab("Diagnostico", buildDiagnosticsTab())
         );
@@ -567,6 +569,16 @@ public class MainWindow {
                 "La fuente y el tamaño se aplican al guardar. El titulo y algunos elementos fijos mantienen su tamaño relativo.",
                 createTypographySelector()));
         content.getChildren().add(configPanel("Vista previa", null, buildThemePreview()));
+        return settingsScroll(content);
+    }
+
+    private ScrollPane buildServerTab() {
+        VBox content = new VBox(16);
+        content.getStyleClass().add("settings-tab-content");
+        content.getChildren().add(configPanel(
+                "Servidor",
+                "-Dapi.base.url mantiene precedencia sobre este ajuste.",
+                createServerConfigEditor()));
         return settingsScroll(content);
     }
 
@@ -688,6 +700,72 @@ public class MainWindow {
         grid.add(sizeCombo, 1, 1);
         grid.add(applyFont, 1, 2);
         return grid;
+    }
+
+    private Node createServerConfigEditor() {
+        TextField serverUrl = new TextField(backendUrl());
+        serverUrl.setPromptText(ServerConfig.DEFAULT_API_BASE_URL);
+        serverUrl.setMaxWidth(Double.MAX_VALUE);
+        serverUrl.setDisable(ServerConfig.hasSystemOverride());
+
+        Label status = new Label(ServerConfig.hasSystemOverride()
+                ? "Servidor fijado por parametro de arranque."
+                : "");
+        status.getStyleClass().add("settings-muted");
+        status.setWrapText(true);
+
+        Button save = new Button("Guardar servidor");
+        save.getStyleClass().add("action-button-primary");
+        save.setDisable(ServerConfig.hasSystemOverride());
+        save.setOnAction(e -> {
+            try {
+                String before = backendUrl();
+                ServerConfig.saveUserBaseUrl(serverUrl.getText());
+                String after = backendUrl();
+                serverUrl.setText(after);
+                if (!before.equals(after) && context.getSession().isLoggedIn()) {
+                    if (chatView != null) {
+                        chatView.onHidden();
+                    }
+                    context.getSession().clear();
+                    setStatus("Servidor actualizado. Inicia sesion de nuevo.");
+                    showLogin();
+                } else {
+                    setStatus("Servidor actualizado.");
+                    status.setText("Servidor configurado: " + after);
+                }
+            } catch (IllegalArgumentException ex) {
+                status.setText(ex.getMessage());
+                setStatus("URL de servidor no valida.");
+            }
+        });
+
+        Button reset = new Button("Usar servidor por defecto");
+        reset.getStyleClass().add("action-button-secondary");
+        reset.setDisable(ServerConfig.hasSystemOverride());
+        reset.setOnAction(e -> {
+            String before = backendUrl();
+            ServerConfig.resetUserBaseUrl();
+            String after = backendUrl();
+            serverUrl.setText(after);
+            if (!before.equals(after) && context.getSession().isLoggedIn()) {
+                if (chatView != null) {
+                    chatView.onHidden();
+                }
+                context.getSession().clear();
+                setStatus("Servidor restablecido. Inicia sesion de nuevo.");
+                showLogin();
+            } else {
+                setStatus("Servidor restablecido.");
+                status.setText("Servidor configurado: " + after);
+            }
+        });
+
+        HBox actions = new HBox(10, save, reset);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        VBox box = new VBox(10, serverUrl, actions, status);
+        box.setFillWidth(true);
+        return box;
     }
 
     private VBox buildThemePreview() {
@@ -1055,7 +1133,7 @@ public class MainWindow {
     }
 
     private String backendUrl() {
-        return System.getProperty("api.base.url", "http://localhost:8080/");
+        return ServerConfig.getBaseUrl();
     }
 
     private String nullSafe(String value) {

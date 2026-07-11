@@ -21,6 +21,12 @@ public class NoteRepository {
         cache.replaceAll(notes);
     }
 
+    /** Must be called on the JavaFX Application Thread. */
+    public void updateFromSync(List<SyncDtos.NoteDtos.FamilyNoteDto> notes) {
+        cache.mergeById(notes, SyncDtos.NoteDtos.FamilyNoteDto::id,
+                SyncDtos.NoteDtos.FamilyNoteDto::deleted);
+    }
+
     public NoteRepository(ApiClient api, AppSession session) {
         this.api = api;
         this.session = session;

@@ -3,7 +3,10 @@ package org.gipsybuho.recetasfamiliares.data.cache;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * In-memory ObservableList cache for a single entity type.
@@ -20,6 +23,32 @@ public class SimpleCache<T> {
     /** Replace the entire cached list. Must be called on the JavaFX Application Thread. */
     public void replaceAll(List<T> newItems) {
         items.setAll(newItems);
+    }
+
+    /** Merge server-side sync deltas by id. Must be called on the JavaFX Application Thread. */
+    public void mergeById(List<T> changes, Function<T, String> idExtractor, Predicate<T> deletedPredicate) {
+        if (changes == null) {
+            return;
+        }
+        LinkedHashMap<String, T> merged = new LinkedHashMap<>();
+        for (T item : items) {
+            String id = idExtractor.apply(item);
+            if (id != null) {
+                merged.put(id, item);
+            }
+        }
+        for (T change : changes) {
+            String id = idExtractor.apply(change);
+            if (id == null) {
+                continue;
+            }
+            if (deletedPredicate.test(change)) {
+                merged.remove(id);
+            } else {
+                merged.put(id, change);
+            }
+        }
+        items.setAll(merged.values());
     }
 
     /** Add a single item. Must be called on the JavaFX Application Thread. */

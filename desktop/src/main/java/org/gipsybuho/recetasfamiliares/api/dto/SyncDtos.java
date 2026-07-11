@@ -17,7 +17,9 @@ public final class SyncDtos {
             List<ShoppingDtos.ShoppingListItemDto> shoppingListItems,
             List<FavoriteDtos.FavoriteRecipeDto> favoriteRecipes,
             List<NoteDtos.FamilyNoteDto> familyNotes,
-            List<PhotoDtos.RecipePhotoDto> recipePhotos
+            List<PhotoDtos.RecipePhotoDto> recipePhotos,
+            boolean hasMore,
+            String nextSince
     ) {}
 
     public record SyncPushRequest(

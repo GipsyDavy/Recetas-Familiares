@@ -13,6 +13,7 @@ import javafx.scene.text.Text;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
+import org.gipsybuho.recetasfamiliares.core.ServerConfig;
 
 public class LoginView extends VBox {
 
@@ -22,6 +23,7 @@ public class LoginView extends VBox {
     private final TextField displayNameField = new TextField();
     private final TextField emailField    = new TextField();
     private final TextField familyNameField = new TextField();
+    private final TextField serverUrlField = new TextField();
     private final PasswordField passwordField   = new PasswordField();
     private final TextField passwordVisible     = new TextField();
     private final Button loginButton = new Button("Iniciar sesión");
@@ -71,6 +73,16 @@ public class LoginView extends VBox {
         familyNameField.setVisible(false);
         familyNameField.setManaged(false);
         familyNameField.setOnAction(e -> doSubmit());
+
+        serverUrlField.setText(ServerConfig.getBaseUrl());
+        serverUrlField.setPromptText(ServerConfig.DEFAULT_API_BASE_URL);
+        serverUrlField.getStyleClass().add("login-field");
+        serverUrlField.setMaxWidth(Double.MAX_VALUE);
+        serverUrlField.setDisable(ServerConfig.hasSystemOverride());
+        serverUrlField.setOnAction(e -> doSubmit());
+        Tooltip.install(serverUrlField, new Tooltip(ServerConfig.hasSystemOverride()
+                ? "Servidor fijado por parametro de arranque"
+                : "URL del servidor"));
 
         // ── Password field with show/hide toggle ──────────────────────────────
         passwordField.setPromptText("Contraseña");
@@ -125,7 +137,7 @@ public class LoginView extends VBox {
 
         // ── Card ──────────────────────────────────────────────────────────────
         VBox card = new VBox(14, logo, title, subtitle,
-                displayNameField, emailField, familyNameField, pwStack,
+                displayNameField, emailField, familyNameField, serverUrlField, pwStack,
                 loginButton, modeSwitchButton, errorLabel);
         card.getStyleClass().add("login-card");
         card.setAlignment(Pos.TOP_CENTER);
@@ -209,6 +221,15 @@ public class LoginView extends VBox {
         if (registerMode && password.length() < 12) {
             showError("La contraseña debe tener al menos 12 caracteres.");
             return;
+        }
+        if (!ServerConfig.hasSystemOverride()) {
+            try {
+                ServerConfig.saveUserBaseUrl(serverUrlField.getText());
+                serverUrlField.setText(ServerConfig.getBaseUrl());
+            } catch (IllegalArgumentException ex) {
+                showError(ex.getMessage());
+                return;
+            }
         }
 
         loginButton.setDisable(true);

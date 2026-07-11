@@ -5,12 +5,14 @@ import com.google.gson.GsonBuilder;
 import okhttp3.*;
 import org.gipsybuho.recetasfamiliares.api.dto.AuthDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
+import org.gipsybuho.recetasfamiliares.core.ServerConfig;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 public class ApiClient {
 
@@ -18,19 +20,23 @@ public class ApiClient {
 
     private final AppSession session;
     private final Gson gson;
-    private final String baseUrl;
+    private final Supplier<String> baseUrlSupplier;
     private final OkHttpClient client;
     // Separate client for token refresh — avoids authenticator recursion
     private final OkHttpClient refreshClient;
 
     public ApiClient(AppSession session) {
-        this(session, System.getProperty("api.base.url", "http://localhost:8080/"));
+        this(session, ServerConfig::getBaseUrl);
     }
 
     public ApiClient(AppSession session, String baseUrl) {
+        this(session, fixedBaseUrl(baseUrl));
+    }
+
+    private ApiClient(AppSession session, Supplier<String> baseUrlSupplier) {
         this.session = session;
         this.gson = new GsonBuilder().create();
-        this.baseUrl = normalizeBaseUrl(baseUrl);
+        this.baseUrlSupplier = baseUrlSupplier;
         this.refreshClient = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(15, TimeUnit.SECONDS)
@@ -46,7 +52,7 @@ public class ApiClient {
 
     public <T> T get(String path, Class<T> responseType) throws ApiException {
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .get()
                 .build();
@@ -56,7 +62,7 @@ public class ApiClient {
     public <T> T post(String path, Object body, Class<T> responseType) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .post(rb)
                 .build();
@@ -66,7 +72,7 @@ public class ApiClient {
     public <T> T postAuth(String path, Object body, Class<T> responseType) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .post(rb)
                 .build();
         return execute(request, responseType);
@@ -75,7 +81,7 @@ public class ApiClient {
     public <T> T put(String path, Object body, Class<T> responseType) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .put(rb)
                 .build();
@@ -85,7 +91,7 @@ public class ApiClient {
     public void put(String path, Object body) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .put(rb)
                 .build();
@@ -94,7 +100,7 @@ public class ApiClient {
 
     public void delete(String path) throws ApiException {
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .delete()
                 .build();
@@ -103,7 +109,7 @@ public class ApiClient {
 
     public <T> T delete(String path, Class<T> responseType) throws ApiException {
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .delete()
                 .build();
@@ -117,7 +123,7 @@ public class ApiClient {
                 .addFormDataPart(partName, file.getName(), fileBody)
                 .build();
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .post(multipart)
                 .build();
@@ -149,7 +155,7 @@ public class ApiClient {
             }
         }
         Request request = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url(path))
                 .header("Authorization", "Bearer " + session.getAccessToken())
                 .post(multipart.build())
                 .build();
@@ -186,7 +192,7 @@ public class ApiClient {
 
     /** Base URL normalizada (termina en "/"). Necesaria para derivar la URL WebSocket. */
     public String getBaseUrl() {
-        return baseUrl;
+        return ServerConfig.normalizeAndValidate(baseUrlSupplier.get());
     }
 
     /**
@@ -251,7 +257,7 @@ public class ApiClient {
         var refreshBody = new AuthDtos.RefreshRequest(refreshToken);
         RequestBody rb = RequestBody.create(gson.toJson(refreshBody), JSON);
         Request refreshRequest = new Request.Builder()
-                .url(baseUrl + "api/v1/auth/refresh")
+                .url(url("api/v1/auth/refresh"))
                 .post(rb)
                 .build();
 
@@ -275,7 +281,7 @@ public class ApiClient {
     }
 
     private boolean isApiOrigin(HttpUrl requested) {
-        HttpUrl base = HttpUrl.parse(baseUrl);
+        HttpUrl base = HttpUrl.parse(getBaseUrl());
         return base != null
                 && requested.scheme().equals(base.scheme())
                 && requested.host().equals(base.host())
@@ -287,7 +293,7 @@ public class ApiClient {
         if (requested == null || isApiOrigin(requested) || !isChatUploadPath(requested)) {
             return requested;
         }
-        HttpUrl base = HttpUrl.parse(baseUrl);
+        HttpUrl base = HttpUrl.parse(getBaseUrl());
         return base != null
                 ? base.newBuilder()
                         .encodedPath(requested.encodedPath())
@@ -308,10 +314,12 @@ public class ApiClient {
                 || path.startsWith("/uploads/chat_thumbnails/");
     }
 
-    private static String normalizeBaseUrl(String rawBaseUrl) {
-        String normalized = rawBaseUrl == null || rawBaseUrl.isBlank()
-                ? "http://localhost:8080/"
-                : rawBaseUrl;
-        return normalized.endsWith("/") ? normalized : normalized + "/";
+    private String url(String path) {
+        return getBaseUrl() + path;
+    }
+
+    private static Supplier<String> fixedBaseUrl(String rawBaseUrl) {
+        String normalized = ServerConfig.normalizeAndValidate(rawBaseUrl);
+        return () -> normalized;
     }
 }
