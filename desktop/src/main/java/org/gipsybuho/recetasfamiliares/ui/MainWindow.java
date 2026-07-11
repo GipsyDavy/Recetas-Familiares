@@ -131,7 +131,8 @@ public class MainWindow {
         // Conexion en segundo plano desde el login: permite avisar en la
         // sidebar de mensajes nuevos aunque el chat no este abierto.
         chatView.startRealtime();
-        profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus);
+        profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus,
+                this::showLogin);
         if (context.getSession().isAdmin()) {
             familyMembersView = new FamilyMembersView(context);
         }

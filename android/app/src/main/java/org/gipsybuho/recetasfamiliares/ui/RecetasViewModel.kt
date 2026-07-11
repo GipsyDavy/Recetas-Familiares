@@ -148,7 +148,91 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _email.value = null
         _avatarUrl.value = null
         _familyStats.value = null
+        _emailVerified.value = null
     }
+
+    // ── Ciclo de vida de cuenta (CRIT-2) ────────────────────────────────────
+
+    private val _emailVerified = MutableStateFlow<Boolean?>(null)
+    val emailVerified: StateFlow<Boolean?> = _emailVerified.asStateFlow()
+
+    /** Consulta /users/me para el estado de verificacion; offline deja null. */
+    fun loadAccountStatus() {
+        viewModelScope.launch {
+            runCatching { container.userRepository.me() }
+                .onSuccess { _emailVerified.value = it.emailVerified }
+        }
+    }
+
+    fun requestPasswordReset(email: String, onDone: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                container.authRepository.requestPasswordReset(email)
+            }.onSuccess { onDone() }
+                .onFailure {
+                    onError(
+                        if ((it as? retrofit2.HttpException)?.code() == 429)
+                            "Demasiados intentos. Espera un momento y vuelve a probar."
+                        else "No se pudo enviar el correo de recuperación"
+                    )
+                }
+        }
+    }
+
+    fun confirmPasswordReset(token: String, newPassword: String, onDone: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                container.authRepository.confirmPasswordReset(token, newPassword)
+            }.onSuccess { onDone() }
+                .onFailure { onError(accountErrorMessage(it, "No se pudo cambiar la contraseña")) }
+        }
+    }
+
+    fun requestEmailVerification() {
+        val email = container.sessionStore.email ?: return
+        viewModelScope.launch {
+            runCatching {
+                container.authRepository.requestEmailVerification(email)
+            }.onSuccess { _userMessage.emit("Correo de verificación enviado. Revisa tu bandeja.") }
+                .onFailure { _userMessage.emit("No se pudo enviar el correo de verificación") }
+        }
+    }
+
+    fun confirmEmailVerification(token: String) {
+        viewModelScope.launch {
+            runCatching {
+                container.authRepository.confirmEmailVerification(token)
+            }.onSuccess {
+                _emailVerified.value = true
+                _userMessage.emit("Correo verificado correctamente")
+            }.onFailure { _userMessage.emit("El código no es válido o ha caducado") }
+        }
+    }
+
+    fun deleteAccount(password: String, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                closeChat()
+                container.authRepository.deleteAccount(password)
+            }.onSuccess {
+                logout()
+            }.onFailure {
+                val message = when ((it as? retrofit2.HttpException)?.code()) {
+                    403 -> "Contraseña incorrecta"
+                    429 -> "Demasiados intentos. Espera un momento y vuelve a probar."
+                    else -> "No se pudo eliminar la cuenta"
+                }
+                onError(message)
+            }
+        }
+    }
+
+    private fun accountErrorMessage(error: Throwable, fallback: String): String =
+        when ((error as? retrofit2.HttpException)?.code()) {
+            429 -> "Demasiados intentos. Espera un momento y vuelve a probar."
+            400 -> "El código no es válido o ha caducado"
+            else -> fallback
+        }
 
     fun saveServerBaseUrl(rawBaseUrl: String, onError: (String) -> Unit): Boolean {
         val normalized = try {

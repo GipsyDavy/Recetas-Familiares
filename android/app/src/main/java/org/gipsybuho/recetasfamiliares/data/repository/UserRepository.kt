@@ -18,6 +18,9 @@ class UserRepository(
     private val api: RecetasApi,
     private val sessionStore: SessionStore
 ) {
+    /** Perfil propio con el estado de verificacion del correo (CRIT-2). */
+    suspend fun me(): UserResponseDto = api.getMe()
+
     suspend fun updateDisplayName(newName: String): UserResponseDto {
         val response = api.updateMe(UpdateUserRequestDto(newName.trim()))
         sessionStore.displayName = response.displayName

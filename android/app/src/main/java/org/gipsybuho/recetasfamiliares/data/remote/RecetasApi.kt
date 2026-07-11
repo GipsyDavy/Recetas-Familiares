@@ -24,7 +24,12 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ConfirmEmailVerificationRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ConfirmPasswordResetRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.DeleteAccountRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.EmailVerificationRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PasswordResetRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRatingRequestDto
@@ -45,6 +50,7 @@ import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -66,6 +72,24 @@ interface RecetasApi {
 
     @POST("api/v1/auth/login")
     suspend fun login(@Body request: LoginRequestDto): AuthResponseDto
+
+    // ── Ciclo de vida de cuenta (CRIT-2) ────────────────────────────────────
+
+    @POST("api/v1/auth/password-reset/request")
+    suspend fun requestPasswordReset(@Body request: PasswordResetRequestDto)
+
+    @POST("api/v1/auth/password-reset/confirm")
+    suspend fun confirmPasswordReset(@Body request: ConfirmPasswordResetRequestDto)
+
+    @POST("api/v1/auth/email-verification/request")
+    suspend fun requestEmailVerification(@Body request: EmailVerificationRequestDto)
+
+    @POST("api/v1/auth/email-verification/confirm")
+    suspend fun confirmEmailVerification(@Body request: ConfirmEmailVerificationRequestDto)
+
+    // DELETE con body: Retrofit lo exige via @HTTP(hasBody = true)
+    @HTTP(method = "DELETE", path = "api/v1/auth/account", hasBody = true)
+    suspend fun deleteAccount(@Body request: DeleteAccountRequestDto)
 
     @GET("api/v1/families")
     suspend fun families(): List<FamilyDto>

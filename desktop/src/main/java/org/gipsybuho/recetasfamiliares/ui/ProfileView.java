@@ -34,6 +34,7 @@ public class ProfileView extends ScrollPane {
     private final Stage stage;
     private final Runnable onUserInfoChanged;
     private final java.util.function.Consumer<String> onStatus;
+    private final Runnable onAccountDeleted;
 
     private final StackPane avatarSlot = new StackPane();
     private final Label nameLabel = new Label();
@@ -41,15 +42,18 @@ public class ProfileView extends ScrollPane {
     private final Label familyLabel = new Label();
     private final Label roleBadge = new Label();
     private final HBox statsSection = new HBox(16);
+    private final Label verificationLabel = new Label();
+    private final HBox verificationActions = new HBox(10);
     // Solo se toca en FX thread: invalida cargas de avatar antiguas que lleguen tarde
     private int avatarLoadGeneration = 0;
 
     public ProfileView(AppContext context, Stage stage, Runnable onUserInfoChanged,
-                       java.util.function.Consumer<String> onStatus) {
+                       java.util.function.Consumer<String> onStatus, Runnable onAccountDeleted) {
         this.context = context;
         this.stage = stage;
         this.onUserInfoChanged = onUserInfoChanged;
         this.onStatus = onStatus;
+        this.onAccountDeleted = onAccountDeleted;
         build();
     }
 
@@ -64,7 +68,8 @@ public class ProfileView extends ScrollPane {
         subtitle.getStyleClass().add("settings-muted");
         VBox header = new VBox(3, title, subtitle);
 
-        VBox content = new VBox(18, header, buildIdentityCard(), buildFamilyCard(), buildHelpCard());
+        VBox content = new VBox(18, header, buildIdentityCard(), buildFamilyCard(),
+                buildAccountCard(), buildHelpCard());
         content.getStyleClass().add("settings-tab-content");
         content.setPadding(new Insets(24, 28, 28, 28));
         setContent(content);
@@ -119,6 +124,41 @@ public class ProfileView extends ScrollPane {
         return card;
     }
 
+    private VBox buildAccountCard() {
+        Label sectionTitle = new Label("Cuenta");
+        sectionTitle.getStyleClass().add("settings-section-title");
+
+        verificationLabel.getStyleClass().add("settings-muted");
+        verificationLabel.setWrapText(true);
+        verificationLabel.setText("Comprobando estado del correo...");
+
+        Button sendVerificationBtn = new Button("Enviar correo de verificación");
+        sendVerificationBtn.getStyleClass().add("action-button-secondary");
+        sendVerificationBtn.setOnAction(e -> requestEmailVerification(sendVerificationBtn));
+
+        Button haveCodeBtn = new Button("Ya tengo el código");
+        haveCodeBtn.getStyleClass().add("action-button-secondary");
+        haveCodeBtn.setOnAction(e -> confirmEmailVerification());
+
+        verificationActions.getChildren().setAll(sendVerificationBtn, haveCodeBtn);
+        verificationActions.setVisible(false);
+        verificationActions.setManaged(false);
+
+        Label dangerLabel = new Label("Eliminar tu cuenta borra tu acceso y anonimiza tus datos personales. "
+                + "Esta acción no se puede deshacer.");
+        dangerLabel.getStyleClass().add("settings-muted");
+        dangerLabel.setWrapText(true);
+
+        Button deleteAccountBtn = new Button("Eliminar cuenta");
+        deleteAccountBtn.getStyleClass().add("logout-button");
+        deleteAccountBtn.setOnAction(e -> confirmDeleteAccount());
+
+        VBox card = new VBox(10, sectionTitle, verificationLabel, verificationActions,
+                new Separator(), dangerLabel, deleteAccountBtn);
+        card.getStyleClass().add("settings-section");
+        return card;
+    }
+
     private VBox buildHelpCard() {
         Label sectionTitle = new Label("Ayuda");
         sectionTitle.getStyleClass().add("settings-section-title");
@@ -147,6 +187,32 @@ public class ProfileView extends ScrollPane {
         updateRoleBadge(null);
         familyLabel.setText("Cargando...");
         loadFamilyInfo();
+        loadVerificationState();
+    }
+
+    /** Consulta /users/me para saber si el correo esta verificado (CRIT-2). */
+    private void loadVerificationState() {
+        verificationLabel.setText("Comprobando estado del correo...");
+        verificationActions.setVisible(false);
+        verificationActions.setManaged(false);
+        Thread.ofVirtual().start(() -> {
+            try {
+                var me = context.getUserRepository().fetchMe();
+                Platform.runLater(() -> {
+                    if (me.emailVerified()) {
+                        verificationLabel.setText("✓ Correo verificado");
+                    } else {
+                        verificationLabel.setText("Tu correo aún no está verificado. "
+                                + "Verifícalo para poder recuperar tu cuenta si olvidas la contraseña.");
+                        verificationActions.setVisible(true);
+                        verificationActions.setManaged(true);
+                    }
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() ->
+                        verificationLabel.setText("Estado del correo no disponible sin conexión."));
+            }
+        });
     }
 
     private void renderAvatar(String displayName) {
@@ -347,6 +413,96 @@ public class ProfileView extends ScrollPane {
             } catch (Exception ex) {
                 Platform.runLater(() -> onStatus.accept("Error al subir la foto: " + ex.getMessage()));
             }
+        });
+    }
+
+    private void requestEmailVerification(Button trigger) {
+        String email = context.getSession().getEmail();
+        if (email == null || email.isBlank()) {
+            onStatus.accept("No hay correo en la sesión.");
+            return;
+        }
+        trigger.setDisable(true);
+        Thread.ofVirtual().start(() -> {
+            try {
+                context.getAuthRepository().requestEmailVerification(email);
+                Platform.runLater(() -> {
+                    trigger.setDisable(false);
+                    onStatus.accept("Correo de verificación enviado. Revisa tu bandeja de entrada.");
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    trigger.setDisable(false);
+                    onStatus.accept("No se pudo enviar el correo de verificación.");
+                });
+            }
+        });
+    }
+
+    private void confirmEmailVerification() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Verificar correo");
+        dialog.setHeaderText(null);
+        dialog.setContentText("Código del correo:");
+        DialogStyler.apply(dialog);
+        dialog.showAndWait().ifPresent(token -> {
+            if (token.isBlank()) return;
+            Thread.ofVirtual().start(() -> {
+                try {
+                    context.getAuthRepository().confirmEmailVerification(token);
+                    Platform.runLater(() -> {
+                        onStatus.accept("Correo verificado correctamente.");
+                        loadVerificationState();
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() ->
+                            onStatus.accept("El código no es válido o ha caducado."));
+                }
+            });
+        });
+    }
+
+    private void confirmDeleteAccount() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Eliminar cuenta");
+        dialog.initOwner(stage);
+
+        Label warning = new Label("Vas a eliminar tu cuenta de forma permanente. "
+                + "Perderás el acceso y tus datos personales se anonimizarán. "
+                + "Escribe tu contraseña para confirmar.");
+        warning.setWrapText(true);
+
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Contraseña actual");
+
+        VBox content = new VBox(12, warning, passwordField);
+        content.setPrefWidth(380);
+        dialog.getDialogPane().setContent(content);
+
+        ButtonType deleteType = new ButtonType("Eliminar cuenta", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(deleteType, ButtonType.CANCEL);
+        DialogStyler.apply(dialog);
+        Button deleteBtn = (Button) dialog.getDialogPane().lookupButton(deleteType);
+        deleteBtn.getStyleClass().add("logout-button");
+        deleteBtn.disableProperty().bind(passwordField.textProperty().isEmpty());
+
+        dialog.showAndWait().ifPresent(result -> {
+            if (result != deleteType) return;
+            String password = passwordField.getText();
+            Thread.ofVirtual().start(() -> {
+                try {
+                    context.getAuthRepository().deleteAccount(password);
+                    Platform.runLater(onAccountDeleted);
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        String message = (ex instanceof org.gipsybuho.recetasfamiliares.api.ApiException apiEx
+                                && apiEx.getHttpStatus() == 403)
+                                ? "Contraseña incorrecta."
+                                : "No se pudo eliminar la cuenta.";
+                        onStatus.accept(message);
+                    });
+                }
+            });
         });
     }
 

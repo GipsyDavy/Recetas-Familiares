@@ -24,8 +24,22 @@ data class AuthUserDto(
     val displayName: String
 )
 
-data class UserResponseDto(val id: String, val email: String, val displayName: String, val avatarUrl: String? = null)
+data class UserResponseDto(
+    val id: String,
+    val email: String,
+    val displayName: String,
+    val avatarUrl: String? = null,
+    val emailVerified: Boolean = false
+)
 data class UpdateUserRequestDto(val displayName: String)
+
+// ── Ciclo de vida de cuenta (CRIT-2) ──────────────────────────────────────────
+
+data class PasswordResetRequestDto(val email: String)
+data class ConfirmPasswordResetRequestDto(val token: String, val newPassword: String)
+data class EmailVerificationRequestDto(val email: String)
+data class ConfirmEmailVerificationRequestDto(val token: String)
+data class DeleteAccountRequestDto(val password: String)
 
 data class AuthFamilyDto(
     val id: String,

@@ -28,6 +28,7 @@ public class LoginView extends VBox {
     private final TextField passwordVisible     = new TextField();
     private final Button loginButton = new Button("Iniciar sesión");
     private final Button modeSwitchButton = new Button("Crear cuenta");
+    private final Hyperlink forgotPasswordLink = new Hyperlink("¿Has olvidado tu contraseña?");
     private final Label errorLabel   = new Label();
     private boolean showingPassword  = false;
     private boolean registerMode = false;
@@ -128,6 +129,13 @@ public class LoginView extends VBox {
         modeSwitchButton.setMaxWidth(Double.MAX_VALUE);
         modeSwitchButton.setOnAction(e -> setRegisterMode(!registerMode));
 
+        forgotPasswordLink.setFocusTraversable(false);
+        forgotPasswordLink.setOnAction(e -> {
+            forgotPasswordLink.setVisited(false);
+            PasswordResetDialog.show(getScene() != null ? getScene().getWindow() : null,
+                    context.getAuthRepository(), emailField.getText());
+        });
+
         // ── Error label ───────────────────────────────────────────────────────
         errorLabel.getStyleClass().add("login-error");
         errorLabel.setVisible(false);
@@ -138,7 +146,7 @@ public class LoginView extends VBox {
         // ── Card ──────────────────────────────────────────────────────────────
         VBox card = new VBox(14, logo, title, subtitle,
                 displayNameField, emailField, familyNameField, serverUrlField, pwStack,
-                loginButton, modeSwitchButton, errorLabel);
+                loginButton, modeSwitchButton, forgotPasswordLink, errorLabel);
         card.getStyleClass().add("login-card");
         card.setAlignment(Pos.TOP_CENTER);
         card.setMaxWidth(420);
@@ -173,6 +181,8 @@ public class LoginView extends VBox {
         familyNameField.setManaged(enabled);
         loginButton.setText(enabled ? "Crear cuenta" : "Iniciar sesión");
         modeSwitchButton.setText(enabled ? "Ya tengo cuenta" : "Crear cuenta");
+        forgotPasswordLink.setVisible(!enabled);
+        forgotPasswordLink.setManaged(!enabled);
         hideError();
         if (enabled) {
             displayNameField.requestFocus();

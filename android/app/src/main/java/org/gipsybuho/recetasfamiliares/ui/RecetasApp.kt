@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
@@ -61,6 +62,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -125,6 +127,15 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
     var password by remember { mutableStateOf("") }
     var serverUrl by remember(configuredServerUrl) { mutableStateOf(configuredServerUrl) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showForgotPassword by remember { mutableStateOf(false) }
+
+    if (showForgotPassword) {
+        ForgotPasswordDialog(
+            viewModel = viewModel,
+            prefillEmail = email,
+            onDismiss = { showForgotPassword = false }
+        )
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(Spacing.xxl),
@@ -194,7 +205,127 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
                 modifier = Modifier.size(18.dp)
             )
         }
+        TextButton(
+            onClick = {
+                error = null
+                if (viewModel.saveServerBaseUrl(serverUrl) { error = it }) {
+                    showForgotPassword = true
+                }
+            }
+        ) {
+            Text("¿Has olvidado tu contraseña?")
+        }
     }
+}
+
+/**
+ * Recuperacion de contraseña en dos pasos (CRIT-2): pedir el correo y despues
+ * pegar el codigo recibido junto a la nueva contraseña. El backend responde
+ * 202 exista o no la cuenta (anti-enumeracion).
+ */
+@Composable
+private fun ForgotPasswordDialog(
+    viewModel: RecetasViewModel,
+    prefillEmail: String,
+    onDismiss: () -> Unit
+) {
+    var step by remember { mutableStateOf(1) }
+    var resetEmail by remember { mutableStateOf(prefillEmail) }
+    var token by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var repeatPassword by remember { mutableStateOf("") }
+    var dialogError by remember { mutableStateOf<String?>(null) }
+    var working by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!working) onDismiss() },
+        title = { Text(if (done) "Contraseña actualizada" else "Recuperar contraseña") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                when {
+                    done -> Text("Ya puedes iniciar sesión con tu nueva contraseña.")
+                    step == 1 -> {
+                        Text("Te enviaremos un correo con un código de recuperación.")
+                        OutlinedTextField(
+                            value = resetEmail, onValueChange = { resetEmail = it },
+                            label = { Text("Email") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    else -> {
+                        Text("Pega el código del correo y elige tu nueva contraseña.")
+                        OutlinedTextField(
+                            value = token, onValueChange = { token = it },
+                            label = { Text("Código del correo") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = newPassword, onValueChange = { newPassword = it },
+                            label = { Text("Nueva contraseña (mín. 12)") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true, modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = repeatPassword, onValueChange = { repeatPassword = it },
+                            label = { Text("Repite la contraseña") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true, modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                dialogError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            when {
+                done -> Button(onClick = onDismiss) { Text("Entendido") }
+                step == 1 -> Button(
+                    enabled = !working && resetEmail.contains("@"),
+                    onClick = {
+                        dialogError = null
+                        working = true
+                        viewModel.requestPasswordReset(
+                            resetEmail,
+                            onDone = { working = false; step = 2 },
+                            onError = { working = false; dialogError = it }
+                        )
+                    }
+                ) { Text("Enviar correo") }
+                else -> Button(
+                    enabled = !working && token.isNotBlank(),
+                    onClick = {
+                        when {
+                            newPassword.length < 12 ->
+                                dialogError = "La contraseña debe tener al menos 12 caracteres"
+                            newPassword != repeatPassword ->
+                                dialogError = "Las contraseñas no coinciden"
+                            else -> {
+                                dialogError = null
+                                working = true
+                                viewModel.confirmPasswordReset(
+                                    token, newPassword,
+                                    onDone = { working = false; done = true },
+                                    onError = { working = false; dialogError = it }
+                                )
+                            }
+                        }
+                    }
+                ) { Text("Cambiar contraseña") }
+            }
+        },
+        dismissButton = {
+            if (!done) {
+                if (step == 1) {
+                    TextButton(onClick = { dialogError = null; step = 2 }) { Text("Ya tengo el código") }
+                } else {
+                    TextButton(enabled = !working, onClick = onDismiss) { Text("Cancelar") }
+                }
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

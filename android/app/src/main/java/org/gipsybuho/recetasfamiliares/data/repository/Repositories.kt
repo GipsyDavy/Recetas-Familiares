@@ -32,7 +32,12 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ConfirmEmailVerificationRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.ConfirmPasswordResetRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.DeleteAccountRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.EmailVerificationRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PasswordResetRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.MenuItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientDto
@@ -110,6 +115,27 @@ class AuthRepository(
     }
 
     fun logout() {
+        sessionStore.clear()
+    }
+
+    // ── Ciclo de vida de cuenta (CRIT-2) ────────────────────────────────────
+
+    /** 202 exista o no la cuenta (anti-enumeracion): exito = "aceptado". */
+    suspend fun requestPasswordReset(email: String) =
+        api.requestPasswordReset(PasswordResetRequestDto(email.trim()))
+
+    suspend fun confirmPasswordReset(token: String, newPassword: String) =
+        api.confirmPasswordReset(ConfirmPasswordResetRequestDto(token.trim(), newPassword))
+
+    suspend fun requestEmailVerification(email: String) =
+        api.requestEmailVerification(EmailVerificationRequestDto(email.trim()))
+
+    suspend fun confirmEmailVerification(token: String) =
+        api.confirmEmailVerification(ConfirmEmailVerificationRequestDto(token.trim()))
+
+    /** Borra (anonimiza) la cuenta autenticada; exige password actual. Limpia la sesion local. */
+    suspend fun deleteAccount(password: String) {
+        api.deleteAccount(DeleteAccountRequestDto(password))
         sessionStore.clear()
     }
 }

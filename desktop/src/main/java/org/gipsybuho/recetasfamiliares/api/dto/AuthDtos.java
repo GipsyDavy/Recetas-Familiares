@@ -22,4 +22,14 @@ public final class AuthDtos {
             // legacy flat fields kept for backwards compat with older backend versions
             String familyId
     ) {}
+
+    public record PasswordResetRequest(String email) {}
+
+    public record ConfirmPasswordResetRequest(String token, String newPassword) {}
+
+    public record EmailVerificationRequest(String email) {}
+
+    public record ConfirmEmailVerificationRequest(String token) {}
+
+    public record DeleteAccountRequest(String password) {}
 }

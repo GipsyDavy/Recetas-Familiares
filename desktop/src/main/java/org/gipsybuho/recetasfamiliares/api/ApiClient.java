@@ -107,6 +107,17 @@ public class ApiClient {
         executeVoid(request);
     }
 
+    /** DELETE con body JSON (p. ej. borrado de cuenta que exige password actual). */
+    public void deleteWithBody(String path, Object body) throws ApiException {
+        RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
+        Request request = new Request.Builder()
+                .url(url(path))
+                .header("Authorization", "Bearer " + session.getAccessToken())
+                .delete(rb)
+                .build();
+        executeVoid(request);
+    }
+
     public <T> T delete(String path, Class<T> responseType) throws ApiException {
         Request request = new Request.Builder()
                 .url(url(path))

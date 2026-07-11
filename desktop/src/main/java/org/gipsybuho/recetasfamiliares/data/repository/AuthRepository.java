@@ -40,6 +40,40 @@ public class AuthRepository {
         }
     }
 
+    /**
+     * Solicita el email de recuperacion. El backend responde 202 exista o no la
+     * cuenta (anti-enumeracion), asi que el exito aqui solo significa "aceptado".
+     */
+    public void requestPasswordReset(String email) throws ApiException {
+        api.postAuth("api/v1/auth/password-reset/request",
+                new AuthDtos.PasswordResetRequest(email.trim()), Void.class);
+    }
+
+    /** Cambia la password con el token recibido por email. Revoca las sesiones activas. */
+    public void confirmPasswordReset(String token, String newPassword) throws ApiException {
+        api.postAuth("api/v1/auth/password-reset/confirm",
+                new AuthDtos.ConfirmPasswordResetRequest(token.trim(), newPassword), Void.class);
+    }
+
+    public void requestEmailVerification(String email) throws ApiException {
+        api.postAuth("api/v1/auth/email-verification/request",
+                new AuthDtos.EmailVerificationRequest(email.trim()), Void.class);
+    }
+
+    public void confirmEmailVerification(String token) throws ApiException {
+        api.postAuth("api/v1/auth/email-verification/confirm",
+                new AuthDtos.ConfirmEmailVerificationRequest(token.trim()), Void.class);
+    }
+
+    /**
+     * Borra (anonimiza) la cuenta autenticada. Exige la password actual.
+     * Si el backend acepta, limpia la sesion local; el llamador vuelve al login.
+     */
+    public void deleteAccount(String password) throws ApiException {
+        api.deleteWithBody("api/v1/auth/account", new AuthDtos.DeleteAccountRequest(password));
+        session.clear();
+    }
+
     public void logout() {
         try {
             api.post("api/v1/auth/logout", "{}", Void.class);

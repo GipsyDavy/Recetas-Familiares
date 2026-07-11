@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
@@ -68,7 +69,27 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     var serverUrlInput by remember(serverBaseUrl) { mutableStateOf(serverBaseUrl) }
     var serverUrlError by remember { mutableStateOf<String?>(null) }
     var showInvite  by remember { mutableStateOf(false) }
+    var showVerifyCode by remember { mutableStateOf(false) }
+    var showDeleteAccount by remember { mutableStateOf(false) }
+    val emailVerified by viewModel.emailVerified.collectAsState()
     val context     = LocalContext.current
+
+    if (showVerifyCode) {
+        VerifyEmailCodeDialog(
+            onDismiss = { showVerifyCode = false },
+            onConfirm = { code ->
+                viewModel.confirmEmailVerification(code)
+                showVerifyCode = false
+            }
+        )
+    }
+
+    if (showDeleteAccount) {
+        DeleteAccountDialog(
+            viewModel = viewModel,
+            onDismiss = { showDeleteAccount = false }
+        )
+    }
 
     if (showInvite) {
         InviteMemberDialog(
@@ -203,7 +224,10 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             }
         }
 
-        LaunchedEffect(Unit) { viewModel.loadFamilyStats() }
+        LaunchedEffect(Unit) {
+            viewModel.loadFamilyStats()
+            viewModel.loadAccountStatus()
+        }
         val recipes by viewModel.recipes.collectAsState()
         val familyStats by viewModel.familyStats.collectAsState()
         if (familyStats != null || recipes.isNotEmpty()) {
@@ -266,6 +290,51 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
                 Spacer(Modifier.size(Spacing.sm))
                 Text("Invitar miembro a la familia")
             }
+        }
+
+        Spacer(Modifier.height(Spacing.lg))
+        Text(
+            "Cuenta",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        when (emailVerified) {
+            true -> Text(
+                "✓ Correo verificado",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            false -> {
+                Text(
+                    "Tu correo aún no está verificado. Verifícalo para poder recuperar tu cuenta si olvidas la contraseña.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { viewModel.requestEmailVerification() },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Enviar correo") }
+                    OutlinedButton(
+                        onClick = { showVerifyCode = true },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Ya tengo el código") }
+                }
+            }
+            null -> Text(
+                "Estado del correo no disponible sin conexión.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        OutlinedButton(
+            onClick = { showDeleteAccount = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Text("Eliminar cuenta")
         }
 
         Spacer(Modifier.weight(1f))
@@ -361,6 +430,78 @@ private fun StatItem(modifier: Modifier = Modifier, value: String, label: String
             )
         }
     }
+}
+
+@Composable
+private fun VerifyEmailCodeDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var code by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Verificar correo") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                Text("Pega el código que has recibido por correo.")
+                OutlinedTextField(
+                    value = code, onValueChange = { code = it },
+                    label = { Text("Código del correo") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(code.trim()) }, enabled = code.isNotBlank()) {
+                Text("Verificar")
+            }
+        },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
+}
+
+@Composable
+private fun DeleteAccountDialog(viewModel: RecetasViewModel, onDismiss: () -> Unit) {
+    var password by remember { mutableStateOf("") }
+    var dialogError by remember { mutableStateOf<String?>(null) }
+    var working by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = { if (!working) onDismiss() },
+        title = { Text("Eliminar cuenta") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                Text(
+                    "Vas a eliminar tu cuenta de forma permanente. Perderás el acceso y " +
+                        "tus datos personales se anonimizarán. Esta acción no se puede deshacer."
+                )
+                OutlinedTextField(
+                    value = password, onValueChange = { password = it },
+                    label = { Text("Contraseña actual") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                dialogError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    dialogError = null
+                    working = true
+                    // Si el borrado triunfa, el ViewModel hace logout y la app vuelve al login
+                    viewModel.deleteAccount(password) {
+                        working = false
+                        dialogError = it
+                    }
+                },
+                enabled = !working && password.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) { Text("Eliminar cuenta") }
+        },
+        dismissButton = {
+            OutlinedButton(enabled = !working, onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
