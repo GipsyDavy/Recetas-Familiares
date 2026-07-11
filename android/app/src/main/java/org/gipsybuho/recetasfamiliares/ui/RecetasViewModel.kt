@@ -274,6 +274,41 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    private val _familyMembers = MutableStateFlow<List<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto>>(emptyList())
+    val familyMembers: StateFlow<List<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto>> = _familyMembers.asStateFlow()
+
+    private val _familyInfo = MutableStateFlow<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto?>(null)
+    val familyInfo: StateFlow<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto?> = _familyInfo.asStateFlow()
+
+    /** Nombre e imagen del grupo familiar activo. */
+    fun loadFamilyInfo() {
+        viewModelScope.launch {
+            runCatching { container.familyMemberRepository.currentFamily() }
+                .onSuccess { _familyInfo.value = it }
+        }
+    }
+
+    fun uploadFamilyAvatar(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                container.familyMemberRepository.uploadFamilyAvatar(context, uri)
+            }.onSuccess {
+                _familyInfo.value = it
+                _userMessage.emit("Imagen del grupo actualizada")
+            }.onFailure {
+                _userMessage.emit("No se pudo actualizar la imagen del grupo")
+            }
+        }
+    }
+
+    /** Lista de miembros de la familia; offline mantiene la ultima carga en memoria. */
+    fun loadFamilyMembers() {
+        viewModelScope.launch {
+            runCatching { container.familyMemberRepository.members() }
+                .onSuccess { _familyMembers.value = it }
+        }
+    }
+
     /** Carga las stats del servidor; si falla (offline) se mantiene el fallback local. */
     fun loadFamilyStats() {
         viewModelScope.launch {

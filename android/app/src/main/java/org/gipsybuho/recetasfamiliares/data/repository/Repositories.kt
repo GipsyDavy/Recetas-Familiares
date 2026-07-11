@@ -154,6 +154,29 @@ class FamilyMemberRepository(
         val familyId = sessionStore.familyId ?: return null
         return api.familyStats(familyId)
     }
+
+    suspend fun members(): List<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto> {
+        val familyId = sessionStore.familyId ?: return emptyList()
+        return api.familyMembers(familyId)
+    }
+
+    /** Datos de la familia activa (nombre + imagen de grupo). */
+    suspend fun currentFamily(): org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto? {
+        val familyId = sessionStore.familyId ?: return null
+        return api.families().firstOrNull { it.id == familyId }
+    }
+
+    /** Sube la imagen del grupo (backend exige OWNER/ADMIN). */
+    suspend fun uploadFamilyAvatar(
+        context: android.content.Context,
+        uri: android.net.Uri
+    ): org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto {
+        val familyId = sessionStore.familyId ?: error("No family session")
+        val bytes = compressAvatarImage(context, uri)
+        val body = bytes.toRequestBody("image/jpeg".toMediaType())
+        val part = okhttp3.MultipartBody.Part.createFormData("file", "family-avatar.jpg", body)
+        return api.uploadFamilyAvatar(familyId, part)
+    }
 }
 
 class RecipeRepository(

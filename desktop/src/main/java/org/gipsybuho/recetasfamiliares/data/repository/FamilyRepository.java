@@ -53,6 +53,12 @@ public class FamilyRepository {
         api.delete("api/v1/families/" + familyId + "/members/" + userId);
     }
 
+    /** Sube la imagen del grupo familiar (OWNER/ADMIN only). */
+    public FamilyDtos.FamilyResponse uploadAvatar(String familyId, java.io.File file) throws ApiException {
+        return api.postMultipart("api/v1/families/" + familyId + "/avatar", file, "file",
+                FamilyDtos.FamilyResponse.class);
+    }
+
     /**
      * Calls GET /api/v1/families, reads the role from the first family in the list,
      * and persists it in the session. Defaults to MEMBER on any error (fail-safe).

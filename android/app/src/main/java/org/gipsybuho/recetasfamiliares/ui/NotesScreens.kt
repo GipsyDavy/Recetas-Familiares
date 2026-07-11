@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.animation.Crossfade
@@ -124,8 +125,13 @@ internal fun NotesScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Notas familiares", style = MaterialTheme.typography.headlineSmall)
-                        IconButton(onClick = { showCreateForm = true }) {
-                            Icon(Icons.Filled.Add, contentDescription = "Nueva nota")
+                        Row {
+                            IconButton(onClick = { viewModel.refresh() }, enabled = !isRefreshing) {
+                                Icon(Icons.Filled.Refresh, contentDescription = "Actualizar notas")
+                            }
+                            IconButton(onClick = { showCreateForm = true }) {
+                                Icon(Icons.Filled.Add, contentDescription = "Nueva nota")
+                            }
                         }
                     }
                     error?.let {

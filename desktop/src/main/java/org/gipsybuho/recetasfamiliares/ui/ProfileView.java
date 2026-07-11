@@ -44,6 +44,10 @@ public class ProfileView extends ScrollPane {
     private final HBox statsSection = new HBox(16);
     private final Label verificationLabel = new Label();
     private final HBox verificationActions = new HBox(10);
+    private final StackPane familyAvatarSlot = new StackPane();
+    private final Button changeFamilyPhotoBtn = new Button("Cambiar imagen del grupo");
+    // Solo FX thread: invalida cargas antiguas del avatar de familia
+    private int familyAvatarLoadGeneration = 0;
     // Solo se toca en FX thread: invalida cargas de avatar antiguas que lleguen tarde
     private int avatarLoadGeneration = 0;
 
@@ -112,14 +116,24 @@ public class ProfileView extends ScrollPane {
         Label sectionTitle = new Label("Mi familia");
         sectionTitle.getStyleClass().add("settings-section-title");
 
+        familyAvatarSlot.setPrefSize(44, 44);
+        familyAvatarSlot.setMinSize(44, 44);
+        familyAvatarSlot.setMaxSize(44, 44);
+
         familyLabel.getStyleClass().add("profile-family-name");
         roleBadge.getStyleClass().add("profile-role-badge");
-        HBox familyRow = new HBox(10, familyLabel, roleBadge);
+        HBox familyRow = new HBox(10, familyAvatarSlot, familyLabel, roleBadge);
         familyRow.setAlignment(Pos.CENTER_LEFT);
+
+        changeFamilyPhotoBtn.getStyleClass().add("action-button-secondary");
+        changeFamilyPhotoBtn.setOnAction(e -> chooseAndUploadFamilyAvatar());
+        boolean isAdmin = context.getSession().isAdmin();
+        changeFamilyPhotoBtn.setVisible(isAdmin);
+        changeFamilyPhotoBtn.setManaged(isAdmin);
 
         statsSection.setPadding(new Insets(6, 0, 0, 0));
 
-        VBox card = new VBox(10, sectionTitle, familyRow, statsSection);
+        VBox card = new VBox(10, sectionTitle, familyRow, changeFamilyPhotoBtn, statsSection);
         card.getStyleClass().add("settings-section");
         return card;
     }
@@ -311,12 +325,83 @@ public class ProfileView extends ScrollPane {
                     }
                     familyLabel.setText(selected.name() != null ? selected.name() : "Sin nombre");
                     updateRoleBadge(selected.role());
+                    renderFamilyAvatar(selected.name(), selected.avatarUrl());
                     loadFamilyStats(selected.id());
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
                     familyLabel.setText("Familia no disponible sin conexión");
                     loadFamilyStats(context.getSession().getFamilyId());
+                });
+            }
+        });
+    }
+
+    /** Imagen del grupo familiar (punto 15 del roadmap); fallback a inicial del nombre. */
+    private void renderFamilyAvatar(String familyName, String avatarUrl) {
+        int generation = ++familyAvatarLoadGeneration;
+        Label fallback = new Label(familyName != null && !familyName.isBlank()
+                ? String.valueOf(Character.toUpperCase(familyName.charAt(0))) : "👪");
+        fallback.getStyleClass().add("profile-avatar-circle");
+        fallback.setTextFill(javafx.scene.paint.Color.WHITE);
+        fallback.setFont(Font.font("System", FontWeight.BOLD, 18));
+        fallback.setAlignment(Pos.CENTER);
+        fallback.setMinSize(44, 44);
+        fallback.setPrefSize(44, 44);
+        familyAvatarSlot.getChildren().setAll(fallback);
+        if (avatarUrl == null || avatarUrl.isBlank()) return;
+        // Carga autenticada en segundo plano: /uploads/** requiere JWT (SEC-3)
+        Thread.ofVirtual().start(() -> {
+            try {
+                byte[] bytes = context.getApiClient().fetchImage(avatarUrl);
+                Image image = new Image(new java.io.ByteArrayInputStream(bytes), 44, 44, true, true);
+                Platform.runLater(() -> {
+                    if (generation != familyAvatarLoadGeneration) return;
+                    ImageView imageView = new ImageView(image);
+                    imageView.setFitWidth(44);
+                    imageView.setFitHeight(44);
+                    imageView.setPreserveRatio(false);
+                    StackPane pane = new StackPane(imageView);
+                    pane.setPrefSize(44, 44);
+                    pane.setClip(new Circle(22, 22, 22));
+                    familyAvatarSlot.getChildren().setAll(pane);
+                });
+            } catch (Exception ignored) {
+                // Queda la inicial del nombre
+            }
+        });
+    }
+
+    private void chooseAndUploadFamilyAvatar() {
+        String familyId = context.getSession().getFamilyId();
+        if (familyId == null) return;
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Seleccionar imagen del grupo familiar");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Imágenes (JPG, PNG, WebP)", "*.jpg", "*.jpeg", "*.png", "*.webp"));
+        File file = chooser.showOpenDialog(stage);
+        if (file == null) return;
+        if (file.length() > 8L * 1024 * 1024) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "El tamaño máximo permitido es 8 MB.");
+            alert.setTitle("Archivo demasiado grande");
+            alert.setHeaderText(null);
+            DialogStyler.apply(alert);
+            alert.showAndWait();
+            return;
+        }
+        changeFamilyPhotoBtn.setDisable(true);
+        Thread.ofVirtual().start(() -> {
+            try {
+                var updated = context.getFamilyRepository().uploadAvatar(familyId, file);
+                Platform.runLater(() -> {
+                    changeFamilyPhotoBtn.setDisable(false);
+                    renderFamilyAvatar(updated.name(), updated.avatarUrl());
+                    onStatus.accept("Imagen del grupo actualizada");
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    changeFamilyPhotoBtn.setDisable(false);
+                    onStatus.accept("No se pudo actualizar la imagen del grupo.");
                 });
             }
         });

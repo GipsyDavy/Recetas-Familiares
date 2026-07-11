@@ -46,11 +46,20 @@ data class AuthFamilyDto(
     val name: String
 )
 
+data class FamilyMemberDto(
+    val userId: String,
+    val displayName: String,
+    val email: String,
+    val avatarUrl: String? = null,
+    val role: String? = null
+)
+
 // ── Common ────────────────────────────────────────────────────────────────────
 
 data class FamilyDto(
     val id: String,
     val name: String,
+    val avatarUrl: String? = null,
     val role: String? = null
 )
 

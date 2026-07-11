@@ -36,23 +36,27 @@ class UserRepository(
         return response
     }
 
-    private fun compressImage(context: Context, uri: Uri): ByteArray {
-        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
-        } else {
-            @Suppress("DEPRECATION")
-            android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-        }
-        val maxDim = 512
-        val scaled = if (bitmap.width > maxDim || bitmap.height > maxDim) {
-            val ratio = minOf(maxDim.toFloat() / bitmap.width, maxDim.toFloat() / bitmap.height)
-            Bitmap.createScaledBitmap(
-                bitmap, (bitmap.width * ratio).toInt(), (bitmap.height * ratio).toInt(), true
-            )
-        } else bitmap
-        val baos = ByteArrayOutputStream()
-        scaled.compress(Bitmap.CompressFormat.JPEG, 80, baos)
-        if (scaled !== bitmap) scaled.recycle()
-        return baos.toByteArray()
+    private fun compressImage(context: Context, uri: Uri): ByteArray =
+        compressAvatarImage(context, uri)
+}
+
+/** Compresion compartida para avatares (usuario y familia): 512px max, JPEG 80. */
+internal fun compressAvatarImage(context: Context, uri: Uri): ByteArray {
+    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
+    } else {
+        @Suppress("DEPRECATION")
+        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
     }
+    val maxDim = 512
+    val scaled = if (bitmap.width > maxDim || bitmap.height > maxDim) {
+        val ratio = minOf(maxDim.toFloat() / bitmap.width, maxDim.toFloat() / bitmap.height)
+        Bitmap.createScaledBitmap(
+            bitmap, (bitmap.width * ratio).toInt(), (bitmap.height * ratio).toInt(), true
+        )
+    } else bitmap
+    val baos = ByteArrayOutputStream()
+    scaled.compress(Bitmap.CompressFormat.JPEG, 80, baos)
+    if (scaled !== bitmap) scaled.recycle()
+    return baos.toByteArray()
 }

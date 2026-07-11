@@ -21,6 +21,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceIngredientsRequest
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceStepsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
@@ -288,6 +289,18 @@ interface RecetasApi {
         @Path("familyId") familyId: String,
         @Body request: InviteMemberRequestDto
     ): Unit
+
+    @GET("api/v1/families/{familyId}/members")
+    suspend fun familyMembers(
+        @Path("familyId") familyId: String
+    ): List<FamilyMemberDto>
+
+    @Multipart
+    @POST("api/v1/families/{familyId}/avatar")
+    suspend fun uploadFamilyAvatar(
+        @Path("familyId") familyId: String,
+        @Part file: MultipartBody.Part
+    ): FamilyDto
 
     // ── Chat familiar (fase 1) ──────────────────────────────────────────────
 

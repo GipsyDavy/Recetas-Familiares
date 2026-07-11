@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
@@ -110,6 +112,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
@@ -227,12 +230,61 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
         LaunchedEffect(Unit) {
             viewModel.loadFamilyStats()
             viewModel.loadAccountStatus()
+            viewModel.loadFamilyMembers()
+            viewModel.loadFamilyInfo()
         }
+        val familyInfo by viewModel.familyInfo.collectAsState()
+        val familyPhotoLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri ->
+            uri?.let { viewModel.uploadFamilyAvatar(context, it) }
+        }
+        familyInfo?.let { family ->
+            Spacer(Modifier.height(Spacing.lg))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(48.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (!family.avatarUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = family.avatarUrl,
+                                contentDescription = "Imagen del grupo familiar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        } else {
+                            Text(
+                                family.name.firstOrNull()?.uppercaseChar()?.toString() ?: "👪",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.size(Spacing.md))
+                Text(family.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (isAdmin) {
+                    IconButton(onClick = { familyPhotoLauncher.launch("image/*") }) {
+                        Icon(
+                            Icons.Filled.CameraAlt,
+                            contentDescription = "Cambiar imagen del grupo familiar",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
         val recipes by viewModel.recipes.collectAsState()
         val familyStats by viewModel.familyStats.collectAsState()
         if (familyStats != null || recipes.isNotEmpty()) {
             Spacer(Modifier.height(Spacing.lg))
             FamilyStatsSection(recipes = recipes, stats = familyStats)
+        }
+
+        val familyMembers by viewModel.familyMembers.collectAsState()
+        if (familyMembers.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.lg))
+            FamilyMembersSection(members = familyMembers)
         }
 
         Spacer(Modifier.height(Spacing.lg))
@@ -337,7 +389,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             Text("Eliminar cuenta")
         }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(Spacing.xl))
 
         Button(
             onClick = { viewModel.logout() },
@@ -348,6 +400,12 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             )
         ) {
             Text("Cerrar sesión")
+        }
+        OutlinedButton(
+            onClick = { (context as? android.app.Activity)?.finish() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Salir de la aplicación")
         }
     }
 }
@@ -402,6 +460,64 @@ private fun FamilyStatsSection(
                 value    = lastActivity,
                 label    = "última actividad"
             )
+        }
+    }
+}
+
+@Composable
+private fun FamilyMembersSection(members: List<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape    = MaterialTheme.shapes.large
+    ) {
+        Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Text(
+                "Miembros (${members.size})",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            members.forEach { member ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(36.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (!member.avatarUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = member.avatarUrl,
+                                    contentDescription = "Foto de ${member.displayName}",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                )
+                            } else {
+                                Text(
+                                    member.displayName.split(" ").filter { it.isNotBlank() }.take(2)
+                                        .map { it.first().uppercaseChar() }.joinToString(""),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.size(Spacing.md))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(member.displayName, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            member.email,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        when (member.role) {
+                            "OWNER" -> "Propietario"
+                            "ADMIN" -> "Admin"
+                            else -> "Miembro"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
     }
 }

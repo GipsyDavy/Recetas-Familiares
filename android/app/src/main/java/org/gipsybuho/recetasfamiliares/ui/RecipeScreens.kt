@@ -498,6 +498,11 @@ internal fun RecipeDetail(
                                 modifier = Modifier.clickable { showMenu = false; shareRecipe(context, recipe, ingredients, steps) }
                             )
                             ListItem(
+                                headlineContent = { Text("Buscar en la web") },
+                                leadingContent  = { Icon(Icons.Filled.Search, contentDescription = null) },
+                                modifier = Modifier.clickable { showMenu = false; searchRecipeOnWeb(context, recipe.title) }
+                            )
+                            ListItem(
                                 headlineContent = { Text("Editar") },
                                 leadingContent  = { Icon(Icons.Filled.Edit, contentDescription = null) },
                                 modifier = Modifier.clickable { showMenu = false; onEdit(ingredients, steps) }
@@ -747,6 +752,20 @@ internal fun RatingsSection(
         if (ratings.isEmpty() && !showForm) {
             Text("Sé el primero en valorar esta receta", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
         }
+    }
+}
+
+/**
+ * Busqueda web simple (punto 8 del roadmap, version sin backend ni IA):
+ * abre el navegador con la consulta; ningun dato sale de la app salvo el titulo.
+ */
+private fun searchRecipeOnWeb(context: android.content.Context, title: String) {
+    val query = java.net.URLEncoder.encode("receta $title", Charsets.UTF_8.name())
+    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.google.com/search?q=$query"))
+    try {
+        context.startActivity(intent)
+    } catch (_: android.content.ActivityNotFoundException) {
+        // Sin navegador instalado: no hay nada razonable que hacer
     }
 }
 

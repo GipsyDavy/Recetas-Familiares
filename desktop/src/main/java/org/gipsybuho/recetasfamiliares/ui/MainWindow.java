@@ -202,6 +202,17 @@ public class MainWindow {
         logoutBtn.setMaxWidth(Double.MAX_VALUE);
         logoutBtn.setOnAction(e -> doLogout());
 
+        Button exitBtn = new Button("Salir");
+        exitBtn.getStyleClass().add("sidebar-nav-button");
+        exitBtn.setMaxWidth(Double.MAX_VALUE);
+        Tooltip exitTooltip = new Tooltip("Cerrar la aplicación (la sesión se conserva)");
+        exitTooltip.setShowDelay(Duration.millis(400));
+        Tooltip.install(exitBtn, exitTooltip);
+        exitBtn.setOnAction(e -> {
+            if (chatView != null) chatView.shutdown();
+            Platform.exit();
+        });
+
         Button helpBtn = new Button("❓  Ayuda");
         helpBtn.getStyleClass().add("sidebar-nav-button");
         helpBtn.setMaxWidth(Double.MAX_VALUE);
@@ -210,7 +221,7 @@ public class MainWindow {
         Tooltip.install(helpBtn, helpTooltip);
         helpBtn.setOnAction(e -> HelpDialog.show(stage, activeView));
 
-        VBox bottom = new VBox(8, helpBtn, syncBtn, logoutBtn);
+        VBox bottom = new VBox(8, helpBtn, syncBtn, logoutBtn, exitBtn);
         bottom.setPadding(new Insets(8, 16, 24, 16));
 
         HBox userCard = buildUserCard();

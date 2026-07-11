@@ -38,6 +38,8 @@ public class RecipeDetailView extends VBox {
     private final VBox stepsList = new VBox(10);
     private final HBox photosList = new HBox(10);
     private final Label photosStatusLabel = new Label();
+    private final VBox ratingsBox = new VBox(10);
+    private final Label ratingsStatusLabel = new Label();
     private final Label statusLabel = new Label();
     private final HBox actionBar = new HBox(10);
     private final Button favBtn = new Button("♡  Favorito");
@@ -75,6 +77,13 @@ public class RecipeDetailView extends VBox {
         cookingBtn.getStyleClass().add("action-button-secondary");
         cookingBtn.setOnAction(e -> openCookingMode());
 
+        Button webBtn = new Button("🌐  Buscar en la web");
+        webBtn.getStyleClass().add("action-button-secondary");
+        Tooltip webTooltip = new Tooltip("Buscar esta receta en el navegador");
+        webTooltip.setShowDelay(javafx.util.Duration.millis(400));
+        Tooltip.install(webBtn, webTooltip);
+        webBtn.setOnAction(e -> openWebSearch());
+
         Button copyBtn = new Button("📋  Copiar");
         copyBtn.getStyleClass().add("action-button-secondary");
         copyBtn.setOnAction(e -> copyToClipboard());
@@ -97,7 +106,7 @@ public class RecipeDetailView extends VBox {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, copyBtn, exportBtn, pdfBtn, editBtn, deleteBtn);
+        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, webBtn, copyBtn, exportBtn, pdfBtn, editBtn, deleteBtn);
         actionBar.setPadding(new Insets(12, 16, 8, 16));
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -128,6 +137,10 @@ public class RecipeDetailView extends VBox {
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
+        Label ratingsLabel = new Label("Valoraciones");
+        ratingsLabel.getStyleClass().add("section-header");
+        ratingsStatusLabel.getStyleClass().add("status-label");
+
         VBox content = new VBox(16,
                 titleText, metaText, descText,
                 new Separator(),
@@ -136,6 +149,8 @@ public class RecipeDetailView extends VBox {
                 stepsLabel, stepsList,
                 new Separator(),
                 photosLabel, photosScroll, photosStatusLabel,
+                new Separator(),
+                ratingsLabel, ratingsBox, ratingsStatusLabel,
                 statusLabel
         );
         content.setPadding(new Insets(16, 24, 24, 24));
@@ -156,6 +171,8 @@ public class RecipeDetailView extends VBox {
         stepsList.getChildren().clear();
         photosList.getChildren().clear();
         photosStatusLabel.setText("");
+        ratingsBox.getChildren().clear();
+        ratingsStatusLabel.setText("");
         statusLabel.setText("Cargando...");
         statusLabel.setVisible(true);
         actionBar.setVisible(true);
@@ -185,6 +202,8 @@ public class RecipeDetailView extends VBox {
         stepsList.getChildren().clear();
         photosList.getChildren().clear();
         photosStatusLabel.setText("");
+        ratingsBox.getChildren().clear();
+        ratingsStatusLabel.setText("");
         currentPhotos = new ArrayList<>();
         statusLabel.setVisible(false);
         actionBar.setVisible(false);
@@ -232,6 +251,7 @@ public class RecipeDetailView extends VBox {
             stepsList.getChildren().add(noDataLabel("Sin pasos."));
 
         loadAndRenderPhotos();
+        loadAndRenderRatings();
     }
 
     private void loadAndRenderPhotos() {
@@ -348,6 +368,175 @@ public class RecipeDetailView extends VBox {
                 Platform.runLater(this::loadAndRenderPhotos);
             } catch (Exception ex) {
                 Platform.runLater(() -> photosStatusLabel.setText("Error al eliminar foto: " + ex.getMessage()));
+            }
+        });
+    }
+
+    // ── Valoraciones (estrellas 1-5, punto 9 del roadmap) ────────────────────
+
+    private void loadAndRenderRatings() {
+        if (currentRecipe == null) return;
+        RecipeDtos.RecipeDto recipe = currentRecipe;
+        ratingsStatusLabel.setText("Cargando valoraciones...");
+        ratingsBox.getChildren().clear();
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                var ratings = context.getRecipeRepository().loadRatings(recipe.id());
+                Platform.runLater(() -> {
+                    if (currentRecipe == null || !recipe.id().equals(currentRecipe.id())) return;
+                    renderRatings(ratings);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> ratingsStatusLabel.setText("No se pudieron cargar las valoraciones."));
+            }
+        });
+    }
+
+    private void renderRatings(List<RecipeDtos.RecipeRatingResponse> ratings) {
+        ratingsBox.getChildren().clear();
+        ratingsStatusLabel.setText("");
+        String myUserId = context.getSession().getUserId();
+
+        RecipeDtos.RecipeRatingResponse myRating = null;
+        List<RecipeDtos.RecipeRatingResponse> others = new ArrayList<>();
+        double sum = 0;
+        for (var rating : ratings) {
+            sum += rating.stars();
+            if (rating.userId() != null && rating.userId().equals(myUserId)) {
+                myRating = rating;
+            } else {
+                others.add(rating);
+            }
+        }
+        if (!ratings.isEmpty()) {
+            double avg = sum / ratings.size();
+            Label avgLabel = new Label(String.format("%s  %.1f de 5  (%d valoraci%s)",
+                    starsText((int) Math.round(avg)), avg, ratings.size(), ratings.size() == 1 ? "ón" : "ones"));
+            avgLabel.getStyleClass().add("recipe-meta");
+            ratingsBox.getChildren().add(avgLabel);
+        }
+
+        ratingsBox.getChildren().add(buildMyRatingEditor(myRating));
+
+        for (var rating : others) {
+            VBox box = new VBox(2);
+            box.getStyleClass().add("step-box");
+            Label header = new Label(starsText(rating.stars()) + "  —  "
+                    + (rating.userDisplayName() != null ? rating.userDisplayName() : "Miembro"));
+            header.getStyleClass().add("step-number");
+            box.getChildren().add(header);
+            if (rating.comment() != null && !rating.comment().isBlank()) {
+                Label comment = new Label(rating.comment());
+                comment.setWrapText(true);
+                comment.getStyleClass().add("step-desc");
+                box.getChildren().add(comment);
+            }
+            ratingsBox.getChildren().add(box);
+        }
+    }
+
+    /** Editor de la valoracion propia: 5 estrellas clicables + comentario opcional. */
+    private Node buildMyRatingEditor(RecipeDtos.RecipeRatingResponse myRating) {
+        VBox editor = new VBox(6);
+        editor.getStyleClass().add("step-box");
+
+        Label title = new Label(myRating == null ? "Tu valoración" : "Tu valoración (toca una estrella para cambiarla)");
+        title.getStyleClass().add("step-number");
+
+        int[] selected = {myRating != null ? myRating.stars() : 0};
+        HBox starsRow = new HBox(4);
+        List<Label> starLabels = new ArrayList<>();
+        for (int i = 1; i <= 5; i++) {
+            final int value = i;
+            Label star = new Label(value <= selected[0] ? "★" : "☆");
+            star.setStyle("-fx-font-size: 22px; -fx-cursor: hand;");
+            star.setOnMouseClicked(e -> {
+                selected[0] = value;
+                for (int j = 0; j < starLabels.size(); j++) {
+                    starLabels.get(j).setText(j < value ? "★" : "☆");
+                }
+            });
+            starLabels.add(star);
+            starsRow.getChildren().add(star);
+        }
+
+        TextField commentField = new TextField(myRating != null && myRating.comment() != null ? myRating.comment() : "");
+        commentField.setPromptText("Comentario (opcional)");
+
+        Button saveBtn = new Button(myRating == null ? "Valorar" : "Actualizar");
+        saveBtn.getStyleClass().add("action-button-secondary");
+        RecipeDtos.RecipeRatingResponse existing = myRating;
+        saveBtn.setOnAction(e -> {
+            if (selected[0] < 1) {
+                ratingsStatusLabel.setText("Selecciona entre 1 y 5 estrellas.");
+                return;
+            }
+            String comment = commentField.getText().trim();
+            String commentOrNull = comment.isBlank() ? null : comment;
+            saveBtn.setDisable(true);
+            RecipeDtos.RecipeDto recipe = currentRecipe;
+            Thread.ofVirtual().start(() -> {
+                try {
+                    if (existing == null) {
+                        context.getRecipeRepository().createRating(recipe.id(), selected[0], commentOrNull);
+                    } else {
+                        context.getRecipeRepository().updateRating(recipe.id(), existing.id(), selected[0], commentOrNull);
+                    }
+                    Platform.runLater(this::loadAndRenderRatings);
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        saveBtn.setDisable(false);
+                        ratingsStatusLabel.setText("No se pudo guardar la valoración.");
+                    });
+                }
+            });
+        });
+
+        HBox actions = new HBox(8, saveBtn);
+        if (myRating != null) {
+            Button removeBtn = new Button("Eliminar");
+            removeBtn.getStyleClass().addAll("action-button-secondary", "delete-button");
+            removeBtn.setOnAction(e -> {
+                removeBtn.setDisable(true);
+                RecipeDtos.RecipeDto recipe = currentRecipe;
+                Thread.ofVirtual().start(() -> {
+                    try {
+                        context.getRecipeRepository().deleteRating(recipe.id(), existing.id());
+                        Platform.runLater(this::loadAndRenderRatings);
+                    } catch (Exception ex) {
+                        Platform.runLater(() -> {
+                            removeBtn.setDisable(false);
+                            ratingsStatusLabel.setText("No se pudo eliminar la valoración.");
+                        });
+                    }
+                });
+            });
+            actions.getChildren().add(removeBtn);
+        }
+
+        editor.getChildren().addAll(title, starsRow, commentField, actions);
+        return editor;
+    }
+
+    private String starsText(int stars) {
+        return "★".repeat(Math.max(0, Math.min(5, stars))) + "☆".repeat(Math.max(0, 5 - Math.min(5, stars)));
+    }
+
+    // ── Busqueda web simple (punto 8 del roadmap, sin backend ni IA) ──────────
+
+    private void openWebSearch() {
+        if (currentRecipe == null) return;
+        String query = java.net.URLEncoder.encode("receta " + currentRecipe.title(), StandardCharsets.UTF_8);
+        String url = "https://www.google.com/search?q=" + query;
+        Thread.ofVirtual().start(() -> {
+            try {
+                java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    statusLabel.setText("No se pudo abrir el navegador.");
+                    statusLabel.setVisible(true);
+                });
             }
         });
     }

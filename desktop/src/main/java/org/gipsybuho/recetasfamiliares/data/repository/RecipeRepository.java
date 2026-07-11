@@ -69,6 +69,31 @@ public class RecipeRepository {
         return List.of(result);
     }
 
+    /** Valoraciones de una receta (estrellas 1-5 + comentario opcional). */
+    public List<RecipeDtos.RecipeRatingResponse> loadRatings(String recipeId) throws ApiException {
+        String familyId = session.getFamilyId();
+        String path = "api/v1/families/" + familyId + "/recipes/" + recipeId + "/ratings";
+        RecipeDtos.RecipeRatingResponse[] result = api.get(path, RecipeDtos.RecipeRatingResponse[].class);
+        return List.of(result);
+    }
+
+    public RecipeDtos.RecipeRatingResponse createRating(String recipeId, int stars, String comment) throws ApiException {
+        String familyId = session.getFamilyId();
+        String path = "api/v1/families/" + familyId + "/recipes/" + recipeId + "/ratings";
+        return api.post(path, new RecipeDtos.RatingRequest(stars, comment), RecipeDtos.RecipeRatingResponse.class);
+    }
+
+    public RecipeDtos.RecipeRatingResponse updateRating(String recipeId, String ratingId, int stars, String comment) throws ApiException {
+        String familyId = session.getFamilyId();
+        String path = "api/v1/families/" + familyId + "/recipes/" + recipeId + "/ratings/" + ratingId;
+        return api.put(path, new RecipeDtos.RatingRequest(stars, comment), RecipeDtos.RecipeRatingResponse.class);
+    }
+
+    public void deleteRating(String recipeId, String ratingId) throws ApiException {
+        String familyId = session.getFamilyId();
+        api.delete("api/v1/families/" + familyId + "/recipes/" + recipeId + "/ratings/" + ratingId);
+    }
+
     public RecipeDtos.RecipeDto update(String recipeId, RecipeCreateDtos.UpdateRecipeRequest request) throws ApiException {
         String familyId = session.getFamilyId();
         return api.put("api/v1/families/" + familyId + "/recipes/" + recipeId, request, RecipeDtos.RecipeDto.class);
