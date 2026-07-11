@@ -389,7 +389,7 @@ Ya cubiertos (verificar, no reimplementar):
 
 Orden de sprints aprobado:
 - Sprint A (EN CURSO): cerrar CRIT-2 — SMTP produccion + UX cliente reset password, verificar email, borrar cuenta (punto 6).
-- Sprint B (quick wins): (1) boton actualizar notas Android, (2) boton salir Desktop/Android, (10) creador de receta visible, (15) imagen de familia, (19) miembros en Android, (21) 5 recetas por defecto al crear familia (2 faciles, 2 medias, 1 dificil), verificacion de (7) y (9), y (8) SOLO en version simple (abrir busqueda en navegador, sin backend).
+- Sprint B (quick wins): EJECUTADO 2026-07-12 (ver trazabilidad). (10) creador de receta visible se MOVIO a sprint propio: requiere cambio de contrato sync + migracion Room multiplataforma (regla §3); no es quick win.
 - Sprint C (gestion familiar): (3) editar miembros (rol/expulsar), (5) crear familia solo owner/admin (matiz: usuario nuevo sin familia debe poder crear la primera). VibeSec obligatorio.
 - Sprint D (epica multi-familia): (4)+(13)+(12) son un solo bloque — pertenecer a varias familias, cambiar de familia activa y copiar recetas entre familias. Requiere sprint de diseño previo (brainstorming + Codex/Gemini) antes de codigo. Riesgo principal: fuga de datos entre familias en cache/sync/merge.
 - Posteriores: (20) presencia online + avisos de actividad (limitacion: sin push, solo con app abierta; encaja con chat fase 4), (11) ranking de usuarios (depende de 9 y 10; plantear como gamificacion ligera acorde a filosofia del producto), (14) chat privado 1:1 (despues de chat fase 4/push).
@@ -1845,6 +1845,19 @@ Revision final Claude Code (2026-07-11, misma fecha):
   - SMTP real en produccion: definir proveedor y setear `MAIL_ENABLED=true`, `SMTP_HOST`, `SMTP_PORT`, credenciales, `MAIL_FROM`, `APP_PUBLIC_URL` en el entorno del VPS. Sin esto los correos no salen y los flujos cliente no pueden probarse end-to-end.
   - Prueba manual end-to-end de los 3 flujos con SMTP activo (Desktop y Android).
 - Riesgos residuales: flujos cliente validados por compilacion y tests, sin prueba manual E2E (bloqueada por SMTP); los emails del backend enlazan rutas web (`/reset-password`) que no existen — los clientes piden pegar el codigo, valido pero mejorable cuando haya web o deep links; iOS sin estos flujos (runtime bloqueado, COD-1/COD-2); instalador Windows no regenerado en esta sesion (el .exe vigente no incluye estas pantallas).
+
+### Sprint B - Quick wins del roadmap (2026-07-12, Claude Code)
+
+- Objetivo: puntos 1, 2, 8-simple, 9-Desktop, 15, 19 y 21 del roadmap funcional aprobado. Punto 10 (creador de receta) APLAZADO a sprint propio: exige campo nuevo en modelo sincronizado (migracion backend + Room + DTOs sync en 3 clientes), incompatible con "quick win" segun regla §3.
+- Verificaciones del roadmap: (7) fotos de receta + portada ya existian en Android y Desktop — nada que implementar (backlog menor: thumbnail en cards de listado); (9) estrellas 1-5 ya completas en Android; faltaba Desktop y se implemento en este sprint.
+- Backend:
+  - (21) `StarterRecipeSeeder`: 5 recetas conocidas (tortilla de patatas y gazpacho EASY; carbonara y lentejas MEDIUM; paella HARD) con ingredientes y pasos, sembradas al registrar familia. Flag `app.starter-recipes.enabled` (default true; false en `application-test.yml` para no romper asserts de familias vacias).
+  - (15) Imagen de grupo: migracion `V17__add_avatar_url_to_families.sql` (aditiva nullable), `FamilyEntity.avatarUrl`, `FamilyResponse.avatarUrl`, `POST /families/{id}/avatar` (multipart, solo OWNER/ADMIN, mismo `FileStorageService` endurecido), serving `/uploads/family_avatars/**` en `UploadController` con ownership por familia y 404 fail-closed.
+- Desktop: boton "Salir" en sidebar (cierra app conservando sesion); "🌐 Buscar en la web" en detalle de receta (URLEncoder + navegador); seccion Valoraciones completa en `RecipeDetailView` (media, editor propio con 5 estrellas clicables + comentario, crear/actualizar/eliminar, lista de las de otros; DTOs y 4 metodos nuevos en `RecipeRepository`); avatar de familia en `ProfileView` (render autenticado + "Cambiar imagen del grupo" solo admin).
+- Android: boton actualizar en cabecera de Notas (ademas del pull-to-refresh existente); "Salir de la aplicacion" en perfil; "Buscar en la web" en menu del detalle de receta; seccion Miembros en perfil (endpoint `GET /members` añadido a `RecetasApi` + `FamilyMemberDto`); seccion Familia con imagen de grupo (subida solo admin, compresion compartida `compressAvatarImage`); perfil ahora scrolleable (`verticalScroll`).
+- Seguridad (checklist VibeSec/security-review aplicado al diff en la sesion): upload familia solo OWNER/ADMIN validado en backend; serving con allowlist de nombre UUID y ownership; avatarUrl de familia solo lo escribe el backend (no acepta URLs de cliente); seeder son constantes; busqueda web solo expone el titulo de la receta elegido por el usuario. Sin hallazgos de alta confianza.
+- Validacion ejecutada: backend `AuthServiceTest` 7/0 + compile OK (suite completa requiere DB; gate en CI tras push); Desktop `mvn test` 20/0; Android `gradlew test` + `assembleDebug` OK.
+- Riesgos residuales: sin prueba manual de UI en esta sesion (flujos validados por compilacion/tests); tests de integracion backend (FamilyController/RecipeController) corren en CI con `starter-recipes.enabled=false` — el seeder en si no tiene test de integracion propio; iOS sin estos cambios (runtime bloqueado); instalador Windows y APK de release no regenerados.
 
 ### Chequeo obligatorio de cierre
 
