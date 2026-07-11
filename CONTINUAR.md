@@ -362,6 +362,7 @@ Prioridad propuesta para el siguiente sprint no autorizado (fijada por el usuari
    - Validacion: login/sync/chat reales contra Hetzner desde Desktop instalado y movil/emulador con el APK nuevo.
    - Motivo de URL configurable y no horneada: `sslip.io` es temporal; con URL configurable, comprar dominio propio no obligara a redistribuir binarios.
    - Seguridad: VibeSec aplica (red, tokens, URL introducida por usuario).
+   - Preflight de dependencias: si el usuario aporta credenciales Sonatype OSS Index, activar y validar el analyzer en backend/desktop. Sin credenciales, mantener OWASP con NVD/CISA y documentar la cobertura reducida.
 2. COD-8 siguiente capa: Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory; Desktop tests adicionales si aportan valor sin fragilizar.
 3. iOS: validar runtime en macOS/dispositivo (Keychain, interceptor 401, Coil autenticado, pull paginado), revisar warnings de casts Keychain y AppIcon con `recetas.png` cuando exista el proyecto Xcode (COD-1/COD-2). Bloqueado sin macOS.
 4. Dominio propio/API estable: cuando el usuario compre el dominio (ver nota de aplazamiento arriba).
@@ -1549,6 +1550,16 @@ Sprints posteriores recomendados (orden vigente de la seccion 8): vigilancia dep
 - Siguiente sprint recomendado (NO autorizado): COD-8 siguiente capa, tests Android `SyncWorker`/colas offline end-to-end con Room fake o DB in-memory.
 
 Actualizacion posterior (2026-07-11): el usuario fijo como siguiente sprint `Apuntar clientes a produccion (URL de API configurable)`; la recomendacion COD-8 pasa a segundo lugar. Detalle completo del alcance en la seccion 8.
+
+### Revision Gemini - Sonatype OSS Index (2026-07-11)
+
+- Hallazgo procesado por Codex a peticion del usuario: `CONFIRMADO`, Dependency-Check tiene el analyzer Sonatype OSS Index deshabilitado por falta de credenciales/token.
+- Verificacion real en esta sesion:
+  - Entorno: `NVD_API_KEY` presente; `OSS_INDEX_USERNAME`, `OSS_INDEX_PASSWORD`, `OSSINDEX_USERNAME`, `OSSINDEX_PASSWORD`, `SONATYPE_OSS_INDEX_USERNAME` y `SONATYPE_OSS_INDEX_TOKEN` ausentes (solo se comprobo presencia, no se imprimieron valores).
+  - Plugin OWASP verificado con `mvn org.owasp:dependency-check-maven:12.2.2:help -Ddetail=true -Dgoal=check`: parametros disponibles `ossIndexUsername`, `ossIndexPassword`, `ossIndexServerId`, `ossIndexAnalyzerEnabled`, `ossIndexWarnOnlyOnRemoteErrors`.
+  - `backend/pom.xml` y `desktop/pom.xml` solo configuran NVD (`nvdApiKeyEnvironmentVariable=NVD_API_KEY`); no hay configuracion OSS Index.
+- Decision aplicada: no tocar `backend/pom.xml` ni `desktop/pom.xml` sin credenciales, porque no se podria validar el analyzer y tocar `backend/**` dispararia CI/CD y deploy a produccion con una mejora no comprobable.
+- Siguiente sprint: si se aportan credenciales, configurar el analyzer preferentemente via Maven `settings.xml`/`ossIndexServerId` o variables de entorno seguras, ejecutar `mvn -f backend\pom.xml -DskipTests verify -P security-audit` y `mvn -f desktop\pom.xml -DskipTests verify -P security-audit`, comprobar en logs/reportes que OSS Index no queda deshabilitado, y mantener sin imprimir secretos. Si no hay credenciales, dejar explicitamente la auditoria como NVD/CISA + analizadores locales.
 
 ### Chequeo obligatorio de cierre
 
