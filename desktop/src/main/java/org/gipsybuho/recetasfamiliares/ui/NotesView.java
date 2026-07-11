@@ -159,8 +159,8 @@ public class NotesView extends VBox {
             try {
                 var page = context.getNoteRepository().loadPage(0, PAGE_SIZE);
                 List<SyncDtos.NoteDtos.FamilyNoteDto> notes =
-                        page.content() == null ? List.of()
-                        : page.content().stream().filter(n -> !n.deleted()).toList();
+                        page.items() == null ? List.of()
+                        : page.items().stream().filter(n -> !n.deleted()).toList();
                 Platform.runLater(() -> {
                     allNotes.setAll(notes);
                     context.getNoteRepository().updateCache(notes);
@@ -181,8 +181,8 @@ public class NotesView extends VBox {
             try {
                 var page = context.getNoteRepository().loadPage(nextPage, PAGE_SIZE);
                 List<SyncDtos.NoteDtos.FamilyNoteDto> newNotes =
-                        page.content() == null ? List.of()
-                        : page.content().stream().filter(n -> !n.deleted()).toList();
+                        page.items() == null ? List.of()
+                        : page.items().stream().filter(n -> !n.deleted()).toList();
                 Platform.runLater(() -> {
                     var appended = new ArrayList<>(allNotes);
                     appended.addAll(newNotes);

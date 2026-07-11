@@ -23,9 +23,11 @@ public class StockRepository {
 
     public List<StockDtos.StockItemDto> load() throws ApiException {
         String familyId = session.getFamilyId();
-        StockDtos.StockItemDto[] result = api.get(
-                "api/v1/families/" + familyId + "/stock-items", StockDtos.StockItemDto[].class);
-        return List.of(result);
+        // El backend devuelve PageResponse (contrato seccion 6), no un array.
+        StockDtos.StockPageResponse page = api.get(
+                "api/v1/families/" + familyId + "/stock-items?page=0&size=100",
+                StockDtos.StockPageResponse.class);
+        return page.items() == null ? List.of() : page.items();
     }
 
     public StockDtos.StockItemDto create(StockDtos.CreateStockItemRequest req) throws ApiException {

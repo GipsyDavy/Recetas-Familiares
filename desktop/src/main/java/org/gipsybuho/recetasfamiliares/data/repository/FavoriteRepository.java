@@ -25,12 +25,13 @@ public class FavoriteRepository {
 
     public List<SyncDtos.FavoriteDtos.FavoriteRecipeDto> loadAll() throws ApiException {
         String familyId = session.getFamilyId();
-        String path = "api/v1/families/" + familyId + "/favorite-recipes?page=0&size=200";
+        // El backend limita size a 100 (@Max); 200 provocaba un 400 silencioso.
+        String path = "api/v1/families/" + familyId + "/favorite-recipes?page=0&size=100";
         SyncDtos.FavoriteDtos.FavoritePageResponse page =
                 api.get(path, SyncDtos.FavoriteDtos.FavoritePageResponse.class);
         List<SyncDtos.FavoriteDtos.FavoriteRecipeDto> items =
-                page.content() == null ? List.of()
-                : page.content().stream().filter(f -> !f.deleted()).toList();
+                page.items() == null ? List.of()
+                : page.items().stream().filter(f -> !f.deleted()).toList();
         cache.replaceAll(items);
         return items;
     }

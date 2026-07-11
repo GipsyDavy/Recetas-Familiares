@@ -34,11 +34,12 @@ public class NoteRepository {
 
     public List<SyncDtos.NoteDtos.FamilyNoteDto> loadAll() throws ApiException {
         String familyId = session.getFamilyId();
-        String path = "api/v1/families/" + familyId + "/notes?page=0&size=200";
+        // El backend limita size a 100 (@Max); 200 provocaba un 400 silencioso.
+        String path = "api/v1/families/" + familyId + "/notes?page=0&size=100";
         SyncDtos.NoteDtos.NotePageResponse page =
                 api.get(path, SyncDtos.NoteDtos.NotePageResponse.class);
-        if (page.content() == null) return List.of();
-        return page.content().stream().filter(n -> !n.deleted()).toList();
+        if (page.items() == null) return List.of();
+        return page.items().stream().filter(n -> !n.deleted()).toList();
     }
 
     public SyncDtos.NoteDtos.NotePageResponse loadPage(int page, int size) throws ApiException {

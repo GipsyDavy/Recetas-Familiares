@@ -79,10 +79,11 @@ public final class SyncDtos {
         ) {}
 
         public record MenuPageResponse(
-                java.util.List<MenuItemDto> content,
-                int totalElements,
-                int totalPages,
-                int number
+                java.util.List<MenuItemDto> items,
+                int page,
+                int size,
+                long totalItems,
+                int totalPages
         ) {}
 
         public record AssignMenuItemRequest(
@@ -110,13 +111,13 @@ public final class SyncDtos {
         ) {}
 
         public record ShoppingPageResponse(
-                java.util.List<ShoppingListDto> content,
-                int totalElements, int totalPages, int number
+                java.util.List<ShoppingListDto> items,
+                int page, int size, long totalItems, int totalPages
         ) {}
 
         public record ShoppingItemPageResponse(
-                java.util.List<ShoppingListItemDto> content,
-                int totalElements, int totalPages, int number
+                java.util.List<ShoppingListItemDto> items,
+                int page, int size, long totalItems, int totalPages
         ) {}
 
         public record UpdateShoppingListItemRequest(
@@ -136,8 +137,8 @@ public final class SyncDtos {
         public record AddFavoriteRequest(String recipeId) {}
 
         public record FavoritePageResponse(
-                java.util.List<FavoriteRecipeDto> content,
-                int totalElements, int totalPages, int number
+                java.util.List<FavoriteRecipeDto> items,
+                int page, int size, long totalItems, int totalPages
         ) {}
     }
 
@@ -151,8 +152,8 @@ public final class SyncDtos {
         ) {}
 
         public record NotePageResponse(
-                java.util.List<FamilyNoteDto> content,
-                int totalElements, int totalPages, int number
+                java.util.List<FamilyNoteDto> items,
+                int page, int size, long totalItems, int totalPages
         ) {}
 
         public record CreateNoteRequest(String title, String body, boolean pinned) {}

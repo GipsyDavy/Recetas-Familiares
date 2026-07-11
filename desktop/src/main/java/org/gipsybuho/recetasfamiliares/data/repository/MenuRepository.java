@@ -26,8 +26,8 @@ public class MenuRepository {
         String familyId = session.getFamilyId();
         String path = "api/v1/families/" + familyId + "/menu-items?weekStart=" + weekStart + "&page=0&size=100";
         SyncDtos.MenuDtos.MenuPageResponse page = api.get(path, SyncDtos.MenuDtos.MenuPageResponse.class);
-        if (page.content() == null) return List.of();
-        return page.content().stream().filter(i -> !i.deleted()).toList();
+        if (page.items() == null) return List.of();
+        return page.items().stream().filter(i -> !i.deleted()).toList();
     }
 
     public SyncDtos.MenuDtos.MenuItemDto assign(String recipeId, LocalDate plannedDate, String mealType) throws ApiException {

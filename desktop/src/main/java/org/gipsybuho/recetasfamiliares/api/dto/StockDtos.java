@@ -18,6 +18,11 @@ public final class StockDtos {
             boolean deleted
     ) {}
 
+    public record StockPageResponse(
+            java.util.List<StockItemDto> items,
+            int page, int size, long totalItems, int totalPages
+    ) {}
+
     public record CreateStockItemRequest(
             String name,
             Double quantity,
