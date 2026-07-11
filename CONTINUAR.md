@@ -1773,7 +1773,7 @@ Revision final Claude Code (2026-07-11, misma fecha):
   - `git diff --check --cached` -> sin errores.
 - Seguridad: VibeSec-Skill usado como checklist por tratarse del pipeline de auditoria de dependencias; sin secretos versionados, sin logging nuevo, sin cambios de auth/ownership/API/backend.
 - Impacto operativo: no se tocaron `backend/**`, `infra/backend/**`, `scripts/backend/**` ni `.github/workflows/backend-ci-cd.yml`; no deberia disparar deploy automatico de backend. Si un entorno Windows local vuelve a necesitar `Windows-ROOT`, configurarlo fuera del repo via `MAVEN_OPTS` o perfil local de IDE.
-- Pendiente tras push: lanzar o revisar el workflow manual `Dependency Audit` en GitHub y confirmar que el job `dependency-check desktop` pasa en Ubuntu.
+- Verificacion GitHub tras push: workflow manual `Dependency Audit` run `29165213615` sobre `636b557` -> `success`; jobs `Backend dependency audit` y `Desktop dependency audit` completados con `success`.
 
 ### Chequeo obligatorio de cierre
 
