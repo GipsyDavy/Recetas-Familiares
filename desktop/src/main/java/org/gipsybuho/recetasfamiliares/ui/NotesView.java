@@ -21,10 +21,11 @@ import org.gipsybuho.recetasfamiliares.core.AppContext;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NotesView extends VBox {
+public class NotesView extends ScrollPane {
 
     private final AppContext context;
     private final Runnable onSync;
+    private final VBox content = new VBox();
     private final Label statusLabel = new Label();
     private final ObservableList<SyncDtos.NoteDtos.FamilyNoteDto> allNotes = FXCollections.observableArrayList();
     private final FilteredList<SyncDtos.NoteDtos.FamilyNoteDto> filteredNotes = new FilteredList<>(allNotes);
@@ -54,9 +55,11 @@ public class NotesView extends VBox {
     // ── Build ──────────────────────────────────────────────────────────────────
 
     private void build() {
-        getStyleClass().add("stock-view");
-        setSpacing(0);
-        setPadding(new Insets(24));
+        DesktopScroll.configurePage(this, content);
+        content.getStyleClass().add("stock-view");
+        content.setSpacing(0);
+        content.setPadding(new Insets(24));
+        setContent(content);
 
         Label header = new Label("Notas familiares");
         header.getStyleClass().add("view-header");
@@ -145,7 +148,7 @@ public class NotesView extends VBox {
         statusLabel.getStyleClass().add("status-label");
         statusLabel.setPadding(new Insets(8, 0, 0, 0));
 
-        getChildren().addAll(header, toolbar, split, statusLabel);
+        content.getChildren().addAll(header, toolbar, split, statusLabel);
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────

@@ -15,10 +15,11 @@ import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 import org.gipsybuho.recetasfamiliares.core.ServerConfig;
 
-public class LoginView extends VBox {
+public class LoginView extends ScrollPane {
 
     private final AppContext context;
     private final Runnable onLoginSuccess;
+    private final VBox content = new VBox();
 
     private final TextField displayNameField = new TextField();
     private final TextField emailField    = new TextField();
@@ -40,9 +41,11 @@ public class LoginView extends VBox {
     }
 
     private void build() {
-        getStyleClass().add("login-view");
-        setAlignment(Pos.CENTER);
-        setFillWidth(true);
+        DesktopScroll.configurePage(this, content);
+        content.getStyleClass().add("login-view");
+        content.setAlignment(Pos.CENTER);
+        content.setFillWidth(true);
+        setContent(content);
 
         // ── Logo circle ───────────────────────────────────────────────────────
         Label logo = new Label("RF");
@@ -152,7 +155,7 @@ public class LoginView extends VBox {
         card.setMaxWidth(420);
         card.setFillWidth(true);
 
-        getChildren().add(card);
+        content.getChildren().add(card);
 
         // ── Entry animation (FadeIn + slight scale-up) ────────────────────────
         card.setOpacity(0);

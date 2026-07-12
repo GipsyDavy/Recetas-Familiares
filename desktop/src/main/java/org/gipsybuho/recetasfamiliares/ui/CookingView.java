@@ -185,10 +185,13 @@ public class CookingView {
         VBox center = new VBox(20, progressBox, instructionPane, timerWrapper, navBar, hintBar);
         center.setAlignment(Pos.CENTER);
         VBox.setVgrow(instructionPane, Priority.ALWAYS);
+        ScrollPane centerScroll = new ScrollPane(center);
+        DesktopScroll.configurePage(centerScroll, center);
+        centerScroll.setStyle("-fx-background-color: transparent; -fx-background: #FAF7F2;");
 
         BorderPane root = new BorderPane();
         root.setTop(topBar);
-        root.setCenter(center);
+        root.setCenter(centerScroll);
         root.setStyle("-fx-background-color: #FAF7F2;");
 
         Scene scene = new Scene(root, 1100, 720);

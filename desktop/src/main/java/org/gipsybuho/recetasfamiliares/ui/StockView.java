@@ -19,13 +19,14 @@ import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.util.function.Consumer;
 
-public class StockView extends VBox {
+public class StockView extends ScrollPane {
 
     private static final int PAGE_SIZE = 50;
 
     private final AppContext context;
     private final Runnable onSync;
     private final Consumer<String> onStatusUpdate;
+    private final VBox content = new VBox();
     private final TableView<StockDtos.StockItemDto> table = new TableView<>();
     private final Label statusLabel = new Label();
     private final TextField filterField = new TextField();
@@ -48,9 +49,11 @@ public class StockView extends VBox {
 
     @SuppressWarnings("unchecked")
     private void build() {
-        getStyleClass().add("stock-view");
-        setSpacing(12);
-        setPadding(new Insets(24));
+        DesktopScroll.configurePage(this, content);
+        content.getStyleClass().add("stock-view");
+        content.setSpacing(12);
+        content.setPadding(new Insets(24));
+        setContent(content);
 
         Label header = new Label("Stock familiar");
         header.getStyleClass().add("view-header");
@@ -131,10 +134,10 @@ public class StockView extends VBox {
             filteredItems.setPredicate(val == null || val.isBlank() ? null :
                 s -> s.name() != null && s.name().toLowerCase().contains(val.toLowerCase())));
 
-        getChildren().addAll(header, filterField, buildToolbar(), table, statusLabel);
+        content.getChildren().addAll(header, filterField, buildToolbar(), table, statusLabel);
     }
 
-    private HBox buildToolbar() {
+    private FlowPane buildToolbar() {
         Button newBtn = new Button("+ Nuevo");
         newBtn.getStyleClass().add("action-button-primary");
         newBtn.setOnAction(e -> openCreateDialog());
@@ -170,7 +173,7 @@ public class StockView extends VBox {
             refreshDisplay();
         });
 
-        HBox toolbar = new HBox(8, newBtn, editBtn, deleteBtn, refreshBtn, loadMoreBtn);
+        FlowPane toolbar = new FlowPane(8, 8, newBtn, editBtn, deleteBtn, refreshBtn, loadMoreBtn);
         toolbar.setPadding(new Insets(0, 0, 4, 0));
         return toolbar;
     }

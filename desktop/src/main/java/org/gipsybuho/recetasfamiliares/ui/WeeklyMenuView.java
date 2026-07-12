@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class WeeklyMenuView extends VBox {
+public class WeeklyMenuView extends ScrollPane {
 
     private static final String[] MEAL_LABELS  = {"Desayuno", "Comida", "Cena", "Merienda"};
     private static final String[] MEAL_TYPES   = {"BREAKFAST", "LUNCH", "DINNER", "SNACK"};
@@ -30,6 +30,7 @@ public class WeeklyMenuView extends VBox {
 
     private final AppContext context;
     private final Runnable onSync;
+    private final VBox content = new VBox();
     private final GridPane grid      = new GridPane();
     private final Label weekLabel    = new Label();
     private final Label statusLabel  = new Label();
@@ -45,9 +46,11 @@ public class WeeklyMenuView extends VBox {
     // ── Build ──────────────────────────────────────────────────────────────────
 
     private void build() {
-        getStyleClass().add("menu-view");
-        setSpacing(0);
-        setPadding(new Insets(24));
+        DesktopScroll.configurePage(this, content);
+        content.getStyleClass().add("menu-view");
+        content.setSpacing(0);
+        content.setPadding(new Insets(24));
+        setContent(content);
 
         Label header = new Label("Menú Semanal");
         header.getStyleClass().add("view-header");
@@ -84,7 +87,7 @@ public class WeeklyMenuView extends VBox {
         exportBtn.getStyleClass().add("action-button-secondary");
         exportBtn.setOnAction(e -> exportCurrentView());
 
-        HBox navBar = new HBox(10, prevBtn, todayBtn, nextBtn, viewToggleBtn, syncBtn, exportBtn, navSpacer, weekLabel);
+        FlowPane navBar = new FlowPane(10, 8, prevBtn, todayBtn, nextBtn, viewToggleBtn, syncBtn, exportBtn, navSpacer, weekLabel);
         navBar.setAlignment(Pos.CENTER_LEFT);
         navBar.setPadding(new Insets(12, 0, 16, 0));
 
@@ -96,7 +99,7 @@ public class WeeklyMenuView extends VBox {
         statusLabel.getStyleClass().add("status-label");
         statusLabel.setPadding(new Insets(8, 0, 0, 0));
 
-        getChildren().addAll(header, navBar, grid, statusLabel);
+        content.getChildren().addAll(header, navBar, grid, statusLabel);
     }
 
     // ── Refresh ────────────────────────────────────────────────────────────────
