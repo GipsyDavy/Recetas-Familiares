@@ -24,6 +24,8 @@ import org.gipsybuho.recetasfamiliares.data.repository.StockRepository
 import org.gipsybuho.recetasfamiliares.data.repository.SyncRepository
 import org.gipsybuho.recetasfamiliares.data.repository.UserRepository
 import org.gipsybuho.recetasfamiliares.ui.theme.ThemePreference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import java.util.concurrent.TimeUnit
@@ -71,7 +73,11 @@ class AppContainer(context: Context) {
         .build()
         .create(RecetasApi::class.java)
 
-    val authRepository = AuthRepository(api, sessionStore)
+    val authRepository = AuthRepository(api, sessionStore) {
+        // Cambio de usuario en el mismo dispositivo: la cache local es del
+        // usuario anterior; los datos maestros viven en el servidor.
+        withContext(Dispatchers.IO) { database.clearAllTables() }
+    }
     val recipeRepository = RecipeRepository(api, database, sessionStore)
     val stockRepository = StockRepository(api, database.stockDao(), sessionStore)
     val syncRepository = SyncRepository(api, database, sessionStore)

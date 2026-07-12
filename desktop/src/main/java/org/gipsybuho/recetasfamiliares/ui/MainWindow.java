@@ -58,7 +58,7 @@ public class MainWindow {
     private boolean navigating = false;
     private boolean updatingFamilySelector = false;
     private ComboBox<FamilyChoice> familySelector;
-    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnSettings, btnMembers;
+    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnProfile, btnSettings, btnMembers;
     private final TextField globalSearch = new TextField();
     private final Label statusBar = new Label("");
 
@@ -191,6 +191,9 @@ public class MainWindow {
         btnShopping  = sidebarButton("🛒  Lista de la compra", "shopping");
         btnNotes     = sidebarButton("📝  Notas familiares", "notes");
         btnChat      = sidebarButton("💬  Chat familiar", "chat");
+        // Hallazgo Sprint D: el usuario no encontraba "Eliminar cuenta"
+        // (vive en Perfil, antes solo accesible desde la user card).
+        btnProfile   = sidebarButton("👤  Mi perfil y cuenta", "profile");
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -231,7 +234,7 @@ public class MainWindow {
 
         // ── Common buttons ────────────────────────────────────────────────────
         sidebar.getChildren().addAll(header, globalSearch, userCard, buildFamilySelector(),
-                btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat);
+                btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnProfile);
 
         // ── Admin-only buttons ────────────────────────────────────────────────
         if (context.getSession().isAdmin()) {
@@ -580,7 +583,7 @@ public class MainWindow {
     // ── Logout ───────────────────────────────────────────────────────────────
 
     private void updateActiveSidebarButton(String view) {
-        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnSettings, btnMembers};
+        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnProfile, btnSettings, btnMembers};
         for (Button btn : navButtons) {
             if (btn != null) btn.getStyleClass().remove("sidebar-nav-button-active");
         }
@@ -592,6 +595,7 @@ public class MainWindow {
             case "shopping"  -> btnShopping;
             case "notes"     -> btnNotes;
             case "chat"      -> btnChat;
+            case "profile"   -> btnProfile;
             case "settings"  -> btnSettings;
             case "members"   -> btnMembers;
             default          -> null;

@@ -2154,3 +2154,18 @@ Siguientes sprints candidatos tras el cierre D (orden sugerido):
   4. (10) creador de receta visible -> (11) ranking.
   5. (20) presencia online + (14) chat 1:1 tras chat fase 4/push.
 - Riesgos residuales vivos: SMTP produccion pendiente (usuario); APK debug sin firma release; iOS runtime bloqueado sin macOS; cuentas `claude.e2e.20260712.*` posiblemente vivas.
+
+### Sprint E - Higiene de sesion/cache local Android + visibilidad cuenta Desktop (2026-07-12 noche, Claude Code)
+
+- Objetivo: cerrar el hallazgo de privacidad de Sprint D (datos del usuario anterior visibles en el mismo dispositivo) y el hallazgo UX de la prueba Desktop ("Eliminar cuenta" no encontrable).
+- Agente lider: Claude Code. Codex/Gemini: bloques IDE de revision solo lectura entregados al usuario al cierre (peticion explicita del usuario).
+- Android:
+  - `SessionStore.clear()` preserva `last_user_id` (solo UUID, en EncryptedSharedPreferences) y expone `lastKnownUserId` para detectar cambio de usuario tras cualquier limpieza de sesion (logout, authenticator, cambio de servidor).
+  - `AuthRepository` recibe `clearLocalData`; en `login()`, si el usuario difiere del ultimo conocido, vacia Room ANTES de escribir la sesion nueva (fail-closed: si el wipe falla, falla el login y no se mezclan datos).
+  - `RecetasViewModel.wipeLocalCaches()` (clearAllTables en Dispatchers.IO, best-effort) invocado en `logout()` y en los dos caminos de cambio/reset de URL de servidor.
+  - `AppContainer` inyecta el wipe real (`database.clearAllTables()` con `withContext(Dispatchers.IO)`).
+  - Decision de producto: al cerrar sesion se pierden cambios offline no sincronizados; privacidad en dispositivo compartido gana sobre el residuo local. Datos maestros en el servidor.
+- Desktop: boton de sidebar "👤 Mi perfil y cuenta" (vista `profile` existente, todos los roles, con estado activo en la sidebar). "Eliminar cuenta" ya vivia en Perfil > Cuenta pero solo era accesible clicando la user card y el usuario no lo descubrio.
+- Validacion ejecutada: Android `gradlew testDebugUnitTest assembleDebug` BUILD SUCCESSFUL (incluye `AuthRepositoryUserChangeTest` nuevo: usuario distinto vacia cache, mismo usuario conserva, primer login no vacia); Desktop `mvn test` 21 tests 0 fallos.
+- Seguridad: VibeSec invocado sobre el diff, 0 hallazgos criticos. `security-review` no aplica (backend intacto). Residuales: wipe de logout best-effort con segunda barrera fail-closed en login de usuario distinto; un pull en vuelo iniciado antes del logout podria escribir tras el wipe (ventana pequena, cubierta por la segunda barrera).
+- Pendiente/observaciones: Desktop mantiene caches en memoria hasta que el pull del siguiente login las reemplaza (evaluar si hace falta limpieza explicita al cambiar de usuario en el mismo proceso); binarios NO regenerados en esta sesion (APK/instalador actuales no llevan Sprint E); warning Kotlin "Condition is always true" en RecetasViewModel preexistente.

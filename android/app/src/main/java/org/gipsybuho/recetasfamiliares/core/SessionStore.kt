@@ -95,8 +95,19 @@ class SessionStore(context: Context) {
         _familyRole.value = role
     }
 
+    /** Ultimo usuario con sesion en este dispositivo. Sobrevive a clear()
+     *  para que el siguiente login detecte cambio de usuario y vacie la
+     *  cache local (privacidad en dispositivos compartidos). */
+    val lastKnownUserId: String?
+        get() = preferences.getString("user_id", null)
+            ?: preferences.getString("last_user_id", null)
+
     fun clear() {
-        preferences.edit { clear() }
+        val lastUser = lastKnownUserId
+        preferences.edit {
+            clear()
+            if (lastUser != null) putString("last_user_id", lastUser)
+        }
         _familyId.value = null
         _familyRole.value = null
     }

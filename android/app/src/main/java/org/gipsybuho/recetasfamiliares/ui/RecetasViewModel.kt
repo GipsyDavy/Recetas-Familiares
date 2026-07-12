@@ -168,6 +168,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     fun logout() {
         stopChatBadge()
         container.authRepository.logout()
+        wipeLocalCaches()
         _isLoggedIn.value = false
         _displayName.value = null
         _email.value = null
@@ -175,6 +176,15 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _families.value = emptyList()
         clearFamilyScopedState()
         _emailVerified.value = null
+    }
+
+    /** Privacidad en dispositivos compartidos: al cerrar sesion no queda
+     *  contenido familiar en Room. Los datos maestros viven en el servidor;
+     *  los cambios offline aun no sincronizados se pierden. */
+    private fun wipeLocalCaches() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { container.database.clearAllTables() }
+        }
     }
 
     // ── Ciclo de vida de cuenta (CRIT-2) ────────────────────────────────────
@@ -274,6 +284,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             closeChat()
             stopChatBadge()
             container.sessionStore.clear()
+            wipeLocalCaches()
             _isLoggedIn.value = false
             _displayName.value = null
             _email.value = null
@@ -293,6 +304,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             closeChat()
             stopChatBadge()
             container.sessionStore.clear()
+            wipeLocalCaches()
             _isLoggedIn.value = false
             _displayName.value = null
             _email.value = null

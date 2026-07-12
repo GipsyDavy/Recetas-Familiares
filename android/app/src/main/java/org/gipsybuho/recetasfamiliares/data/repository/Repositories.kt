@@ -114,13 +114,18 @@ private fun <T> SessionStore.familyScopedValueFlow(
 
 class AuthRepository(
     private val api: RecetasApi,
-    private val sessionStore: SessionStore
+    private val sessionStore: SessionStore,
+    private val clearLocalData: suspend () -> Unit
 ) {
     val isLoggedIn: Boolean
         get() = !sessionStore.accessToken.isNullOrBlank() && !sessionStore.familyId.isNullOrBlank()
 
     suspend fun login(email: String, password: String) {
         val response = api.login(LoginRequestDto(email.trim(), password))
+        val previousUser = sessionStore.lastKnownUserId
+        if (previousUser != null && previousUser != response.user.id) {
+            clearLocalData()
+        }
         sessionStore.accessToken  = response.accessToken
         sessionStore.refreshToken = response.refreshToken
         sessionStore.userId       = response.user.id
