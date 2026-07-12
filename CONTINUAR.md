@@ -2188,3 +2188,38 @@ Integracion revision Codex/Gemini (alcance B autorizado por el usuario):
 - SMTP CONFIGURADO 2026-07-12 noche: el usuario aporto App Password de Gmail; añadidas MAIL_ENABLED=true, MAIL_FROM, SMTP_HOST=smtp.gmail.com:587, SMTP_USERNAME, SMTP_PASSWORD y APP_PUBLIC_URL a `/etc/recetas-familiares/backend.env` (backup previo `backend.env.bak-20260712`, chmod 600), servicio reiniciado, health UP.
 - Prueba de envio real: `POST /auth/password-reset/request` a la cuenta real del usuario -> 202, sin errores en journalctl, y el usuario CONFIRMO la recepcion del correo en Gmail (2026-07-12 noche).
 - SMTP deja de ser pendiente: entrega real verificada. CRIT-2 cerrado operativo: reset (request+entrega+confirm validados; confirm ejercitado hoy ademas en la limpieza E2E), borrado de cuenta validado en produccion. Residual menor: el correo de "verificar email" no se ha probado con buzon real, pero usa el mismo canal SMTP ya verificado.
+
+### Cierre de sesion Claude Code 2026-07-12 noche — punto exacto para retomar
+
+Estado exacto al cerrar:
+- Rama `main` alineada con `origin/main`, ultimo commit `50b2d83`. Arbol limpio; solo `paraImplementar.txt` sin trackear (intocable sin decision explicita).
+- Cerrado en esta sesion: Sprint D declarado cerrado de producto (`64170c0`); Sprint E implementado (`1e3b083`) con revision Codex/Gemini integrada en alcance B (`a5b483a`); cuentas `claude.e2e.20260712.*` eliminadas de produccion; SMTP configurado y CERRADO con entrega real confirmada por el usuario (CRIT-2 operativo).
+- Produccion: health UP; sin cambios de codigo backend en la sesion (solo env SMTP en el VPS con backup `backend.env.bak-20260712`).
+
+Checklist de cierre (protocolo CLAUDE.md):
+- Contexto leido en sesion: SI (CLAUDE.md, CONTINUAR.md, fuentes afectadas).
+- Agentes IA: Codex y Gemini consultados via bloques IDE para Sprint E; sus hallazgos se verificaron contra codigo antes de integrar (severidad de Codex-1 rebajada con evidencia; guard inicial por familyId corregido a userId gracias al test E2E).
+- Seguridad: VibeSec invocado 2 veces (diff Sprint E y diff integracion), 0 hallazgos criticos. `security-review` NO APLICA: no se toco codigo backend (solo clientes y operacion). Plugin security-guidance activo por hooks.
+- Tests: Android `testDebugUnitTest assembleDebug` 46 tests 0 fallos; Desktop `mvn test` 21 tests 0 fallos. iOS no aplica (sin cambios iOS; runtime bloqueado sin macOS).
+- Trazabilidad: este archivo actualizado en cada hito y pusheado.
+
+PUNTO EXACTO PARA RETOMAR (siguiente accion, ~10 min, sin decision pendiente):
+- Regenerar binarios: los distribuibles actuales NO llevan Sprint E (wipe de cache, single-flight ya iba, dialogo logout, boton Perfil Desktop).
+  - Android: `cd android; .\gradlew.bat clean testDebugUnitTest assembleDebug` -> APK en `app/build/outputs/apk/debug/`.
+  - Desktop: cerrar procesos `RecetasFamiliares.exe` abiertos; `pwsh -NoProfile -ExecutionPolicy Bypass -File desktop/build-installer.ps1` (PowerShell 7, no PS5).
+  - Documentar hashes SHA-256 nuevos aqui.
+
+Orden de sprints siguientes (acordado con el usuario):
+1. Regenerar binarios (arriba). Micro-tarea, hacerla antes de cualquier sprint.
+2. Sprint (3) completo: OWNER/ADMIN edita datos/password de otro miembro. ANTES de codificar, presentar al usuario la decision de seguridad: admin-reset de password ajena (opciones: solo disparar email de reset al miembro — recomendada, minimo riesgo; o set directo de password temporal con cambio forzado — mas soporte pero mas riesgo). Toca backend (endpoint nuevo + ownership) -> VibeSec + security-review obligatorios y bloques Codex/Gemini al cierre.
+3. Sprint (22): scroll/responsive Desktop — 7 vistas sin ScrollPane envolvente (WeeklyMenuView, CookingView, FamilyMembersView, LoginView, RecipeListView, StockView, NotesView). Solo Desktop, sin contratos.
+4. Sprint (10): creador de receta visible. Contrato sync + migracion Room/clientes (regla §3, revisar impacto multiplataforma). Despues (11) ranking (depende de 9+10).
+5. Sprint (20) presencia online + avisos, y (14) chat 1:1 — tras chat fase 4 (push notifications).
+
+Riesgos vivos que hereda la proxima sesion:
+- Binarios distribuibles desactualizados (punto 1).
+- iOS: runtime sin validar (sin macOS); NUEVO-4 pendiente (`ios/.../sync/SyncRepository.kt` traga CancellationException); URL horneada iOS pendiente de sprint clientes.
+- Desktop: caches en memoria no se limpian al cambiar de usuario en el mismo proceso (el pull del login siguiente las reemplaza; evaluar).
+- Correo de verificacion de email sin prueba de buzon real (mismo canal SMTP verificado).
+- Fotos huerfanas en `uploads/` del VPS (limpieza de huerfanos futura).
+- APK debug sin firma release.
