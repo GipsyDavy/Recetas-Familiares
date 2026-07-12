@@ -1932,3 +1932,38 @@ Antes de marcar un sprint como cerrado:
 - Confirmar documentacion: cambios relevantes y riesgos residuales registrados.
 
 Si un punto falla, el sprint sigue abierto. No escribir `cerrado`, `PASS`, `completo` o `validado` sin haberlo comprobado realmente.
+
+### Continuacion Codex 2026-07-12 - cierre operativo Sprint D multi-familia
+
+- Punto de partida: `main` estaba en `b027212 feat: multi-familia en backend, Android, Desktop e iOS`, ya pusheado a `origin/main`; worktree limpio salvo `paraImplementar.txt` sin trackear.
+- GitHub Actions:
+  - `Backend CI/CD` run `29183497963` sobre `b027212` -> `success`; jobs `Build and test backend` y `Deploy backend` -> `success`.
+  - Health externo tras deploy Sprint D: `GET https://recetas.167.233.213.242.sslip.io/api/v1/health` -> 200 `UP`.
+- E2E API real contra produccion con datos temporales `codex.e2e.20260712091313-c12320.*@example.com`:
+  - Creadas dos familias (`sourceFamilyId=720d826e-0192-4b42-8036-21b4519bcb32`, `targetFamilyId=461bb7b7-54c7-4027-90f1-b0f82e1c87d8`).
+  - Roles mixtos: guest `MEMBER` en origen y `ADMIN` en destino.
+  - Receta creada en origen con ingredientes, pasos y foto real subida desde `recetas.png`.
+  - Copia ejecutada por guest desde origen a destino: conserva ingredientes, pasos y foto; la foto copiada mantiene la referencia compartida de URL/storage.
+  - Chat verificado aislado por `familyId`: mensaje origen no aparece en destino y viceversa.
+  - Tras expulsar guest de origen, `GET /families/{source}/recipes` devuelve 403 y sigue accediendo a la receta/foto copiada en destino.
+  - Copia dentro de la misma familia rechazada con 400.
+- Hallazgo durante limpieza: `DELETE /api/v1/auth/account` devolvia 500 al anonimizar usuario porque `AuthService.deleteAccount()` generaba `UUID:UUID` (73 bytes) para BCrypt, que rechaza passwords de mas de 72 bytes.
+- Hotfix aplicado y desplegado:
+  - Commit `e8b2ce9 fix(auth): avoid bcrypt limit on account deletion`.
+  - Cambio: anonimizar cuenta con un solo UUID aleatorio antes de hashear.
+  - Test nuevo en `AuthServiceTest` con `BCryptPasswordEncoder` real para cubrir el limite de 72 bytes.
+  - Validacion local: `mvn -B -f backend/pom.xml -Dtest=AuthServiceTest test` -> 8/0; `mvn -B -f backend/pom.xml -DskipTests compile` -> `BUILD SUCCESS`; `git diff --check` -> sin errores (solo avisos CRLF Windows).
+  - `Backend CI/CD` run `29184008888` sobre `e8b2ce9` -> `success`; jobs `Build and test backend` y `Deploy backend` -> `success`.
+  - Health externo post-hotfix: 200 `UP` (`checkedAt` 2026-07-12T07:21:29Z).
+- Limpieza:
+  - Las recetas/fotos temporales se soft-deletearon por API.
+  - Tras hotfix, `DELETE /auth/account` de guest y owner -> 204.
+  - Login posterior de ambas cuentas -> 401.
+  - Verificacion JDBC acotada al sufijo temporal: `users_active=0`, `families_active=0`, `members_active=0`.
+- Seguridad:
+  - VibeSec-Skill usado como checklist por tocar ciclo de vida de cuenta, roles, ownership y datos multi-tenant.
+  - No se detecto fuga tenant en la E2E API: filtros por `familyId`, permisos de copia y serving de foto compartida se comportaron como esperado.
+- Pendiente para cierre de producto Sprint D:
+  - Falta prueba UI guiada en clientes reales (Desktop/Android) con dos familias y roles mixtos: crear/cambiar familia activa desde UI, copiar receta con foto desde UI y comprobar aislamiento visual de recetas/chat/cache.
+  - En esta maquina no hay `adb` disponible/conectado; Desktop puede compilarse, pero la prueba visual requiere interaccion manual.
+  - Por tanto, backend/API/CI/deploy quedan verificados, pero no declarar Sprint D cerrado de producto hasta completar la prueba UI cliente.
