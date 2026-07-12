@@ -2582,3 +2582,51 @@ Agente lider: Claude Code, en la misma sesion que dejo el plan registrado arriba
 **Riesgo residual:** los hallazgos Medios/Bajos listados arriba quedan pendientes, documentados, sin fecha de sprint asignada todavia. La deuda de infraestructura de tests (BD compartida sin aislamiento) puede volver a bloquear la suite si se corre sin purgar `recetas_familiares_test` primero.
 
 **Siguiente sprint recomendado:** decidir con el usuario si se ataca la deuda Medio/Bajo de esta auditoria antes de Sprint (12), o si Sprint (12) (copiar recetas entre familias) sigue siendo prioridad.
+
+### Sesion 2026-07-13 (continuacion, misma tarde): aclarado Sprint(12), spec+plan iOS multi-familia, sesion cerrada por cuota baja (7%)
+
+Agente lider: Claude Code. Verificacion real por grep/Read (no memoria): Sprint(12)
+"copiar receta entre familias" **YA esta cerrado** en backend+Android+Desktop (Sprint D,
+`RecipeDetailView.java:757-789` Desktop, `RecipeScreens.kt:516-553` Android). La nota
+"Sprint(12) sigue siendo prioridad" del cierre anterior era una referencia repetida sin
+actualizar. El gap real es **iOS**: no tiene ninguna pantalla de multi-familia ni de
+copiar receta (verificado, cero coincidencias en `ios/composeApp/src`).
+
+Codex MCP (`mcp__plugin_second-opinion_codex__codex`) probado por primera vez a peticion
+del usuario: **fallo real** (`400, modelo gpt-5.6-sol requiere version mas nueva de
+Codex`). No utilizable hoy; se mantiene el canal ya validado de bloques copy-paste al
+chat IDE para Codex/Gemini.
+
+Usuario autorizo sprint **iOS: multi-familia (listar/cambiar/crear) + copiar receta**,
+partido en 2 specs (recomendado por Claude): Spec 1 = multi-familia (este), Spec 2 =
+copiar receta (posterior, depende del 1). Flujo `superpowers:brainstorming` completo:
+
+- Spec escrito y aprobado: `docs/superpowers/specs/2026-07-13-ios-multi-family-design.md`
+  (corregido una vez tras verificar codigo: `SessionStore.familyRole`/`familyRoleFlow` y
+  `FamilyDto` **ya existian** de un sprint anterior — el spec inicial decia erroneamente
+  que habia que crearlos).
+- Plan escrito: `docs/superpowers/plans/2026-07-13-ios-multi-family.md` (5 tareas TDD:
+  bootstrap `commonTest`+engine inyectable en `ApiClient`, DTOs, `FamilyMemberRepository`,
+  `FamilyViewModel` nuevo, UI `ModalBottomSheet` + entrada en Ajustes).
+- **Limitacion de entorno documentada y aceptada por el usuario:** esta maquina
+  (Windows, sin macOS/Xcode) solo puede compilar metadata comun de iOS
+  (`:composeApp:compileKotlinMetadata`), nunca ejecutar tests reales de iOS. Decision
+  explicita: escribir los tests completos igualmente, marcados como "no ejecutados",
+  verificar solo por compilacion de metadata (RED = error de compilacion, GREEN =
+  `BUILD SUCCESSFUL`). Nunca declarar que estos tests "pasaron".
+- Commits de esta sesion (solo documentacion, **ningun codigo tocado todavia**):
+  `3553569` (cierre auditoria anterior + paso 0 superpowers + spec v1) y `f165e55`
+  (correccion del spec + plan). Arbol de trabajo limpio salvo `paraImplementar.txt`
+  (sin trackear, sin tocar, como siempre).
+
+**Sesion cerrada por el usuario a cuota 7%** justo despues de escribir el plan, antes de
+elegir metodo de ejecucion (pregunte Subagent-Driven vs Inline, el usuario pidio aclarar
+algo y luego decidio cerrar por cuota en vez de continuar). Ningun archivo de codigo
+modificado; el arbol esta limpio en un punto seguro.
+
+PUNTO EXACTO PARA RETOMAR: leer `docs/superpowers/plans/2026-07-13-ios-multi-family.md`
+completo, preguntar al usuario Subagent-Driven vs Inline (`superpowers:subagent-driven-development`
+o `superpowers:executing-plans`), y ejecutar las 5 tareas en orden empezando por la
+Task 1 (bootstrap `commonTest` + `engine` inyectable en `ApiClient.kt`). No hace falta
+repetir el brainstorming ni la escritura del plan, ya estan aprobados. Tras cerrar Spec 1
+(multi-familia), el Spec 2 (copiar receta en iOS) queda pendiente de brainstorming propio.
