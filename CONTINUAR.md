@@ -1986,3 +1986,44 @@ Si un punto falla, el sprint sigue abierto. No escribir `cerrado`, `PASS`, `comp
   - Android `gradlew.bat test` -> `BUILD SUCCESSFUL`.
   - Desktop `mvn -f desktop/pom.xml test` -> 21 tests, 0 fallos.
 - Nota: primer intento de `desktop/build-installer.ps1` con Windows PowerShell 5 fallo por lectura UTF-8 de caracteres decorativos del script; rerun con PowerShell 7 (`pwsh`) correcto.
+
+### Cierre de sesion Codex 2026-07-12 09:32 Europe/Madrid - handoff a Claude Code
+
+- Estado exacto al cerrar:
+  - Rama: `main`.
+  - Ultimo commit remoto antes de esta nota: `c6ec627 docs: registrar binarios cliente regenerados`.
+  - Worktree sin cambios trackeados pendientes; queda `paraImplementar.txt` sin trackear, preexistente, usado como roadmap funcional. No borrarlo ni commitearlo sin decision explicita.
+  - Produccion backend verificada tras hotfix: `GET https://recetas.167.233.213.242.sslip.io/api/v1/health` -> 200 `UP`.
+- Lo que ya esta hecho y NO debe repetirse salvo sospecha de regresion:
+  - Sprint D multi-familia esta implementado y pusheado en backend, Android, Desktop e iOS.
+  - Backend CI/CD verde para Sprint D (`29183497963` sobre `b027212`) y hotfix auth (`29184008888` sobre `e8b2ce9`).
+  - E2E API real de dos familias/roles/copia con foto/chat aislado paso contra produccion.
+  - Hotfix `DELETE /auth/account` por limite BCrypt desplegado y validado; limpieza de cuentas temporales confirmada por API y JDBC.
+  - APK debug y EXE Windows regenerados con las implementaciones actuales; rutas y hashes en la seccion anterior.
+- Siguiente punto exacto para Claude Code:
+  - Sprint recomendado: **Cierre de Sprint D multi-familia - prueba UI cliente real**.
+  - No empezar presencia online, ranking, chat 1:1 ni creador de receta hasta decidir si Sprint D queda cerrado de producto.
+  - Objetivo: prueba manual guiada en Desktop y Android con dos familias y roles mixtos, usando los binarios regenerados y backend de produccion.
+- Runbook minimo de prueba UI:
+  1. Leer `CLAUDE.md` completo y las ultimas secciones de `CONTINUAR.md`.
+  2. Confirmar `git status --short --branch`; no tocar `paraImplementar.txt` salvo instruccion del usuario.
+  3. Desktop: usar `desktop/output/RecetasFamiliares-Instalador-v1.1.exe` o app-image `desktop/output/RecetasFamiliares/RecetasFamiliares.exe`.
+  4. Android: instalar `android/app/build/outputs/apk/debug/app-debug.apk` en dispositivo/emulador. En esta sesion no habia `adb`; si sigue sin estar, pedir prueba manual al usuario o conectar dispositivo.
+  5. Crear datos temporales identificables (`claude.e2e.<fecha>.*`) y limpiar al terminar con `DELETE /auth/account`; el bug de borrado ya esta corregido.
+  6. Verificar desde UI: crear segunda familia, cambiar familia activa, ver miembros/roles, copiar receta con foto entre familias, comprobar que recetas/chat/notas/stats/ratings no muestran datos de la familia anterior tras cambiar.
+  7. Probar rol mixto: usuario `MEMBER` en origen y `ADMIN` en destino puede copiar; al perder origen debe conservar destino y no ver origen.
+  8. Revisar especialmente cache/sync al cambiar familia activa: que no aparezcan items antiguos ni cursores cruzados tras refresh, relogin o cambio rapido.
+  9. Si hay cualquier cambio en auth/roles/sync/ownership/cache multi-tenant, usar VibeSec-Skill y documentar riesgos.
+  10. Si la prueba UI pasa, actualizar esta seccion marcando Sprint D cerrado de producto con fecha, cuentas temporales limpiadas, comandos/acciones reales y riesgos residuales. Si falla, corregir solo el blocker, ejecutar tests afectados y repetir la prueba.
+- Riesgos vivos para no olvidar:
+  - Android logout no vacia Room; se considera residuo local preexistente sin exposicion UI, pero debe observarse en la prueba de cambio de familia.
+  - La limpieza futura de fotos fisicas debe contar filas activas de TODAS las familias por `storagePath` antes de borrar archivos compartidos.
+  - SMTP real sigue pendiente para cerrar CRIT-2 end-to-end de emails; no bloquea Sprint D multi-familia.
+  - APK actual es `debug`; no hay firma release configurada en `android/app/build.gradle.kts`.
+  - iOS compila, pero runtime real sigue bloqueado sin macOS/dispositivo.
+- Herramientas confirmadas en esta maquina:
+  - Codex CLI, Gemini CLI y Claude Code CLI disponibles.
+  - VibeSec-Skill disponible; `security-review` callable no disponible.
+  - OWASP Dependency-Check configurado por Maven en backend/desktop con `security-audit`, requiere `NVD_API_KEY`.
+  - `gh` CLI no disponible.
+  - `adb` no disponible/conectado al cierre de esta sesion.
