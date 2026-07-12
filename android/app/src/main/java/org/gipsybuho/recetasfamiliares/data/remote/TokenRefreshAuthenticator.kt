@@ -20,6 +20,7 @@ class TokenRefreshAuthenticator(
 
     private val gson = Gson()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
+    private val refreshLock = Any()
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -35,44 +36,58 @@ class TokenRefreshAuthenticator(
             sessionStore.clear()
             return null
         }
-        val refreshToken = sessionStore.refreshToken ?: run {
-            sessionStore.clear()
-            return null
-        }
-
-        val body = gson.toJson(mapOf("refreshToken" to refreshToken))
-            .toRequestBody(jsonType)
-
-        val refreshResponse = runCatching {
-            client.newCall(
-                Request.Builder()
-                    .url("${baseUrlProvider()}api/v1/auth/refresh")
-                    .post(body)
+        // Single-flight: el backend rota el refresh token de forma atomica
+        // (revokeIfActive); dos refresh concurrentes con el mismo token
+        // revocarian la sesion entera. Solo un hilo refresca; el resto
+        // reintenta con el token que dejo el primero.
+        val failedAccessToken = response.request.header("Authorization")
+            ?.removePrefix("Bearer ")
+        synchronized(refreshLock) {
+            val current = sessionStore.accessToken
+            if (!current.isNullOrBlank() && current != failedAccessToken) {
+                return response.request.newBuilder()
+                    .header("Authorization", "Bearer $current")
                     .build()
-            ).execute()
-        }.getOrNull() ?: run {
-            sessionStore.clear()
-            return null
+            }
+            val refreshToken = sessionStore.refreshToken ?: run {
+                sessionStore.clear()
+                return null
+            }
+
+            val body = gson.toJson(mapOf("refreshToken" to refreshToken))
+                .toRequestBody(jsonType)
+
+            val refreshResponse = runCatching {
+                client.newCall(
+                    Request.Builder()
+                        .url("${baseUrlProvider()}api/v1/auth/refresh")
+                        .post(body)
+                        .build()
+                ).execute()
+            }.getOrNull() ?: run {
+                sessionStore.clear()
+                return null
+            }
+
+            if (!refreshResponse.isSuccessful) {
+                sessionStore.clear()
+                return null
+            }
+
+            val auth = runCatching {
+                gson.fromJson(refreshResponse.body?.string(), AuthResponseDto::class.java)
+            }.getOrNull() ?: run {
+                sessionStore.clear()
+                return null
+            }
+
+            sessionStore.accessToken = auth.accessToken
+            sessionStore.refreshToken = auth.refreshToken
+
+            return response.request.newBuilder()
+                .header("Authorization", "Bearer ${auth.accessToken}")
+                .build()
         }
-
-        if (!refreshResponse.isSuccessful) {
-            sessionStore.clear()
-            return null
-        }
-
-        val auth = runCatching {
-            gson.fromJson(refreshResponse.body?.string(), AuthResponseDto::class.java)
-        }.getOrNull() ?: run {
-            sessionStore.clear()
-            return null
-        }
-
-        sessionStore.accessToken = auth.accessToken
-        sessionStore.refreshToken = auth.refreshToken
-
-        return response.request.newBuilder()
-            .header("Authorization", "Bearer ${auth.accessToken}")
-            .build()
     }
 
     private fun isApiOrigin(url: okhttp3.HttpUrl): Boolean {

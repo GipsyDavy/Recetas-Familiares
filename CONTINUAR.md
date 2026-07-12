@@ -398,6 +398,18 @@ DESCARTADOS TOTALMENTE por decision del usuario (2026-07-12):
 - (16) Comparar recetas con internet + sugerencias IA de modificacion: coste recurrente, consentimiento de datos familiares, complejidad alta para valor incierto. YAGNI.
 - (8) en version integrada (API externa de alimentos/recetas): mismos motivos. Solo sobrevive la version simple (abrir navegador) en Sprint B.
 
+Estado verificado de los 22 puntos (2026-07-12 mediodia, Claude Code, contra codigo y UI real):
+- COMPLETOS: 1, 2, 4, 5, 6*, 8-simple, 9, 12, 13, 15, 17, 18, 19, 21. (*6 espera SMTP del usuario para E2E de emails.)
+  - (5) verificado en codigo: `FamilyService.createFamily` exige OWNER/ADMIN en alguna familia (o usuario sin membresias); MEMBER puro recibe 403. UI Android oculta "Crear familia" segun rol de la familia activa (mas conservador que backend: MEMBER activo con OWNER en otra familia no ve el boton; decision UI aceptada).
+  - (21) verificado en codigo y produccion: StarterRecipeSeeder crea 2 EASY + 2 MEDIUM + 1 HARD.
+- PARCIALES:
+  - (3) rol/expulsion OK (Sprint C); NO existe endpoint para que OWNER/ADMIN edite datos/password de otro miembro (verificado: FamilyController solo tiene invite/list/role/remove/avatar/stats). El "password olvidada" queda cubierto por self-reset CRIT-2 via email. Si se quiere el literal del punto 3, falta sprint backend+clientes con decision de seguridad (admin-reset de password ajena es delicado).
+  - (7) foto y portada en DETALLE OK (verificado Android hoy); las cards de LISTADO no muestran portada ni en Android ni en Desktop (`RecipeListView` sin imagenes). Mejora UX pendiente.
+  - (14) chat familiar OK; chat privado 1:1 pendiente (tras chat fase 4 push).
+- PENDIENTES: (10) creador de receta (sprint propio, contrato sync + Room), (11) ranking (depende de 9+10), (20) presencia online/avisos (sin push, solo app abierta), (22) scroll Desktop al redimensionar.
+  - (22) NO estaba en el roadmap anterior. Verificado hoy: 7 vistas Desktop sin ScrollPane envolvente (WeeklyMenuView, CookingView, FamilyMembersView, LoginView, RecipeListView, StockView, NotesView; las de tabla tienen scroll interno pero cabeceras/formularios pueden quedar fuera al reducir ventana). Sprint UX Desktop propio.
+- DESCARTADOS: (16) y (8) integrado.
+
 Antes de arrancar sprint, revisar `auditoria.md` para IDs `SEC-*`, `COD-*`, `UX-*` y comprobar vigencia en codigo.
 
 ---
@@ -2027,3 +2039,52 @@ Si un punto falla, el sprint sigue abierto. No escribir `cerrado`, `PASS`, `comp
   - OWASP Dependency-Check configurado por Maven en backend/desktop con `security-audit`, requiere `NVD_API_KEY`.
   - `gh` CLI no disponible.
   - `adb` no disponible/conectado al cierre de esta sesion.
+
+### Sprint Cierre D - prueba UI cliente Android + fixes auth (2026-07-12 mediodia, Claude Code)
+
+- Objetivo: ejecutar la prueba UI real multi-familia pendiente para el cierre de producto de Sprint D, siguiendo el runbook del handoff Codex.
+- Agente lider: Claude Code en solitario. Codex/Gemini no consultados: prueba manual guiada + fixes puntuales verificados con tests; no habia incertidumbre de diseno que justificara segunda opinion. VibeSec invocado (se toco autenticacion).
+- Herramientas usadas: emulador `Pixel_9_Pro` + adb (input/screencap) para prueba UI real automatizada; PowerShell `Invoke-RestMethod`/`curl.exe` para preparar datos E2E contra produccion. No hizo falta instalar plugins/skills nuevos (autorizacion del usuario registrada; no aplico).
+
+Prueba UI Android EJECUTADA Y SUPERADA (guest `MEMBER` en "E2E Origen", `OWNER` en "E2E Destino"):
+- Login desde UI contra produccion con URL default correcta.
+- Selector "Cambiar familia activa" con familia actual deshabilitada; el orden de filas varia (la actual se recoloca): no asumir posicion fija al automatizar.
+- Cambio de familia: recetas/stats/miembros/roles correctos por familia; pull con cursor por familia trae ingredientes/pasos/fotos tras el cambio.
+- "Copiar a otra familia" desde el menu del detalle: la copia aparece en destino con foto (portada+carrusel) e ingredientes (10) verificados visualmente.
+- Chat aislado: mensaje enviado en Origen no aparece en el chat de Destino.
+- Relanzar la app mantiene sesion sin crash y conserva la familia activa.
+
+3 BUGS REALES encontrados durante la prueba y CORREGIDOS en la sesion:
+1. CRASH al arrancar con sesion invalida (cuenta borrada / refresh revocado): `RecetasViewModel.refresh()` tenia try/finally SIN catch y `HttpException 401` mataba el proceso en cada arranque. Fix: catch (re-lanza `CancellationException`) y, si el authenticator ya limpio la sesion, `_isLoggedIn=false` -> vuelve a login. Tambien evita crash de pull-to-refresh sin red.
+2. CARRERA de refresh concurrente (Android `TokenRefreshAuthenticator` y Desktop `ApiClient.authenticate`): sin single-flight, N peticiones paralelas con token caducado (el detalle dispara ratings+photos+uploads a la vez) refrescaban en paralelo con el MISMO refresh token; la rotacion atomica del backend (`revokeIfActive`) revoca a los perdedores -> `session.clear()` -> logout/estado roto aleatorio. Reproducido en vivo en el emulador a los ~40 min de sesion. Fix en AMBOS clientes: `synchronized` + re-chequeo del token vigente (si otro hilo ya refresco, reintenta con el token nuevo sin refrescar). iOS usa el plugin Auth de Ktor (single-flight propio); verificar en macOS cuando haya runtime.
+3. Estado ZOMBIE tras limpieza de sesion: con la sesion borrada por el authenticator, la UI seguia "logueada" mostrando datos vacios (los flows por familia emiten vacio con familyId null y los repos hacen early-return sin error). Fix: observador de `familyIdFlow` en `RecetasViewModel` que vuelve a login cuando la sesion desaparece de verdad.
+
+Hallazgos SIN corregir (documentados, fuera de alcance quirurgico del sprint):
+- PRIVACIDAD (media, mismo dispositivo): tras morir una sesion, el Perfil mostro nombre/email del usuario ANTERIOR ("Abuela Demo", cache local de sesiones del 11-jul) hasta relogin. Confirma el riesgo conocido "logout no vacia Room/cache de usuario". Sprint recomendado: limpiar caches locales al iniciar sesion con un usuario distinto al anterior.
+- UX menor: tras login, el header del perfil muestra nombre/email vacios hasta que `/users/me` responde.
+- UX menor: cards de listado de recetas sin foto de portada (Android y Desktop); la foto solo se ve en el detalle.
+- UI vs backend en "Crear familia": el gating usa el rol de la familia ACTIVA; backend permite crear si eres OWNER/ADMIN de CUALQUIER familia. Conservador, no es fallo de seguridad.
+
+Validaciones ejecutadas en la sesion:
+- Android: `gradlew testDebugUnitTest assembleDebug` BUILD SUCCESSFUL (2 veces, tras cada tanda de fixes); APK reinstalado y flujo completo re-probado en emulador.
+- Desktop: `mvn test` 21 tests, 0 fallos, BUILD SUCCESS (compila el fix de ApiClient).
+- `git diff --check` sin errores (solo avisos CRLF de Windows).
+- Seguridad: VibeSec invocado sobre el diff (single-flight sin deadlock, fail-closed preservado, sin tokens en logs, EncryptedSharedPreferences intacto): 0 hallazgos.
+- Produccion: health 200 UP; sin cambios de backend en este sprint.
+
+Datos E2E en produccion (NO limpiados a proposito, para la prueba GUI Desktop del usuario):
+- Cuentas: `claude.e2e.20260712.owner@example.com` (OWNER de "E2E Origen") y `claude.e2e.20260712.guest@example.com` (OWNER de "E2E Destino", MEMBER en "E2E Origen"). Password compartida de prueba conocida por el usuario de la sesion (no documentada aqui).
+- Familias: "E2E Origen" (1eddd914-...) con paella + foto y 1 mensaje de chat; "E2E Destino" (1646a34e-...) con 6 recetas (5 seed + paella copiada con foto).
+- LIMPIEZA tras la prueba Desktop: `DELETE /api/v1/auth/account` con cada cuenta (bug bcrypt ya corregido) o desde la propia app (Perfil > Cuenta > Borrar).
+
+PENDIENTE para declarar Sprint D CERRADO DE PRODUCTO:
+- Prueba GUI Desktop manual del usuario (JavaFX no automatizable en esta sesion): login guest, cambiar familia activa, copiar receta con foto, verificar aislamiento visual de recetas/chat. OJO: el instalador/app-image v1.1 actual NO incluye el fix single-flight de esta sesion; regenerar instalador (`desktop/build-installer.ps1` con pwsh 7) o probar con `mvn javafx:run`.
+- Regenerar APK distribuible (el APK del emulador ya lleva los fixes; el hash documentado en la seccion "Regeneracion de binarios" quedo obsoleto).
+- Commit de esta sesion pusheado (ver git log); CI verde a verificar en GitHub Actions (sin `gh` en este PC).
+
+Siguientes sprints candidatos tras el cierre D (orden sugerido):
+1. Higiene de sesion/cache local Android (hallazgo de privacidad de esta sesion) + limpieza de Room en logout/cambio de usuario.
+2. (3) completo si se desea: edicion de datos/password de miembro por OWNER/ADMIN (decision de seguridad previa).
+3. (22) scroll/responsive Desktop.
+4. (10) creador de receta visible -> luego (11) ranking.
+5. (20) presencia online + (14) chat 1:1 tras chat fase 4/push.

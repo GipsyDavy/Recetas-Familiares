@@ -80,6 +80,19 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private val _isLoggedIn = MutableStateFlow(container.authRepository.isLoggedIn)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
+    init {
+        // Si el authenticator limpia la sesion (refresh token revocado o
+        // cuenta eliminada), volver a login en vez de quedarse en una UI
+        // logueada mostrando datos vacios.
+        viewModelScope.launch {
+            container.sessionStore.familyIdFlow.collect { id ->
+                if (id == null && _isLoggedIn.value && !container.authRepository.isLoggedIn) {
+                    _isLoggedIn.value = false
+                }
+            }
+        }
+    }
+
     private val _onboardingDone = MutableStateFlow(container.onboardingPreference.onboardingDone)
     val onboardingDone: StateFlow<Boolean> = _onboardingDone.asStateFlow()
 
@@ -501,6 +514,11 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 runCatching { container.syncRepository.pullOnce() }
                 _recipeNextPage.value = 1
                 _recipeHasMore.value = container.recipeRepository.totalPages > 1
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                // Sesion invalidada (p.ej. cuenta borrada o refresh token revocado):
+                // el authenticator ya limpio la sesion; volver a login sin crashear.
+                if (!container.authRepository.isLoggedIn) _isLoggedIn.value = false
             } finally {
                 _isRefreshing.value = false
             }

@@ -24,6 +24,7 @@ public class ApiClient {
     private final OkHttpClient client;
     // Separate client for token refresh — avoids authenticator recursion
     private final OkHttpClient refreshClient;
+    private final Object refreshLock = new Object();
 
     public ApiClient(AppSession session) {
         this(session, ServerConfig::getBaseUrl);
@@ -258,30 +259,45 @@ public class ApiClient {
             session.clear();
             return null;
         }
-        String refreshToken = session.getRefreshToken();
-        if (refreshToken == null || refreshToken.isBlank()) {
-            session.clear();
-            return null;
-        }
-
-        // Perform token refresh with the separate client
-        var refreshBody = new AuthDtos.RefreshRequest(refreshToken);
-        RequestBody rb = RequestBody.create(gson.toJson(refreshBody), JSON);
-        Request refreshRequest = new Request.Builder()
-                .url(url("api/v1/auth/refresh"))
-                .post(rb)
-                .build();
-
-        try (Response refreshResponse = refreshClient.newCall(refreshRequest).execute()) {
-            if (!refreshResponse.isSuccessful() || refreshResponse.body() == null) {
+        // Single-flight: el backend rota el refresh token de forma atomica
+        // (revokeIfActive); dos refresh concurrentes con el mismo token
+        // revocarian la sesion entera. Solo un hilo refresca; el resto
+        // reintenta con el token que dejo el primero.
+        String failedAuth = response.request().header("Authorization");
+        String failedToken = failedAuth != null && failedAuth.startsWith("Bearer ")
+                ? failedAuth.substring(7) : null;
+        synchronized (refreshLock) {
+            String current = session.getAccessToken();
+            if (current != null && !current.isBlank() && !current.equals(failedToken)) {
+                return response.request().newBuilder()
+                        .header("Authorization", "Bearer " + current)
+                        .build();
+            }
+            String refreshToken = session.getRefreshToken();
+            if (refreshToken == null || refreshToken.isBlank()) {
                 session.clear();
                 return null;
             }
-            AuthDtos.AuthResponse authResp = gson.fromJson(refreshResponse.body().string(), AuthDtos.AuthResponse.class);
-            session.setTokens(authResp.accessToken(), authResp.refreshToken());
-            return response.request().newBuilder()
-                    .header("Authorization", "Bearer " + authResp.accessToken())
+
+            // Perform token refresh with the separate client
+            var refreshBody = new AuthDtos.RefreshRequest(refreshToken);
+            RequestBody rb = RequestBody.create(gson.toJson(refreshBody), JSON);
+            Request refreshRequest = new Request.Builder()
+                    .url(url("api/v1/auth/refresh"))
+                    .post(rb)
                     .build();
+
+            try (Response refreshResponse = refreshClient.newCall(refreshRequest).execute()) {
+                if (!refreshResponse.isSuccessful() || refreshResponse.body() == null) {
+                    session.clear();
+                    return null;
+                }
+                AuthDtos.AuthResponse authResp = gson.fromJson(refreshResponse.body().string(), AuthDtos.AuthResponse.class);
+                session.setTokens(authResp.accessToken(), authResp.refreshToken());
+                return response.request().newBuilder()
+                        .header("Authorization", "Bearer " + authResp.accessToken())
+                        .build();
+            }
         }
     }
 
