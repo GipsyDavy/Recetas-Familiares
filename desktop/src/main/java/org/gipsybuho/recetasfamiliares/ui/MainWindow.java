@@ -56,6 +56,8 @@ public class MainWindow {
     private ProfileView profileView;
     private String activeView = "dashboard";
     private boolean navigating = false;
+    private boolean updatingFamilySelector = false;
+    private ComboBox<FamilyChoice> familySelector;
     private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnSettings, btnMembers;
     private final TextField globalSearch = new TextField();
     private final Label statusBar = new Label("");
@@ -106,6 +108,7 @@ public class MainWindow {
         if (chatView != null) {
             chatView.shutdown();
         }
+        context.clearFamilyScopedCaches();
         LoginView loginView = new LoginView(context, () -> {
             showMain();
             triggerInitialSync();
@@ -227,7 +230,7 @@ public class MainWindow {
         HBox userCard = buildUserCard();
 
         // ── Common buttons ────────────────────────────────────────────────────
-        sidebar.getChildren().addAll(header, globalSearch, userCard,
+        sidebar.getChildren().addAll(header, globalSearch, userCard, buildFamilySelector(),
                 btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat);
 
         // ── Admin-only buttons ────────────────────────────────────────────────
@@ -244,6 +247,87 @@ public class MainWindow {
 
         sidebar.getChildren().addAll(spacer, bottom);
         return sidebar;
+    }
+
+    private Node buildFamilySelector() {
+        Label label = new Label("Familia activa");
+        label.getStyleClass().add("sidebar-user-email");
+
+        ComboBox<FamilyChoice> selector = new ComboBox<>();
+        familySelector = selector;
+        selector.setMaxWidth(Double.MAX_VALUE);
+        selector.setPromptText("Cargando...");
+        selector.setDisable(true);
+        selector.getStyleClass().add("search-field");
+
+        Label status = new Label("");
+        status.getStyleClass().add("sidebar-user-email");
+        status.setWrapText(true);
+
+        selector.setOnAction(e -> {
+            if (updatingFamilySelector) return;
+            FamilyChoice selected = selector.getSelectionModel().getSelectedItem();
+            if (selected != null && !Objects.equals(selected.id(), context.getSession().getFamilyId())) {
+                // Cambio directo: es reversible y el aviso llega por la barra de estado.
+                switchActiveFamily(selected);
+            }
+        });
+
+        VBox box = new VBox(5, label, selector, status);
+        box.setPadding(new Insets(0, 16, 12, 16));
+        loadFamilyChoices(selector, status);
+        return box;
+    }
+
+    private void loadFamilyChoices(ComboBox<FamilyChoice> selector, Label status) {
+        String activeFamilyId = context.getSession().getFamilyId();
+        Thread.ofVirtual().start(() -> {
+            try {
+                var families = context.getFamilyRepository().loadMyFamilies();
+                List<FamilyChoice> choices = new ArrayList<>();
+                for (var family : families) {
+                    choices.add(new FamilyChoice(family.id(), family.name(), family.role()));
+                }
+                Platform.runLater(() -> {
+                    if (familySelector != selector) return;
+                    updatingFamilySelector = true;
+                    selector.getItems().setAll(choices);
+                    FamilyChoice active = choices.stream()
+                            .filter(choice -> Objects.equals(choice.id(), activeFamilyId))
+                            .findFirst()
+                            .orElse(choices.isEmpty() ? null : choices.get(0));
+                    if (active != null) {
+                        selector.getSelectionModel().select(active);
+                        status.setText(roleText(active.role()));
+                    } else {
+                        status.setText("Sin familias disponibles.");
+                    }
+                    selector.setDisable(choices.size() < 2);
+                    updatingFamilySelector = false;
+
+                    if (active != null && !Objects.equals(active.id(), context.getSession().getFamilyId())) {
+                        switchActiveFamily(active);
+                    }
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    if (familySelector != selector) return;
+                    status.setText("No se pudieron cargar tus familias.");
+                    selector.setDisable(true);
+                });
+            }
+        });
+    }
+
+    private void switchActiveFamily(FamilyChoice selected) {
+        if (selected == null || Objects.equals(selected.id(), context.getSession().getFamilyId())) return;
+        if (chatView != null) {
+            chatView.shutdown();
+        }
+        context.switchActiveFamily(selected.id(), parseFamilyRole(selected.role()));
+        showMain();
+        triggerInitialSync();
+        setStatus("Familia activa: " + selected.name());
     }
 
     private HBox buildUserCard() {
@@ -1164,6 +1248,33 @@ public class MainWindow {
 
     private String nullSafe(String value) {
         return value != null ? value : "";
+    }
+
+    private FamilyRole parseFamilyRole(String role) {
+        if (role == null || role.isBlank()) {
+            return FamilyRole.MEMBER;
+        }
+        try {
+            return FamilyRole.valueOf(role.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            return FamilyRole.MEMBER;
+        }
+    }
+
+    private String roleText(String role) {
+        FamilyRole parsed = parseFamilyRole(role);
+        return switch (parsed) {
+            case OWNER -> "Propietario";
+            case ADMIN -> "Administrador";
+            case MEMBER -> "Miembro";
+        };
+    }
+
+    private record FamilyChoice(String id, String name, String role) {
+        @Override
+        public String toString() {
+            return name != null && !name.isBlank() ? name : "Familia";
+        }
     }
 
     private void testBackend(Label status) {

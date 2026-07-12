@@ -9,6 +9,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.gipsybuho.recetasfamiliares.core.SessionStore
@@ -47,10 +48,11 @@ class RecipeRepositoryOfflineTest {
     @Before
     fun setUp() {
         every { sessionStore.familyId } returns FAMILY_ID
+        every { sessionStore.familyIdFlow } returns MutableStateFlow(FAMILY_ID)
         every { database.recipeDao() } returns recipeDao
         every { database.recipeIngredientDao() } returns ingredientDao
         every { database.recipeStepDao() } returns stepDao
-        every { recipeDao.observeRecipes() } returns emptyFlow()
+        every { recipeDao.observeRecipes(FAMILY_ID) } returns emptyFlow()
 
         coEvery { recipeDao.upsertAll(any()) } just Runs
         coEvery { ingredientDao.upsertAll(any()) } just Runs

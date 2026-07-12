@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
@@ -27,6 +28,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
 import androidx.compose.material3.Button
@@ -79,9 +81,13 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     var showInvite  by remember { mutableStateOf(false) }
     var showVerifyCode by remember { mutableStateOf(false) }
     var showDeleteAccount by remember { mutableStateOf(false) }
+    var showFamilySelector by remember { mutableStateOf(false) }
+    var showCreateFamily by remember { mutableStateOf(false) }
     var memberRoleChange by remember { mutableStateOf<MemberRoleChange?>(null) }
     var memberToRemove by remember { mutableStateOf<FamilyMemberDto?>(null) }
     val emailVerified by viewModel.emailVerified.collectAsState()
+    val families by viewModel.families.collectAsState()
+    val activeFamilyId by viewModel.activeFamilyId.collectAsState()
     val context     = LocalContext.current
     val haptic      = LocalHapticFeedback.current
     val hapticsEnabled = LocalHapticsEnabled.current
@@ -110,6 +116,28 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             onConfirm = { inviteEmail, role ->
                 viewModel.inviteMember(inviteEmail, role)
                 showInvite = false
+            }
+        )
+    }
+
+    if (showFamilySelector) {
+        FamilySelectorDialog(
+            families = families,
+            activeFamilyId = activeFamilyId,
+            onDismiss = { showFamilySelector = false },
+            onSelect = { family ->
+                viewModel.switchActiveFamily(family.id)
+                showFamilySelector = false
+            }
+        )
+    }
+
+    if (showCreateFamily) {
+        CreateFamilyDialog(
+            onDismiss = { showCreateFamily = false },
+            onConfirm = { name ->
+                viewModel.createFamily(name)
+                showCreateFamily = false
             }
         )
     }
@@ -276,34 +304,63 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
         }
         familyInfo?.let { family ->
             Spacer(Modifier.height(Spacing.lg))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(48.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (!family.avatarUrl.isNullOrBlank()) {
-                            AsyncImage(
-                                model = family.avatarUrl,
-                                contentDescription = "Imagen del grupo familiar",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape)
-                            )
-                        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(48.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (!family.avatarUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = family.avatarUrl,
+                                    contentDescription = "Imagen del grupo familiar",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                )
+                            } else {
+                                Text(
+                                    family.name.firstOrNull()?.uppercaseChar()?.toString() ?: "F",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.size(Spacing.md))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(family.name, style = MaterialTheme.typography.titleMedium)
+                        family.role?.let {
                             Text(
-                                family.name.firstOrNull()?.uppercaseChar()?.toString() ?: "👪",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                familyRoleLabel(it),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    if (isAdmin) {
+                        IconButton(onClick = { familyPhotoLauncher.launch("image/*") }) {
+                            Icon(
+                                Icons.Filled.CameraAlt,
+                                contentDescription = "Cambiar imagen del grupo familiar",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
-                Spacer(Modifier.size(Spacing.md))
-                Text(family.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (families.size > 1) {
+                    OutlinedButton(
+                        onClick = { showFamilySelector = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cambiar familia activa")
+                    }
+                }
                 if (isAdmin) {
-                    IconButton(onClick = { familyPhotoLauncher.launch("image/*") }) {
-                        Icon(
-                            Icons.Filled.CameraAlt,
-                            contentDescription = "Cambiar imagen del grupo familiar",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    OutlinedButton(
+                        onClick = { showCreateFamily = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(Spacing.sm))
+                        Text("Crear familia")
                     }
                 }
             }
@@ -455,7 +512,83 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     }
 }
 
+@Composable
+private fun FamilySelectorDialog(
+    families: List<FamilyDto>,
+    activeFamilyId: String?,
+    onDismiss: () -> Unit,
+    onSelect: (FamilyDto) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cambiar familia activa") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                families.forEach { family ->
+                    val selected = family.id == activeFamilyId
+                    if (selected) {
+                        Button(
+                            onClick = {},
+                            enabled = false,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("${family.name} · actual")
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { onSelect(family) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(family.name)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        }
+    )
+}
+
 private data class MemberRoleChange(val member: FamilyMemberDto, val newRole: String)
+
+@Composable
+private fun CreateFamilyDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Crear familia") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nombre de la nueva familia") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(name.trim()) },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Crear")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
 
 @Composable
 private fun FamilyStatsSection(

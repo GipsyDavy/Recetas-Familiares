@@ -14,11 +14,12 @@ class SyncRepository(
     driverFactory: DatabaseDriverFactory
 ) {
     private val db  = AppDatabase(driverFactory.createDriver())
-    private val KEY = "last_sync_timestamp"
+    private val KEY_PREFIX = "last_sync_timestamp:"
 
     suspend fun pullIncremental() {
         val familyId = session.familyId ?: return
-        var since = db.appDatabaseQueries.getMetadata(KEY).executeAsOneOrNull()?.value_
+        val cursorKey = KEY_PREFIX + familyId
+        var since = db.appDatabaseQueries.getMetadata(cursorKey).executeAsOneOrNull()?.value_
         var pages = 0
         while (true) {
             val response: SyncPullResponseDto = try {
@@ -29,12 +30,12 @@ class SyncRepository(
             } catch (e: Exception) {
                 return  // sin red — silencioso, los repos usarán el cache existente
             }
-            applyPage(response)
+            applyPage(familyId, response)
             val hasNextPage = response.hasMore && response.nextSince != null
             if (!hasNextPage) {
                 // el cursor persistido solo avanza al completar el pull; si se
                 // interrumpe, la próxima sincronización repite páginas (upsert idempotente)
-                db.appDatabaseQueries.setMetadata(KEY, response.serverTime)
+                db.appDatabaseQueries.setMetadata(cursorKey, response.serverTime)
                 return
             }
             if (++pages >= MAX_PULL_PAGES) {
@@ -45,8 +46,9 @@ class SyncRepository(
         }
     }
 
-    private fun applyPage(response: SyncPullResponseDto) {
-        response.recipes.forEach { dto ->
+    /** Defensa en profundidad: descarta filas cuyo familyId no coincida con el pull solicitado. */
+    private fun applyPage(familyId: String, response: SyncPullResponseDto) {
+        response.recipes.filter { it.familyId == familyId }.forEach { dto ->
             db.appDatabaseQueries.insertOrReplaceRecipe(
                 id          = dto.id,
                 familyId    = dto.familyId,
@@ -72,7 +74,7 @@ class SyncRepository(
             )
         }
 
-        response.stockItems.forEach { dto ->
+        response.stockItems.filter { it.familyId == familyId }.forEach { dto ->
             db.appDatabaseQueries.insertOrReplaceStockItem(
                 id                = dto.id,
                 familyId          = dto.familyId,

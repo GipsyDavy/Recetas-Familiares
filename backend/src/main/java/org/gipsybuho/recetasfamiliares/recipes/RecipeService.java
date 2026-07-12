@@ -110,6 +110,74 @@ public class RecipeService {
         recipeRepository.save(recipe);
     }
 
+    @Transactional
+    public RecipeResponse copyRecipe(String sourceFamilyId, String recipeId, String userId, CopyRecipeRequest request) {
+        String targetFamilyId = request.targetFamilyId().trim();
+        if (sourceFamilyId.equals(targetFamilyId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Target family must be different");
+        }
+        requireMembership(sourceFamilyId, userId);
+        requireEditor(targetFamilyId, userId);
+
+        RecipeEntity source = requireActiveRecipe(sourceFamilyId, recipeId);
+        FamilyEntity targetFamily = familyRepository.findById(targetFamilyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Family write access denied"));
+        RecipeEntity copy = recipeRepository.save(new RecipeEntity(
+                targetFamily,
+                source.getTitle(),
+                source.getDescription(),
+                source.getServings(),
+                source.getPrepMinutes(),
+                source.getCookMinutes(),
+                source.getDifficulty()
+        ));
+
+        List<RecipeIngredientEntity> ingredients = ingredientRepository
+                .findByRecipe_IdAndDeletedFalseOrderByPositionAsc(source.getId())
+                .stream()
+                .map(ingredient -> new RecipeIngredientEntity(
+                        copy,
+                        ingredient.getPosition(),
+                        ingredient.getName(),
+                        ingredient.getQuantity(),
+                        ingredient.getUnit(),
+                        ingredient.getNote()
+                ))
+                .toList();
+        List<RecipeStepEntity> steps = stepRepository
+                .findByRecipe_IdAndDeletedFalseOrderByPositionAsc(source.getId())
+                .stream()
+                .map(step -> new RecipeStepEntity(
+                        copy,
+                        step.getPosition(),
+                        step.getInstruction(),
+                        step.getTimerMinutes()
+                ))
+                .toList();
+        List<RecipePhotoEntity> photos = photoRepository
+                .findByRecipe_IdAndDeletedFalseOrderByPositionAsc(source.getId())
+                .stream()
+                .map(photo -> new RecipePhotoEntity(
+                        copy,
+                        photo.getPosition(),
+                        photo.getUrl(),
+                        photo.getThumbnailUrl(),
+                        photo.getCaption(),
+                        photo.getContentType(),
+                        photo.getSizeBytes(),
+                        photo.getStoragePath()
+                ))
+                .toList();
+        ingredientRepository.saveAll(ingredients);
+        stepRepository.saveAll(steps);
+        photoRepository.saveAll(photos);
+        if (!ingredients.isEmpty() || !steps.isEmpty() || !photos.isEmpty()) {
+            copy.markContentChanged();
+            recipeRepository.save(copy);
+        }
+        return toResponse(copy);
+    }
+
     private void requireMembership(String familyId, String userId) {
         if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family access denied");

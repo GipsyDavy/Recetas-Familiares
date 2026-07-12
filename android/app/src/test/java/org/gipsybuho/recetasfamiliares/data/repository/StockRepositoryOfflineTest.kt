@@ -9,6 +9,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.gipsybuho.recetasfamiliares.core.SessionStore
@@ -38,7 +39,8 @@ class StockRepositoryOfflineTest {
     @Before
     fun setUp() {
         every { sessionStore.familyId } returns FAMILY_ID
-        every { stockDao.observeStock() } returns emptyFlow()
+        every { sessionStore.familyIdFlow } returns MutableStateFlow(FAMILY_ID)
+        every { stockDao.observeStock(FAMILY_ID) } returns emptyFlow()
         coEvery { stockDao.upsertAll(any()) } just Runs
         coEvery { stockDao.deleteById(any()) } just Runs
         repository = StockRepository(api, stockDao, sessionStore)

@@ -49,6 +49,10 @@ public class RecipeRepository {
     /** Load paginated recipes into cache. */
     public RecipeDtos.RecipePageResponse loadPage(int page, int size) throws ApiException {
         String familyId = session.getFamilyId();
+        return loadPage(familyId, page, size);
+    }
+
+    public RecipeDtos.RecipePageResponse loadPage(String familyId, int page, int size) throws ApiException {
         String path = "api/v1/families/" + familyId + "/recipes?page=" + page + "&size=" + size;
         return api.get(path, RecipeDtos.RecipePageResponse.class);
     }
@@ -117,6 +121,21 @@ public class RecipeRepository {
     public void replaceSteps(String recipeId, RecipeCreateDtos.ReplaceStepsRequest request) throws ApiException {
         String familyId = session.getFamilyId();
         api.put("api/v1/families/" + familyId + "/recipes/" + recipeId + "/steps", request);
+    }
+
+    /** Copia atomica en backend: cabecera, ingredientes, pasos y fotos (POST /copy). */
+    public RecipeDtos.RecipeDto copyToFamily(RecipeDtos.RecipeDto source, String targetFamilyId) throws ApiException {
+        if (source == null) {
+            throw new IllegalArgumentException("Receta no valida");
+        }
+        if (targetFamilyId == null || targetFamilyId.isBlank()) {
+            throw new IllegalArgumentException("Familia destino no valida");
+        }
+        String sourceFamilyId = source.familyId() != null && !source.familyId().isBlank()
+                ? source.familyId()
+                : session.getFamilyId();
+        String path = "api/v1/families/" + sourceFamilyId + "/recipes/" + source.id() + "/copy";
+        return api.post(path, new RecipeCreateDtos.CopyRecipeRequest(targetFamilyId), RecipeDtos.RecipeDto.class);
     }
 
     public List<RecipeDtos.RecipePhotoResponse> loadPhotos(String familyId, String recipeId) throws Exception {
@@ -203,6 +222,12 @@ public class RecipeRepository {
 
     public void updatePhotosFromSync(List<SyncDtos.PhotoDtos.RecipePhotoDto> photos) {
         // Desktop no mantiene cache local de fotos: se cargan bajo demanda desde /photos.
+    }
+
+    public void clearCache() {
+        cache.clear();
+        ingredientCache.clear();
+        stepCache.clear();
     }
 
     public void shutdown() {

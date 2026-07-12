@@ -52,6 +52,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Share
@@ -438,8 +439,14 @@ internal fun RecipeDetail(
     val isFavorite by viewModel.isFavorite(recipe.id).collectAsState(initial = false)
     val photos by viewModel.photosFor(recipe.id).collectAsState(initial = emptyList())
     val ratings by viewModel.recipeRatings.collectAsState()
+    val families by viewModel.families.collectAsState()
+    val activeFamilyId by viewModel.activeFamilyId.collectAsState()
+    val copyTargets = families.filter { family ->
+        family.id != activeFamilyId && (family.role == "OWNER" || family.role == "ADMIN")
+    }
     val myUserId = viewModel.myUserId
     var showMenu by remember { mutableStateOf(false) }
+    var showCopyTargets by remember { mutableStateOf(false) }
     val favoriteScale = remember { Animatable(1f) }
 
     LaunchedEffect(recipe.id) {
@@ -502,6 +509,16 @@ internal fun RecipeDetail(
                                 leadingContent  = { Icon(Icons.Filled.Search, contentDescription = null) },
                                 modifier = Modifier.clickable { showMenu = false; searchRecipeOnWeb(context, recipe.title) }
                             )
+                            if (copyTargets.isNotEmpty()) {
+                                ListItem(
+                                    headlineContent = { Text("Copiar a otra familia") },
+                                    leadingContent = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
+                                    modifier = Modifier.clickable {
+                                        showMenu = false
+                                        showCopyTargets = true
+                                    }
+                                )
+                            }
                             ListItem(
                                 headlineContent = { Text("Editar") },
                                 leadingContent  = { Icon(Icons.Filled.Edit, contentDescription = null) },
@@ -512,6 +529,29 @@ internal fun RecipeDetail(
                                 leadingContent  = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                                 modifier = Modifier.clickable { showMenu = false; onDelete() }
                             )
+                        }
+                    }
+                }
+                if (showCopyTargets) {
+                    ModalBottomSheet(onDismissRequest = { showCopyTargets = false }) {
+                        Column(modifier = Modifier.padding(bottom = Spacing.xxl)) {
+                            Text(
+                                "La receta y sus fotos se copiarán a la familia elegida.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                            )
+                            copyTargets.forEach { family ->
+                                ListItem(
+                                    headlineContent = { Text(family.name) },
+                                    supportingContent = { Text(familyRoleLabel(family.role)) },
+                                    leadingContent = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
+                                    modifier = Modifier.clickable {
+                                        showCopyTargets = false
+                                        viewModel.copyRecipeToFamily(recipe.id, family.id)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -817,6 +857,12 @@ private fun difficultyLabel(difficulty: String): String = when (difficulty.upper
     "MEDIUM" -> "Media"
     "HARD"   -> "Difícil"
     else     -> difficulty.lowercase().replaceFirstChar { it.uppercase() }
+}
+
+private fun familyRoleLabel(role: String?): String = when (role?.uppercase()) {
+    "OWNER" -> "Propietario"
+    "ADMIN" -> "Admin"
+    else -> "Miembro"
 }
 
 @Composable

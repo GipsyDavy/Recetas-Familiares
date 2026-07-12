@@ -68,6 +68,20 @@ public final class AppContext {
     public FamilyRepository getFamilyRepository() { return familyRepository; }
     public ChatRepository getChatRepository() { return chatRepository; }
 
+    public void switchActiveFamily(String familyId, FamilyRole role) {
+        session.setFamilyId(familyId);
+        session.setFamilyRole(role);
+        clearFamilyScopedCaches();
+    }
+
+    public void clearFamilyScopedCaches() {
+        recipeRepository.clearCache();
+        stockRepository.clearCache();
+        menuRepository.clearCache();
+        favoriteRepository.clearCache();
+        noteRepository.clearCache();
+    }
+
     public void shutdown() {
         recipeRepository.shutdown();
         apiClient.shutdown();

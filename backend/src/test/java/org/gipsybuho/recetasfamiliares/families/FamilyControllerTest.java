@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.sql.Timestamp;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.UUID;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,6 +61,67 @@ class FamilyControllerTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].name").value("Familia Dos"))
                 .andExpect(jsonPath("$[0].role").value("OWNER"));
+    }
+
+    @Test
+    void createsAdditionalFamilyForOwnerAndListsBothMemberships() throws Exception {
+        RegisteredUser user = register("familia-create-owner@example.com", "Familia Principal");
+
+        mockMvc.perform(post("/api/v1/families")
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Familia Segunda"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(org.hamcrest.Matchers.notNullValue()))
+                .andExpect(jsonPath("$.name").value("Familia Segunda"))
+                .andExpect(jsonPath("$.role").value("OWNER"));
+
+        mockMvc.perform(get("/api/v1/families")
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[?(@.name == 'Familia Principal' && @.role == 'OWNER')]").exists())
+                .andExpect(jsonPath("$[?(@.name == 'Familia Segunda' && @.role == 'OWNER')]").exists());
+    }
+
+    @Test
+    void blocksMemberOnlyUserFromCreatingAdditionalFamily() throws Exception {
+        RegisteredUser owner = register("familia-create-admin@example.com", "Familia Admin");
+        RegisteredUser member = register("familia-create-member@example.com", "Familia Temporal");
+        Instant now = Instant.now();
+        jdbcTemplate.update(
+                """
+                INSERT INTO family_members (id, family_id, user_id, role, created_at, updated_at, sync_version, deleted)
+                VALUES (?, ?, ?, 'MEMBER', ?, ?, 0, false)
+                """,
+                UUID.randomUUID().toString(),
+                owner.familyId(),
+                member.userId(),
+                Timestamp.from(now),
+                Timestamp.from(now)
+        );
+        jdbcTemplate.update(
+                """
+                UPDATE family_members
+                SET deleted = true, deleted_at = ?, updated_at = ?
+                WHERE family_id = ? AND user_id = ?
+                """,
+                Timestamp.from(now),
+                Timestamp.from(now),
+                member.familyId(),
+                member.userId()
+        );
+
+        mockMvc.perform(post("/api/v1/families")
+                        .header("Authorization", "Bearer " + member.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Familia No Permitida"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("request_error"));
     }
 
     /** COD-4: lastActivityAt debe reflejar actividad de cualquier entidad, no solo recetas. */
@@ -170,7 +232,8 @@ class FamilyControllerTest {
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         return new RegisteredUser(
                 response.get("accessToken").asText(),
-                response.get("family").get("id").asText()
+                response.get("family").get("id").asText(),
+                response.get("user").get("id").asText()
         );
     }
 
@@ -197,6 +260,6 @@ class FamilyControllerTest {
         return response.get(field).asText();
     }
 
-    private record RegisteredUser(String accessToken, String familyId) {
+    private record RegisteredUser(String accessToken, String familyId, String userId) {
     }
 }

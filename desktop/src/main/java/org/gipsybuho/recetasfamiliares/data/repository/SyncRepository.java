@@ -10,6 +10,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class SyncRepository {
 
@@ -44,6 +45,9 @@ public class SyncRepository {
     /** Pull incremental changes from server and update in-memory caches. */
     public void pull() throws ApiException {
         String familyId = session.getFamilyId();
+        if (familyId == null || familyId.isBlank()) {
+            return;
+        }
         String cursor = session.getLastSyncTime();
         SyncAccumulator accumulator = new SyncAccumulator();
         boolean completed = false;
@@ -74,6 +78,9 @@ public class SyncRepository {
         // Las caches son ObservableList enlazadas a la UI: mutarlas solo en el FX thread.
         // pull() se invoca desde hilos de fondo (MainWindow.triggerSync).
         Runnable applyCaches = () -> {
+            if (!Objects.equals(familyId, session.getFamilyId())) {
+                return;
+            }
             recipeRepo.updateFromSync(accumulator.recipes, accumulator.ingredients, accumulator.steps);
             recipeRepo.updatePhotosFromSync(accumulator.recipePhotos);
             stockRepo.updateFromSync(accumulator.stockItems);
@@ -81,14 +88,14 @@ public class SyncRepository {
             shoppingListRepository.updateFromSync(accumulator.shoppingLists, accumulator.shoppingListItems);
             favoriteRepository.updateFromSync(accumulator.favoriteRecipes);
             noteRepository.updateFromSync(accumulator.familyNotes);
+            if (finalCompleted && finalServerTime != null) {
+                session.setLastSyncTime(finalServerTime);
+            }
         };
         if (Platform.isFxApplicationThread()) {
             applyCaches.run();
         } else {
             Platform.runLater(applyCaches);
-        }
-        if (finalCompleted && finalServerTime != null) {
-            session.setLastSyncTime(finalServerTime);
         }
     }
 

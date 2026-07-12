@@ -44,4 +44,8 @@ public class MenuRepository {
     public void updateFromSync(List<SyncDtos.MenuDtos.MenuItemDto> items) {
         cache.mergeById(items, SyncDtos.MenuDtos.MenuItemDto::id, SyncDtos.MenuDtos.MenuItemDto::deleted);
     }
+
+    public void clearCache() {
+        cache.clear();
+    }
 }

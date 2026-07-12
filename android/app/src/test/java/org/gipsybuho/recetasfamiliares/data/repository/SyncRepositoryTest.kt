@@ -7,6 +7,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteDao
@@ -68,13 +69,13 @@ class SyncRepositoryTest {
         every { database.familyNoteDao() } returns noteDao
         every { database.recipePhotoDao() } returns photoDao
 
-        coEvery { recipeDao.findPendingIds() } returns emptyList()
-        coEvery { ingredientDao.findPendingIds() } returns emptyList()
-        coEvery { stepDao.findPendingIds() } returns emptyList()
-        coEvery { stockDao.findPendingIds() } returns emptyList()
-        coEvery { shoppingListItemDao.findPendingIds() } returns emptyList()
-        coEvery { favoriteDao.findPendingIds() } returns emptyList()
-        coEvery { noteDao.findPendingIds() } returns emptyList()
+        coEvery { recipeDao.findPendingIds(FAMILY_ID) } returns emptyList()
+        coEvery { ingredientDao.findPendingIds(FAMILY_ID) } returns emptyList()
+        coEvery { stepDao.findPendingIds(FAMILY_ID) } returns emptyList()
+        coEvery { stockDao.findPendingIds(FAMILY_ID) } returns emptyList()
+        coEvery { shoppingListItemDao.findPendingIds(FAMILY_ID) } returns emptyList()
+        coEvery { favoriteDao.findPendingIds(FAMILY_ID) } returns emptyList()
+        coEvery { noteDao.findPendingIds(FAMILY_ID) } returns emptyList()
 
         coEvery { recipeDao.upsertAll(any()) } just Runs
         coEvery { ingredientDao.upsertAll(any()) } just Runs
@@ -89,8 +90,9 @@ class SyncRepositoryTest {
 
         savedLastSyncTime = null
         every { sessionStore.familyId } returns FAMILY_ID
-        every { sessionStore.lastSyncTime } returns null
-        every { sessionStore.lastSyncTime = any() } answers { savedLastSyncTime = firstArg() }
+        every { sessionStore.familyIdFlow } returns MutableStateFlow(FAMILY_ID)
+        every { sessionStore.lastSyncTimeFor(FAMILY_ID) } returns null
+        every { sessionStore.setLastSyncTime(FAMILY_ID, any()) } answers { savedLastSyncTime = secondArg() }
 
         repository = SyncRepository(api, database, sessionStore)
     }
@@ -137,7 +139,7 @@ class SyncRepositoryTest {
 
     @Test
     fun `pullOnce no pisa filas locales pendientes de sincronizar`() = runTest {
-        coEvery { recipeDao.findPendingIds() } returns listOf("r-dirty")
+        coEvery { recipeDao.findPendingIds(FAMILY_ID) } returns listOf("r-dirty")
         coEvery { api.pullSync(FAMILY_ID, null, any()) } returns emptyPull(
             serverTime = "T1",
             recipes = listOf(recipeDto("r-dirty"), recipeDto("r-clean"))
@@ -154,22 +156,22 @@ class SyncRepositoryTest {
     fun `pushThenPull envia baseSyncVersion segun la convencion de syncVersion`() = runTest {
         // syncVersion=0 creado offline; syncVersion=-3 editado offline (base 3);
         // syncVersion=-2 + deleted borrado offline (base 2)
-        coEvery { recipeDao.findPendingCreate() } returns listOf(
+        coEvery { recipeDao.findPendingCreate(FAMILY_ID) } returns listOf(
             recipeEntity("r-new", syncVersion = 0L),
             recipeEntity("r-edited", syncVersion = -3L)
         )
-        coEvery { recipeDao.findPendingDelete() } returns listOf(
+        coEvery { recipeDao.findPendingDelete(FAMILY_ID) } returns listOf(
             recipeEntity("r-deleted", syncVersion = -2L, deleted = true)
         )
         coEvery { ingredientDao.findByRecipeIds(any()) } returns emptyList()
         coEvery { stepDao.findByRecipeIds(any()) } returns emptyList()
-        coEvery { stockDao.findPendingCreate() } returns emptyList()
-        coEvery { stockDao.findPendingDelete() } returns emptyList()
-        coEvery { noteDao.findPendingCreate() } returns emptyList()
-        coEvery { noteDao.findPendingDelete() } returns emptyList()
-        coEvery { shoppingListItemDao.findPendingCheck() } returns emptyList()
-        coEvery { favoriteDao.findPendingCreate() } returns emptyList()
-        coEvery { favoriteDao.findPendingDelete() } returns emptyList()
+        coEvery { stockDao.findPendingCreate(FAMILY_ID) } returns emptyList()
+        coEvery { stockDao.findPendingDelete(FAMILY_ID) } returns emptyList()
+        coEvery { noteDao.findPendingCreate(FAMILY_ID) } returns emptyList()
+        coEvery { noteDao.findPendingDelete(FAMILY_ID) } returns emptyList()
+        coEvery { shoppingListItemDao.findPendingCheck(FAMILY_ID) } returns emptyList()
+        coEvery { favoriteDao.findPendingCreate(FAMILY_ID) } returns emptyList()
+        coEvery { favoriteDao.findPendingDelete(FAMILY_ID) } returns emptyList()
 
         val pushed = slot<SyncPushRequestDto>()
         coEvery { api.pushSync(FAMILY_ID, capture(pushed)) } returns
@@ -194,15 +196,15 @@ class SyncRepositoryTest {
 
     @Test
     fun `pushThenPull envia colas offline de stock notas favoritos y compra`() = runTest {
-        coEvery { recipeDao.findPendingCreate() } returns emptyList()
-        coEvery { recipeDao.findPendingDelete() } returns emptyList()
-        coEvery { stockDao.findPendingCreate() } returns listOf(stockEntity("s-new", syncVersion = 0L))
-        coEvery { stockDao.findPendingDelete() } returns listOf(stockEntity("s-deleted", syncVersion = -8L, deleted = true))
-        coEvery { noteDao.findPendingCreate() } returns listOf(noteEntity("n-edited", syncVersion = -3L))
-        coEvery { noteDao.findPendingDelete() } returns listOf(noteEntity("n-deleted", syncVersion = -4L, deleted = true))
-        coEvery { shoppingListItemDao.findPendingCheck() } returns listOf(shoppingItemEntity("li-checked", syncVersion = -5L))
-        coEvery { favoriteDao.findPendingCreate() } returns listOf(favoriteEntity("f-new", syncVersion = 0L))
-        coEvery { favoriteDao.findPendingDelete() } returns listOf(favoriteEntity("f-deleted", syncVersion = -6L, deleted = true))
+        coEvery { recipeDao.findPendingCreate(FAMILY_ID) } returns emptyList()
+        coEvery { recipeDao.findPendingDelete(FAMILY_ID) } returns emptyList()
+        coEvery { stockDao.findPendingCreate(FAMILY_ID) } returns listOf(stockEntity("s-new", syncVersion = 0L))
+        coEvery { stockDao.findPendingDelete(FAMILY_ID) } returns listOf(stockEntity("s-deleted", syncVersion = -8L, deleted = true))
+        coEvery { noteDao.findPendingCreate(FAMILY_ID) } returns listOf(noteEntity("n-edited", syncVersion = -3L))
+        coEvery { noteDao.findPendingDelete(FAMILY_ID) } returns listOf(noteEntity("n-deleted", syncVersion = -4L, deleted = true))
+        coEvery { shoppingListItemDao.findPendingCheck(FAMILY_ID) } returns listOf(shoppingItemEntity("li-checked", syncVersion = -5L))
+        coEvery { favoriteDao.findPendingCreate(FAMILY_ID) } returns listOf(favoriteEntity("f-new", syncVersion = 0L))
+        coEvery { favoriteDao.findPendingDelete(FAMILY_ID) } returns listOf(favoriteEntity("f-deleted", syncVersion = -6L, deleted = true))
 
         val pushed = slot<SyncPushRequestDto>()
         coEvery { api.pushSync(FAMILY_ID, capture(pushed)) } returns emptyPull(serverTime = "T-PUSH")

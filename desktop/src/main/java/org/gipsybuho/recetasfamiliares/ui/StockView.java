@@ -302,10 +302,14 @@ public class StockView extends VBox {
 
     public void refresh() {
         statusLabel.setText("Cargando...");
+        String familyAtStart = context.getSession().getFamilyId();
         Thread.ofVirtual().start(() -> {
             try {
                 var items = context.getStockRepository().load();
                 Platform.runLater(() -> {
+                    if (!java.util.Objects.equals(familyAtStart, context.getSession().getFamilyId())) {
+                        return;
+                    }
                     context.getStockRepository().getCache().replaceAll(
                             items.stream().filter(i -> !i.deleted()).toList());
                     refreshDisplay();

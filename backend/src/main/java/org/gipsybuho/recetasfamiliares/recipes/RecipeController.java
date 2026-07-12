@@ -78,4 +78,15 @@ public class RecipeController {
     ) {
         recipeService.deleteRecipe(familyId, recipeId, authentication.getName());
     }
+
+    @PostMapping("/{recipeId}/copy")
+    @ResponseStatus(HttpStatus.CREATED)
+    public RecipeResponse copyRecipe(
+            @PathVariable String familyId,
+            @PathVariable String recipeId,
+            @Valid @RequestBody CopyRecipeRequest request,
+            Authentication authentication
+    ) {
+        return recipeService.copyRecipe(familyId, recipeId, authentication.getName(), request);
+    }
 }

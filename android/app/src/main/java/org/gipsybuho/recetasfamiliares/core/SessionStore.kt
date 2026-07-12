@@ -22,8 +22,22 @@ class SessionStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
+    private val _familyId = MutableStateFlow(preferences.getString("family_id", null))
+    val familyIdFlow: StateFlow<String?> = _familyId.asStateFlow()
+
     private val _familyRole = MutableStateFlow(preferences.getString("family_role", null))
     val familyRoleFlow: StateFlow<String?> = _familyRole.asStateFlow()
+
+    init {
+        val activeFamilyId = _familyId.value
+        val legacyLastSync = preferences.getString("last_sync_time", null)
+        if (!activeFamilyId.isNullOrBlank() && !legacyLastSync.isNullOrBlank()) {
+            preferences.edit {
+                putString(lastSyncKey(activeFamilyId), legacyLastSync)
+                remove("last_sync_time")
+            }
+        }
+    }
 
     var accessToken: String?
         get() = preferences.getString("access_token", null)
@@ -35,7 +49,10 @@ class SessionStore(context: Context) {
 
     var familyId: String?
         get() = preferences.getString("family_id", null)
-        set(value) = preferences.edit { putString("family_id", value) }
+        set(value) {
+            preferences.edit { putString("family_id", value) }
+            _familyId.value = value
+        }
 
     var userId: String?
         get() = preferences.getString("user_id", null)
@@ -60,12 +77,29 @@ class SessionStore(context: Context) {
             _familyRole.value = value
         }
 
-    var lastSyncTime: String?
-        get() = preferences.getString("last_sync_time", null)
-        set(value) = preferences.edit { putString("last_sync_time", value) }
+    fun lastSyncTimeFor(familyId: String): String? =
+        preferences.getString(lastSyncKey(familyId), null)
+
+    /** El cursor se escribe bajo la familia del pull: un sync en vuelo de la
+     *  familia anterior no puede corromper el cursor de la nueva. */
+    fun setLastSyncTime(familyId: String, value: String?) {
+        preferences.edit { putString(lastSyncKey(familyId), value) }
+    }
+
+    fun setActiveFamily(id: String, role: String?) {
+        preferences.edit {
+            putString("family_id", id)
+            putString("family_role", role)
+        }
+        _familyId.value = id
+        _familyRole.value = role
+    }
 
     fun clear() {
         preferences.edit { clear() }
+        _familyId.value = null
         _familyRole.value = null
     }
+
+    private fun lastSyncKey(familyId: String): String = "last_sync_time_$familyId"
 }

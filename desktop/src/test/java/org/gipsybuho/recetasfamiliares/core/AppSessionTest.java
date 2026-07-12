@@ -77,4 +77,24 @@ class AppSessionTest {
         assertEquals(FamilyRole.MEMBER, session.getFamilyRole());
         assertFalse(session.isAdmin());
     }
+
+    @Test
+    void lastSyncTimeQuedaAisladoPorFamiliaActiva() {
+        AppSession session = new AppSession(prefs);
+
+        session.setFamilyId("fam-1");
+        session.setLastSyncTime("2026-07-05T10:00:00Z");
+        session.setFamilyId("fam-2");
+
+        assertNull(session.getLastSyncTime());
+
+        session.setLastSyncTime("2026-07-06T10:00:00Z");
+        session.setFamilyId("fam-1");
+
+        assertEquals("2026-07-05T10:00:00Z", session.getLastSyncTime());
+
+        AppSession reloaded = new AppSession(prefs);
+        assertEquals("fam-1", reloaded.getFamilyId());
+        assertEquals("2026-07-05T10:00:00Z", reloaded.getLastSyncTime());
+    }
 }

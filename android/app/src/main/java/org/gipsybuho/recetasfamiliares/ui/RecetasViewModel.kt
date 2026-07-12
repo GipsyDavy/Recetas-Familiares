@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package org.gipsybuho.recetasfamiliares.ui
 
 import androidx.lifecycle.ViewModel
@@ -17,6 +19,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
@@ -46,6 +50,7 @@ import org.gipsybuho.recetasfamiliares.data.local.MenuItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
@@ -83,6 +88,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         .map { it == "ADMIN" || it == "OWNER" }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val activeFamilyId: StateFlow<String?> = container.sessionStore.familyIdFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), container.sessionStore.familyId)
+
     private val _displayName = MutableStateFlow(container.sessionStore.displayName)
     val displayName: StateFlow<String?> = _displayName.asStateFlow()
 
@@ -104,7 +112,10 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     val filteredRecipes: StateFlow<List<RecipeEntity>> = combine(
         container.recipeRepository.recipes,
         stockItems,
-        container.database.recipeIngredientDao().observeAllIngredients(),
+        container.sessionStore.familyIdFlow.flatMapLatest { familyId ->
+            if (familyId.isNullOrBlank()) flowOf(emptyList())
+            else container.database.recipeIngredientDao().observeAllIngredients(familyId)
+        },
         _filterByStock
     ) { recipeList, stock, ingredients, active ->
         if (!active) recipeList
@@ -148,7 +159,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _displayName.value = null
         _email.value = null
         _avatarUrl.value = null
-        _familyStats.value = null
+        _families.value = emptyList()
+        clearFamilyScopedState()
         _emailVerified.value = null
     }
 
@@ -253,7 +265,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             _displayName.value = null
             _email.value = null
             _avatarUrl.value = null
-            _familyStats.value = null
+            _families.value = emptyList()
+            clearFamilyScopedState()
         }
         return true
     }
@@ -271,21 +284,106 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             _displayName.value = null
             _email.value = null
             _avatarUrl.value = null
-            _familyStats.value = null
+            _families.value = emptyList()
+            clearFamilyScopedState()
         }
+    }
+
+    private fun clearFamilyScopedState() {
+        _familyStats.value = null
+        _familyMembers.value = emptyList()
+        _familyInfo.value = null
+        _recipeRatings.value = emptyList()
+        _chatMessages.value = emptyList()
+        _chatHasMoreOlder.value = false
+        chatOldestCursor = null
+        _chatUnread.value = 0
+        _recipeNextPage.value = 1
+        _recipeHasMore.value = false
     }
 
     private val _familyMembers = MutableStateFlow<List<FamilyMemberDto>>(emptyList())
     val familyMembers: StateFlow<List<FamilyMemberDto>> = _familyMembers.asStateFlow()
 
-    private val _familyInfo = MutableStateFlow<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto?>(null)
-    val familyInfo: StateFlow<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto?> = _familyInfo.asStateFlow()
+    private val _families = MutableStateFlow<List<FamilyDto>>(emptyList())
+    val families: StateFlow<List<FamilyDto>> = _families.asStateFlow()
+
+    private val _familyInfo = MutableStateFlow<FamilyDto?>(null)
+    val familyInfo: StateFlow<FamilyDto?> = _familyInfo.asStateFlow()
 
     /** Nombre e imagen del grupo familiar activo. */
     fun loadFamilyInfo() {
         viewModelScope.launch {
-            runCatching { container.familyMemberRepository.currentFamily() }
-                .onSuccess { _familyInfo.value = it }
+            refreshFamiliesFromServer()
+        }
+    }
+
+    private suspend fun refreshFamiliesFromServer(): List<FamilyDto> {
+        return runCatching { container.familyMemberRepository.families() }
+            .onSuccess { families ->
+                _families.value = families
+                val currentFamilyId = container.sessionStore.familyId
+                val active = families.firstOrNull { it.id == currentFamilyId }
+                    ?: families.firstOrNull()
+                if (active != null) {
+                    val familyChanged = active.id != currentFamilyId
+                    if (active.id != currentFamilyId || active.role != container.sessionStore.familyRole) {
+                        container.familyMemberRepository.setActiveFamily(active)
+                    }
+                    if (familyChanged) clearFamilyScopedState()
+                    _familyInfo.value = active
+                } else {
+                    clearFamilyScopedState()
+                    _familyInfo.value = null
+                }
+            }
+            .getOrElse { _families.value }
+    }
+
+    fun switchActiveFamily(familyId: String) {
+        if (familyId == container.sessionStore.familyId) return
+        viewModelScope.launch {
+            val families = _families.value.ifEmpty { refreshFamiliesFromServer() }
+            val target = families.firstOrNull { it.id == familyId }
+            if (target == null) {
+                _userMessage.emit("No se pudo cambiar de familia")
+                return@launch
+            }
+            closeChat()
+            stopChatBadge()
+            container.familyMemberRepository.setActiveFamily(target)
+            clearFamilyScopedState()
+            _familyInfo.value = target
+            refresh()
+            loadFamilyStats()
+            loadFamilyMembers()
+            startChatBadge()
+            _userMessage.emit("Familia activa: ${target.name}")
+        }
+    }
+
+    fun createFamily(name: String) {
+        viewModelScope.launch {
+            runCatching { container.familyMemberRepository.createFamily(name) }
+                .onSuccess { created ->
+                    refreshFamiliesFromServer()
+                    _userMessage.emit("Familia creada: ${created.name}")
+                }
+                .onFailure { _userMessage.emit("No se pudo crear la familia") }
+        }
+    }
+
+    fun copyRecipeToFamily(recipeId: String, targetFamilyId: String) {
+        viewModelScope.launch {
+            runCatching { container.recipeRepository.copyToFamily(recipeId, targetFamilyId) }
+                .onSuccess {
+                    val targetName = _families.value.firstOrNull { it.id == targetFamilyId }?.name
+                    _userMessage.emit(
+                        if (targetName != null) "Receta y fotos copiadas a $targetName"
+                        else "Receta copiada"
+                    )
+                }
+                .onFailure { _userMessage.emit("No se pudo copiar la receta") }
         }
     }
 
@@ -305,8 +403,12 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     /** Lista de miembros de la familia; offline mantiene la ultima carga en memoria. */
     fun loadFamilyMembers() {
         viewModelScope.launch {
+            val familyId = container.sessionStore.familyId ?: return@launch
             runCatching { container.familyMemberRepository.members() }
-                .onSuccess { _familyMembers.value = it }
+                .onSuccess {
+                    // Descarta respuestas tardias si el usuario ya cambio de familia.
+                    if (familyId == container.sessionStore.familyId) _familyMembers.value = it
+                }
         }
     }
 
@@ -339,8 +441,11 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     /** Carga las stats del servidor; si falla (offline) se mantiene el fallback local. */
     fun loadFamilyStats() {
         viewModelScope.launch {
+            val familyId = container.sessionStore.familyId ?: return@launch
             runCatching { container.familyMemberRepository.stats() }
-                .onSuccess { _familyStats.value = it }
+                .onSuccess {
+                    if (familyId == container.sessionStore.familyId) _familyStats.value = it
+                }
         }
     }
 
@@ -430,7 +535,10 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     val menuItems: StateFlow<List<MenuItemEntity>> =
-        container.database.menuItemDao().observeMenuItems()
+        container.sessionStore.familyIdFlow.flatMapLatest { familyId ->
+            if (familyId.isNullOrBlank()) flowOf(emptyList())
+            else container.database.menuItemDao().observeMenuItems(familyId)
+        }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val shoppingLists: StateFlow<List<ShoppingListEntity>> =
@@ -438,10 +546,16 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun ingredientsFor(recipeId: String): Flow<List<RecipeIngredientEntity>> =
-        container.database.recipeIngredientDao().observeIngredients(recipeId)
+        container.sessionStore.familyIdFlow.flatMapLatest { familyId ->
+            if (familyId.isNullOrBlank()) flowOf(emptyList())
+            else container.database.recipeIngredientDao().observeIngredients(recipeId, familyId)
+        }
 
     fun stepsFor(recipeId: String): Flow<List<RecipeStepEntity>> =
-        container.database.recipeStepDao().observeSteps(recipeId)
+        container.sessionStore.familyIdFlow.flatMapLatest { familyId ->
+            if (familyId.isNullOrBlank()) flowOf(emptyList())
+            else container.database.recipeStepDao().observeSteps(recipeId, familyId)
+        }
 
     fun itemsFor(listId: String): Flow<List<ShoppingListItemEntity>> =
         container.shoppingListRepository.itemsFor(listId)
@@ -602,8 +716,11 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     fun loadRatings(recipeId: String) {
         viewModelScope.launch {
+            val familyId = container.sessionStore.familyId ?: return@launch
             runCatching { container.recipeRatingRepository.loadRatings(recipeId) }
-                .onSuccess { _recipeRatings.value = it }
+                .onSuccess {
+                    if (familyId == container.sessionStore.familyId) _recipeRatings.value = it
+                }
         }
     }
 

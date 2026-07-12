@@ -9,6 +9,7 @@ import org.gipsybuho.recetasfamiliares.favorites.FavoriteRecipeRepository;
 import org.gipsybuho.recetasfamiliares.menus.MenuItemRepository;
 import org.gipsybuho.recetasfamiliares.notes.FamilyNoteRepository;
 import org.gipsybuho.recetasfamiliares.recipes.RecipeRepository;
+import org.gipsybuho.recetasfamiliares.recipes.StarterRecipeSeeder;
 import org.gipsybuho.recetasfamiliares.shopping.ShoppingListRepository;
 import org.gipsybuho.recetasfamiliares.stock.StockItemRepository;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
@@ -35,6 +36,7 @@ public class FamilyService {
     private final FavoriteRecipeRepository favoriteRecipeRepository;
     private final PasswordEncoder passwordEncoder;
     private final org.gipsybuho.recetasfamiliares.photos.FileStorageService fileStorageService;
+    private final StarterRecipeSeeder starterRecipeSeeder;
 
     public FamilyService(
             FamilyMemberRepository familyMemberRepository,
@@ -48,7 +50,8 @@ public class FamilyService {
             FamilyNoteRepository familyNoteRepository,
             FavoriteRecipeRepository favoriteRecipeRepository,
             PasswordEncoder passwordEncoder,
-            org.gipsybuho.recetasfamiliares.photos.FileStorageService fileStorageService
+            org.gipsybuho.recetasfamiliares.photos.FileStorageService fileStorageService,
+            StarterRecipeSeeder starterRecipeSeeder
     ) {
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
@@ -62,6 +65,7 @@ public class FamilyService {
         this.favoriteRecipeRepository = favoriteRecipeRepository;
         this.passwordEncoder = passwordEncoder;
         this.fileStorageService = fileStorageService;
+        this.starterRecipeSeeder = starterRecipeSeeder;
     }
 
     @Transactional(readOnly = true)
@@ -75,6 +79,30 @@ public class FamilyService {
                         member.getFamily().getAvatarUrl()
                 ))
                 .toList();
+    }
+
+    /** Tope defensivo de membresias activas por usuario: frena creacion masiva de familias. */
+    private static final int MAX_ACTIVE_MEMBERSHIPS = 10;
+
+    @Transactional
+    public FamilyResponse createFamily(String userId, CreateFamilyRequest request) {
+        List<FamilyMemberEntity> activeMemberships = familyMemberRepository.findByUser_IdAndDeletedFalse(userId);
+        boolean canCreateAdditionalFamily = activeMemberships.isEmpty()
+                || activeMemberships.stream()
+                        .anyMatch(member -> member.getRole() == FamilyRole.OWNER || member.getRole() == FamilyRole.ADMIN);
+        if (!canCreateAdditionalFamily) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family creation requires admin access");
+        }
+        if (activeMemberships.size() >= MAX_ACTIVE_MEMBERSHIPS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Family limit reached");
+        }
+
+        UserEntity user = userRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Family creation requires admin access"));
+        FamilyEntity family = familyRepository.save(new FamilyEntity(request.name().trim()));
+        familyMemberRepository.save(new FamilyMemberEntity(family, user, FamilyRole.OWNER));
+        starterRecipeSeeder.seedStarterRecipes(family);
+        return new FamilyResponse(family.getId(), family.getName(), FamilyRole.OWNER, family.getAvatarUrl());
     }
 
     @Transactional(readOnly = true)

@@ -48,7 +48,7 @@ class StockRepository(
                 }
             }
         } catch (e: Exception) {
-            db.appDatabaseQueries.selectAllStockItems().executeAsList().map { it.toDto() }
+            db.appDatabaseQueries.selectAllStockItems(familyId).executeAsList().map { it.toDto() }
         }
     }
 

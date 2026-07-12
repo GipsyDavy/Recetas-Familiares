@@ -9,6 +9,7 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
@@ -58,7 +59,9 @@ class SyncRepositoryE2eTest {
     private lateinit var repository: SyncRepository
 
     private var familyId: String? = FAMILY_ID
-    private var lastSyncTime: String? = null
+    private val familyIdFlow = MutableStateFlow<String?>(FAMILY_ID)
+    private val lastSyncTimes = mutableMapOf<String, String?>()
+    private val lastSyncTime: String? get() = lastSyncTimes[FAMILY_ID]
 
     @Before
     fun setUp() {
@@ -66,10 +69,14 @@ class SyncRepositoryE2eTest {
         store.attach(database)
 
         familyId = FAMILY_ID
-        lastSyncTime = null
+        familyIdFlow.value = FAMILY_ID
+        lastSyncTimes.clear()
         every { sessionStore.familyId } answers { familyId }
-        every { sessionStore.lastSyncTime } answers { lastSyncTime }
-        every { sessionStore.lastSyncTime = any() } answers { lastSyncTime = firstArg() }
+        every { sessionStore.familyIdFlow } returns familyIdFlow
+        every { sessionStore.lastSyncTimeFor(any()) } answers { lastSyncTimes[firstArg()] }
+        every { sessionStore.setLastSyncTime(any(), any()) } answers {
+            lastSyncTimes[firstArg<String>()] = secondArg()
+        }
 
         repository = SyncRepository(api, database, sessionStore)
     }
@@ -153,6 +160,34 @@ class SyncRepositoryE2eTest {
     }
 
     @Test
+    fun `pushThenPull no envia pendientes de otra familia`() = runTest {
+        store.recipes["r-active"] = recipeEntity("r-active", syncVersion = 0L, title = "Activa")
+        store.recipes["r-other"] = recipeEntity(
+            "r-other",
+            syncVersion = 0L,
+            title = "Otra",
+            familyId = "fam-2"
+        )
+        store.stockItems["stock-active"] = stockEntity("stock-active", syncVersion = 0L)
+        store.stockItems["stock-other"] = stockEntity("stock-other", syncVersion = 0L, familyId = "fam-2")
+        store.notes["note-active"] = noteEntity("note-active", syncVersion = 0L)
+        store.notes["note-other"] = noteEntity("note-other", syncVersion = 0L, familyId = "fam-2")
+        store.favorites["fav-active"] = favoriteEntity("fav-active", syncVersion = 0L)
+        store.favorites["fav-other"] = favoriteEntity("fav-other", syncVersion = 0L, familyId = "fam-2")
+
+        val pushed = slot<SyncPushRequestDto>()
+        coEvery { api.pushSync(FAMILY_ID, capture(pushed)) } returns emptyPull(serverTime = "T-PUSH")
+        coEvery { api.pullSync(FAMILY_ID, null, 200) } returns emptyPull(serverTime = "T-PULL")
+
+        repository.pushThenPull()
+
+        assertEquals(listOf("r-active"), pushed.captured.recipes.map { it.id })
+        assertEquals(listOf("stock-active"), pushed.captured.stockItems!!.map { it.id })
+        assertEquals(listOf("note-active"), pushed.captured.familyNotes!!.map { it.id })
+        assertEquals(listOf("fav-active"), pushed.captured.favoriteRecipes!!.map { it.id })
+    }
+
+    @Test
     fun `delete de entidades creadas offline elimina localmente sin API`() = runTest {
         store.recipes["r-new"] = recipeEntity("r-new", syncVersion = 0L)
         store.ingredients["i-new"] = ingredientEntity("i-new", recipeId = "r-new", syncVersion = 0L)
@@ -193,6 +228,34 @@ class SyncRepositoryE2eTest {
         assertEquals(4L, store.recipes.getValue("r-conflict").syncVersion)
         assertEquals("T-SERVER", lastSyncTime)
         coVerify(exactly = 1) { api.pullSync(FAMILY_ID, null, 200) }
+    }
+
+    @Test
+    fun `push 409 tras cambio de familia hace pull de la familia original sin tocar la nueva`() = runTest {
+        store.recipes["r-a"] = recipeEntity("r-a", syncVersion = -3L, title = "Dirty A")
+        store.recipes["r-b"] = recipeEntity("r-b", syncVersion = 0L, title = "Pendiente B", familyId = "fam-2")
+        coEvery { api.pushSync(FAMILY_ID, any()) } answers {
+            // El usuario cambia de familia con el push en vuelo
+            familyId = "fam-2"
+            familyIdFlow.value = "fam-2"
+            throw http409()
+        }
+        coEvery { api.pullSync(FAMILY_ID, null, 200) } returns emptyPull(
+            serverTime = "T-A",
+            recipes = listOf(recipeDto("r-a", title = "Server A", syncVersion = 4L))
+        )
+
+        repository.pushThenPull()
+
+        // El pull de resolucion pertenece a la familia original, nunca a la nueva
+        coVerify(exactly = 1) { api.pullSync(FAMILY_ID, null, 200) }
+        coVerify(exactly = 0) { api.pullSync("fam-2", any(), any()) }
+        // El pendiente offline de la familia nueva queda intacto
+        assertEquals(0L, store.recipes.getValue("r-b").syncVersion)
+        assertEquals("Pendiente B", store.recipes.getValue("r-b").title)
+        // El cursor avanzado es el de la familia original
+        assertEquals("T-A", lastSyncTimes[FAMILY_ID])
+        assertNull(lastSyncTimes["fam-2"])
     }
 
     @Test
@@ -248,23 +311,42 @@ class SyncRepositoryE2eTest {
         val photoDao = mockk<RecipePhotoDao>()
 
         init {
-            every { recipeDao.observeRecipes() } returns emptyFlow()
-            every { recipeDao.observeRecipe(any()) } returns emptyFlow()
-            coEvery { recipeDao.findAll() } answers { recipes.values.filterNot { it.deleted } }
-            coEvery { recipeDao.findPendingCreate() } answers { recipes.values.filter { it.syncVersion <= 0 && !it.deleted } }
-            coEvery { recipeDao.findPendingDelete() } answers { recipes.values.filter { it.syncVersion <= 0 && it.deleted } }
-            coEvery { recipeDao.findPendingIds() } answers { recipes.values.filter { it.syncVersion <= 0 }.map { it.id } }
+            every { recipeDao.observeRecipes(any()) } returns emptyFlow()
+            every { recipeDao.observeRecipe(any(), any()) } returns emptyFlow()
+            coEvery { recipeDao.findAll(any()) } answers {
+                val familyId = firstArg<String>()
+                recipes.values.filter { it.familyId == familyId && !it.deleted }
+            }
+            coEvery { recipeDao.findPendingCreate(any()) } answers {
+                val familyId = firstArg<String>()
+                recipes.values.filter { it.familyId == familyId && it.syncVersion <= 0 && !it.deleted }
+            }
+            coEvery { recipeDao.findPendingDelete(any()) } answers {
+                val familyId = firstArg<String>()
+                recipes.values.filter { it.familyId == familyId && it.syncVersion <= 0 && it.deleted }
+            }
+            coEvery { recipeDao.findPendingIds(any()) } answers {
+                val familyId = firstArg<String>()
+                recipes.values.filter { it.familyId == familyId && it.syncVersion <= 0 }.map { it.id }
+            }
+            coEvery { recipeDao.findByIdForFamily(any(), any()) } answers {
+                val id = firstArg<String>()
+                val familyId = secondArg<String>()
+                recipes.values.firstOrNull { it.id == id && it.familyId == familyId && !it.deleted }
+            }
             coEvery { recipeDao.deleteById(any()) } answers { recipes.remove(firstArg<String>()) }
             coEvery { recipeDao.upsertAll(any()) } answers { upsert(recipes, firstArg()) { it.id } }
 
-            every { ingredientDao.observeIngredients(any()) } returns emptyFlow()
-            every { ingredientDao.observeAllIngredients() } returns emptyFlow()
+            every { ingredientDao.observeIngredients(any(), any()) } returns emptyFlow()
+            every { ingredientDao.observeAllIngredients(any()) } returns emptyFlow()
             coEvery { ingredientDao.findByRecipeIds(any()) } answers {
                 val ids = firstArg<List<String>>().toSet()
                 ingredients.values.filter { it.recipeId in ids && !it.deleted }
             }
-            coEvery { ingredientDao.findPendingIds() } answers {
-                ingredients.values.filter { it.syncVersion <= 0 }.map { it.id }
+            coEvery { ingredientDao.findPendingIds(any()) } answers {
+                val familyId = firstArg<String>()
+                val recipeIds = recipes.values.filter { it.familyId == familyId }.map { it.id }.toSet()
+                ingredients.values.filter { it.recipeId in recipeIds && it.syncVersion <= 0 }.map { it.id }
             }
             coEvery { ingredientDao.deleteByRecipeId(any()) } answers {
                 val recipeId = firstArg<String>()
@@ -272,63 +354,96 @@ class SyncRepositoryE2eTest {
             }
             coEvery { ingredientDao.upsertAll(any()) } answers { upsert(ingredients, firstArg()) { it.id } }
 
-            every { stepDao.observeSteps(any()) } returns emptyFlow()
+            every { stepDao.observeSteps(any(), any()) } returns emptyFlow()
             coEvery { stepDao.findByRecipeIds(any()) } answers {
                 val ids = firstArg<List<String>>().toSet()
                 steps.values.filter { it.recipeId in ids && !it.deleted }
             }
-            coEvery { stepDao.findPendingIds() } answers { steps.values.filter { it.syncVersion <= 0 }.map { it.id } }
+            coEvery { stepDao.findPendingIds(any()) } answers {
+                val familyId = firstArg<String>()
+                val recipeIds = recipes.values.filter { it.familyId == familyId }.map { it.id }.toSet()
+                steps.values.filter { it.recipeId in recipeIds && it.syncVersion <= 0 }.map { it.id }
+            }
             coEvery { stepDao.deleteByRecipeId(any()) } answers {
                 val recipeId = firstArg<String>()
                 steps.entries.removeIf { it.value.recipeId == recipeId }
             }
             coEvery { stepDao.upsertAll(any()) } answers { upsert(steps, firstArg()) { it.id } }
 
-            every { stockDao.observeStock() } returns emptyFlow()
-            coEvery { stockDao.findPendingCreate() } answers { stockItems.values.filter { it.syncVersion <= 0 && !it.deleted } }
-            coEvery { stockDao.findPendingDelete() } answers { stockItems.values.filter { it.syncVersion <= 0 && it.deleted } }
-            coEvery { stockDao.findPendingIds() } answers { stockItems.values.filter { it.syncVersion <= 0 }.map { it.id } }
+            every { stockDao.observeStock(any()) } returns emptyFlow()
+            coEvery { stockDao.findPendingCreate(any()) } answers {
+                val familyId = firstArg<String>()
+                stockItems.values.filter { it.familyId == familyId && it.syncVersion <= 0 && !it.deleted }
+            }
+            coEvery { stockDao.findPendingDelete(any()) } answers {
+                val familyId = firstArg<String>()
+                stockItems.values.filter { it.familyId == familyId && it.syncVersion <= 0 && it.deleted }
+            }
+            coEvery { stockDao.findPendingIds(any()) } answers {
+                val familyId = firstArg<String>()
+                stockItems.values.filter { it.familyId == familyId && it.syncVersion <= 0 }.map { it.id }
+            }
             coEvery { stockDao.deleteById(any()) } answers { stockItems.remove(firstArg<String>()) }
-            coEvery { stockDao.findExpiringItems() } returns emptyList()
-            coEvery { stockDao.findCriticalItems(any()) } returns emptyList()
+            coEvery { stockDao.findExpiringItems(any()) } returns emptyList()
+            coEvery { stockDao.findCriticalItems(any(), any()) } returns emptyList()
             coEvery { stockDao.upsertAll(any()) } answers { upsert(stockItems, firstArg()) { it.id } }
 
-            every { menuItemDao.observeMenuItems() } returns emptyFlow()
-            every { menuItemDao.observeMenuItemsFrom(any()) } returns emptyFlow()
+            every { menuItemDao.observeMenuItems(any()) } returns emptyFlow()
+            every { menuItemDao.observeMenuItemsFrom(any(), any()) } returns emptyFlow()
             coEvery { menuItemDao.upsertAll(any()) } just Runs
 
-            every { shoppingListDao.observeShoppingLists() } returns emptyFlow()
+            every { shoppingListDao.observeShoppingLists(any()) } returns emptyFlow()
             coEvery { shoppingListDao.upsertAll(any()) } just Runs
 
-            every { shoppingListItemDao.observeItems(any()) } returns emptyFlow()
-            coEvery { shoppingListItemDao.findPendingCheck() } answers {
+            every { shoppingListItemDao.observeItems(any(), any()) } returns emptyFlow()
+            coEvery { shoppingListItemDao.findPendingCheck(any()) } answers {
                 shoppingItems.values.filter { it.syncVersion <= 0 && !it.deleted }
             }
-            coEvery { shoppingListItemDao.findPendingIds() } answers {
+            coEvery { shoppingListItemDao.findPendingIds(any()) } answers {
                 shoppingItems.values.filter { it.syncVersion <= 0 }.map { it.id }
             }
+            coEvery { shoppingListItemDao.belongsToFamily(any(), any()) } returns true
             coEvery { shoppingListItemDao.upsertAll(any()) } answers { upsert(shoppingItems, firstArg()) { it.id } }
 
-            every { favoriteDao.observeFavorites() } returns emptyFlow()
-            coEvery { favoriteDao.findByRecipeId(any()) } answers {
+            every { favoriteDao.observeFavorites(any()) } returns emptyFlow()
+            coEvery { favoriteDao.findByRecipeId(any(), any()) } answers {
                 val recipeId = firstArg<String>()
-                favorites.values.firstOrNull { it.recipeId == recipeId && !it.deleted }
+                val familyId = secondArg<String>()
+                favorites.values.firstOrNull { it.familyId == familyId && it.recipeId == recipeId && !it.deleted }
             }
-            coEvery { favoriteDao.findPendingCreate() } answers { favorites.values.filter { it.syncVersion <= 0 && !it.deleted } }
-            coEvery { favoriteDao.findPendingDelete() } answers { favorites.values.filter { it.syncVersion <= 0 && it.deleted } }
-            coEvery { favoriteDao.findPendingIds() } answers { favorites.values.filter { it.syncVersion <= 0 }.map { it.id } }
+            coEvery { favoriteDao.findPendingCreate(any()) } answers {
+                val familyId = firstArg<String>()
+                favorites.values.filter { it.familyId == familyId && it.syncVersion <= 0 && !it.deleted }
+            }
+            coEvery { favoriteDao.findPendingDelete(any()) } answers {
+                val familyId = firstArg<String>()
+                favorites.values.filter { it.familyId == familyId && it.syncVersion <= 0 && it.deleted }
+            }
+            coEvery { favoriteDao.findPendingIds(any()) } answers {
+                val familyId = firstArg<String>()
+                favorites.values.filter { it.familyId == familyId && it.syncVersion <= 0 }.map { it.id }
+            }
             coEvery { favoriteDao.deleteById(any()) } answers { favorites.remove(firstArg<String>()) }
             coEvery { favoriteDao.upsertAll(any()) } answers { upsert(favorites, firstArg()) { it.id } }
 
-            every { noteDao.observeNotes() } returns emptyFlow()
-            coEvery { noteDao.findPendingCreate() } answers { notes.values.filter { it.syncVersion <= 0 && !it.deleted } }
-            coEvery { noteDao.findPendingDelete() } answers { notes.values.filter { it.syncVersion <= 0 && it.deleted } }
-            coEvery { noteDao.findPendingIds() } answers { notes.values.filter { it.syncVersion <= 0 }.map { it.id } }
+            every { noteDao.observeNotes(any()) } returns emptyFlow()
+            coEvery { noteDao.findPendingCreate(any()) } answers {
+                val familyId = firstArg<String>()
+                notes.values.filter { it.familyId == familyId && it.syncVersion <= 0 && !it.deleted }
+            }
+            coEvery { noteDao.findPendingDelete(any()) } answers {
+                val familyId = firstArg<String>()
+                notes.values.filter { it.familyId == familyId && it.syncVersion <= 0 && it.deleted }
+            }
+            coEvery { noteDao.findPendingIds(any()) } answers {
+                val familyId = firstArg<String>()
+                notes.values.filter { it.familyId == familyId && it.syncVersion <= 0 }.map { it.id }
+            }
             coEvery { noteDao.deleteById(any()) } answers { notes.remove(firstArg<String>()) }
             coEvery { noteDao.upsertAll(any()) } answers { upsert(notes, firstArg()) { it.id } }
 
-            every { photoDao.observePhotos(any()) } returns emptyFlow()
-            coEvery { photoDao.findFirstByRecipeId(any()) } returns null
+            every { photoDao.observePhotos(any(), any()) } returns emptyFlow()
+            coEvery { photoDao.findFirstByRecipeId(any(), any()) } returns null
             coEvery { photoDao.upsertAll(any()) } just Runs
         }
 
@@ -382,10 +497,11 @@ class SyncRepositoryE2eTest {
             id: String,
             syncVersion: Long,
             title: String = "Recipe",
-            deleted: Boolean = false
+            deleted: Boolean = false,
+            familyId: String = FAMILY_ID
         ) = RecipeEntity(
             id = id,
-            familyId = FAMILY_ID,
+            familyId = familyId,
             title = title,
             description = null,
             servings = null,
@@ -444,9 +560,14 @@ class SyncRepositoryE2eTest {
             deleted = false
         )
 
-        fun stockEntity(id: String, syncVersion: Long, deleted: Boolean = false) = StockItemEntity(
+        fun stockEntity(
+            id: String,
+            syncVersion: Long,
+            deleted: Boolean = false,
+            familyId: String = FAMILY_ID
+        ) = StockItemEntity(
             id = id,
-            familyId = FAMILY_ID,
+            familyId = familyId,
             name = "Harina",
             quantity = 1.0,
             unit = "kg",
@@ -478,10 +599,11 @@ class SyncRepositoryE2eTest {
             id: String,
             syncVersion: Long,
             title: String = "Nota",
-            deleted: Boolean = false
+            deleted: Boolean = false,
+            familyId: String = FAMILY_ID
         ) = FamilyNoteEntity(
             id = id,
-            familyId = FAMILY_ID,
+            familyId = familyId,
             recipeId = null,
             recipeTitle = null,
             title = title,
@@ -511,10 +633,11 @@ class SyncRepositoryE2eTest {
             id: String,
             syncVersion: Long,
             recipeId: String = "r-fav",
-            deleted: Boolean = false
+            deleted: Boolean = false,
+            familyId: String = FAMILY_ID
         ) = FavoriteRecipeEntity(
             id = id,
-            familyId = FAMILY_ID,
+            familyId = familyId,
             recipeId = recipeId,
             recipeTitle = "Tarta",
             createdAt = NOW,

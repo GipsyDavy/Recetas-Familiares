@@ -17,6 +17,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
@@ -44,6 +45,7 @@ public class RecipeDetailView extends VBox {
     private final HBox actionBar = new HBox(10);
     private final Button favBtn = new Button("♡  Favorito");
     private final Button addPhotoBtn = new Button("Añadir foto");
+    private final Button copyFamilyBtn = new Button("Copiar a familia");
 
     private RecipeDtos.RecipeDto currentRecipe;
     private List<RecipeDtos.RecipeIngredientDto> currentIngredients = new ArrayList<>();
@@ -88,6 +90,12 @@ public class RecipeDetailView extends VBox {
         copyBtn.getStyleClass().add("action-button-secondary");
         copyBtn.setOnAction(e -> copyToClipboard());
 
+        copyFamilyBtn.getStyleClass().add("action-button-secondary");
+        Tooltip copyFamilyTooltip = new Tooltip("Crear una copia en otra familia");
+        copyFamilyTooltip.setShowDelay(javafx.util.Duration.millis(400));
+        Tooltip.install(copyFamilyBtn, copyFamilyTooltip);
+        copyFamilyBtn.setOnAction(e -> openCopyToFamilyDialog());
+
         Button exportBtn = new Button("💾  Exportar");
         exportBtn.getStyleClass().add("action-button-secondary");
         exportBtn.setOnAction(e -> exportToFile());
@@ -106,7 +114,7 @@ public class RecipeDetailView extends VBox {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, webBtn, copyBtn, exportBtn, pdfBtn, editBtn, deleteBtn);
+        actionBar.getChildren().addAll(spacer, favBtn, addPhotoBtn, cookingBtn, webBtn, copyBtn, copyFamilyBtn, exportBtn, pdfBtn, editBtn, deleteBtn);
         actionBar.setPadding(new Insets(12, 16, 8, 16));
         actionBar.setVisible(false);
         actionBar.setManaged(false);
@@ -704,6 +712,93 @@ public class RecipeDetailView extends VBox {
         statusLabel.setVisible(true);
     }
 
+    private void openCopyToFamilyDialog() {
+        if (currentRecipe == null) return;
+        copyFamilyBtn.setDisable(true);
+        statusLabel.setText("Cargando familias...");
+        statusLabel.setVisible(true);
+        String sourceFamilyId = familyId(currentRecipe);
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                FamilyDtos.FamilyResponse[] families = context.getFamilyRepository().loadMyFamilies();
+                List<FamilyTarget> targets = java.util.Arrays.stream(families)
+                        .filter(family -> family.id() != null && !family.id().equals(sourceFamilyId))
+                        .filter(family -> isWritableRole(family.role()))
+                        .map(family -> new FamilyTarget(family.id(), family.name(), family.role()))
+                        .toList();
+                Platform.runLater(() -> showCopyToFamilyDialog(targets));
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    copyFamilyBtn.setDisable(false);
+                    statusLabel.setText("No se pudieron cargar las familias.");
+                    statusLabel.setVisible(true);
+                });
+            }
+        });
+    }
+
+    private void showCopyToFamilyDialog(List<FamilyTarget> targets) {
+        copyFamilyBtn.setDisable(false);
+        if (targets.isEmpty()) {
+            statusLabel.setText("No hay otra familia donde puedas crear recetas.");
+            statusLabel.setVisible(true);
+            return;
+        }
+
+        ComboBox<FamilyTarget> targetBox = new ComboBox<>();
+        targetBox.getItems().setAll(targets);
+        targetBox.getSelectionModel().selectFirst();
+        targetBox.setMaxWidth(Double.MAX_VALUE);
+
+        VBox content = new VBox(10,
+                new Label("Familia destino"),
+                targetBox,
+                new Label("Se copiarán la receta y sus fotos (título, descripción, tiempos, ingredientes y pasos). Las valoraciones no se copian."));
+        content.setPrefWidth(420);
+
+        Dialog<FamilyTarget> dialog = new Dialog<>();
+        dialog.setTitle("Copiar receta a otra familia");
+        dialog.setHeaderText(currentRecipe.title());
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        DialogStyler.apply(dialog);
+        dialog.setResultConverter(button -> button == ButtonType.OK
+                ? targetBox.getSelectionModel().getSelectedItem()
+                : null);
+        dialog.showAndWait().ifPresent(this::copyRecipeToFamily);
+    }
+
+    private void copyRecipeToFamily(FamilyTarget target) {
+        if (currentRecipe == null || target == null) return;
+        RecipeDtos.RecipeDto recipe = currentRecipe;
+        copyFamilyBtn.setDisable(true);
+        statusLabel.setText("Copiando receta...");
+        statusLabel.setVisible(true);
+        Thread.ofVirtual().start(() -> {
+            try {
+                context.getRecipeRepository().copyToFamily(recipe, target.id());
+                Platform.runLater(() -> {
+                    copyFamilyBtn.setDisable(false);
+                    statusLabel.setText("Receta y fotos copiadas a " + target.name() + ".");
+                    statusLabel.setVisible(true);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    copyFamilyBtn.setDisable(false);
+                    statusLabel.setText("No se pudo copiar la receta.");
+                    statusLabel.setVisible(true);
+                });
+            }
+        });
+    }
+
+    private boolean isWritableRole(String role) {
+        if (role == null) return false;
+        String normalized = role.trim().toUpperCase(java.util.Locale.ROOT);
+        return "OWNER".equals(normalized) || "ADMIN".equals(normalized);
+    }
+
     private void exportToFile() {
         if (currentRecipe == null) return;
 
@@ -877,5 +972,12 @@ public class RecipeDetailView extends VBox {
         if (r.cookMinutes() != null) sb.append("Cocción: ").append(r.cookMinutes()).append(" min  ");
         if (r.difficulty() != null) sb.append(r.difficulty());
         return sb.toString().trim();
+    }
+
+    private record FamilyTarget(String id, String name, String role) {
+        @Override
+        public String toString() {
+            return name != null && !name.isBlank() ? name : "Familia";
+        }
     }
 }

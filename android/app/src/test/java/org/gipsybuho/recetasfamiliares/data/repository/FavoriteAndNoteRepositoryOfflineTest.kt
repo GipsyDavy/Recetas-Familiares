@@ -8,6 +8,7 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
 import java.io.IOException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.gipsybuho.recetasfamiliares.core.SessionStore
@@ -16,6 +17,8 @@ import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.FavoriteRecipeDao
 import org.gipsybuho.recetasfamiliares.data.local.FavoriteRecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecetasDatabase
+import org.gipsybuho.recetasfamiliares.data.local.RecipeDao
+import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -28,6 +31,7 @@ class FavoriteAndNoteRepositoryOfflineTest {
     private val api = mockk<RecetasApi>()
     private val database = mockk<RecetasDatabase>()
     private val sessionStore = mockk<SessionStore>()
+    private val recipeDao = mockk<RecipeDao>()
     private val favoriteDao = mockk<FavoriteRecipeDao>()
     private val noteDao = mockk<FamilyNoteDao>()
 
@@ -37,10 +41,12 @@ class FavoriteAndNoteRepositoryOfflineTest {
     @Before
     fun setUp() {
         every { sessionStore.familyId } returns FAMILY_ID
+        every { sessionStore.familyIdFlow } returns MutableStateFlow(FAMILY_ID)
+        every { database.recipeDao() } returns recipeDao
         every { database.favoriteRecipeDao() } returns favoriteDao
         every { database.familyNoteDao() } returns noteDao
-        every { favoriteDao.observeFavorites() } returns emptyFlow()
-        every { noteDao.observeNotes() } returns emptyFlow()
+        every { favoriteDao.observeFavorites(FAMILY_ID) } returns emptyFlow()
+        every { noteDao.observeNotes(FAMILY_ID) } returns emptyFlow()
 
         coEvery { favoriteDao.upsertAll(any()) } just Runs
         coEvery { favoriteDao.deleteById(any()) } just Runs
@@ -53,7 +59,8 @@ class FavoriteAndNoteRepositoryOfflineTest {
 
     @Test
     fun `toggle favorite offline crea favorito pendiente con syncVersion 0`() = runTest {
-        coEvery { favoriteDao.findByRecipeId("r1") } returns null
+        coEvery { favoriteDao.findByRecipeId("r1", FAMILY_ID) } returns null
+        coEvery { recipeDao.findByIdForFamily("r1", FAMILY_ID) } returns recipe("r1")
         coEvery { api.addFavorite(any(), any()) } throws IOException("sin red")
         val saved = slot<List<FavoriteRecipeEntity>>()
         coEvery { favoriteDao.upsertAll(capture(saved)) } just Runs
@@ -69,7 +76,7 @@ class FavoriteAndNoteRepositoryOfflineTest {
 
     @Test
     fun `toggle favorite creado offline elimina localmente sin llamar API`() = runTest {
-        coEvery { favoriteDao.findByRecipeId("r1") } returns favorite("f1", "r1", syncVersion = 0L)
+        coEvery { favoriteDao.findByRecipeId("r1", FAMILY_ID) } returns favorite("f1", "r1", syncVersion = 0L)
 
         favoriteRepository.toggle("r1")
 
@@ -80,7 +87,7 @@ class FavoriteAndNoteRepositoryOfflineTest {
 
     @Test
     fun `toggle favorite sincronizado offline marca deleted con version dirty`() = runTest {
-        coEvery { favoriteDao.findByRecipeId("r1") } returns favorite("f1", "r1", syncVersion = 4L)
+        coEvery { favoriteDao.findByRecipeId("r1", FAMILY_ID) } returns favorite("f1", "r1", syncVersion = 4L)
         coEvery { api.removeFavorite(any(), any()) } throws IOException("sin red")
         val saved = slot<List<FavoriteRecipeEntity>>()
         coEvery { favoriteDao.upsertAll(capture(saved)) } just Runs
@@ -167,6 +174,21 @@ class FavoriteAndNoteRepositoryOfflineTest {
             createdAt = "2026-01-01T00:00:00Z",
             updatedAt = "2026-01-01T00:00:00Z",
             syncVersion = syncVersion,
+            deleted = false
+        )
+
+        fun recipe(id: String) = RecipeEntity(
+            id = id,
+            familyId = FAMILY_ID,
+            title = "Receta",
+            description = null,
+            servings = null,
+            prepMinutes = null,
+            cookMinutes = null,
+            difficulty = null,
+            createdAt = "2026-01-01T00:00:00Z",
+            updatedAt = "2026-01-01T00:00:00Z",
+            syncVersion = 1L,
             deleted = false
         )
     }

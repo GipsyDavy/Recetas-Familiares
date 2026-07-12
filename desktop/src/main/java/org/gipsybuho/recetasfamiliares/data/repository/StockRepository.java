@@ -48,4 +48,8 @@ public class StockRepository {
     public void updateFromSync(List<StockDtos.StockItemDto> items) {
         cache.mergeById(items, StockDtos.StockItemDto::id, StockDtos.StockItemDto::deleted);
     }
+
+    public void clearCache() {
+        cache.clear();
+    }
 }

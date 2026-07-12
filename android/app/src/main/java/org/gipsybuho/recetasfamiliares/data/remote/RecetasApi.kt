@@ -10,6 +10,8 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatHistoryDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.EditChatMessageRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SendChatMessageRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.CopyRecipeRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateFamilyRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateStockItemRequestDto
@@ -95,6 +97,16 @@ interface RecetasApi {
 
     @GET("api/v1/families")
     suspend fun families(): List<FamilyDto>
+
+    @POST("api/v1/families")
+    suspend fun createFamily(@Body request: CreateFamilyRequestDto): FamilyDto
+
+    @POST("api/v1/families/{familyId}/recipes/{recipeId}/copy")
+    suspend fun copyRecipe(
+        @Path("familyId") familyId: String,
+        @Path("recipeId") recipeId: String,
+        @Body request: CopyRecipeRequestDto
+    ): RecipeDto
 
     @GET("api/v1/families/{familyId}/stats")
     suspend fun familyStats(@Path("familyId") familyId: String): FamilyStatsDto

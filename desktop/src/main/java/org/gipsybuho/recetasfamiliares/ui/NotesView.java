@@ -155,6 +155,7 @@ public class NotesView extends VBox {
         hasMore = false;
         updateLoadMoreBtn();
         statusLabel.setText("Cargando...");
+        String familyAtStart = context.getSession().getFamilyId();
         Thread.ofVirtual().start(() -> {
             try {
                 var page = context.getNoteRepository().loadPage(0, PAGE_SIZE);
@@ -162,6 +163,9 @@ public class NotesView extends VBox {
                         page.items() == null ? List.of()
                         : page.items().stream().filter(n -> !n.deleted()).toList();
                 Platform.runLater(() -> {
+                    if (!java.util.Objects.equals(familyAtStart, context.getSession().getFamilyId())) {
+                        return;
+                    }
                     allNotes.setAll(notes);
                     context.getNoteRepository().updateCache(notes);
                     hasMore = page.totalPages() > 1;
@@ -177,6 +181,7 @@ public class NotesView extends VBox {
     private void loadNextPage() {
         loadMoreBtn.setDisable(true);
         int nextPage = currentPage + 1;
+        String familyAtStart = context.getSession().getFamilyId();
         Thread.ofVirtual().start(() -> {
             try {
                 var page = context.getNoteRepository().loadPage(nextPage, PAGE_SIZE);
@@ -184,6 +189,9 @@ public class NotesView extends VBox {
                         page.items() == null ? List.of()
                         : page.items().stream().filter(n -> !n.deleted()).toList();
                 Platform.runLater(() -> {
+                    if (!java.util.Objects.equals(familyAtStart, context.getSession().getFamilyId())) {
+                        return;
+                    }
                     var appended = new ArrayList<>(allNotes);
                     appended.addAll(newNotes);
                     allNotes.setAll(appended);

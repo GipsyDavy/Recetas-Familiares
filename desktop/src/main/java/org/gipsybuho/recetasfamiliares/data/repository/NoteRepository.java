@@ -66,4 +66,8 @@ public class NoteRepository {
         String familyId = session.getFamilyId();
         api.delete("api/v1/families/" + familyId + "/notes/" + noteId);
     }
+
+    public void clearCache() {
+        cache.clear();
+    }
 }

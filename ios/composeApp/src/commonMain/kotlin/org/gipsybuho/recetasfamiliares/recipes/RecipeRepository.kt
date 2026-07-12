@@ -46,7 +46,7 @@ class RecipeRepository(
                 }
             }
         } catch (e: Exception) {
-            db.appDatabaseQueries.selectAllRecipes().executeAsList().map { it.toDto() }
+            db.appDatabaseQueries.selectAllRecipes(familyId).executeAsList().map { it.toDto() }
         }
     }
 
@@ -90,8 +90,10 @@ class RecipeRepository(
     }
 
     fun loadLocalIngredients(): List<Pair<String, String>> =
-        db.appDatabaseQueries.selectAllIngredients().executeAsList()
+        session.familyId?.let { familyId ->
+            db.appDatabaseQueries.selectAllIngredientsForFamily(familyId).executeAsList()
             .map { it.recipeId to it.name.lowercase().trim() }
+        } ?: emptyList()
 
     private fun Recipes.toDto() = RecipeDto(
         id          = id,

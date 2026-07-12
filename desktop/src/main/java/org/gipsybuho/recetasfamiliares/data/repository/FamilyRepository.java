@@ -60,16 +60,30 @@ public class FamilyRepository {
     }
 
     /**
-     * Calls GET /api/v1/families, reads the role from the first family in the list,
-     * and persists it in the session. Defaults to MEMBER on any error (fail-safe).
+     * Calls GET /api/v1/families, reads the role for the active family, and
+     * persists it in the session. Defaults to MEMBER on any error (fail-safe).
      */
     public void detectAndSaveRole() {
         try {
             FamilyDtos.FamilyResponse[] families = loadMyFamilies();
+            String activeFamilyId = session.getFamilyId();
             FamilyRole role = FamilyRole.MEMBER;
-            if (families.length > 0 && families[0].role() != null) {
+            FamilyDtos.FamilyResponse active = null;
+            for (FamilyDtos.FamilyResponse family : families) {
+                if (activeFamilyId != null && activeFamilyId.equals(family.id())) {
+                    active = family;
+                    break;
+                }
+            }
+            if (active == null && families.length > 0) {
+                active = families[0];
+                if (activeFamilyId == null || activeFamilyId.isBlank()) {
+                    session.setFamilyId(active.id());
+                }
+            }
+            if (active != null && active.role() != null) {
                 try {
-                    role = FamilyRole.valueOf(families[0].role().toUpperCase());
+                    role = FamilyRole.valueOf(active.role().toUpperCase());
                 } catch (IllegalArgumentException ignored) {
                     // Unknown role string — default to MEMBER
                 }

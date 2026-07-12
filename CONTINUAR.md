@@ -391,7 +391,7 @@ Orden de sprints aprobado:
 - Sprint A: EJECUTADO 2026-07-12 — UX cliente reset password, verificar email, borrar cuenta (punto 6). SMTP produccion sigue como pendiente operativo del usuario.
 - Sprint B (quick wins): EJECUTADO 2026-07-12 (ver trazabilidad). (10) creador de receta visible se MOVIO a sprint propio: requiere cambio de contrato sync + migracion Room multiplataforma (regla §3); no es quick win.
 - Sprint C (gestion familiar): EJECUTADO 2026-07-12 por Codex (ver trazabilidad). (3) editar miembros queda expuesto en Android y verificado en Desktop; (5) queda cubierto de facto por el modelo actual: registro = primera familia del usuario, que nace OWNER; no existe endpoint para crear familias adicionales. La restriccion plena se disenara con multi-familia.
-- Sprint D (SIGUIENTE, solo diseño): epica multi-familia. (4)+(13)+(12) son un solo bloque — pertenecer a varias familias, cambiar de familia activa y copiar recetas entre familias. Requiere sprint de diseño previo (brainstorming + Codex/Gemini) antes de codigo. Riesgo principal: fuga de datos entre familias en cache/sync/merge.
+- Sprint D (multi-familia, (4)+(13)+(12)): backend EJECUTADO por Codex y clientes/sync-cache COMPLETADOS 2026-07-12 por Claude Code tras auditoria (ver trazabilidad "Sprint D cliente multi-familia"). Pendiente de cierre: prueba manual con dos familias y roles mixtos + suite backend completa en CI.
 - Posteriores: (20) presencia online + avisos de actividad (limitacion: sin push, solo con app abierta; encaja con chat fase 4), (11) ranking de usuarios (depende de 9 y 10; plantear como gamificacion ligera acorde a filosofia del producto), (14) chat privado 1:1 (despues de chat fase 4/push).
 
 DESCARTADOS TOTALMENTE por decision del usuario (2026-07-12):
@@ -1870,6 +1870,35 @@ Revision final Claude Code (2026-07-11, misma fecha):
 - Validacion ejecutada en Windows: Android `.\gradlew test` -> `BUILD SUCCESS`; Android `.\gradlew assembleDebug` -> `BUILD SUCCESS`; Desktop `mvn -f desktop/pom.xml test` -> `BUILD SUCCESS`, 20 tests, 0 fallos; Desktop `mvn -f desktop/pom.xml -DskipTests compile` -> `BUILD SUCCESS`; `git diff --check` -> sin errores (solo avisos LF/CRLF de Windows). Backend suite no ejecutada porque no hubo cambios de codigo backend.
 - Riesgos residuales: sin prueba manual de UI en emulador/JavaFX en esta sesion; Android compilo con warnings preexistentes/no bloqueantes (`menuAnchor` deprecado en `InviteMemberDialog` y condicion siempre verdadera en `RecetasViewModel`); iOS sigue sin paridad de esta gestion familiar; la restriccion plena de "crear familias adicionales solo owner/admin" queda para el diseno multi-familia de Sprint D.
 
+### Sprint D backend/API/security - ejecucion Codex (2026-07-12)
+
+- Alcance delegado por el usuario: backend/API/security de multi-familia, puntos (4)+(13)+(12), sin tocar clientes. No se cambia `sync/pull`, `sync/push` ni modelos sincronizados.
+- Decision de API: `GET /api/v1/families` ya lista las familias activas del usuario y el cambio de familia activa queda como seleccion cliente del `familyId` usado en rutas existentes. Nuevo `POST /api/v1/families` crea una familia adicional; solo lo puede usar un usuario autenticado sin familia activa o con al menos una membresia OWNER/ADMIN. La familia nueva nace con el usuario como OWNER y ejecuta `StarterRecipeSeeder`.
+- Decision de copia: nuevo `POST /api/v1/families/{sourceFamilyId}/recipes/{recipeId}/copy` con body `{ "targetFamilyId": "..." }`. Requiere membresia activa en origen y rol OWNER/ADMIN en destino; bloquea copiar dentro de la misma familia. Copia cabecera de receta, ingredientes, pasos y fotos no borradas. No copia favoritos, valoraciones, notas ni menus porque son estado contextual de la familia destino.
+- Migraciones: no se anadio migracion de esquema; las tablas actuales (`families`, `family_members`, `recipes`, contenidos y fotos) ya soportan multiples familias por usuario y copias como filas nuevas.
+- Seguridad: VibeSec-Skill usado como checklist por tocar ownership, roles y datos familiares. La autorizacion real vive en backend; las consultas filtran por `familyId`; la copia reutiliza fotos solo tras autorizacion explicita origen/destino, y `UploadController` sigue autorizando por familias propietarias del `storagePath`. Errores por permisos usan respuestas genericas existentes (`request_error`) sin stacks ni secretos. `/security-review` no estuvo disponible como herramienta callable en Codex; alternativa aplicada: revision manual VibeSec sobre el diff.
+- Validacion ejecutada en Windows: `mvn -B -f backend/pom.xml "-Dtest=FamilyServiceTest,RecipeServiceTest" test` -> `BUILD SUCCESS`, 6 tests, 0 fallos; `mvn -B -f backend/pom.xml -DskipTests compile` -> `BUILD SUCCESS`; `mvn -B -f backend/pom.xml test` -> `BUILD FAILURE` por entorno local, Flyway no obtiene conexion PostgreSQL porque el servidor pide password y no hay `DB_TEST_PASSWORD` (`The server requested password-based authentication, but no password was provided`). Los tests de controlador anadidos quedan como gate de CI/DB test.
+- Riesgos residuales: clientes aun no consumen los endpoints nuevos; login sigue devolviendo una familia primaria por compatibilidad y los clientes deben listar/seleccionar familia. Android/Desktop/iOS requieren trabajo separado de UI/cache activa por familia antes de cerrar Sprint D de producto. Worktree local contiene cambios Android/Desktop ajenos a esta entrada y no se tocaron desde esta tarea backend.
+
+### Sprint D cliente multi-familia — auditoria + ejecucion (2026-07-12, Claude Code + Codex + Gemini)
+
+- Contexto: el worktree contenia ~1530 lineas sin commitear de Sprint D (backend Codex + clientes a medias). Auditoria autorizada por el usuario (alcance a+b), luego ejecucion completa autorizada via opciones.
+- Hallazgos de auditoria (Claude, verificados en codigo; Codex y Gemini como segunda opinion copy-paste, ambos integrados):
+  - CRITICO C1: Android no compilaba — la UI llamaba a `createFamily`/`copyRecipeToFamily` sin capa API/repo/viewmodel (RecetasApi/ApiDtos solo tenian cambio de EOL). CORREGIDO: DTOs + endpoints Retrofit + `FamilyMemberRepository.createFamily` + `RecipeRepository.copyToFamily` + viewmodel.
+  - ALTA A1/A2 (A2 por Codex): carrera de cursor sync — `lastSyncTime` resolvia la familia activa al escribir, y el 409 de push relanzaba `pullOnce(protectPending=false)` sobre la familia nueva. CORREGIDO: `SessionStore.lastSyncTimeFor/setLastSyncTime(familyId,...)` y `pullOnce(familyId, protectPending)` con familia capturada; test E2E nuevo "push 409 tras cambio de familia".
+  - MEDIA M1: `POST /api/v1/families` sin tope. CORREGIDO: `MAX_ACTIVE_MEMBERSHIPS=10` (400 Family limit reached) + test.
+  - MEDIA M2 (Codex+Gemini): Desktop reimplementaba la copia cliente-side sin fotos y con mensaje contradictorio. CORREGIDO: Desktop usa `POST /copy` atomico; mensajes unificados "la receta y sus fotos se copiaran" en Desktop y Android.
+  - MEDIA M4/M5 (Codex): respuestas tardias pintaban miembros/stats/ratings/`_totalPages` de la familia anterior. CORREGIDO: guard de familia activa antes de asignar estado.
+  - MEDIA M6 (Codex): iOS aplicaba paginas de pull sin validar `dto.familyId`. CORREGIDO: filtro defensivo en `applyPage`; query muerta `selectAllIngredients` eliminada.
+  - BAJA B1: `RecipeDetail` llamaba `loadFamilyInfo()` (red + posible auto-cambio de familia) en cada apertura. CORREGIDO: eliminado; `families` se carga en login y perfil.
+- Decisiones de producto del usuario (2026-07-12):
+  - Fotos al copiar receta: SI se copian (referencia compartida de `storagePath`; `UploadController` ya autoriza por lista de familias propietarias y el borrado de fotos es soft delete sin borrar el fisico).
+  - Cualquier MEMBER del origen puede copiar (equivale a reescribirla a mano); fijado por `RecipeServiceTest` (origen solo exige membresia).
+  - Cambio de familia en Desktop: directo sin dialogo de confirmacion, aviso en barra de estado (dialogo eliminado).
+- UX Gemini aplicado: titulo "Cambiar familia activa", label "Nombre de la nueva familia", nota informativa en el bottom sheet de copia Android.
+- Validado en esta sesion (Windows): Android `gradlew test assembleDebug` BUILD SUCCESSFUL (warnings preexistentes: `menuAnchor`, tooltips deprecados, condicion siempre true); Desktop `mvn test` 21/0; backend `-Dtest=FamilyServiceTest,RecipeServiceTest` 8/0; iOS `compileKotlinIosSimulatorArm64` BUILD SUCCESSFUL (warnings Keychain preexistentes). VibeSec invocado sobre el diff.
+- Riesgo residual: suite backend completa NO ejecutada en local (Flyway exige `DB_TEST_PASSWORD`; los `*ControllerTest` de multi-familia quedan como gate de CI). Sin prueba manual UI con dos familias reales. Limpieza de huerfanos de fotos (futura) debera contar filas activas de TODAS las familias por `storagePath` antes de borrar el fisico. Logout Android sigue sin vaciar Room (residuo local sin exposicion en UI, preexistente).
+
 ### Cierre de sesion 2026-07-12 (Claude Code) — PUNTO EXACTO DEL PROYECTO
 
 Estado para retomar en la proxima sesion, cualquier agente:
@@ -1887,10 +1916,8 @@ PENDIENTES OPERATIVOS DEL USUARIO (bloquean cierres, no el desarrollo):
 - SMTP real en el VPS para cerrar CRIT-2: `MAIL_ENABLED=true`, `SMTP_HOST/PORT`, credenciales, `MAIL_FROM`, `APP_PUBLIC_URL` en `/etc/recetas-familiares/backend.env`; despues prueba E2E de reset/verificacion/borrado desde ambos clientes.
 - Regenerar instalador Windows (`desktop/build-installer.ps1`) y distribuir APK nuevo: los binarios vigentes NO incluyen las pantallas de Sprint A/B.
 
-SIGUIENTE SPRINT (fijado por roadmap §8, NO autorizado aun): **Sprint D — epica multi-familia, SOLO fase de diseno**
-- Alcance: propuesta de arquitectura para (4)+(13)+(12): pertenecer a varias familias, cambiar familia activa y copiar recetas entre familias.
-- Incluir obligatoriamente impacto en sync/cache por familia, seleccion de tenant activo, compatibilidad Android/Desktop/iOS, migraciones/API necesarias y riesgos de fuga entre tenants.
-- No escribir codigo en Sprint D hasta autorizacion explicita del usuario despues del diseno. Recomendado: brainstorming + Codex/Gemini/security-review si estan disponibles.
+SIGUIENTE SPRINT: **Cierre de Sprint D multi-familia**
+- Codigo completo en las 4 plataformas (ver trazabilidad "Sprint D cliente multi-familia"). Falta para declarar cierre: commit + runs verdes de CI (los `*ControllerTest` multi-familia solo corren con DB) + prueba manual con dos familias y roles mixtos (crear familia, cambiar activa, copiar receta con fotos, verificar aislamiento de datos y del chat).
 - Posteriores: presencia online (20), ranking (11), chat 1:1 (14, tras chat fase 4 push), y sprint propio para (10) creador de receta (contrato sync + Room).
 
 ### Chequeo obligatorio de cierre

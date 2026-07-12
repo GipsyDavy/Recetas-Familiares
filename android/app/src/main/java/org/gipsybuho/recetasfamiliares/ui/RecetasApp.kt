@@ -102,6 +102,7 @@ fun RecetasApp(viewModel: RecetasViewModel, initialRecipeId: String? = null) {
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
             viewModel.scheduleSync(WorkManager.getInstance(context))
+            viewModel.loadFamilyInfo()
             viewModel.refresh()
             viewModel.startChatBadge()
         } else {

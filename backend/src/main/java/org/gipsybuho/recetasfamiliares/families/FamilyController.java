@@ -31,6 +31,15 @@ public class FamilyController {
         return familyService.findFamiliesForUser(authentication.getName());
     }
 
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public FamilyResponse createFamily(
+            @Valid @RequestBody CreateFamilyRequest request,
+            Authentication authentication
+    ) {
+        return familyService.createFamily(authentication.getName(), request);
+    }
+
     @PostMapping("/{familyId}/members")
     @ResponseStatus(HttpStatus.CREATED)
     public void inviteMember(

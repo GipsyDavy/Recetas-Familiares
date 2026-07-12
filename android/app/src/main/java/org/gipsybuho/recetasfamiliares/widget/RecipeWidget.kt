@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.MainActivity
 import org.gipsybuho.recetasfamiliares.R
 import org.gipsybuho.recetasfamiliares.core.AppContainer
+import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.local.RecetasDatabase
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import java.net.HttpURLConnection
@@ -41,14 +42,15 @@ class RecipeWidget : AppWidgetProvider() {
             "recetas-familiares.db"
         ).addMigrations(AppContainer.MIGRATION_1_2).build()
         try {
-            val recipes = db.recipeDao().findAll()
+            val familyId = SessionStore(context.applicationContext).familyId
+            val recipes = familyId?.let { db.recipeDao().findAll(it) }.orEmpty()
             val recipe = if (recipes.isNotEmpty()) {
                 val dayIndex = (System.currentTimeMillis() / 86_400_000L % recipes.size).toInt()
                 recipes[dayIndex]
             } else null
 
             val photoBitmap: Bitmap? = recipe?.let { r ->
-                db.recipePhotoDao().findFirstByRecipeId(r.id)?.url?.let { url ->
+                db.recipePhotoDao().findFirstByRecipeId(r.id, r.familyId)?.url?.let { url ->
                     downloadBitmap(url)
                 }
             }

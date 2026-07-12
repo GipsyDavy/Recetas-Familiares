@@ -63,6 +63,10 @@ data class FamilyDto(
     val role: String? = null
 )
 
+data class CreateFamilyRequestDto(val name: String)
+
+data class CopyRecipeRequestDto(val targetFamilyId: String)
+
 data class FamilyMemberResponseDto(
     val userId: String,
     val displayName: String?,

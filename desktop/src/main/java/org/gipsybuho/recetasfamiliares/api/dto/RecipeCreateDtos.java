@@ -19,13 +19,12 @@ public final class RecipeCreateDtos {
             String name,
             String quantity,
             String unit,
-            int sortOrder
+            String note
     ) {}
 
     public record CreateStepRequest(
-            int stepNumber,
-            String description,
-            Integer durationMinutes
+            String instruction,
+            Integer timerMinutes
     ) {}
 
     public record UpdateRecipeRequest(
@@ -37,7 +36,9 @@ public final class RecipeCreateDtos {
             String difficulty
     ) {}
 
-    public record ReplaceIngredientsRequest(List<CreateIngredientRequest> ingredients) {}
+    public record ReplaceIngredientsRequest(List<CreateIngredientRequest> items) {}
 
-    public record ReplaceStepsRequest(List<CreateStepRequest> steps) {}
+    public record ReplaceStepsRequest(List<CreateStepRequest> items) {}
+
+    public record CopyRecipeRequest(String targetFamilyId) {}
 }

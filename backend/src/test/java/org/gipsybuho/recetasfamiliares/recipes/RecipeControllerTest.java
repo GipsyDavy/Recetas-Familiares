@@ -219,6 +219,97 @@ class RecipeControllerTest {
     }
 
     @Test
+    void copiesRecipeContentToAnotherOwnedFamily() throws Exception {
+        RegisteredUser user = register("recipes-copy-owner@example.com", "Familia Origen");
+        MvcResult source = createRecipe(user, "Paella familiar").andReturn();
+        String recipeId = read(source, "id");
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {"name": "Arroz", "quantity": 400, "unit": "g"},
+                                    {"name": "Caldo", "quantity": 1, "unit": "l"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/steps", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {"instruction": "Sofreir la base"},
+                                    {"instruction": "Cocer el arroz", "timerMinutes": 18}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk());
+        String targetFamilyId = read(createFamily(user, "Familia Destino").andReturn(), "id");
+
+        MvcResult copied = mockMvc.perform(post(
+                        "/api/v1/families/{familyId}/recipes/{recipeId}/copy",
+                        user.familyId(),
+                        recipeId
+                )
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"targetFamilyId": "%s"}
+                                """.formatted(targetFamilyId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(org.hamcrest.Matchers.not(recipeId)))
+                .andExpect(jsonPath("$.familyId").value(targetFamilyId))
+                .andExpect(jsonPath("$.title").value("Paella familiar"))
+                .andReturn();
+        String copiedRecipeId = read(copied, "id");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients", targetFamilyId, copiedRecipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].name").value("Arroz"))
+                .andExpect(jsonPath("$[1].name").value("Caldo"));
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}/steps", targetFamilyId, copiedRecipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].instruction").value("Cocer el arroz"));
+    }
+
+    @Test
+    void copyRecipeRequiresSourceMembershipAndTargetWriteAccess() throws Exception {
+        RegisteredUser sourceOwner = register("recipes-copy-source@example.com", "Familia Fuente");
+        RegisteredUser targetOwner = register("recipes-copy-target@example.com", "Familia Destino Protegida");
+        MvcResult source = createRecipe(sourceOwner, "Receta Fuente").andReturn();
+        String recipeId = read(source, "id");
+        addFamilyMember(targetOwner.familyId(), "recipes-copy-source@example.com", FamilyRole.MEMBER);
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/recipes/{recipeId}/copy",
+                        sourceOwner.familyId(),
+                        recipeId)
+                        .header("Authorization", "Bearer " + targetOwner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"targetFamilyId": "%s"}
+                                """.formatted(targetOwner.familyId())))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/recipes/{recipeId}/copy",
+                        sourceOwner.familyId(),
+                        recipeId)
+                        .header("Authorization", "Bearer " + sourceOwner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"targetFamilyId": "%s"}
+                                """.formatted(targetOwner.familyId())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("request_error"));
+    }
+
+    @Test
     void replacesAndListsRecipeIngredientsInOrder() throws Exception {
         RegisteredUser user = register("recipe-ingredients@example.com", "Familia Ingredientes");
         MvcResult created = createRecipe(user, "Croquetas familiares").andReturn();
@@ -467,7 +558,17 @@ class RecipeControllerTest {
                                   "cookMinutes": 20,
                                   "difficulty": "EASY"
                                 }
-                                """.formatted(title)))
+                """.formatted(title)))
+                .andExpect(status().isCreated());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createFamily(RegisteredUser user, String name) throws Exception {
+        return mockMvc.perform(post("/api/v1/families")
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "%s"}
+                                """.formatted(name)))
                 .andExpect(status().isCreated());
     }
 

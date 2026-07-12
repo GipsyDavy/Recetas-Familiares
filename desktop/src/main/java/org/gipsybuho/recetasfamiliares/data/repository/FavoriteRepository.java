@@ -63,4 +63,8 @@ public class FavoriteRepository {
         cache.mergeById(items, SyncDtos.FavoriteDtos.FavoriteRecipeDto::id,
                 SyncDtos.FavoriteDtos.FavoriteRecipeDto::deleted);
     }
+
+    public void clearCache() {
+        cache.clear();
+    }
 }

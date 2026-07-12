@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.MainActivity
 import org.gipsybuho.recetasfamiliares.R
 import org.gipsybuho.recetasfamiliares.core.AppContainer
+import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.local.RecetasDatabase
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -38,7 +39,8 @@ class StockWidget : AppWidgetProvider() {
         ).addMigrations(AppContainer.MIGRATION_1_2).build()
         try {
             val threshold = LocalDate.now().plusDays(3).format(DateTimeFormatter.ISO_LOCAL_DATE)
-            val criticalCount = db.stockDao().findCriticalItems(threshold).size
+            val familyId = SessionStore(context.applicationContext).familyId
+            val criticalCount = familyId?.let { db.stockDao().findCriticalItems(threshold, it).size } ?: 0
 
             for (widgetId in ids) {
                 val views = RemoteViews(context.packageName, R.layout.widget_stock)

@@ -32,7 +32,7 @@ INSERT OR REPLACE INTO recipes
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectAllRecipes:
-SELECT * FROM recipes WHERE deleted = 0;
+SELECT * FROM recipes WHERE familyId = ? AND deleted = 0;
 
 insertOrReplaceStockItem:
 INSERT OR REPLACE INTO stock_items
@@ -40,7 +40,7 @@ INSERT OR REPLACE INTO stock_items
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectAllStockItems:
-SELECT * FROM stock_items WHERE deleted = 0;
+SELECT * FROM stock_items WHERE familyId = ? AND deleted = 0;
 
 CREATE TABLE recipe_ingredients (
     id        TEXT NOT NULL PRIMARY KEY,
@@ -61,8 +61,13 @@ VALUES (?, ?, ?, ?);
 selectIngredientsByRecipeId:
 SELECT * FROM recipe_ingredients WHERE recipeId = ? AND deleted = 0;
 
-selectAllIngredients:
-SELECT * FROM recipe_ingredients WHERE deleted = 0;
+selectAllIngredientsForFamily:
+SELECT recipe_ingredients.*
+FROM recipe_ingredients
+JOIN recipes ON recipes.id = recipe_ingredients.recipeId
+WHERE recipes.familyId = ?
+  AND recipes.deleted = 0
+  AND recipe_ingredients.deleted = 0;
 
 getMetadata:
 SELECT value FROM sync_metadata WHERE key = ?;

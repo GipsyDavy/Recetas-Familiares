@@ -18,6 +18,7 @@ public class AppSession {
     private static final String KEY_USER_ID      = "userId";
     private static final String KEY_FAMILY_ID    = "familyId";
     private static final String KEY_LAST_SYNC    = "lastSyncTime";
+    private static final String KEY_LAST_SYNC_PREFIX = "lastSyncTime.";
     private static final String KEY_DISPLAY_NAME = "displayName";
     private static final String KEY_EMAIL        = "email";
     private static final String KEY_FAMILY_ROLE  = "familyRole";
@@ -45,12 +46,12 @@ public class AppSession {
         this.refreshToken = readToken(KEY_REFRESH);
         this.userId       = prefs.get(KEY_USER_ID,       null);
         this.familyId     = prefs.get(KEY_FAMILY_ID,     null);
-        this.lastSyncTime = prefs.get(KEY_LAST_SYNC,     null);
         this.displayName  = prefs.get(KEY_DISPLAY_NAME,  null);
         this.email        = prefs.get(KEY_EMAIL,         null);
         this.avatarUrl    = prefs.get(KEY_AVATAR_URL,    null);
         String roleStr    = prefs.get(KEY_FAMILY_ROLE,   null);
         this.familyRole   = parseFamilyRole(roleStr);
+        this.lastSyncTime = readLastSyncTime(this.familyId, true);
     }
 
     public boolean isLoggedIn() {
@@ -123,12 +124,19 @@ public class AppSession {
         this.familyId = familyId;
         if (familyId != null) prefs.put(KEY_FAMILY_ID, familyId);
         else prefs.remove(KEY_FAMILY_ID);
+        this.lastSyncTime = readLastSyncTime(familyId, false);
     }
 
     public void setLastSyncTime(String lastSyncTime) {
         this.lastSyncTime = lastSyncTime;
-        if (lastSyncTime != null) prefs.put(KEY_LAST_SYNC, lastSyncTime);
-        else prefs.remove(KEY_LAST_SYNC);
+        String key = lastSyncKeyForFamily(familyId);
+        if (key == null) {
+            if (lastSyncTime != null) prefs.put(KEY_LAST_SYNC, lastSyncTime);
+            else prefs.remove(KEY_LAST_SYNC);
+            return;
+        }
+        if (lastSyncTime != null) prefs.put(key, lastSyncTime);
+        else prefs.remove(key);
     }
 
     public void setUserInfo(String displayName, String email) {
@@ -169,10 +177,43 @@ public class AppSession {
         prefs.remove(KEY_EMAIL);
         prefs.remove(KEY_FAMILY_ROLE);
         prefs.remove(KEY_AVATAR_URL);
+        removeFamilySyncKeys();
     }
 
     private static FamilyRole parseFamilyRole(String str) {
         if (str == null || str.isBlank()) return null;
         try { return FamilyRole.valueOf(str); } catch (IllegalArgumentException e) { return FamilyRole.MEMBER; }
+    }
+
+    private String readLastSyncTime(String familyId, boolean allowLegacyFallback) {
+        String key = lastSyncKeyForFamily(familyId);
+        if (key == null) {
+            return allowLegacyFallback ? prefs.get(KEY_LAST_SYNC, null) : null;
+        }
+        String value = prefs.get(key, null);
+        if (value == null && allowLegacyFallback) {
+            value = prefs.get(KEY_LAST_SYNC, null);
+        }
+        return value;
+    }
+
+    private String lastSyncKeyForFamily(String familyId) {
+        if (familyId == null || familyId.isBlank()) {
+            return null;
+        }
+        return KEY_LAST_SYNC_PREFIX + familyId;
+    }
+
+    private void removeFamilySyncKeys() {
+        prefs.remove(KEY_LAST_SYNC);
+        try {
+            for (String key : prefs.keys()) {
+                if (key.startsWith(KEY_LAST_SYNC_PREFIX)) {
+                    prefs.remove(key);
+                }
+            }
+        } catch (java.util.prefs.BackingStoreException ignored) {
+            // Best-effort cleanup; session fields have already been cleared.
+        }
     }
 }

@@ -34,10 +34,12 @@ class ExpiryNotificationWorker(
         ensureChannel()
         if (!hasNotificationPermission()) return Result.success()
 
-        val database = (applicationContext as RecetasApplication).container.database
+        val container = (applicationContext as RecetasApplication).container
+        val database = container.database
+        val familyId = container.sessionStore.familyId ?: return Result.success()
         val today = LocalDate.now()
 
-        val expiring = database.stockDao().findExpiringItems()
+        val expiring = database.stockDao().findExpiringItems(familyId)
 
         fun daysLeft(item: org.gipsybuho.recetasfamiliares.data.local.StockItemEntity): Long =
             item.expiresAt?.let { dateStr ->

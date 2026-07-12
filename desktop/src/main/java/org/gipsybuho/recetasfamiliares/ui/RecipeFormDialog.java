@@ -269,13 +269,13 @@ public class RecipeFormDialog {
         List<RecipeCreateDtos.CreateIngredientRequest> ingredients = ingredientRows.stream()
                 .filter(r -> !r.getName().isBlank())
                 .map(r -> new RecipeCreateDtos.CreateIngredientRequest(
-                        r.getName(), r.getQuantity(), r.getUnit(), ingredientRows.indexOf(r) + 1))
+                        r.getName(), r.getQuantity(), r.getUnit(), null))
                 .toList();
 
         List<RecipeCreateDtos.CreateStepRequest> steps = stepRows.stream()
                 .filter(s -> !s.getDescription().isBlank())
                 .map(s -> new RecipeCreateDtos.CreateStepRequest(
-                        stepRows.indexOf(s) + 1, s.getDescription(), parseIntOrNull(s.getDuration())))
+                        s.getDescription(), parseIntOrNull(s.getDuration())))
                 .toList();
 
         Thread.ofVirtual().start(() -> {

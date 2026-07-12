@@ -106,10 +106,14 @@ public class RecipeListView extends SplitPane {
         statusLabel.setText("Cargando...");
         skeletonPane.setVisible(true);
         startSkeletonShimmer();
+        String familyAtStart = context.getSession().getFamilyId();
         Thread.ofVirtual().start(() -> {
             try {
-                var page = context.getRecipeRepository().loadPage(0, PAGE_SIZE);
+                var page = context.getRecipeRepository().loadPage(familyAtStart, 0, PAGE_SIZE);
                 Platform.runLater(() -> {
+                    if (!java.util.Objects.equals(familyAtStart, context.getSession().getFamilyId())) {
+                        return;
+                    }
                     context.getRecipeRepository().getCache().replaceAll(
                             page.items().stream().filter(r -> !r.deleted()).toList());
                     hasMore = page.totalPages() > 1;
@@ -164,10 +168,14 @@ public class RecipeListView extends SplitPane {
     private void loadNextPage() {
         loadMoreBtn.setDisable(true);
         int nextPage = currentPage + 1;
+        String familyAtStart = context.getSession().getFamilyId();
         Thread.ofVirtual().start(() -> {
             try {
-                var page = context.getRecipeRepository().loadPage(nextPage, PAGE_SIZE);
+                var page = context.getRecipeRepository().loadPage(familyAtStart, nextPage, PAGE_SIZE);
                 Platform.runLater(() -> {
+                    if (!java.util.Objects.equals(familyAtStart, context.getSession().getFamilyId())) {
+                        return;
+                    }
                     var appended = new ArrayList<>(context.getRecipeRepository().getCache().getItems());
                     page.items().stream().filter(r -> !r.deleted()).forEach(appended::add);
                     context.getRecipeRepository().getCache().replaceAll(appended);
