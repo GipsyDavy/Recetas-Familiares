@@ -391,7 +391,7 @@ Orden de sprints aprobado:
 - Sprint A: EJECUTADO 2026-07-12 — UX cliente reset password, verificar email, borrar cuenta (punto 6). SMTP produccion sigue como pendiente operativo del usuario.
 - Sprint B (quick wins): EJECUTADO 2026-07-12 (ver trazabilidad). (10) creador de receta visible se MOVIO a sprint propio: requiere cambio de contrato sync + migracion Room multiplataforma (regla §3); no es quick win.
 - Sprint C (gestion familiar): EJECUTADO 2026-07-12 por Codex (ver trazabilidad). (3) editar miembros queda expuesto en Android y verificado en Desktop; (5) queda cubierto de facto por el modelo actual: registro = primera familia del usuario, que nace OWNER; no existe endpoint para crear familias adicionales. La restriccion plena se disenara con multi-familia.
-- Sprint D (multi-familia, (4)+(13)+(12)): backend EJECUTADO por Codex y clientes/sync-cache COMPLETADOS 2026-07-12 por Claude Code tras auditoria (ver trazabilidad "Sprint D cliente multi-familia"). Pendiente de cierre: prueba manual con dos familias y roles mixtos + suite backend completa en CI.
+- Sprint D (multi-familia, (4)+(13)+(12)): CERRADO DE PRODUCTO 2026-07-12. Backend EJECUTADO por Codex, clientes/sync-cache COMPLETADOS por Claude Code, prueba UI Android superada (mediodia), prueba GUI Desktop del usuario superada (tarde), CI backend verde. Ver trazabilidad "Cierre de producto Sprint D".
 - Posteriores: (20) presencia online + avisos de actividad (limitacion: sin push, solo con app abierta; encaja con chat fase 4), (11) ranking de usuarios (depende de 9 y 10; plantear como gamificacion ligera acorde a filosofia del producto), (14) chat privado 1:1 (despues de chat fase 4/push).
 
 DESCARTADOS TOTALMENTE por decision del usuario (2026-07-12):
@@ -2088,3 +2088,69 @@ Siguientes sprints candidatos tras el cierre D (orden sugerido):
 3. (22) scroll/responsive Desktop.
 4. (10) creador de receta visible -> luego (11) ranking.
 5. (20) presencia online + (14) chat 1:1 tras chat fase 4/push.
+
+### Continuacion Codex 2026-07-12 tarde - binarios post-fix auth/single-flight
+
+- Punto de partida: `main` alineado con `origin/main` en `00cdb1f fix(auth): single-flight refresh y arranque robusto con sesion invalida`; worktree sin cambios trackeados pendientes. Sigue `paraImplementar.txt` sin trackear, preexistente, no tocar sin decision explicita.
+- Alcance ejecutado: solo cierre operativo automatizable de Sprint D. No se modifico codigo fuente en esta continuacion.
+- Android:
+  - Comando: `android\gradlew.bat clean testDebugUnitTest assembleDebug` -> `BUILD SUCCESSFUL`.
+  - APK: `android/app/build/outputs/apk/debug/app-debug.apk`.
+  - Tamano: 23.990.383 bytes.
+  - SHA-256: `246F72463E567EF004F34E4AC5A9879D42BE01FD6ED49D8B17A179572176E88C`.
+  - Warnings observados: preexistentes/de menor impacto (`stripDebugDebugSymbols`, safe call innecesaria, `menuAnchor`/tooltips deprecados, condicion siempre true, icono `Sort` deprecado).
+- Desktop:
+  - Comando: `mvn test` en `desktop/` -> 21 tests, 0 fallos, `BUILD SUCCESS`.
+  - Primer intento de `pwsh -NoProfile -ExecutionPolicy Bypass -File desktop/build-installer.ps1` fallo porque dos procesos `RecetasFamiliares.exe` abiertos desde `desktop/output/RecetasFamiliares` bloqueaban el app-image. Se cerraron solo esos procesos y se reintento.
+  - Segundo intento: `desktop/build-installer.ps1` con PowerShell 7 -> build completado; JDK 21.0.11 LTS, Maven NetBeans y NSIS detectados.
+  - Instalador: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe`.
+  - Tamano instalador: 52.761.331 bytes.
+  - SHA-256 instalador: `B95E25178B9C5A3A6C645DF4DF861F0233EA8FB9664CCBE4BB942FABB0094A01`.
+  - App-image exe: `desktop/output/RecetasFamiliares/RecetasFamiliares.exe`.
+  - Tamano app-image exe: 458.752 bytes.
+  - SHA-256 app-image exe: `BFB9F6FBC3E692CAAE672BC8AC3E58C6F682706716367959599186C64B8D6713`.
+  - API por defecto embebida: `https://recetas.167.233.213.242.sslip.io/`.
+- Seguridad:
+  - `VibeSec-Skill` leido/usado como checklist por estar cerrando trabajo relacionado con auth/sesion/cache, pero en esta continuacion no hubo cambios de codigo.
+  - `security-review` no disponible como herramienta callable en esta sesion; alternativa aplicada: no se tocaron endpoints/backend ni contratos, y se limitaron acciones a build/test/hashes.
+- CI:
+  - `gh` CLI no disponible.
+  - La pagina publica de GitHub Actions muestra los runs Backend CI/CD previos para `b027212` y `e8b2ce9`, pero no un run para `00cdb1f`.
+  - Revisado `.github/workflows/backend-ci-cd.yml`: el workflow solo se dispara por cambios en `backend/**`, `infra/backend/**`, `scripts/backend/**` o el propio YAML. `00cdb1f` toca Android, Desktop y documentacion, por lo que no se espera deploy backend nuevo.
+- Estado Sprint D:
+  - Sigue SIN declararse cerrado de producto.
+  - Falta la prueba GUI Desktop real/manual: login guest, cambiar familia activa, copiar receta con foto, verificar aislamiento visual de recetas/chat/cache y limpiar cuentas E2E al terminar (`DELETE /auth/account` o Perfil > Cuenta > Borrar).
+  - Tras esa prueba, si pasa, actualizar esta seccion y entonces cerrar Sprint D; despues avanzar al sprint 1 sugerido: higiene de sesion/cache local Android + limpieza de Room en logout/cambio de usuario.
+
+### Continuacion Codex 2026-07-12 tarde - credenciales nuevas para prueba Desktop Sprint D
+
+- Motivo: el password del set E2E anterior no estaba documentado. Se creo un set E2E nuevo contra produccion para la prueba GUI Desktop manual.
+- No se documenta el password en este archivo. Se comunico al usuario en la conversacion de la sesion.
+- Guest para login Desktop: `sprintd.desktop.20260712175028.guest@example.com`.
+- Owner auxiliar: `sprintd.desktop.20260712175028.owner@example.com`.
+- Familias:
+  - Origen: `SprintD Origen Desktop` (`283dca5f-a7a5-4405-a365-6113223df5ba`), guest con rol `MEMBER`.
+  - Destino: `SprintD Destino Desktop` (`6c405931-3494-4701-9663-0848b402e095`), guest con rol `OWNER`.
+- Datos preparados:
+  - Receta origen: `Paella Sprint D Desktop` (`9ea02a64-9358-475b-ae74-804d2adf1d45`) con ingredientes, pasos y foto subida via `/photos/upload`.
+  - Chat: mensaje distinto en origen y destino para comprobar aislamiento visual.
+- Verificacion API previa: login guest OK; lista de familias devuelve destino OWNER y origen MEMBER.
+- Limpieza pendiente tras la prueba Desktop: borrar guest y owner desde Perfil > Cuenta > Borrar, o por `DELETE /api/v1/auth/account` autenticado con cada cuenta.
+- Limpieza ejecutada despues por Codex via API porque el usuario no encontro opcion visible de borrado en Desktop:
+  - `DELETE /api/v1/auth/account` guest -> 204; login posterior -> 401.
+  - `DELETE /api/v1/auth/account` owner auxiliar -> 204; login posterior -> 401.
+  - Hallazgo UX/funcional: en la prueba Desktop el usuario no encontro la accion de borrar cuenta ni en Miembros ni en Ajustes. Revisar visibilidad/ubicacion de borrado de cuenta Desktop antes de dar por pulida la UX de CRIT-2 en cliente Desktop.
+
+### Cierre de producto Sprint D multi-familia (2026-07-12 tarde/noche, Claude Code)
+
+- El usuario confirmo en esta sesion que la prueba GUI Desktop manual PASO (set E2E `sprintd.desktop.20260712175028.*`): login guest, cambio de familia activa, copia de receta con foto y aislamiento visual de recetas/chat correctos.
+- Con esto Sprint D queda CERRADO DE PRODUCTO. Evidencia acumulada: E2E API real (Codex), prueba UI Android automatizada (Claude Code, mediodia), prueba GUI Desktop manual (usuario, tarde), CI backend verde (runs `29183497963` y `29184008888`), binarios regenerados con fixes auth (`00cdb1f`).
+- Agente lider: Claude Code. Codex/Gemini no consultados: cierre documental sin cambios de codigo. VibeSec/security-review no aplican (solo documentacion; sin tocar auth, ownership ni datos).
+- Cuentas E2E: set `sprintd.desktop.*` limpiado por Codex via `DELETE /auth/account` (documentado arriba). OJO: el set anterior `claude.e2e.20260712.*` (familias "E2E Origen"/"E2E Destino") NO tiene limpieza documentada y su password no quedo registrada; verificar si sigue vivo en produccion y limpiarlo (el usuario conoce la password de sesion, o borrar desde la app Android con login de cada cuenta).
+- Backlog que hereda del cierre (orden sugerido ya registrado en la seccion anterior):
+  1. Sprint E - higiene de sesion/cache local Android (fuga de privacidad: datos del usuario anterior visibles tras cambio de sesion) + visibilidad de "Borrar cuenta" en Desktop (hallazgo de la prueba del usuario).
+  2. (3) completo: edicion de datos/password de miembro por OWNER/ADMIN (decision de seguridad previa).
+  3. (22) scroll/responsive Desktop (7 vistas sin ScrollPane envolvente).
+  4. (10) creador de receta visible -> (11) ranking.
+  5. (20) presencia online + (14) chat 1:1 tras chat fase 4/push.
+- Riesgos residuales vivos: SMTP produccion pendiente (usuario); APK debug sin firma release; iOS runtime bloqueado sin macOS; cuentas `claude.e2e.20260712.*` posiblemente vivas.
