@@ -2178,3 +2178,11 @@ Integracion revision Codex/Gemini (alcance B autorizado por el usuario):
 - UX: dialogo de confirmacion al cerrar sesion en Android (aviso de borrado local y de cambios sin sincronizar, haptic en confirmar).
 - Tests añadidos: orden wipe->sesion, wipe fallido aborta login sin escribir tokens, pendingWipe fuerza vaciado, y pull en vuelo no aplica datos si la sesion del usuario murio. Android `testDebugUnitTest assembleDebug` BUILD SUCCESSFUL (46 tests).
 - VibeSec re-aplicado al diff de la integracion: 0 hallazgos. Residual documentado: ventana TOCTOU microscopica entre el guard y el upsert (reducida de segundos a microsegundos; cerrar del todo exigiria transaccion Room con check dentro, no justificado).
+
+### Limpieza cuentas E2E claude.e2e.20260712.* (2026-07-12 noche, Claude Code)
+
+- Verificado en BD de produccion (SSH + psql via root@VPS): las 2 cuentas y las familias "E2E Origen"/"E2E Destino" seguian vivas.
+- El password no estaba documentado; en vez de DELETE por SQL a mano, se uso el flujo del propio backend: token de PASSWORD_RESET inyectado en `account_action_tokens` (Base64URL de SHA-256, mismo formato que `AccountActionTokenService.hash`), `POST /auth/password-reset/confirm` (204), login (200) y `DELETE /auth/account` (204) por cada cuenta; login posterior 401.
+- Estado final verificado por SQL: usuarios anonimizados (`deleted+<id>@deleted.recetas.local`, deleted=t) y ambas familias soft-deleted (el propio `AuthService.removeMembershipForDeletedUser` las cerro al quedarse sin miembros).
+- Residuo minimo aceptado: los archivos fisicos de la foto de la paella quedan huerfanos en `uploads/` del VPS (no servibles: ownership fail-closed y familias borradas). Entra en la limpieza futura de huerfanos ya documentada.
+- SMTP verificado como pendiente real: `backend.env` del VPS no tiene claves de correo (MAIL_ENABLED=false); `spring-boot-starter-mail` ya esta en el pom. Falta SOLO credencial SMTP del usuario (App Password de Gmail o proveedor transaccional); con ella: añadir MAIL_ENABLED/MAIL_FROM/SMTP_*/APP_PUBLIC_URL a `/etc/recetas-familiares/backend.env`, reiniciar `recetas-backend` y probar E2E los 3 flujos de email.
