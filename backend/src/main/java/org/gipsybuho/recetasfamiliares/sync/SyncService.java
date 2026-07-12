@@ -43,6 +43,8 @@ import org.gipsybuho.recetasfamiliares.shopping.ShoppingListResponse;
 import org.gipsybuho.recetasfamiliares.stock.StockItemEntity;
 import org.gipsybuho.recetasfamiliares.stock.StockItemRepository;
 import org.gipsybuho.recetasfamiliares.stock.StockItemResponse;
+import org.gipsybuho.recetasfamiliares.users.UserEntity;
+import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -73,6 +75,7 @@ public class SyncService {
     private final FavoriteRecipeRepository favoriteRecipeRepository;
     private final FamilyNoteRepository familyNoteRepository;
     private final RecipePhotoRepository photoRepository;
+    private final UserRepository userRepository;
 
     public SyncService(
             FamilyMemberRepository familyMemberRepository,
@@ -86,7 +89,8 @@ public class SyncService {
             ShoppingListItemRepository shoppingListItemRepository,
             FavoriteRecipeRepository favoriteRecipeRepository,
             FamilyNoteRepository familyNoteRepository,
-            RecipePhotoRepository photoRepository
+            RecipePhotoRepository photoRepository,
+            UserRepository userRepository
     ) {
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
@@ -100,6 +104,7 @@ public class SyncService {
         this.favoriteRecipeRepository = favoriteRecipeRepository;
         this.familyNoteRepository = familyNoteRepository;
         this.photoRepository = photoRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -231,10 +236,12 @@ public class SyncService {
         requireEditor(familyId, userId);
         FamilyEntity family = familyRepository.findById(familyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
+        UserEntity pushUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 
         List<RecipeResponse> recipes = new ArrayList<>();
         for (SyncRecipePushItem item : request.recipes()) {
-            upsertRecipe(family, item).ifPresent(recipe -> recipes.add(toRecipeResponse(recipe)));
+            upsertRecipe(family, pushUser, item).ifPresent(recipe -> recipes.add(toRecipeResponse(recipe)));
         }
 
         List<RecipeIngredientResponse> ingredients = new ArrayList<>();
@@ -297,7 +304,7 @@ public class SyncService {
         );
     }
 
-    private Optional<RecipeEntity> upsertRecipe(FamilyEntity family, SyncRecipePushItem item) {
+    private Optional<RecipeEntity> upsertRecipe(FamilyEntity family, UserEntity pushUser, SyncRecipePushItem item) {
         Optional<RecipeEntity> existing = recipeRepository.findByIdAndFamily_Id(item.id(), family.getId());
         existing.ifPresent(recipe -> requireNoConflict(recipe.getSyncVersion(), item.baseSyncVersion(), "Recipe conflict"));
         if (existing.isEmpty() && item.deleted()) {
@@ -313,6 +320,7 @@ public class SyncService {
         RecipeEntity recipe = existing.orElseGet(() -> new RecipeEntity(
                 item.id(),
                 family,
+                pushUser,
                 trimRequired(item.title(), "Recipe title is required"),
                 trimToNull(item.description()),
                 item.servings(),
@@ -467,7 +475,9 @@ public class SyncService {
                 recipe.getCreatedAt(),
                 recipe.getUpdatedAt(),
                 recipe.getSyncVersion(),
-                recipe.isDeleted()
+                recipe.isDeleted(),
+                recipe.getCreatedByUserId(),
+                recipe.getCreatedByDisplayName()
         );
     }
 

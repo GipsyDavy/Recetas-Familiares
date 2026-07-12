@@ -18,7 +18,9 @@ public final class RecipeDtos {
             String createdAt,
             String updatedAt,
             long syncVersion,
-            boolean deleted
+            boolean deleted,
+            String createdByUserId,
+            String createdByDisplayName
     ) {}
 
     public record RecipeIngredientDto(

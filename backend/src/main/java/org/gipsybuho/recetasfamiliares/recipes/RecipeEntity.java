@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import org.gipsybuho.recetasfamiliares.families.FamilyEntity;
+import org.gipsybuho.recetasfamiliares.users.UserEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -28,6 +29,10 @@ public class RecipeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "family_id", nullable = false, columnDefinition = "varchar(36)")
     private FamilyEntity family;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_user_id", columnDefinition = "varchar(36)")
+    private UserEntity createdByUser;
 
     @Column(nullable = false, length = 180)
     private String title;
@@ -74,7 +79,21 @@ public class RecipeEntity {
             Integer cookMinutes,
             RecipeDifficulty difficulty
     ) {
+        this(family, null, title, description, servings, prepMinutes, cookMinutes, difficulty);
+    }
+
+    public RecipeEntity(
+            FamilyEntity family,
+            UserEntity createdByUser,
+            String title,
+            String description,
+            Integer servings,
+            Integer prepMinutes,
+            Integer cookMinutes,
+            RecipeDifficulty difficulty
+    ) {
         this.family = family;
+        this.createdByUser = createdByUser;
         this.title = title;
         this.description = description;
         this.servings = servings;
@@ -94,6 +113,21 @@ public class RecipeEntity {
             RecipeDifficulty difficulty
     ) {
         this(family, title, description, servings, prepMinutes, cookMinutes, difficulty);
+        this.id = id;
+    }
+
+    public RecipeEntity(
+            String id,
+            FamilyEntity family,
+            UserEntity createdByUser,
+            String title,
+            String description,
+            Integer servings,
+            Integer prepMinutes,
+            Integer cookMinutes,
+            RecipeDifficulty difficulty
+    ) {
+        this(family, createdByUser, title, description, servings, prepMinutes, cookMinutes, difficulty);
         this.id = id;
     }
 
@@ -118,6 +152,14 @@ public class RecipeEntity {
 
     public String getFamilyId() {
         return family.getId();
+    }
+
+    public String getCreatedByUserId() {
+        return createdByUser == null ? null : createdByUser.getId();
+    }
+
+    public String getCreatedByDisplayName() {
+        return createdByUser == null ? null : createdByUser.getDisplayName();
     }
 
     public String getTitle() {

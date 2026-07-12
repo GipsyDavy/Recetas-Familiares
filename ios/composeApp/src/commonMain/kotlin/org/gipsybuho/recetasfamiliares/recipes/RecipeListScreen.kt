@@ -252,7 +252,8 @@ private fun RecipeCard(
             }
         }
         val totalMin = (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
-        val hasMeta  = totalMin > 0 || recipe.difficulty != null || recipe.servings != null
+        val creator = creatorLabel(recipe)
+        val hasMeta  = totalMin > 0 || recipe.difficulty != null || recipe.servings != null || creator != null
         if (hasMeta) {
             Row(
                 modifier              = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
@@ -261,6 +262,7 @@ private fun RecipeCard(
                 if (totalMin > 0) RecipeMetaChip("⏱ ${totalMin}m")
                 recipe.difficulty?.let { RecipeMetaChip(difficultyLabel(it)) }
                 recipe.servings?.let { RecipeMetaChip("$it porciones") }
+                creator?.let { RecipeMetaChip("Por $it") }
             }
         }
     }
@@ -305,3 +307,6 @@ private fun difficultyLabel(value: String): String = when (value.uppercase()) {
     "HARD"   -> "Difícil"
     else     -> value
 }
+
+private fun creatorLabel(recipe: RecipeDto): String? =
+    recipe.createdByDisplayName?.takeIf { it.isNotBlank() }

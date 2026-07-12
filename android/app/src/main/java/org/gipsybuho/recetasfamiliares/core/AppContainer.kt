@@ -42,7 +42,7 @@ class AppContainer(context: Context) {
         RecetasDatabase::class.java,
         "recetas-familiares.db"
     )
-        .addMigrations(MIGRATION_1_2)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
         .build()
 
     private val retrofitBaseUrl = serverUrlStore.baseUrl
@@ -97,6 +97,13 @@ class AppContainer(context: Context) {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // No schema changes between v1 and v2
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE recipes ADD COLUMN createdByUserId TEXT")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN createdByDisplayName TEXT")
             }
         }
     }

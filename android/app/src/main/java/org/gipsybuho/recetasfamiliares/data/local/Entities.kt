@@ -16,7 +16,9 @@ data class RecipeEntity(
     val createdAt: String,
     val updatedAt: String,
     val syncVersion: Long,
-    val deleted: Boolean
+    val deleted: Boolean,
+    val createdByUserId: String? = null,
+    val createdByDisplayName: String? = null
 )
 
 @Entity(tableName = "recipe_ingredients")

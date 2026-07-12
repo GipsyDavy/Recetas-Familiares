@@ -9,6 +9,8 @@ import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRole;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoEntity;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoRepository;
+import org.gipsybuho.recetasfamiliares.users.UserEntity;
+import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +29,7 @@ public class RecipeService {
     private final RecipePhotoRepository photoRepository;
     private final FamilyRepository familyRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final UserRepository userRepository;
 
     public RecipeService(
             RecipeRepository recipeRepository,
@@ -34,7 +37,8 @@ public class RecipeService {
             RecipeStepRepository stepRepository,
             RecipePhotoRepository photoRepository,
             FamilyRepository familyRepository,
-            FamilyMemberRepository familyMemberRepository
+            FamilyMemberRepository familyMemberRepository,
+            UserRepository userRepository
     ) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
@@ -42,6 +46,7 @@ public class RecipeService {
         this.photoRepository = photoRepository;
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -63,8 +68,10 @@ public class RecipeService {
         requireEditor(familyId, userId);
         FamilyEntity family = familyRepository.findById(familyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family not found"));
+        UserEntity creator = requireUser(userId);
         RecipeEntity recipe = new RecipeEntity(
                 family,
+                creator,
                 request.title().trim(),
                 request.description() == null ? null : request.description().trim(),
                 request.servings(),
@@ -122,8 +129,10 @@ public class RecipeService {
         RecipeEntity source = requireActiveRecipe(sourceFamilyId, recipeId);
         FamilyEntity targetFamily = familyRepository.findById(targetFamilyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Family write access denied"));
+        UserEntity creator = requireUser(userId);
         RecipeEntity copy = recipeRepository.save(new RecipeEntity(
                 targetFamily,
+                creator,
                 source.getTitle(),
                 source.getDescription(),
                 source.getServings(),
@@ -178,6 +187,11 @@ public class RecipeService {
         return toResponse(copy);
     }
 
+    private UserEntity requireUser(String userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+    }
+
     private void requireMembership(String familyId, String userId) {
         if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Family access denied");
@@ -212,7 +226,9 @@ public class RecipeService {
                 recipe.getCreatedAt(),
                 recipe.getUpdatedAt(),
                 recipe.getSyncVersion(),
-                recipe.isDeleted()
+                recipe.isDeleted(),
+                recipe.getCreatedByUserId(),
+                recipe.getCreatedByDisplayName()
         );
     }
 }

@@ -121,6 +121,7 @@ public class DevDataSeeder implements CommandLineRunner {
 
         RecipeEntity tortilla = recipeRepository.save(new RecipeEntity(
                 family,
+                user,
                 "Tortilla familiar",
                 "Una tortilla sencilla para probar recetas, ingredientes, pasos, favoritos y menu.",
                 4,

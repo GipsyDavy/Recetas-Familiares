@@ -385,7 +385,8 @@ private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onCl
             }
         }
         val totalMin = (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
-        val hasMeta = totalMin > 0 || recipe.difficulty != null || recipe.servings != null
+        val creator = creatorLabel(recipe)
+        val hasMeta = totalMin > 0 || recipe.difficulty != null || recipe.servings != null || creator != null
         if (hasMeta) {
             Row(
                 modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
@@ -394,6 +395,7 @@ private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onCl
                 if (totalMin > 0) MetaChip("⏱ ${totalMin}m")
                 recipe.difficulty?.let { MetaChip(difficultyLabel(it)) }
                 recipe.servings?.let { MetaChip("$it porciones") }
+                creator?.let { MetaChip("Por $it") }
             }
         }
     }
@@ -581,6 +583,7 @@ internal fun RecipeDetail(
                 val totalMin = (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
                 if (totalMin > 0) MetaChip("$totalMin min")
                 recipe.difficulty?.let { MetaChip(difficultyLabel(it)) }
+                creatorLabel(recipe)?.let { MetaChip("Por $it") }
             }
         }
         recipe.description?.let { desc ->
@@ -824,6 +827,7 @@ private fun shareRecipe(
             recipe.difficulty?.let { add(it) }
         }
         if (meta.isNotEmpty()) appendLine(meta.joinToString(" · "))
+        creatorLabel(recipe)?.let { appendLine("Creada por $it") }
         recipe.description?.let { appendLine(); appendLine(it) }
         if (ingredients.isNotEmpty()) {
             appendLine(); appendLine("🥗 Ingredientes:")
@@ -858,6 +862,9 @@ private fun difficultyLabel(difficulty: String): String = when (difficulty.upper
     "HARD"   -> "Difícil"
     else     -> difficulty.lowercase().replaceFirstChar { it.uppercase() }
 }
+
+private fun creatorLabel(recipe: org.gipsybuho.recetasfamiliares.data.local.RecipeEntity): String? =
+    recipe.createdByDisplayName?.takeIf { it.isNotBlank() }
 
 private fun familyRoleLabel(role: String?): String = when (role?.uppercase()) {
     "OWNER" -> "Propietario"

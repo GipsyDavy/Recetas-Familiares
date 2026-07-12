@@ -971,7 +971,15 @@ public class RecipeDetailView extends VBox {
         if (r.prepMinutes() != null) sb.append("Prep: ").append(r.prepMinutes()).append(" min  ");
         if (r.cookMinutes() != null) sb.append("Cocción: ").append(r.cookMinutes()).append(" min  ");
         if (r.difficulty() != null) sb.append(r.difficulty());
+        String creator = creatorLabel(r);
+        if (creator != null) sb.append("  ·  Por ").append(creator);
         return sb.toString().trim();
+    }
+
+    private String creatorLabel(RecipeDtos.RecipeDto r) {
+        return r.createdByDisplayName() != null && !r.createdByDisplayName().isBlank()
+                ? r.createdByDisplayName()
+                : null;
     }
 
     private record FamilyTarget(String id, String name, String role) {

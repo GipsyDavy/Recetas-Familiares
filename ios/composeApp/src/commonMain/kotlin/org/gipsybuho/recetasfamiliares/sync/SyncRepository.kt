@@ -58,6 +58,8 @@ class SyncRepository(
                 servings    = dto.servings?.toLong(),
                 prepMinutes = dto.prepMinutes?.toLong(),
                 cookMinutes = dto.cookMinutes?.toLong(),
+                createdByUserId = dto.createdByUserId,
+                createdByDisplayName = dto.createdByDisplayName,
                 updatedAt   = dto.updatedAt,
                 syncVersion = dto.syncVersion,
                 deleted     = if (dto.deleted) 1L else 0L

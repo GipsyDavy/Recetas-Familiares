@@ -18,6 +18,8 @@ import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoEntity;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoRepository;
+import org.gipsybuho.recetasfamiliares.users.UserEntity;
+import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +45,8 @@ class RecipeServiceTest {
     private FamilyRepository familyRepository;
     @Mock
     private FamilyMemberRepository familyMemberRepository;
+    @Mock
+    private UserRepository userRepository;
 
     private RecipeService service;
 
@@ -54,8 +58,35 @@ class RecipeServiceTest {
                 stepRepository,
                 photoRepository,
                 familyRepository,
-                familyMemberRepository
+                familyMemberRepository,
+                userRepository
         );
+    }
+
+    @Test
+    void createRecipeAssignsAuthenticatedUserAsCreator() {
+        FamilyEntity family = family("family-1");
+        UserEntity creator = user("user-1", "Ana");
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndRoleInAndDeletedFalse(
+                eq("family-1"),
+                eq("user-1"),
+                any()
+        )).thenReturn(true);
+        when(familyRepository.findById("family-1")).thenReturn(Optional.of(family));
+        when(userRepository.findById("user-1")).thenReturn(Optional.of(creator));
+        when(recipeRepository.save(any(RecipeEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RecipeResponse response = service.createRecipe(
+                "family-1",
+                "user-1",
+                new CreateRecipeRequest(" Tortilla ", null, 4, 10, 20, RecipeDifficulty.EASY)
+        );
+
+        assertThat(response.createdByUserId()).isEqualTo("user-1");
+        assertThat(response.createdByDisplayName()).isEqualTo("Ana");
+        ArgumentCaptor<RecipeEntity> recipeCaptor = ArgumentCaptor.forClass(RecipeEntity.class);
+        verify(recipeRepository).save(recipeCaptor.capture());
+        assertThat(recipeCaptor.getValue().getCreatedByUserId()).isEqualTo("user-1");
     }
 
     @Test
@@ -75,6 +106,7 @@ class RecipeServiceTest {
         when(recipeRepository.findByIdAndFamily_IdAndDeletedFalse("recipe-1", "source-family"))
                 .thenReturn(Optional.of(source));
         when(familyRepository.findById("target-family")).thenReturn(Optional.of(targetFamily));
+        when(userRepository.findById("user-1")).thenReturn(Optional.of(user("user-1", "Ana")));
         when(recipeRepository.save(any(RecipeEntity.class))).thenAnswer(invocation -> {
             RecipeEntity copy = invocation.getArgument(0);
             ReflectionTestUtils.setField(copy, "id", "copy-1");
@@ -113,6 +145,8 @@ class RecipeServiceTest {
         assertThat(response.id()).isEqualTo("copy-1");
         assertThat(response.familyId()).isEqualTo("target-family");
         assertThat(response.title()).isEqualTo("Receta original");
+        assertThat(response.createdByUserId()).isEqualTo("user-1");
+        assertThat(response.createdByDisplayName()).isEqualTo("Ana");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<RecipeIngredientEntity>> ingredientCaptor = ArgumentCaptor.forClass(List.class);
@@ -198,6 +232,12 @@ class RecipeServiceTest {
         FamilyEntity family = new FamilyEntity("Familia");
         ReflectionTestUtils.setField(family, "id", id);
         return family;
+    }
+
+    private static UserEntity user(String id, String displayName) {
+        UserEntity user = new UserEntity(id + "@example.com", displayName, "hash");
+        ReflectionTestUtils.setField(user, "id", id);
+        return user;
     }
 
     private static RecipeEntity recipe(String id, FamilyEntity family) {

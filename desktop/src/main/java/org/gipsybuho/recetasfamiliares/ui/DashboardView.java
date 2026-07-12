@@ -409,6 +409,14 @@ public class DashboardView extends ScrollPane {
         if (r.servings() != null) sb.append(r.servings()).append(" pers.  ");
         if (r.prepMinutes() != null) sb.append(r.prepMinutes()).append(" min");
         if (r.difficulty() != null) sb.append("  ·  ").append(r.difficulty());
+        String creator = creatorLabel(r);
+        if (creator != null) sb.append("  ·  Por ").append(creator);
         return sb.toString().trim();
+    }
+
+    private String creatorLabel(RecipeDtos.RecipeDto r) {
+        return r.createdByDisplayName() != null && !r.createdByDisplayName().isBlank()
+                ? r.createdByDisplayName()
+                : null;
     }
 }

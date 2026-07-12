@@ -39,6 +39,8 @@ class RecipeRepository(
                         servings    = dto.servings?.toLong(),
                         prepMinutes = dto.prepMinutes?.toLong(),
                         cookMinutes = dto.cookMinutes?.toLong(),
+                        createdByUserId = dto.createdByUserId,
+                        createdByDisplayName = dto.createdByDisplayName,
                         updatedAt   = dto.updatedAt,
                         syncVersion = dto.syncVersion,
                         deleted     = 0L
@@ -107,6 +109,8 @@ class RecipeRepository(
         createdAt   = updatedAt,
         updatedAt   = updatedAt,
         syncVersion = syncVersion,
-        deleted     = deleted != 0L
+        deleted     = deleted != 0L,
+        createdByUserId = createdByUserId,
+        createdByDisplayName = createdByDisplayName
     )
 }

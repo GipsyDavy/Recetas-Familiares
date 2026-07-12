@@ -124,13 +124,15 @@ fun RecipeDetailScreen(
             ) {
                 // Meta chips
                 val totalMin = (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
-                val hasMeta  = totalMin > 0 || recipe.difficulty != null || recipe.servings != null
+                val creator = creatorLabel(recipe)
+                val hasMeta  = totalMin > 0 || recipe.difficulty != null || recipe.servings != null || creator != null
                 if (hasMeta) {
                     item {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (totalMin > 0) DetailMetaChip("⏱ ${totalMin}m")
                             recipe.difficulty?.let { DetailMetaChip(difficultyLabel(it)) }
                             recipe.servings?.let   { DetailMetaChip("$it porciones") }
+                            creator?.let { DetailMetaChip("Por $it") }
                         }
                     }
                 }
@@ -319,6 +321,7 @@ private fun buildShareText(
         }
     }
     if (meta.isNotEmpty()) appendLine(meta.joinToString(" · "))
+    creatorLabel(recipe)?.let { appendLine("Creada por $it") }
     recipe.description?.takeIf { it.isNotBlank() }?.let { appendLine(); appendLine(it) }
     if (ingredients.isNotEmpty()) {
         appendLine(); appendLine("🥗 Ingredientes:")
@@ -354,3 +357,6 @@ private fun difficultyLabel(value: String): String = when (value.uppercase()) {
     "HARD"   -> "Difícil"
     else     -> value
 }
+
+private fun creatorLabel(recipe: RecipeDto): String? =
+    recipe.createdByDisplayName?.takeIf { it.isNotBlank() }

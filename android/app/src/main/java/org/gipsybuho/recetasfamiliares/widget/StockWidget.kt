@@ -36,7 +36,7 @@ class StockWidget : AppWidgetProvider() {
             context.applicationContext,
             RecetasDatabase::class.java,
             "recetas-familiares.db"
-        ).addMigrations(AppContainer.MIGRATION_1_2).build()
+        ).addMigrations(AppContainer.MIGRATION_1_2, AppContainer.MIGRATION_2_3).build()
         try {
             val threshold = LocalDate.now().plusDays(3).format(DateTimeFormatter.ISO_LOCAL_DATE)
             val familyId = SessionStore(context.applicationContext).familyId

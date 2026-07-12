@@ -7,6 +7,8 @@ CREATE TABLE recipes (
     servings      INTEGER,
     prepMinutes   INTEGER,
     cookMinutes   INTEGER,
+    createdByUserId TEXT,
+    createdByDisplayName TEXT,
     updatedAt     TEXT    NOT NULL,
     syncVersion   INTEGER NOT NULL DEFAULT 0,
     deleted       INTEGER NOT NULL DEFAULT 0
@@ -28,8 +30,8 @@ CREATE TABLE stock_items (
 
 insertOrReplaceRecipe:
 INSERT OR REPLACE INTO recipes
-    (id, familyId, title, description, difficulty, servings, prepMinutes, cookMinutes, updatedAt, syncVersion, deleted)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    (id, familyId, title, description, difficulty, servings, prepMinutes, cookMinutes, createdByUserId, createdByDisplayName, updatedAt, syncVersion, deleted)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectAllRecipes:
 SELECT * FROM recipes WHERE familyId = ? AND deleted = 0;

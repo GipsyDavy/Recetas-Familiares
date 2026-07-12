@@ -40,7 +40,7 @@ class RecipeWidget : AppWidgetProvider() {
             context.applicationContext,
             RecetasDatabase::class.java,
             "recetas-familiares.db"
-        ).addMigrations(AppContainer.MIGRATION_1_2).build()
+        ).addMigrations(AppContainer.MIGRATION_1_2, AppContainer.MIGRATION_2_3).build()
         try {
             val familyId = SessionStore(context.applicationContext).familyId
             val recipes = familyId?.let { db.recipeDao().findAll(it) }.orEmpty()
