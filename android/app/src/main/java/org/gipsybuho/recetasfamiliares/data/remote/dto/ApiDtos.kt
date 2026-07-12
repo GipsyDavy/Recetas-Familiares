@@ -76,6 +76,8 @@ data class InviteMemberRequestDto(
     val role: String
 )
 
+data class UpdateMemberRoleRequestDto(val role: String)
+
 data class PageDto<T>(
     val items: List<T>,
     val page: Int,

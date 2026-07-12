@@ -20,6 +20,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceIngredientsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceStepsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateMemberRoleRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
@@ -294,6 +295,19 @@ interface RecetasApi {
     suspend fun familyMembers(
         @Path("familyId") familyId: String
     ): List<FamilyMemberDto>
+
+    @PUT("api/v1/families/{familyId}/members/{userId}/role")
+    suspend fun updateMemberRole(
+        @Path("familyId") familyId: String,
+        @Path("userId") userId: String,
+        @Body request: UpdateMemberRoleRequestDto
+    ): FamilyMemberDto
+
+    @DELETE("api/v1/families/{familyId}/members/{userId}")
+    suspend fun removeMember(
+        @Path("familyId") familyId: String,
+        @Path("userId") userId: String
+    )
 
     @Multipart
     @POST("api/v1/families/{familyId}/avatar")

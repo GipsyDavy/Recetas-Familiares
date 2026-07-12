@@ -388,10 +388,10 @@ Ya cubiertos (verificar, no reimplementar):
 - (19) Listar miembros: Desktop ya lo tiene; falta pantalla Android.
 
 Orden de sprints aprobado:
-- Sprint A (EN CURSO): cerrar CRIT-2 — SMTP produccion + UX cliente reset password, verificar email, borrar cuenta (punto 6).
+- Sprint A: EJECUTADO 2026-07-12 — UX cliente reset password, verificar email, borrar cuenta (punto 6). SMTP produccion sigue como pendiente operativo del usuario.
 - Sprint B (quick wins): EJECUTADO 2026-07-12 (ver trazabilidad). (10) creador de receta visible se MOVIO a sprint propio: requiere cambio de contrato sync + migracion Room multiplataforma (regla §3); no es quick win.
-- Sprint C (gestion familiar): (3) editar miembros (rol/expulsar), (5) crear familia solo owner/admin (matiz: usuario nuevo sin familia debe poder crear la primera). VibeSec obligatorio.
-- Sprint D (epica multi-familia): (4)+(13)+(12) son un solo bloque — pertenecer a varias familias, cambiar de familia activa y copiar recetas entre familias. Requiere sprint de diseño previo (brainstorming + Codex/Gemini) antes de codigo. Riesgo principal: fuga de datos entre familias en cache/sync/merge.
+- Sprint C (gestion familiar): EJECUTADO 2026-07-12 por Codex (ver trazabilidad). (3) editar miembros queda expuesto en Android y verificado en Desktop; (5) queda cubierto de facto por el modelo actual: registro = primera familia del usuario, que nace OWNER; no existe endpoint para crear familias adicionales. La restriccion plena se disenara con multi-familia.
+- Sprint D (SIGUIENTE, solo diseño): epica multi-familia. (4)+(13)+(12) son un solo bloque — pertenecer a varias familias, cambiar de familia activa y copiar recetas entre familias. Requiere sprint de diseño previo (brainstorming + Codex/Gemini) antes de codigo. Riesgo principal: fuga de datos entre familias en cache/sync/merge.
 - Posteriores: (20) presencia online + avisos de actividad (limitacion: sin push, solo con app abierta; encaja con chat fase 4), (11) ranking de usuarios (depende de 9 y 10; plantear como gamificacion ligera acorde a filosofia del producto), (14) chat privado 1:1 (despues de chat fase 4/push).
 
 DESCARTADOS TOTALMENTE por decision del usuario (2026-07-12):
@@ -1859,27 +1859,39 @@ Revision final Claude Code (2026-07-11, misma fecha):
 - Validacion ejecutada: backend `AuthServiceTest` 7/0 + compile OK (suite completa requiere DB; gate en CI tras push); Desktop `mvn test` 20/0; Android `gradlew test` + `assembleDebug` OK.
 - Riesgos residuales: sin prueba manual de UI en esta sesion (flujos validados por compilacion/tests); tests de integracion backend (FamilyController/RecipeController) corren en CI con `starter-recipes.enabled=false` — el seeder en si no tiene test de integracion propio; iOS sin estos cambios (runtime bloqueado); instalador Windows y APK de release no regenerados.
 
+### Sprint C - ejecucion Codex (2026-07-12)
+
+- Objetivo: gestion familiar, puntos (3) editar miembros y (5) crear familia solo owner/admin segun roadmap §8. Alcance aplicado: no inventar endpoint de crear familias adicionales y no tocar sync/modelos sincronizados.
+- Contexto leido en la sesion: `CONTINUAR.md` (seccion "Cierre de sesion 2026-07-12 — PUNTO EXACTO" y §8), `CLAUDE.md`, VibeSec-Skill, backend `families/` (`FamilyService`, `FamilyController`, `FamilyMemberRepository`) y codigo cliente implicado (`FamilyMembersView`, `ProfileView`, `ProfileScreen`, `RecetasApi`, `Repositories.kt`, `RecetasViewModel`).
+- Backend/producto: sin cambios de codigo backend. Verificado que `PUT /api/v1/families/{id}/members/{userId}/role` y `DELETE /api/v1/families/{id}/members/{userId}` ya aplican autorizacion OWNER/ADMIN en backend, bloquean tocar al OWNER, auto-cambio y auto-expulsion, y revocan refresh tokens al expulsar. Para (5), no existe endpoint de crear familia adicional; la unica via funcional de crear familia es `AuthService.register`, que crea la primera familia del usuario y lo registra como OWNER. No se detecto via actual por la que un MEMBER pueda crear o derivar familias.
+- Desktop: revisado `FamilyMembersView`; ya cubre cambiar rol y expulsar con confirmacion, visible solo para admins/owner segun sesion y con botones bloqueados para self/OWNER. `ProfileView` no requirio cambios.
+- Android: añadidos DTO/metodos Retrofit para cambiar rol y expulsar miembro; `FamilyMemberRepository` y `RecetasViewModel` exponen acciones con mensajes genericos; `ProfileScreen` añade menu de gestion por miembro dentro de la seccion Miembros para OWNER/ADMIN, oculta acciones sobre self/OWNER, confirma la expulsion y ejecuta haptico si la preferencia lo permite.
+- Seguridad: VibeSec-Skill usado como checklist sobre roles/ownership. Verificado que la autorizacion real vive en backend; la UI solo oculta acciones. Los errores cliente son genericos y no distinguen existencia/permisos; no se introducen secretos, tokens, logs sensibles, cambios CORS/JWT ni almacenamiento nuevo. `/security-review` no estuvo disponible como herramienta callable (`tool_search` no encontro herramienta); alternativa aplicada: revision manual del diff contra VibeSec + `git diff --check`.
+- Validacion ejecutada en Windows: Android `.\gradlew test` -> `BUILD SUCCESS`; Android `.\gradlew assembleDebug` -> `BUILD SUCCESS`; Desktop `mvn -f desktop/pom.xml test` -> `BUILD SUCCESS`, 20 tests, 0 fallos; Desktop `mvn -f desktop/pom.xml -DskipTests compile` -> `BUILD SUCCESS`; `git diff --check` -> sin errores (solo avisos LF/CRLF de Windows). Backend suite no ejecutada porque no hubo cambios de codigo backend.
+- Riesgos residuales: sin prueba manual de UI en emulador/JavaFX en esta sesion; Android compilo con warnings preexistentes/no bloqueantes (`menuAnchor` deprecado en `InviteMemberDialog` y condicion siempre verdadera en `RecetasViewModel`); iOS sigue sin paridad de esta gestion familiar; la restriccion plena de "crear familias adicionales solo owner/admin" queda para el diseno multi-familia de Sprint D.
+
 ### Cierre de sesion 2026-07-12 (Claude Code) — PUNTO EXACTO DEL PROYECTO
 
 Estado para retomar en la proxima sesion, cualquier agente:
 
-- `main` limpio y pusheado hasta `4d1c6b9`; produccion desplegada y health 200 UP verificado tras el ultimo deploy (incluye migracion V17).
+- Punto de arranque confirmado por Codex para Sprint C: `main` en `181e528`; produccion venia desplegada y verde segun contexto del usuario. En Sprint C no se toco backend ni se hizo push de deploy en esta documentacion.
 - Ejecutado en esta sesion (2026-07-11 noche a 2026-07-12):
   1. **Sprint A CRIT-2 UX cliente** (commits `389dc43`, `f6a9231`, `e1644c9`): reset password, verificar email y borrar cuenta en Desktop y Android; fix backend 401→403 en `DELETE /auth/account` (el 401 hacia que el authenticator OkHttp limpiara la sesion local).
   2. **Sprint B quick wins** (commits hasta `4d1c6b9`): refresh notas Android, boton salir ambos, buscar receta en web, valoraciones Desktop, miembros en perfil Android, imagen de grupo familiar (V17 + endpoint + serving con ownership), StarterRecipeSeeder (5 recetas al registrar familia).
   3. Roadmap funcional de 21 puntos documentado en §8 con decision del usuario: (16) y (8-integrado) DESCARTADOS; (10) aplazado a sprint propio por contrato sync.
-- Validaciones de la sesion: backend `AuthServiceTest` 7/0 (suite completa = gate CI con Postgres); Desktop `mvn test` 20/0; Android `gradlew test` + `assembleDebug` OK; health produccion 200 UP tras ambos deploys.
+  4. **Sprint C gestion familiar** (ejecucion Codex): Android permite cambiar rol/expulsar miembros desde Perfil; Desktop revisado y ya cubria ambas acciones; punto (5) documentado como cubierto de facto hasta multi-familia.
+- Validaciones de la sesion Codex Sprint C: Android `gradlew test` + `assembleDebug` OK; Desktop `mvn test` 20/0 + `-DskipTests compile` OK; backend no ejecutado porque no hubo cambios de codigo backend; `git diff --check` sin errores.
 - Limitacion conocida: sin `gh` CLI en este PC no se verificaron los runs de Actions; confirmar en GitHub → Actions que los 2 ultimos runs de `Backend CI/CD` (post `389dc43` y post `4d1c6b9`) estan verdes. Si el segundo fallara en tests de integracion, sospechar de `FamilyControllerTest`/seeder pese a `starter-recipes.enabled=false` en `application-test.yml`.
 
 PENDIENTES OPERATIVOS DEL USUARIO (bloquean cierres, no el desarrollo):
 - SMTP real en el VPS para cerrar CRIT-2: `MAIL_ENABLED=true`, `SMTP_HOST/PORT`, credenciales, `MAIL_FROM`, `APP_PUBLIC_URL` en `/etc/recetas-familiares/backend.env`; despues prueba E2E de reset/verificacion/borrado desde ambos clientes.
 - Regenerar instalador Windows (`desktop/build-installer.ps1`) y distribuir APK nuevo: los binarios vigentes NO incluyen las pantallas de Sprint A/B.
 
-SIGUIENTE SPRINT (fijado por roadmap §8, NO autorizado aun): **Sprint C — gestion familiar**
-- (3) Editar miembros: UI en clientes para cambiar rol y expulsar (endpoints backend YA existen: `PUT /members/{userId}/role`, `DELETE /members/{userId}`; Desktop tiene `FamilyMembersView` solo admin — revisar que cubra ambos; Android no tiene UI de gestion).
-- (5) Crear familia solo owner/admin: hoy el registro crea familia nueva siempre; decidir producto para "usuario nuevo sin familia" (matiz documentado en §8) y anadir la restriccion en backend + UI.
-- VibeSec y security-review obligatorios (roles/ownership). Codex recomendado como apoyo tecnico.
-- Despues de C: Sprint D epica multi-familia (4+13+12) con sprint de diseño previo obligatorio (brainstorming + Codex/Gemini antes de codigo); luego presencia online (20), ranking (11), chat 1:1 (14, tras chat fase 4 push), y sprint propio para (10) creador de receta (contrato sync + Room).
+SIGUIENTE SPRINT (fijado por roadmap §8, NO autorizado aun): **Sprint D — epica multi-familia, SOLO fase de diseno**
+- Alcance: propuesta de arquitectura para (4)+(13)+(12): pertenecer a varias familias, cambiar familia activa y copiar recetas entre familias.
+- Incluir obligatoriamente impacto en sync/cache por familia, seleccion de tenant activo, compatibilidad Android/Desktop/iOS, migraciones/API necesarias y riesgos de fuga entre tenants.
+- No escribir codigo en Sprint D hasta autorizacion explicita del usuario despues del diseno. Recomendado: brainstorming + Codex/Gemini/security-review si estan disponibles.
+- Posteriores: presencia online (20), ranking (11), chat 1:1 (14, tras chat fase 4 push), y sprint propio para (10) creador de receta (contrato sync + Room).
 
 ### Chequeo obligatorio de cierre
 

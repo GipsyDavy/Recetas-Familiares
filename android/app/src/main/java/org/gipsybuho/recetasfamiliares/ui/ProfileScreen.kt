@@ -18,17 +18,21 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -50,8 +54,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -73,8 +79,13 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     var showInvite  by remember { mutableStateOf(false) }
     var showVerifyCode by remember { mutableStateOf(false) }
     var showDeleteAccount by remember { mutableStateOf(false) }
+    var memberRoleChange by remember { mutableStateOf<MemberRoleChange?>(null) }
+    var memberToRemove by remember { mutableStateOf<FamilyMemberDto?>(null) }
     val emailVerified by viewModel.emailVerified.collectAsState()
     val context     = LocalContext.current
+    val haptic      = LocalHapticFeedback.current
+    val hapticsEnabled = LocalHapticsEnabled.current
+    val myUserId    = viewModel.myUserId
 
     if (showVerifyCode) {
         VerifyEmailCodeDialog(
@@ -99,6 +110,30 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             onConfirm = { inviteEmail, role ->
                 viewModel.inviteMember(inviteEmail, role)
                 showInvite = false
+            }
+        )
+    }
+
+    memberRoleChange?.let { change ->
+        ChangeMemberRoleDialog(
+            member = change.member,
+            newRole = change.newRole,
+            onDismiss = { memberRoleChange = null },
+            onConfirm = {
+                viewModel.updateMemberRole(change.member.userId, change.newRole)
+                memberRoleChange = null
+            }
+        )
+    }
+
+    memberToRemove?.let { member ->
+        RemoveMemberDialog(
+            member = member,
+            onDismiss = { memberToRemove = null },
+            onConfirm = {
+                if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                viewModel.removeMember(member.userId)
+                memberToRemove = null
             }
         )
     }
@@ -284,7 +319,17 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
         val familyMembers by viewModel.familyMembers.collectAsState()
         if (familyMembers.isNotEmpty()) {
             Spacer(Modifier.height(Spacing.lg))
-            FamilyMembersSection(members = familyMembers)
+            FamilyMembersSection(
+                members = familyMembers,
+                isAdmin = isAdmin,
+                myUserId = myUserId,
+                onChangeRole = { member, newRole ->
+                    memberRoleChange = MemberRoleChange(member, newRole)
+                },
+                onRemoveMember = { member ->
+                    memberToRemove = member
+                }
+            )
         }
 
         Spacer(Modifier.height(Spacing.lg))
@@ -410,6 +455,8 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     }
 }
 
+private data class MemberRoleChange(val member: FamilyMemberDto, val newRole: String)
+
 @Composable
 private fun FamilyStatsSection(
     recipes: List<RecipeEntity>,
@@ -465,7 +512,13 @@ private fun FamilyStatsSection(
 }
 
 @Composable
-private fun FamilyMembersSection(members: List<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto>) {
+private fun FamilyMembersSection(
+    members: List<FamilyMemberDto>,
+    isAdmin: Boolean,
+    myUserId: String?,
+    onChangeRole: (FamilyMemberDto, String) -> Unit,
+    onRemoveMember: (FamilyMemberDto) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -478,6 +531,9 @@ private fun FamilyMembersSection(members: List<org.gipsybuho.recetasfamiliares.d
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             members.forEach { member ->
+                val role = member.role?.uppercase() ?: "MEMBER"
+                val canManage = isAdmin && member.userId != myUserId && role != "OWNER"
+                var menuExpanded by remember(member.userId) { mutableStateOf(false) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(36.dp)) {
                         Box(contentAlignment = Alignment.Center) {
@@ -508,19 +564,123 @@ private fun FamilyMembersSection(members: List<org.gipsybuho.recetasfamiliares.d
                         )
                     }
                     Text(
-                        when (member.role) {
-                            "OWNER" -> "Propietario"
-                            "ADMIN" -> "Admin"
-                            else -> "Miembro"
-                        },
+                        familyRoleLabel(role),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    if (canManage) {
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(
+                                    Icons.Filled.MoreVert,
+                                    contentDescription = "Gestionar ${member.displayName}",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                val newRole = if (role == "ADMIN") "MEMBER" else "ADMIN"
+                                DropdownMenuItem(
+                                    text = { Text(if (newRole == "ADMIN") "Hacer administrador" else "Hacer miembro") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onChangeRole(member, newRole)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "Expulsar",
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onRemoveMember(member)
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun ChangeMemberRoleDialog(
+    member: FamilyMemberDto,
+    newRole: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val targetLabel = familyRoleLabel(newRole).lowercase()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cambiar rol") },
+        text = {
+            Text("¿Cambiar el rol de ${member.displayName} a $targetLabel?")
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Cambiar")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+private fun RemoveMemberDialog(
+    member: FamilyMemberDto,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Expulsar miembro") },
+        text = {
+            Text("¿Expulsar a ${member.displayName} de la familia? Esta acción no se puede deshacer.")
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text("Expulsar")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+private fun familyRoleLabel(role: String?): String =
+    when (role?.uppercase()) {
+        "OWNER" -> "Propietario"
+        "ADMIN" -> "Admin"
+        else -> "Miembro"
+    }
 
 @Composable
 private fun StatItem(modifier: Modifier = Modifier, value: String, label: String) {

@@ -54,6 +54,7 @@ import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
 import kotlinx.coroutines.Dispatchers
 import java.io.ByteArrayOutputStream
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
@@ -274,8 +275,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    private val _familyMembers = MutableStateFlow<List<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto>>(emptyList())
-    val familyMembers: StateFlow<List<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto>> = _familyMembers.asStateFlow()
+    private val _familyMembers = MutableStateFlow<List<FamilyMemberDto>>(emptyList())
+    val familyMembers: StateFlow<List<FamilyMemberDto>> = _familyMembers.asStateFlow()
 
     private val _familyInfo = MutableStateFlow<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto?>(null)
     val familyInfo: StateFlow<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto?> = _familyInfo.asStateFlow()
@@ -306,6 +307,32 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             runCatching { container.familyMemberRepository.members() }
                 .onSuccess { _familyMembers.value = it }
+        }
+    }
+
+    fun updateMemberRole(userId: String, newRole: String) {
+        if (newRole != "MEMBER" && newRole != "ADMIN") return
+        viewModelScope.launch {
+            runCatching { container.familyMemberRepository.updateRole(userId, newRole) }
+                .onSuccess { updated ->
+                    _familyMembers.update { members ->
+                        members.map { member -> if (member.userId == updated.userId) updated else member }
+                    }
+                    _userMessage.emit("Rol actualizado")
+                }
+                .onFailure { _userMessage.emit("No se pudo cambiar el rol") }
+        }
+    }
+
+    fun removeMember(userId: String) {
+        viewModelScope.launch {
+            runCatching { container.familyMemberRepository.remove(userId) }
+                .onSuccess {
+                    _familyMembers.update { members -> members.filterNot { it.userId == userId } }
+                    loadFamilyStats()
+                    _userMessage.emit("Miembro expulsado")
+                }
+                .onFailure { _userMessage.emit("No se pudo expulsar al miembro") }
         }
     }
 

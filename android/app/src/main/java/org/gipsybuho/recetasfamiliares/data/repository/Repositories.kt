@@ -30,8 +30,10 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceIngredientsRequest
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceStepsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateMemberRoleRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ConfirmEmailVerificationRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ConfirmPasswordResetRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.DeleteAccountRequestDto
@@ -155,9 +157,19 @@ class FamilyMemberRepository(
         return api.familyStats(familyId)
     }
 
-    suspend fun members(): List<org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto> {
+    suspend fun members(): List<FamilyMemberDto> {
         val familyId = sessionStore.familyId ?: return emptyList()
         return api.familyMembers(familyId)
+    }
+
+    suspend fun updateRole(userId: String, role: String): FamilyMemberDto {
+        val familyId = sessionStore.familyId ?: error("No family session")
+        return api.updateMemberRole(familyId, userId, UpdateMemberRoleRequestDto(role))
+    }
+
+    suspend fun remove(userId: String) {
+        val familyId = sessionStore.familyId ?: error("No family session")
+        api.removeMember(familyId, userId)
     }
 
     /** Datos de la familia activa (nombre + imagen de grupo). */
