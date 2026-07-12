@@ -1967,3 +1967,22 @@ Si un punto falla, el sprint sigue abierto. No escribir `cerrado`, `PASS`, `comp
   - Falta prueba UI guiada en clientes reales (Desktop/Android) con dos familias y roles mixtos: crear/cambiar familia activa desde UI, copiar receta con foto desde UI y comprobar aislamiento visual de recetas/chat/cache.
   - En esta maquina no hay `adb` disponible/conectado; Desktop puede compilarse, pero la prueba visual requiere interaccion manual.
   - Por tanto, backend/API/CI/deploy quedan verificados, pero no declarar Sprint D cerrado de producto hasta completar la prueba UI cliente.
+
+### Regeneracion de binarios cliente 2026-07-12 - Codex
+
+- APK Android regenerado con `android\gradlew.bat clean assembleDebug`.
+  - Ruta: `android/app/build/outputs/apk/debug/app-debug.apk`.
+  - Tamano: 22,88 MB.
+  - SHA-256: `C5622598F598EB292E55B2BC4D92B4D52542E60112DAD5CABBC2E8A6AB6FA72B`.
+  - API por defecto confirmada en build: `https://recetas.167.233.213.242.sslip.io/`.
+- Instalador Windows regenerado con `pwsh -NoProfile -ExecutionPolicy Bypass -File desktop/build-installer.ps1`.
+  - Ruta instalador: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe`.
+  - Tamano: 50,32 MB.
+  - SHA-256: `7969F34AB4F7113CAD51F3837B44995EFA6988724F0F357D8F56B2ABE136432E`.
+  - App-image: `desktop/output/RecetasFamiliares/RecetasFamiliares.exe`.
+  - SHA-256 app-image exe: `BFB9F6FBC3E692CAAE672BC8AC3E58C6F682706716367959599186C64B8D6713`.
+  - API por defecto: `https://recetas.167.233.213.242.sslip.io/`.
+- Validacion posterior:
+  - Android `gradlew.bat test` -> `BUILD SUCCESSFUL`.
+  - Desktop `mvn -f desktop/pom.xml test` -> 21 tests, 0 fallos.
+- Nota: primer intento de `desktop/build-installer.ps1` con Windows PowerShell 5 fallo por lectura UTF-8 de caracteres decorativos del script; rerun con PowerShell 7 (`pwsh`) correcto.
