@@ -46,23 +46,27 @@ para que vuelvan a pedir sus datos.
 
 ## Componentes
 
-### 1. `SessionStore` (expect/actual, Keychain)
+### 1. `SessionStore` (expect/actual, Keychain) — CORRECCIÓN: ya existe
 
-Añadir `familyRole: String?` junto al `familyId` ya existente
-(`ios/composeApp/src/commonMain/.../core/SessionStore.kt:8`). Persistir en
-`SessionStore.ios.kt` igual que `familyId` (mismo mecanismo Keychain vía expect/actual).
-Cambio quirúrgico: una propiedad nueva, sin tocar el resto de la clase.
+Verificado en código (no en memoria): `familyRole: String?` y `familyRoleFlow:
+StateFlow<String?>` **ya están implementados** (`core/SessionStore.kt:13-14`, Keychain
+en `SessionStore.ios.kt:67-74`), añadidos en un sprint anterior para el check de
+admin de `SettingsScreen.kt:78`. No requiere ningún cambio. (Versión anterior de este
+spec decía que había que añadirlo — error corregido tras verificar el código real antes
+de escribir el plan.)
 
 ### 2. DTOs — `network/ApiDtos.kt`
 
+`FamilyDto` ya existe (`ApiDtos.kt:31`) pero sin `avatarUrl`:
+
 ```kotlin
-data class FamilyDto(val id: String, val name: String, val role: String, val avatarUrl: String?)
-data class CreateFamilyRequestDto(val name: String)
+// Antes: data class FamilyDto(val id: String, val name: String, val role: String? = null)
+data class FamilyDto(val id: String, val name: String, val role: String? = null, val avatarUrl: String? = null)
+data class CreateFamilyRequestDto(val name: String) // nuevo
 ```
 
 Mismos campos que `FamilyResponse`/`CreateFamilyRequest` del backend
-(`backend/.../families/FamilyResponse.java`, `CreateFamilyRequest.java`) y que los DTOs
-ya usados en Android (`ApiDtos.kt`).
+(`backend/.../families/FamilyResponse.java`, `CreateFamilyRequest.java`).
 
 ### 3. `FamilyMemberRepository.kt` (extender el existente)
 
@@ -100,15 +104,25 @@ sus datos cuando cambia. No hace falta un "clear" de caché — ver sección ant
   Android/Desktop; en iOS ese flujo tiene el bug conocido documentado arriba, fuera de
   alcance).
 
-### 6. Tests (bootstrap)
+### 6. Tests (bootstrap) — LIMITACIÓN DE ENTORNO CONOCIDA
 
-iOS no tiene ningún test hoy (`commonTest` no existe, confirmado — no hay
-`build.gradle.kts` con dependencias de test ni carpeta `*Test*`). Como el `FamilyViewModel`
-se eligió explícitamente por testabilidad, este spec incluye bootstrapear un source set
-`commonTest` mínimo (`kotlin.test` + fakes de `ApiClient`/`SessionStore`, mismo patrón de
-fakes stateful que ya usa Android/Desktop, p. ej. `SyncRepositoryE2eTest`) para cubrir
-`FamilyViewModel` con TDD: cargar familias, cambiar activa (incluye caso "familyId ya no
-existe en la lista"), crear familia.
+iOS no tiene ningún test hoy (`commonTest` no existe). Se bootstrapea un source set
+`commonTest` mínimo: `kotlin("test")` + `kotlinx-coroutines-test` + `ktor-client-mock`
+(mismo `ktor` version.ref ya usado). `ApiClient` gana un parámetro opcional
+`engine: HttpClientEngine? = null` (si no es null, se usa en vez del engine real) para
+poder construir un `ApiClient` real de test contra `MockEngine` — se prueba el
+`FamilyViewModel` + `FamilyMemberRepository` reales, no un doble a mano.
+
+**Limitación bloqueante verificada:** este proyecto solo puede compilar la metadata
+común de iOS en Windows (`:composeApp:compileKotlinMetadata`); compilar o ejecutar
+código para los targets reales (`iosX64`/`iosArm64`/`iosSimulatorArm64`, incluidos sus
+tests) requiere macOS + Xcode, no disponibles en esta máquina — la misma razón por la
+que "iOS bloqueado" aparece repetido en el historial del proyecto. Los tests de este
+spec se **escriben completos y correctos por diseño**, pero **no se ejecutan** en esta
+sesión: no hay ciclo RED→GREEN real, solo verificación de que el código (producción +
+tests) compila vía `compileKotlinMetadata`. Decisión explícita del usuario
+(2026-07-13): escribir los tests sin ejecutarlos, dejar constancia clara de esta
+limitación en vez de omitirlos o afirmar una ejecución que no ocurrió.
 
 ## Seguridad
 
