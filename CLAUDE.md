@@ -12,7 +12,18 @@ Estas reglas deben respetar siempre:
 
 ## PROTOCOLO PRE-TAREA OBLIGATORIO
 
-Antes de iniciar cualquier sprint, tarea de codigo, modificacion relevante o analisis tecnico, leer en la sesion actual los archivos de contexto que existan y apliquen:
+Paso 0, antes de cualquier otra accion del sprint (incluida la lectura de contexto): comprobar el plugin `superpowers` (skill `using-superpowers`) e invocar la skill de proceso que aplique al tipo de tarea, siguiendo su propia prioridad:
+- Trabajo creativo/nueva funcionalidad -> `superpowers:brainstorming` primero.
+- Bug o fallo a diagnosticar -> `superpowers:systematic-debugging` primero.
+- Tarea multi-paso con spec o requisitos claros -> `superpowers:writing-plans` antes de tocar codigo.
+- Implementacion de una funcionalidad o fix -> `superpowers:test-driven-development`.
+- Ejecucion de un plan ya escrito -> `superpowers:executing-plans` o `superpowers:subagent-driven-development` si hay tareas independientes.
+- Antes de dar una tarea por cerrada -> `superpowers:verification-before-completion`.
+- Cierre de rama/feature -> `superpowers:finishing-a-development-branch`.
+
+Si el plugin no esta instalado/activo en la sesion, o la tarea es puramente documental/trivial y ninguna skill de proceso aplica, dejarlo justificado brevemente y continuar con el protocolo normal. Las instrucciones de este `CLAUDE.md` y las del usuario siguen teniendo prioridad sobre cualquier skill (regla propia de `using-superpowers`).
+
+Despues del paso 0, leer en la sesion actual los archivos de contexto que existan y apliquen:
 
 1. `continuar.md` - estado actual del proyecto, sprint en curso, deuda tecnica, decisiones pendientes.
 2. `CLAUDE.md` - reglas del proyecto.
@@ -30,6 +41,7 @@ Reglas:
 - Si la tarea es puramente documental o trivial, aplicar criterio pragmatico y no sobreactuar el protocolo.
 
 Checklist minimo antes de implementar:
+- [ ] Skill de proceso `superpowers` comprobada e invocada si aplica (paso 0), o justificado que no aplica.
 - [ ] Contexto actual leido en esta sesion.
 - [ ] Archivos afectados identificados.
 - [ ] Riesgos de regresion descritos si existen.

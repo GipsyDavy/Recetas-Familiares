@@ -2539,3 +2539,46 @@ AUTORIZACION RECIBIDA (2026-07-12 noche): el usuario eligio **opcion A, plan com
 
 PUNTO EXACTO PARA RETOMAR: empezar por el paso 1 del plan (verificacion propia: backend compile+tests incluyendo destrabar `FamilyMemberControllerTest` con el metodo de env de `herztner/recetas_app.env`; Android `testDebugUnitTest assembleDebug`; Desktop `mvn test`; iOS `:composeApp:compileKotlinMetadata`), seguido de `/VibeSec`, `/security-review`, bloques de auditoria Codex/Gemini, y solo si todo verifica, commits separados por sprint. No tocar codigo, no hacer build, no commitear cambios de Codex hasta la proxima sesion/instruccion de arranque. `paraImplementar.txt` sigue sin trackear y no se toca.
 - Siguiente accion funcional sigue siendo Sprint (12) exportar/copiar recetas entre grupos familiares, salvo que el usuario quiera primero instalar/probar estos binarios.
+
+### Ejecucion del plan (pasos 1-6) y cierre de Sprint (3)/(22)/(10)/(11) - 2026-07-13 - Claude Code
+
+Agente lider: Claude Code, en la misma sesion que dejo el plan registrado arriba. IDE se cerro inesperadamente mientras se esperaba respuesta de Codex/Gemini; los bloques de auditoria se reconstruyeron desde `CLAUDE.md`/`CONTINUAR.md` y se reenviaron; el usuario pego las respuestas ya generadas.
+
+**Paso 1 - Verificacion propia:**
+- Backend compile OK.
+- Al ejecutar `FamilyMemberControllerTest` con env de `herztner/recetas_app.env`: 16/16 fallos, todos `register()` -> 409. Investigado: no es bug de `FamilyMemberControllerTest`, es sistemico. `mvn test` completo del backend dio **100/154 fallos**, mismo patron, en ~15 clases de test no relacionadas (Chat, User, Recipe, Sync, Stock...). Causa raiz: ningun test backend usa `@Transactional`/rollback ni limpia despues de si mismo; la BD compartida `recetas_familiares_test` (Hetzner) acumula usuarios/emails de ejecuciones anteriores (propias y de Codex) y los `register()` con email fijo chocan.
+- Con autorizacion explicita del usuario, se purgo la BD de test (TRUNCATE de las 19 tablas de aplicacion, `flyway_schema_history` intacto) via utilidad JDBC ad-hoc (`PurgeTestDb.java`, con guard que rechaza cualquier URL que no contenga `recetas_familiares_test`). Tras la purga: **155/155 tests backend OK** (incluye integracion HTTP real contra Postgres). Se repurgo la BD al final de la sesion para dejarla limpia para la proxima.
+- Android `gradlew.bat testDebugUnitTest assembleDebug`: OK (sin cambios en Android en este paso, build UP-TO-DATE).
+- Desktop `mvn test`: OK, 21/21.
+- iOS/KMP `:composeApp:compileKotlinMetadata`: OK.
+- `git diff --check`: OK, solo avisos CRLF de Windows.
+- Deuda de infraestructura de test detectada y NO resuelta (fuera de alcance de este sprint): la suite de integracion backend sigue siendo de un solo uso contra la BD compartida salvo que alguien la purgue antes de correrla. Recomendado para un sprint futuro: `@Transactional` en tests de integracion o `uniqueEmail()` (patron ya usado en `RecipeRankingControllerTest`) generalizado a todas las clases.
+
+**Auditoria Codex + Gemini (solo lectura, sobre Sprint 3/22/10/11 sin commitear):**
+- Gemini: Sprint 3 no toco iOS (ya documentado, no es hallazgo nuevo); ranking top10 Android/Desktop vs top5 iOS (decision de producto); recomienda confirmacion explicita en UI para "Definir temporal".
+- Codex, hallazgo **CRITICO verificado por Claude Code contra el codigo real** (no autoevaluacion): `FamilyService.updateMember` (linea ~161) solo validaba que el objetivo fuera miembro activo de la familia del que llama, pero mutaba el `UserEntity` global (email/password). Un OWNER/ADMIN de familia A podia fijar password temporal + cambiar email de un usuario que tambien pertenece a familia B, y tomar esa cuenta -> acceso completo a familia B. Confirmado leyendo el codigo linea por linea, no solo por el reporte de Codex.
+- Codex, hallazgos MEDIOS verificados: (1) enumeracion de email via 409 en `updateMember` (linea ~175) — cualquier OWNER/ADMIN puede probar emails arbitrarios; (2) ranking cuenta valoraciones de raters expulsados/borrados de la familia (`RecipeRatingJpaRepository` no filtra membresia activa del votante); (3) `AppDatabase.sq` (iOS) anadio columnas sin migracion `.sqm` — riesgo solo si hay install iOS previo en campo (hoy no lo hay); (4) `FamilyMemberRepository.kt` (iOS) `invite()` espera body JSON pero el backend devuelve 201 vacio — invitar miembro en iOS siempre falla (capturado por `runCatching`, no crashea), bug pre-existente no introducido por estos sprints.
+- Codex, hallazgo BAJO verificado: Android no refresca el ranking al crear/borrar receta (si al crear/borrar valoracion).
+- Security-review propio (Claude Code): 1 hallazgo adicional confirmado, mismo que el "Medio" de enumeracion de email de Codex (independiente, misma conclusion).
+
+**Fix del critico (TDD, RED-GREEN verificado):**
+- `FamilyService.updateMember`: si el usuario objetivo tiene mas de una familia activa (`familyMemberRepository.findByUser_IdAndDeletedFalse(targetUserId).size() > 1`), bloquea cambio directo de email y `SET_TEMPORARY` (400); `SEND_RESET` sigue permitido (no da acceso directo al admin, solo dispara email a la cuenta real).
+- Tests nuevos: `FamilyServiceTest` (3 tests unitarios, mocks) + `FamilyMemberControllerTest` (1 test de integracion HTTP nuevo + 2 tests existentes corregidos porque su fixture — `register()` + invite — dejaba al objetivo en 2 familias por construccion, exactamente el escenario vulnerable que el fix bloquea).
+- VibeSec: mensaje de error ajustado para no confirmar explicitamente al admin que el objetivo "pertenece a multiples familias" (minimizacion de informacion).
+- Verificacion final: backend 155/155 (incluye los 17/17 de `FamilyMemberControllerTest` con el fix), Android/Desktop/iOS OK, `git diff --check` OK.
+- **No corregido en esta sesion** (alcance explicito del usuario: "solo el critico"): enumeracion de email (Medio), rater inactivo en ranking (Medio), migracion SQLDelight iOS (Medio), `invite()` roto en iOS (Medio), refresh de ranking en Android tras crear/borrar receta (Bajo), paridad Sprint 3 en iOS (decision de producto pendiente).
+
+**Commits (5, separados por sprint):**
+- `80e81ae` — Sprint 3 backend (editar miembros/password) + fix critico de seguridad + tests TDD.
+- `eec39c3` — Sprint 22 (scroll/responsive Desktop).
+- `2cabbb2` — Sprint 10 (autor de receta visible, todas las plataformas).
+- `2102e88` — Sprint 11 (ranking familiar).
+- `f490c82` — capas cliente compartidas (Android/Desktop/iOS) que mezclan Sprint 3+10+11 en los mismos archivos/metodos (`ProfileScreen.kt`, `RecetasViewModel.kt`, `Repositories.kt`, `ApiDtos.kt` x2, `FamilyDtos.java`, `FamilyRepository.java`, `FamilyMembersView.java`, `ProfileView.java`, `RecipeListView.java`) — no separables por sprint sin partir hunks linea a linea dentro del mismo metodo/clase; decision explicita del usuario de agruparlos en vez de partir hunks a mano.
+- Limitacion honesta: los commits de backend son independientemente compilables/testeables en el orden dado (3, 22, 10, 11 — 11 depende de 10 por `RecipeEntity.createdByUser`). Los commits de Android/Desktop/iOS **no se re-compilaron de forma independiente por commit intermedio** (solo se verifico el estado final con todo aplicado); si algun dia se hace `git bisect` o checkout de un commit intermedio de cliente, no hay garantia adicional mas alla de la logica de dependencia ya razonada.
+- `CLAUDE.md` (modificado, ajeno a estos sprints) y `paraImplementar.txt` (sin trackear) quedan sin tocar, fuera de alcance.
+
+**Seguridad/herramientas usadas:** VibeSec (skill, aplico el ajuste de mensaje), `/security-review` (skill, 1 hallazgo confirmado), Codex + Gemini (bloques IDE, solo lectura, hallazgos verificados contra codigo antes de integrar cualquier cambio), TDD (`superpowers:test-driven-development`) para el fix critico, `superpowers:executing-plans` para retomar el plan de la sesion anterior.
+
+**Riesgo residual:** los hallazgos Medios/Bajos listados arriba quedan pendientes, documentados, sin fecha de sprint asignada todavia. La deuda de infraestructura de tests (BD compartida sin aislamiento) puede volver a bloquear la suite si se corre sin purgar `recetas_familiares_test` primero.
+
+**Siguiente sprint recomendado:** decidir con el usuario si se ataca la deuda Medio/Bajo de esta auditoria antes de Sprint (12), o si Sprint (12) (copiar recetas entre familias) sigue siendo prioridad.
