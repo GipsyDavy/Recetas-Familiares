@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -175,6 +177,44 @@ class AuthServiceTest {
         assertThat(owner.getPasswordHash()).isEqualTo("deleted-hash");
         verify(refreshTokenService).revokeAllForUser("owner-1");
         verify(userRepository).save(owner);
+    }
+
+    @Test
+    void deleteAccountUsesBcryptSafeRandomPasswordForAnonymizedUser() {
+        BCryptPasswordEncoder realEncoder = new BCryptPasswordEncoder(4);
+        AuthService realEncoderService = new AuthService(
+                userRepository,
+                familyRepository,
+                familyMemberRepository,
+                realEncoder,
+                jwtService,
+                refreshTokenService,
+                accountActionTokenService,
+                accountEmailService,
+                starterRecipeSeeder,
+                30,
+                24
+        );
+        String oldHash = realEncoder.encode("current-password");
+        UserEntity user = user("solo-1", "solo@example.com", "Solo", oldHash);
+        FamilyEntity family = family("family-solo");
+        FamilyMemberEntity membership = member("member-solo", family, user, FamilyRole.OWNER,
+                Instant.parse("2026-01-01T00:00:00Z"));
+
+        when(userRepository.findByIdAndDeletedFalse("solo-1")).thenReturn(Optional.of(user));
+        when(familyMemberRepository.findByUser_IdAndDeletedFalse("solo-1")).thenReturn(List.of(membership));
+        when(familyMemberRepository.findMembersWithUserByFamilyId("family-solo")).thenReturn(List.of(membership));
+
+        assertThatCode(() -> realEncoderService.deleteAccount("solo-1",
+                new DeleteAccountRequest("current-password"))).doesNotThrowAnyException();
+
+        assertThat(user.isDeleted()).isTrue();
+        assertThat(user.getPasswordHash()).isNotEqualTo(oldHash);
+        assertThat(realEncoder.matches("current-password", user.getPasswordHash())).isFalse();
+        assertThat(membership.isDeleted()).isTrue();
+        assertThat(ReflectionTestUtils.getField(family, "deleted")).isEqualTo(true);
+        verify(refreshTokenService).revokeAllForUser("solo-1");
+        verify(userRepository).save(user);
     }
 
     private static UserEntity user(String id, String email, String displayName, String passwordHash) {

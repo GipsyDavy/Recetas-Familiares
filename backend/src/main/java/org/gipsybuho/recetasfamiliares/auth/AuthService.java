@@ -173,7 +173,7 @@ public class AuthService {
         List<FamilyMemberEntity> memberships = familyMemberRepository.findByUser_IdAndDeletedFalse(userId);
         memberships.forEach(membership -> removeMembershipForDeletedUser(membership, userId));
         refreshTokenService.revokeAllForUser(userId);
-        user.softDeleteAnonymized(passwordEncoder.encode(UUID.randomUUID() + ":" + UUID.randomUUID()));
+        user.softDeleteAnonymized(passwordEncoder.encode(UUID.randomUUID().toString()));
         userRepository.save(user);
     }
 
