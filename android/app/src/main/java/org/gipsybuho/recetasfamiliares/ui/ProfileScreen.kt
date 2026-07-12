@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -31,6 +32,7 @@ import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyStatsDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UserRecipeRankingDto
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +67,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +88,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     var showFamilySelector by remember { mutableStateOf(false) }
     var showCreateFamily by remember { mutableStateOf(false) }
     var memberRoleChange by remember { mutableStateOf<MemberRoleChange?>(null) }
+    var memberToEdit by remember { mutableStateOf<FamilyMemberDto?>(null) }
     var memberToRemove by remember { mutableStateOf<FamilyMemberDto?>(null) }
     val emailVerified by viewModel.emailVerified.collectAsState()
     val families by viewModel.families.collectAsState()
@@ -162,6 +166,23 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             onConfirm = {
                 viewModel.updateMemberRole(change.member.userId, change.newRole)
                 memberRoleChange = null
+            }
+        )
+    }
+
+    memberToEdit?.let { member ->
+        EditMemberDialog(
+            member = member,
+            onDismiss = { memberToEdit = null },
+            onConfirm = { displayName, memberEmail, passwordAction, temporaryPassword ->
+                viewModel.updateMember(
+                    userId = member.userId,
+                    displayName = displayName,
+                    email = memberEmail,
+                    passwordAction = passwordAction,
+                    temporaryPassword = temporaryPassword
+                )
+                memberToEdit = null
             }
         )
     }
@@ -306,6 +327,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             viewModel.loadFamilyStats()
             viewModel.loadAccountStatus()
             viewModel.loadFamilyMembers()
+            viewModel.loadUserRecipeRankings()
             viewModel.loadFamilyInfo()
         }
         val familyInfo by viewModel.familyInfo.collectAsState()
@@ -385,6 +407,12 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             FamilyStatsSection(recipes = recipes, stats = familyStats)
         }
 
+        val userRecipeRankings by viewModel.userRecipeRankings.collectAsState()
+        if (userRecipeRankings.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.lg))
+            UserRecipeRankingSection(rankings = userRecipeRankings)
+        }
+
         val familyMembers by viewModel.familyMembers.collectAsState()
         if (familyMembers.isNotEmpty()) {
             Spacer(Modifier.height(Spacing.lg))
@@ -394,6 +422,9 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
                 myUserId = myUserId,
                 onChangeRole = { member, newRole ->
                     memberRoleChange = MemberRoleChange(member, newRole)
+                },
+                onEditMember = { member ->
+                    memberToEdit = member
                 },
                 onRemoveMember = { member ->
                     memberToRemove = member
@@ -568,6 +599,12 @@ private fun FamilySelectorDialog(
 
 private data class MemberRoleChange(val member: FamilyMemberDto, val newRole: String)
 
+private enum class MemberPasswordAction(val apiValue: String?, val label: String) {
+    NONE(null, "No cambiar"),
+    SEND_RESET("SEND_RESET", "Enviar email de recuperación"),
+    SET_TEMPORARY("SET_TEMPORARY", "Definir temporal")
+}
+
 @Composable
 private fun CreateFamilyDialog(
     onDismiss: () -> Unit,
@@ -657,11 +694,63 @@ private fun FamilyStatsSection(
 }
 
 @Composable
+private fun UserRecipeRankingSection(rankings: List<UserRecipeRankingDto>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = MaterialTheme.shapes.large
+    ) {
+        Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Text(
+                "Ranking de recetas",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            rankings.take(10).forEach { item ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                item.rank.toString(),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    Spacer(Modifier.size(Spacing.md))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(item.displayName, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "${item.recipesCreated} recetas · ${item.ratingsReceived} valoraciones · ${averageLabel(item.averageStars)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        "${item.score} pts",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun FamilyMembersSection(
     members: List<FamilyMemberDto>,
     isAdmin: Boolean,
     myUserId: String?,
     onChangeRole: (FamilyMemberDto, String) -> Unit,
+    onEditMember: (FamilyMemberDto) -> Unit,
     onRemoveMember: (FamilyMemberDto) -> Unit
 ) {
     Card(
@@ -679,7 +768,12 @@ private fun FamilyMembersSection(
                 val role = member.role?.uppercase() ?: "MEMBER"
                 val canManage = isAdmin && member.userId != myUserId && role != "OWNER"
                 var menuExpanded by remember(member.userId) { mutableStateOf(false) }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = canManage) { onEditMember(member) }
+                ) {
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(36.dp)) {
                         Box(contentAlignment = Alignment.Center) {
                             if (!member.avatarUrl.isNullOrBlank()) {
@@ -726,6 +820,19 @@ private fun FamilyMembersSection(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text("Editar") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.Edit,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onEditMember(member)
+                                    }
+                                )
                                 val newRole = if (role == "ADMIN") "MEMBER" else "ADMIN"
                                 DropdownMenuItem(
                                     text = { Text(if (newRole == "ADMIN") "Hacer administrador" else "Hacer miembro") },
@@ -760,6 +867,114 @@ private fun FamilyMembersSection(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditMemberDialog(
+    member: FamilyMemberDto,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String?, String?) -> Unit
+) {
+    var displayName by remember(member.userId) { mutableStateOf(member.displayName) }
+    var email by remember(member.userId) { mutableStateOf(member.email) }
+    var passwordAction by remember(member.userId) { mutableStateOf(MemberPasswordAction.NONE) }
+    var passwordExpanded by remember { mutableStateOf(false) }
+    var temporaryPassword by remember(member.userId) { mutableStateOf("") }
+    val passwordValid = passwordAction != MemberPasswordAction.SET_TEMPORARY || temporaryPassword.length >= 12
+    val canSave = displayName.isNotBlank() && email.contains("@") && passwordValid
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar miembro") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                OutlinedTextField(
+                    value = displayName,
+                    onValueChange = { displayName = it },
+                    label = { Text("Nombre") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                ExposedDropdownMenuBox(
+                    expanded = passwordExpanded,
+                    onExpandedChange = { passwordExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = passwordAction.label,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Contraseña") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(passwordExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = passwordExpanded,
+                        onDismissRequest = { passwordExpanded = false }
+                    ) {
+                        MemberPasswordAction.entries.forEach { action ->
+                            DropdownMenuItem(
+                                text = { Text(action.label) },
+                                onClick = {
+                                    passwordAction = action
+                                    if (action != MemberPasswordAction.SET_TEMPORARY) {
+                                        temporaryPassword = ""
+                                    }
+                                    passwordExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                if (passwordAction == MemberPasswordAction.SET_TEMPORARY) {
+                    OutlinedTextField(
+                        value = temporaryPassword,
+                        onValueChange = { temporaryPassword = it },
+                        label = { Text("Contraseña temporal") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (temporaryPassword.isNotBlank() && temporaryPassword.length < 12) {
+                        Text(
+                            "Mínimo 12 caracteres",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm(
+                        displayName.trim(),
+                        email.trim(),
+                        passwordAction.apiValue,
+                        temporaryPassword.takeIf { passwordAction == MemberPasswordAction.SET_TEMPORARY }
+                    )
+                },
+                enabled = canSave
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 @Composable
@@ -858,6 +1073,10 @@ private fun familyRoleLabel(role: String?): String =
         "ADMIN" -> "Admin"
         else -> "Miembro"
     }
+
+private fun averageLabel(averageStars: Double?): String =
+    if (averageStars == null) "sin media"
+    else "media ${String.format(Locale.getDefault(), "%.1f", averageStars)}"
 
 @Composable
 private fun StatItem(modifier: Modifier = Modifier, value: String, label: String) {

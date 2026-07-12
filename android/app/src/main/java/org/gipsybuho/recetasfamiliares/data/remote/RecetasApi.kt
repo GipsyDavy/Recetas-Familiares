@@ -22,6 +22,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceIngredientsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceStepsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateFamilyMemberRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateMemberRoleRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
@@ -47,6 +48,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.SyncPushRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateUserRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UserResponseDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UserRecipeRankingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import okhttp3.MultipartBody
@@ -110,6 +112,9 @@ interface RecetasApi {
 
     @GET("api/v1/families/{familyId}/stats")
     suspend fun familyStats(@Path("familyId") familyId: String): FamilyStatsDto
+
+    @GET("api/v1/families/{familyId}/recipe-rankings/users")
+    suspend fun userRecipeRankings(@Path("familyId") familyId: String): List<UserRecipeRankingDto>
 
     @GET("api/v1/families/{familyId}/recipes")
     suspend fun recipes(
@@ -313,6 +318,13 @@ interface RecetasApi {
         @Path("familyId") familyId: String,
         @Path("userId") userId: String,
         @Body request: UpdateMemberRoleRequestDto
+    ): FamilyMemberDto
+
+    @PUT("api/v1/families/{familyId}/members/{userId}")
+    suspend fun updateMember(
+        @Path("familyId") familyId: String,
+        @Path("userId") userId: String,
+        @Body request: UpdateFamilyMemberRequestDto
     ): FamilyMemberDto
 
     @DELETE("api/v1/families/{familyId}/members/{userId}")

@@ -34,10 +34,12 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceIngredientsRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ReplaceStepsRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateFamilyMemberRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateNoteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateMemberRoleRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UserRecipeRankingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
@@ -198,9 +200,34 @@ class FamilyMemberRepository(
         return api.familyMembers(familyId)
     }
 
+    suspend fun userRecipeRankings(): List<UserRecipeRankingDto> {
+        val familyId = sessionStore.familyId ?: return emptyList()
+        return api.userRecipeRankings(familyId)
+    }
+
     suspend fun updateRole(userId: String, role: String): FamilyMemberDto {
         val familyId = sessionStore.familyId ?: error("No family session")
         return api.updateMemberRole(familyId, userId, UpdateMemberRoleRequestDto(role))
+    }
+
+    suspend fun updateMember(
+        userId: String,
+        displayName: String,
+        email: String,
+        passwordAction: String?,
+        temporaryPassword: String?
+    ): FamilyMemberDto {
+        val familyId = sessionStore.familyId ?: error("No family session")
+        return api.updateMember(
+            familyId,
+            userId,
+            UpdateFamilyMemberRequestDto(
+                displayName = displayName.trim(),
+                email = email.trim(),
+                passwordAction = passwordAction,
+                temporaryPassword = temporaryPassword?.takeIf { it.isNotBlank() }
+            )
+        )
     }
 
     suspend fun remove(userId: String) {
@@ -848,7 +875,8 @@ private fun RecipeDto.toEntity() = RecipeEntity(
     id = id, familyId = familyId, title = title, description = description,
     servings = servings, prepMinutes = prepMinutes, cookMinutes = cookMinutes,
     difficulty = difficulty, createdAt = createdAt, updatedAt = updatedAt,
-    syncVersion = syncVersion, deleted = deleted
+    syncVersion = syncVersion, deleted = deleted,
+    createdByUserId = createdByUserId, createdByDisplayName = createdByDisplayName
 )
 
 private fun RecipeIngredientDto.toEntity() = RecipeIngredientEntity(

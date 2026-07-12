@@ -82,6 +82,13 @@ data class InviteMemberRequestDto(
 
 data class UpdateMemberRoleRequestDto(val role: String)
 
+data class UpdateFamilyMemberRequestDto(
+    val displayName: String,
+    val email: String,
+    val passwordAction: String? = null,
+    val temporaryPassword: String? = null
+)
+
 data class PageDto<T>(
     val items: List<T>,
     val page: Int,
@@ -104,7 +111,9 @@ data class RecipeDto(
     val createdAt: String,
     val updatedAt: String,
     val syncVersion: Long,
-    val deleted: Boolean
+    val deleted: Boolean,
+    val createdByUserId: String? = null,
+    val createdByDisplayName: String? = null
 )
 
 data class RecipeIngredientDto(
@@ -279,6 +288,17 @@ data class FamilyStatsDto(
     val totalMembers: Long,
     val totalStockItems: Long,
     val lastActivityAt: String?
+)
+
+data class UserRecipeRankingDto(
+    val rank: Int,
+    val userId: String,
+    val displayName: String,
+    val role: String? = null,
+    val recipesCreated: Long,
+    val ratingsReceived: Long,
+    val averageStars: Double? = null,
+    val score: Long
 )
 
 // ── Mutation request DTOs ─────────────────────────────────────────────────────

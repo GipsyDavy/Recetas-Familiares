@@ -54,6 +54,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeRatingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeIngredientItemDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeStepItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UserRecipeRankingDto
 import org.gipsybuho.recetasfamiliares.core.ServerUrlConfig
 import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeStepEntity
@@ -326,6 +327,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private fun clearFamilyScopedState() {
         _familyStats.value = null
         _familyMembers.value = emptyList()
+        _userRecipeRankings.value = emptyList()
         _familyInfo.value = null
         _recipeRatings.value = emptyList()
         _chatMessages.value = emptyList()
@@ -338,6 +340,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _familyMembers = MutableStateFlow<List<FamilyMemberDto>>(emptyList())
     val familyMembers: StateFlow<List<FamilyMemberDto>> = _familyMembers.asStateFlow()
+
+    private val _userRecipeRankings = MutableStateFlow<List<UserRecipeRankingDto>>(emptyList())
+    val userRecipeRankings: StateFlow<List<UserRecipeRankingDto>> = _userRecipeRankings.asStateFlow()
 
     private val _families = MutableStateFlow<List<FamilyDto>>(emptyList())
     val families: StateFlow<List<FamilyDto>> = _families.asStateFlow()
@@ -391,6 +396,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             refresh()
             loadFamilyStats()
             loadFamilyMembers()
+            loadUserRecipeRankings()
             startChatBadge()
             _userMessage.emit("Familia activa: ${target.name}")
         }
@@ -457,6 +463,43 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                     _userMessage.emit("Rol actualizado")
                 }
                 .onFailure { _userMessage.emit("No se pudo cambiar el rol") }
+        }
+    }
+
+    fun loadUserRecipeRankings() {
+        viewModelScope.launch {
+            val familyId = container.sessionStore.familyId ?: return@launch
+            runCatching { container.familyMemberRepository.userRecipeRankings() }
+                .onSuccess {
+                    if (familyId == container.sessionStore.familyId) _userRecipeRankings.value = it
+                }
+        }
+    }
+
+    fun updateMember(
+        userId: String,
+        displayName: String,
+        email: String,
+        passwordAction: String?,
+        temporaryPassword: String?
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                container.familyMemberRepository.updateMember(
+                    userId = userId,
+                    displayName = displayName,
+                    email = email,
+                    passwordAction = passwordAction,
+                    temporaryPassword = temporaryPassword
+                )
+            }.onSuccess { updated ->
+                _familyMembers.update { members ->
+                    members.map { member -> if (member.userId == updated.userId) updated else member }
+                }
+                _userMessage.emit("Miembro actualizado")
+            }.onFailure {
+                _userMessage.emit("No se pudo actualizar el miembro")
+            }
         }
     }
 
@@ -777,6 +820,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 val idx = current.indexOfFirst { it.id == updated.id }
                 if (idx >= 0) current[idx] = updated else current.add(0, updated)
                 _recipeRatings.value = current
+                loadUserRecipeRankings()
                 _userMessage.emit("Valoración guardada")
             }.onFailure { onError(it.message ?: "Error al guardar valoración") }
         }
@@ -787,6 +831,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             runCatching { container.recipeRatingRepository.delete(recipeId, ratingId) }
                 .onSuccess {
                     _recipeRatings.value = _recipeRatings.value.filter { it.id != ratingId }
+                    loadUserRecipeRankings()
                     _userMessage.emit("Valoración eliminada")
                 }
         }

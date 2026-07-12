@@ -15,14 +15,16 @@ import org.gipsybuho.recetasfamiliares.core.FamilyRole;
 import java.util.List;
 import java.util.Optional;
 
-public class FamilyMembersView extends VBox {
+public class FamilyMembersView extends ScrollPane {
 
     private final AppContext context;
+    private final VBox content = new VBox();
     private final Label statusLabel  = new Label();
     private final Label familyLabel  = new Label("—");
     private final Label roleLabel    = new Label("—");
     private final TableView<MemberRow> table = buildTable();
     private final Button addBtn        = new Button("Añadir miembro");
+    private final Button editBtn       = new Button("Editar");
     private final Button changeRoleBtn = new Button("Cambiar rol");
     private final Button removeBtn     = new Button("Expulsar");
 
@@ -33,9 +35,11 @@ public class FamilyMembersView extends VBox {
     }
 
     private void build() {
-        getStyleClass().add("content-area");
-        setSpacing(20);
-        setPadding(new Insets(28, 32, 28, 32));
+        DesktopScroll.configurePage(this, content);
+        content.getStyleClass().add("content-area");
+        content.setSpacing(20);
+        content.setPadding(new Insets(28, 32, 28, 32));
+        setContent(content);
 
         // ── Header ────────────────────────────────────────────────────────────
         Text title = new Text("👨‍👩‍👧  Miembros de la familia");
@@ -73,6 +77,11 @@ public class FamilyMembersView extends VBox {
         addBtn.setOnAction(e -> onAddMember());
         Tooltip.install(addBtn, new Tooltip("Crear o añadir miembro a la familia"));
 
+        editBtn.getStyleClass().add("action-button-secondary");
+        editBtn.setDisable(true);
+        editBtn.setOnAction(e -> onEditMember());
+        Tooltip.install(editBtn, new Tooltip("Editar datos o contraseña del miembro seleccionado"));
+
         changeRoleBtn.getStyleClass().add("action-button-secondary");
         changeRoleBtn.setDisable(true);
         changeRoleBtn.setOnAction(e -> onChangeRole());
@@ -83,7 +92,7 @@ public class FamilyMembersView extends VBox {
         removeBtn.setOnAction(e -> onRemoveMember());
         Tooltip.install(removeBtn, new Tooltip("Expulsar miembro seleccionado de la familia"));
 
-        HBox toolbar = new HBox(8, addBtn, changeRoleBtn, removeBtn);
+        FlowPane toolbar = new FlowPane(8, 8, addBtn, editBtn, changeRoleBtn, removeBtn);
         toolbar.setAlignment(Pos.CENTER_LEFT);
 
         boolean isAdmin = context.getSession().isAdmin();
@@ -93,11 +102,21 @@ public class FamilyMembersView extends VBox {
         // Update button states when selection changes
         table.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) ->
                 updateButtonStates(selected));
+        table.setRowFactory(tv -> {
+            TableRow<MemberRow> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty() && canManage(row.getItem())) {
+                    table.getSelectionModel().select(row.getItem());
+                    onEditMember();
+                }
+            });
+            return row;
+        });
 
         // ── Status bar ────────────────────────────────────────────────────────
         statusLabel.getStyleClass().add("status-label");
 
-        getChildren().addAll(header, infoCard, toolbar, table, statusLabel);
+        content.getChildren().addAll(header, infoCard, toolbar, table, statusLabel);
         VBox.setVgrow(table, Priority.ALWAYS);
     }
 
@@ -176,6 +195,7 @@ public class FamilyMembersView extends VBox {
         result.ifPresent(newRole -> {
             String familyId = context.getSession().getFamilyId();
             statusLabel.setText("Cambiando rol...");
+            editBtn.setDisable(true);
             changeRoleBtn.setDisable(true);
             removeBtn.setDisable(true);
             Thread.ofVirtual().start(() -> {
@@ -187,6 +207,130 @@ public class FamilyMembersView extends VBox {
                     });
                 } catch (ApiException ex) {
                     Platform.runLater(() -> statusLabel.setText("Error: " + ex.getMessage()));
+                }
+            });
+        });
+    }
+
+    private void onEditMember() {
+        MemberRow selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null || !canManage(selected)) return;
+
+        String familyId = context.getSession().getFamilyId();
+        if (familyId == null || familyId.isBlank()) {
+            statusLabel.setText("Sin sesión de familia activa.");
+            return;
+        }
+
+        Dialog<EditForm> dialog = new Dialog<>();
+        dialog.setTitle("Editar miembro");
+        dialog.setHeaderText(selected.getDisplayName());
+
+        ButtonType saveType = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+        TextField nameField = new TextField(selected.getDisplayName());
+        nameField.setMaxWidth(Double.MAX_VALUE);
+
+        TextField emailField = new TextField(selected.getEmail());
+        emailField.setMaxWidth(Double.MAX_VALUE);
+
+        ChoiceBox<PasswordActionOption> passwordActionBox = new ChoiceBox<>();
+        passwordActionBox.getItems().addAll(PasswordActionOption.NONE, PasswordActionOption.SEND_RESET, PasswordActionOption.SET_TEMPORARY);
+        passwordActionBox.setValue(PasswordActionOption.NONE);
+        passwordActionBox.setMaxWidth(Double.MAX_VALUE);
+
+        PasswordField temporaryPasswordField = new PasswordField();
+        temporaryPasswordField.setPromptText("Contraseña temporal");
+        temporaryPasswordField.setMaxWidth(Double.MAX_VALUE);
+        temporaryPasswordField.setDisable(true);
+        passwordActionBox.valueProperty().addListener((obs, old, value) -> {
+            boolean enabled = value == PasswordActionOption.SET_TEMPORARY;
+            temporaryPasswordField.setDisable(!enabled);
+            if (!enabled) {
+                temporaryPasswordField.clear();
+            }
+        });
+
+        Label error = new Label();
+        error.getStyleClass().add("login-error");
+        error.setVisible(false);
+        error.setManaged(false);
+        error.setWrapText(true);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.add(metaKey("Nombre:"), 0, 0);
+        grid.add(nameField, 1, 0);
+        grid.add(metaKey("Email:"), 0, 1);
+        grid.add(emailField, 1, 1);
+        grid.add(metaKey("Contraseña:"), 0, 2);
+        grid.add(passwordActionBox, 1, 2);
+        grid.add(metaKey("Temporal:"), 0, 3);
+        grid.add(temporaryPasswordField, 1, 3);
+        grid.add(error, 1, 4);
+        ColumnConstraints keyCol = new ColumnConstraints();
+        keyCol.setMinWidth(92);
+        ColumnConstraints valueCol = new ColumnConstraints();
+        valueCol.setHgrow(Priority.ALWAYS);
+        grid.getColumnConstraints().addAll(keyCol, valueCol);
+
+        dialog.getDialogPane().setContent(grid);
+        DialogStyler.apply(dialog);
+
+        Button saveButton = (Button) dialog.getDialogPane().lookupButton(saveType);
+        saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            String message = editValidationMessage(
+                    nameField.getText(),
+                    emailField.getText(),
+                    passwordActionBox.getValue(),
+                    temporaryPasswordField.getText());
+            if (message != null) {
+                error.setText(message);
+                error.setVisible(true);
+                error.setManaged(true);
+                event.consume();
+            }
+        });
+
+        dialog.setResultConverter(button -> {
+            if (button != saveType) return null;
+            PasswordActionOption action = passwordActionBox.getValue();
+            String temporaryPassword = action == PasswordActionOption.SET_TEMPORARY
+                    ? temporaryPasswordField.getText()
+                    : null;
+            return new EditForm(
+                    nameField.getText().trim(),
+                    emailField.getText().trim(),
+                    action.apiValue(),
+                    temporaryPassword
+            );
+        });
+
+        dialog.showAndWait().ifPresent(form -> {
+            statusLabel.setText("Actualizando miembro...");
+            editBtn.setDisable(true);
+            changeRoleBtn.setDisable(true);
+            removeBtn.setDisable(true);
+            Thread.ofVirtual().start(() -> {
+                try {
+                    context.getFamilyRepository().updateMember(
+                            familyId,
+                            selected.getUserId(),
+                            form.displayName(),
+                            form.email(),
+                            form.passwordAction(),
+                            form.temporaryPassword());
+                    Platform.runLater(() -> {
+                        statusLabel.setText("Miembro actualizado correctamente.");
+                        refresh();
+                    });
+                } catch (ApiException ex) {
+                    Platform.runLater(() -> {
+                        statusLabel.setText("Error: " + ex.getMessage());
+                        updateButtonStates(table.getSelectionModel().getSelectedItem());
+                    });
                 }
             });
         });
@@ -310,6 +454,20 @@ public class FamilyMembersView extends VBox {
         return null;
     }
 
+    private String editValidationMessage(String displayName, String email, PasswordActionOption passwordAction, String temporaryPassword) {
+        if (displayName == null || displayName.isBlank()) {
+            return "Introduce el nombre del miembro.";
+        }
+        if (email == null || email.isBlank() || !email.contains("@")) {
+            return "Introduce un email válido.";
+        }
+        if (passwordAction == PasswordActionOption.SET_TEMPORARY
+                && (temporaryPassword == null || temporaryPassword.length() < 12)) {
+            return "La contraseña temporal debe tener al menos 12 caracteres.";
+        }
+        return null;
+    }
+
     private void onRemoveMember() {
         MemberRow selected = table.getSelectionModel().getSelectedItem();
         if (selected == null) return;
@@ -324,6 +482,7 @@ public class FamilyMembersView extends VBox {
         if (result.isPresent() && result.get() == ButtonType.OK) {
             String familyId = context.getSession().getFamilyId();
             statusLabel.setText("Eliminando miembro...");
+            editBtn.setDisable(true);
             changeRoleBtn.setDisable(true);
             removeBtn.setDisable(true);
             Thread.ofVirtual().start(() -> {
@@ -341,16 +500,22 @@ public class FamilyMembersView extends VBox {
     }
 
     private void updateButtonStates(MemberRow selected) {
-        if (selected == null || !context.getSession().isAdmin()) {
+        if (selected == null || !canManage(selected)) {
+            editBtn.setDisable(true);
             changeRoleBtn.setDisable(true);
             removeBtn.setDisable(true);
             return;
         }
-        // Cannot modify self or OWNER
-        boolean isOwner = "OWNER".equalsIgnoreCase(selected.getRole());
-        boolean isSelf  = selected.isSelf();
-        changeRoleBtn.setDisable(isOwner || isSelf);
-        removeBtn.setDisable(isOwner || isSelf);
+        editBtn.setDisable(false);
+        changeRoleBtn.setDisable(false);
+        removeBtn.setDisable(false);
+    }
+
+    private boolean canManage(MemberRow selected) {
+        if (selected == null || !context.getSession().isAdmin()) {
+            return false;
+        }
+        return !"OWNER".equalsIgnoreCase(selected.getRole()) && !selected.isSelf();
     }
 
     private Label metaKey(String text) {
@@ -362,6 +527,31 @@ public class FamilyMembersView extends VBox {
     // ── Row model ─────────────────────────────────────────────────────────────
 
     private record InviteForm(String email, String displayName, String password, String role) {}
+
+    private record EditForm(String displayName, String email, String passwordAction, String temporaryPassword) {}
+
+    private enum PasswordActionOption {
+        NONE(null, "No cambiar"),
+        SEND_RESET("SEND_RESET", "Enviar email de recuperación"),
+        SET_TEMPORARY("SET_TEMPORARY", "Definir temporal");
+
+        private final String apiValue;
+        private final String label;
+
+        PasswordActionOption(String apiValue, String label) {
+            this.apiValue = apiValue;
+            this.label = label;
+        }
+
+        String apiValue() {
+            return apiValue;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
 
     public static final class MemberRow {
         private final String userId;

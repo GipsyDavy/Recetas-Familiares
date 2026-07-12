@@ -40,6 +40,18 @@ data class FamilyMemberResponseDto(
 )
 
 @Serializable
+data class UserRecipeRankingDto(
+    val rank: Int,
+    val userId: String,
+    val displayName: String,
+    val role: String? = null,
+    val recipesCreated: Long,
+    val ratingsReceived: Long,
+    val averageStars: Double? = null,
+    val score: Long
+)
+
+@Serializable
 data class InviteMemberRequestDto(val email: String, val role: String)
 
 @Serializable
@@ -64,7 +76,9 @@ data class RecipeDto(
     val createdAt: String,
     val updatedAt: String,
     val syncVersion: Long,
-    val deleted: Boolean
+    val deleted: Boolean,
+    val createdByUserId: String? = null,
+    val createdByDisplayName: String? = null
 )
 
 @Serializable

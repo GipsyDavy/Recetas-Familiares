@@ -15,12 +15,13 @@ import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 import java.util.ArrayList;
 
-public class RecipeListView extends SplitPane {
+public class RecipeListView extends ScrollPane {
 
     private static final int PAGE_SIZE = 30;
 
     private final AppContext context;
     private final Runnable onSync;
+    private final SplitPane splitPane = new SplitPane();
     private final ListView<RecipeDtos.RecipeDto> listView = new ListView<>();
     private final RecipeDetailView detailView;
     private final TextField searchField = new TextField();
@@ -40,7 +41,9 @@ public class RecipeListView extends SplitPane {
     }
 
     private void build() {
-        getStyleClass().add("recipe-list-view");
+        DesktopScroll.configurePage(this, splitPane);
+        splitPane.getStyleClass().add("recipe-list-view");
+        setContent(splitPane);
 
         // Left panel: search + list
         searchField.setPromptText("Buscar recetas...");
@@ -90,8 +93,8 @@ public class RecipeListView extends SplitPane {
 
         detailView.showEmpty();
 
-        getItems().addAll(leftPanel, detailView);
-        setDividerPositions(0.35);
+        splitPane.getItems().addAll(leftPanel, detailView);
+        splitPane.setDividerPositions(0.35);
     }
 
     public void filterBy(String query) {
@@ -268,7 +271,15 @@ public class RecipeListView extends SplitPane {
             if (r.servings() != null) sb.append(r.servings()).append(" pers.  ");
             if (r.prepMinutes() != null) sb.append(r.prepMinutes()).append(" min");
             if (r.difficulty() != null) sb.append("  ·  ").append(r.difficulty());
+            String creator = creatorLabel(r);
+            if (creator != null) sb.append("  ·  Por ").append(creator);
             return sb.toString().trim();
+        }
+
+        private String creatorLabel(RecipeDtos.RecipeDto r) {
+            return r.createdByDisplayName() != null && !r.createdByDisplayName().isBlank()
+                    ? r.createdByDisplayName()
+                    : null;
         }
     }
 }

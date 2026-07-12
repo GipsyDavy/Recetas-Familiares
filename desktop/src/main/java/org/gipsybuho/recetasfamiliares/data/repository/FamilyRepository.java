@@ -35,10 +35,33 @@ public class FamilyRepository {
         return api.get("api/v1/families/" + familyId + "/stats", FamilyDtos.FamilyStatsResponse.class);
     }
 
+    /** Returns recipe contribution ranking for active family members. */
+    public FamilyDtos.UserRecipeRankingResponse[] loadRecipeRanking(String familyId) throws ApiException {
+        FamilyDtos.UserRecipeRankingResponse[] result = api.get(
+                "api/v1/families/" + familyId + "/recipe-rankings/users",
+                FamilyDtos.UserRecipeRankingResponse[].class);
+        return result != null ? result : new FamilyDtos.UserRecipeRankingResponse[0];
+    }
+
     /** Changes the role of a family member (OWNER/ADMIN only). */
     public FamilyDtos.FamilyMemberResponse updateMemberRole(String familyId, String userId, String newRole) throws ApiException {
         return api.put("api/v1/families/" + familyId + "/members/" + userId + "/role",
                 java.util.Map.of("role", newRole), FamilyDtos.FamilyMemberResponse.class);
+    }
+
+    /** Updates member profile data and optional password action (OWNER/ADMIN only). */
+    public FamilyDtos.FamilyMemberResponse updateMember(
+            String familyId,
+            String userId,
+            String displayName,
+            String email,
+            String passwordAction,
+            String temporaryPassword
+    ) throws ApiException {
+        return api.put(
+                "api/v1/families/" + familyId + "/members/" + userId,
+                new FamilyDtos.UpdateFamilyMemberRequest(displayName, email, passwordAction, temporaryPassword),
+                FamilyDtos.FamilyMemberResponse.class);
     }
 
     /** Invites an existing user or creates and adds a new user (OWNER/ADMIN only). */

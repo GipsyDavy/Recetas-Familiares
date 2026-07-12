@@ -21,6 +21,7 @@ import org.gipsybuho.recetasfamiliares.core.FamilyRole;
 
 import java.io.File;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Vista de perfil (UX-5), accesible a todos los roles: avatar, nombre editable,
@@ -42,6 +43,7 @@ public class ProfileView extends ScrollPane {
     private final Label familyLabel = new Label();
     private final Label roleBadge = new Label();
     private final HBox statsSection = new HBox(16);
+    private final VBox rankingSection = new VBox(8);
     private final Label verificationLabel = new Label();
     private final HBox verificationActions = new HBox(10);
     private final StackPane familyAvatarSlot = new StackPane();
@@ -132,8 +134,12 @@ public class ProfileView extends ScrollPane {
         changeFamilyPhotoBtn.setManaged(isAdmin);
 
         statsSection.setPadding(new Insets(6, 0, 0, 0));
+        Label rankingTitle = new Label("Ranking de recetas");
+        rankingTitle.getStyleClass().add("settings-section-title");
+        rankingSection.setPadding(new Insets(4, 0, 0, 0));
 
-        VBox card = new VBox(10, sectionTitle, familyRow, changeFamilyPhotoBtn, statsSection);
+        VBox card = new VBox(10, sectionTitle, familyRow, changeFamilyPhotoBtn, statsSection,
+                rankingTitle, rankingSection);
         card.getStyleClass().add("settings-section");
         return card;
     }
@@ -321,17 +327,20 @@ public class ProfileView extends ScrollPane {
                     if (selected == null) {
                         familyLabel.setText("Sin familia");
                         statsSection.getChildren().clear();
+                        rankingSection.getChildren().clear();
                         return;
                     }
                     familyLabel.setText(selected.name() != null ? selected.name() : "Sin nombre");
                     updateRoleBadge(selected.role());
                     renderFamilyAvatar(selected.name(), selected.avatarUrl());
                     loadFamilyStats(selected.id());
+                    loadRecipeRanking(selected.id());
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
                     familyLabel.setText("Familia no disponible sin conexión");
                     loadFamilyStats(context.getSession().getFamilyId());
+                    loadRecipeRanking(context.getSession().getFamilyId());
                 });
             }
         });
@@ -457,6 +466,67 @@ public class ProfileView extends ScrollPane {
         Label chip = new Label(text);
         chip.getStyleClass().add("recipe-cell-meta");
         return chip;
+    }
+
+    private void loadRecipeRanking(String familyId) {
+        rankingSection.getChildren().clear();
+        if (familyId == null || familyId.isBlank()) return;
+        rankingSection.getChildren().add(mutedLabel("Cargando ranking..."));
+        Thread.ofVirtual().start(() -> {
+            try {
+                var ranking = context.getFamilyRepository().loadRecipeRanking(familyId);
+                Platform.runLater(() -> renderRecipeRanking(ranking));
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    rankingSection.getChildren().clear();
+                    rankingSection.getChildren().add(mutedLabel("Ranking no disponible sin conexión."));
+                });
+            }
+        });
+    }
+
+    private void renderRecipeRanking(FamilyDtos.UserRecipeRankingResponse[] ranking) {
+        rankingSection.getChildren().clear();
+        if (ranking == null || ranking.length == 0) {
+            rankingSection.getChildren().add(mutedLabel("Sin datos de ranking."));
+            return;
+        }
+        int limit = Math.min(ranking.length, 10);
+        for (int i = 0; i < limit; i++) {
+            rankingSection.getChildren().add(rankingRow(ranking[i]));
+        }
+    }
+
+    private HBox rankingRow(FamilyDtos.UserRecipeRankingResponse item) {
+        Label rank = new Label("#" + item.rank());
+        rank.getStyleClass().add("profile-role-badge");
+        rank.setMinWidth(36);
+
+        Label name = new Label(item.displayName() != null ? item.displayName() : "Usuario");
+        name.getStyleClass().add("settings-section-title");
+        Label meta = mutedLabel(item.recipesCreated() + (item.recipesCreated() == 1 ? " receta" : " recetas")
+                + " · " + item.ratingsReceived()
+                + (item.ratingsReceived() == 1 ? " valoración" : " valoraciones")
+                + " · " + averageText(item.averageStars()));
+        VBox text = new VBox(2, name, meta);
+        HBox.setHgrow(text, Priority.ALWAYS);
+
+        Label score = new Label(item.score() + " pts");
+        score.getStyleClass().add("recipe-cell-meta");
+        HBox row = new HBox(10, rank, text, score);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+
+    private Label mutedLabel(String text) {
+        Label label = new Label(text);
+        label.getStyleClass().add("settings-muted");
+        return label;
+    }
+
+    private String averageText(Double averageStars) {
+        if (averageStars == null) return "sin media";
+        return "media " + String.format(Locale.getDefault(), "%.1f", averageStars);
     }
 
     // ── Acciones ──────────────────────────────────────────────────────────────

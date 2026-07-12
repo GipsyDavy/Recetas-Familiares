@@ -13,6 +13,26 @@ public final class FamilyDtos {
     /** Matches backend InviteMemberRequest: existing-user invite or new-user creation. */
     public record InviteMemberRequest(String email, String displayName, String password, String role) {}
 
+    /** Matches backend UpdateFamilyMemberRequest. */
+    public record UpdateFamilyMemberRequest(
+            String displayName,
+            String email,
+            String passwordAction,
+            String temporaryPassword
+    ) {}
+
     /** Matches backend FamilyStatsResponse: {totalRecipes, totalMembers, totalStockItems, lastActivityAt} */
     public record FamilyStatsResponse(long totalRecipes, long totalMembers, long totalStockItems, String lastActivityAt) {}
+
+    /** Matches backend UserRecipeRankingResponse. */
+    public record UserRecipeRankingResponse(
+            int rank,
+            String userId,
+            String displayName,
+            String role,
+            long recipesCreated,
+            long ratingsReceived,
+            Double averageStars,
+            long score
+    ) {}
 }
