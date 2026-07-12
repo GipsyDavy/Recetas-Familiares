@@ -2535,5 +2535,7 @@ Opciones presentadas al usuario para autorizar el paso 1 en adelante:
 - B: solo verificacion + seguridad (1 a 3), sin commitear todavia.
 - C: otra cosa, a definir por el usuario.
 
-PUNTO EXACTO PARA RETOMAR: esperando respuesta del usuario (A/B/C) para empezar el paso 1. No tocar codigo, no hacer build, no commitear cambios de Codex hasta recibir esa autorizacion. `paraImplementar.txt` sigue sin trackear y no se toca.
+AUTORIZACION RECIBIDA (2026-07-12 noche): el usuario eligio **opcion A, plan completo (pasos 1 a 6)**. Registrado para el siguiente sprint; NADA ejecutado todavia por instruccion explicita del usuario ("solo dejalo registrado... no hagas nada todavia").
+
+PUNTO EXACTO PARA RETOMAR: empezar por el paso 1 del plan (verificacion propia: backend compile+tests incluyendo destrabar `FamilyMemberControllerTest` con el metodo de env de `herztner/recetas_app.env`; Android `testDebugUnitTest assembleDebug`; Desktop `mvn test`; iOS `:composeApp:compileKotlinMetadata`), seguido de `/VibeSec`, `/security-review`, bloques de auditoria Codex/Gemini, y solo si todo verifica, commits separados por sprint. No tocar codigo, no hacer build, no commitear cambios de Codex hasta la proxima sesion/instruccion de arranque. `paraImplementar.txt` sigue sin trackear y no se toca.
 - Siguiente accion funcional sigue siendo Sprint (12) exportar/copiar recetas entre grupos familiares, salvo que el usuario quiera primero instalar/probar estos binarios.
