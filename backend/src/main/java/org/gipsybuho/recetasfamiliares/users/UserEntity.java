@@ -108,6 +108,12 @@ public class UserEntity {
         this.displayName = displayName;
     }
 
+    public void changeEmail(String email) {
+        this.email = email;
+        emailVerified = false;
+        emailVerifiedAt = null;
+    }
+
     public void setAvatarUrl(String avatarUrl) {
         this.avatarUrl = avatarUrl;
     }

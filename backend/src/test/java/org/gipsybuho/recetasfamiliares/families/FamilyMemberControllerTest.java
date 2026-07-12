@@ -268,6 +268,263 @@ class FamilyMemberControllerTest {
     }
 
     @Test
+    void updateMemberDetailsWithTemporaryPasswordChangesLoginAndRevokesRefreshToken() throws Exception {
+        RegisteredUser owner = register("edit-temp-owner@example.com", "Familia EditTemp");
+
+        // Invita creando la cuenta directamente (sin familia propia previa) para que el
+        // objetivo pertenezca a una sola familia: set-temporary-password esta bloqueado
+        // para cuentas multi-familia (proteccion contra toma de cuenta cross-family).
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "edit-temp-guest@example.com",
+                                  "displayName": "Invitada Original",
+                                  "password": "very-secure-password",
+                                  "role": "MEMBER"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        MvcResult members = mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        String guestId = readUserIdByEmail(members, "edit-temp-guest@example.com");
+
+        MvcResult guestLogin = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "edit-temp-guest@example.com",
+                                  "password": "very-secure-password"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        String guestRefreshToken = read(guestLogin, "refreshToken");
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), guestId)
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Invitada Actualizada",
+                                  "email": "edit-temp-updated@example.com",
+                                  "passwordAction": "SET_TEMPORARY",
+                                  "temporaryPassword": "temporary-password-123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Invitada Actualizada"))
+                .andExpect(jsonPath("$.email").value("edit-temp-updated@example.com"))
+                .andExpect(jsonPath("$.role").value("MEMBER"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "edit-temp-guest@example.com",
+                                  "password": "very-secure-password"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "edit-temp-updated@example.com",
+                                  "password": "temporary-password-123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value(guestId))
+                .andExpect(jsonPath("$.user.displayName").value("Invitada Actualizada"))
+                .andExpect(jsonPath("$.user.email").value("edit-temp-updated@example.com"));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken": "%s"}
+                                """.formatted(guestRefreshToken)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateMemberDetailsBlocksTemporaryPasswordWhenTargetBelongsToMultipleFamilies() throws Exception {
+        RegisteredUser owner = register("edit-multi-owner@example.com", "Familia EditMulti");
+        RegisteredUser guest = register("edit-multi-guest@example.com", "Familia EditMultiGuest");
+
+        // El guest ya tiene su propia familia (arriba); al invitarlo a otra familia mas
+        // queda con 2 membresias activas, exactamente el escenario que debe bloquearse.
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "edit-multi-guest@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), guest.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Invitada Actualizada",
+                                  "email": "edit-multi-guest@example.com",
+                                  "passwordAction": "SET_TEMPORARY",
+                                  "temporaryPassword": "temporary-password-123"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        // login con la password original sigue funcionando: nada cambio
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "edit-multi-guest@example.com",
+                                  "password": "very-secure-password"
+                                }
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void updateMemberDetailsRejectsMemberSelfOwnerAndDuplicateEmail() throws Exception {
+        RegisteredUser owner = register("edit-rules-owner@example.com", "Familia EditRules");
+        RegisteredUser admin = register("edit-rules-admin@example.com", "Familia EditRulesAdmin");
+        register("edit-rules-used@example.com", "Familia EditRulesUsed");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "edit-rules-admin@example.com", "role": "ADMIN"}
+                                """))
+                .andExpect(status().isCreated());
+
+        // Miembro invitado creando la cuenta directamente (sin familia propia previa),
+        // para que quede en una sola familia y el cambio de email no choque con el
+        // bloqueo de multi-familia; este test cubre self/OWNER/email-duplicado, no eso.
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "edit-rules-member@example.com",
+                                  "displayName": "Test User",
+                                  "password": "very-secure-password",
+                                  "role": "MEMBER"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        MvcResult members = mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        String memberId = readUserIdByEmail(members, "edit-rules-member@example.com");
+
+        MvcResult memberLogin = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "edit-rules-member@example.com",
+                                  "password": "very-secure-password"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        String memberAccessToken = read(memberLogin, "accessToken");
+
+        String body = """
+                {
+                  "displayName": "Nombre Editado",
+                  "email": "edit-rules-member@example.com",
+                  "passwordAction": "NONE"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), memberId)
+                        .header("Authorization", "Bearer " + memberAccessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), owner.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Owner Editado",
+                                  "email": "edit-rules-owner@example.com",
+                                  "passwordAction": "NONE"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), owner.userId())
+                        .header("Authorization", "Bearer " + admin.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Owner Editado",
+                                  "email": "edit-rules-owner@example.com",
+                                  "passwordAction": "NONE"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), memberId)
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Nombre Editado",
+                                  "email": "edit-rules-used@example.com",
+                                  "passwordAction": "NONE"
+                                }
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void updateMemberDetailsResetEmailFailsClosedWhenMailIsDisabled() throws Exception {
+        RegisteredUser owner = register("edit-reset-owner@example.com", "Familia EditReset");
+        RegisteredUser member = register("edit-reset-member@example.com", "Familia EditResetMember");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "edit-reset-member@example.com", "role": "MEMBER"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), member.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Test User",
+                                  "email": "edit-reset-member@example.com",
+                                  "passwordAction": "SEND_RESET"
+                                }
+                                """))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
     void inviteDuplicateMemberReturns201Silently() throws Exception {
         RegisteredUser owner = register("invite-dup-owner@example.com", "Familia InviteDup");
         register("invite-dup-guest@example.com", "Familia Guest2");

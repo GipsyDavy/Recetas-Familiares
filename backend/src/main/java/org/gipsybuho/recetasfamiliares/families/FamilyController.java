@@ -68,6 +68,16 @@ public class FamilyController {
         return familyService.updateMemberRole(familyId, userId, authentication.getName(), request);
     }
 
+    @PutMapping("/{familyId}/members/{userId}")
+    public FamilyMemberResponse updateMember(
+            @PathVariable String familyId,
+            @PathVariable String userId,
+            @Valid @RequestBody UpdateFamilyMemberRequest request,
+            Authentication authentication
+    ) {
+        return familyService.updateMember(familyId, userId, authentication.getName(), request);
+    }
+
     @DeleteMapping("/{familyId}/members/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeMember(

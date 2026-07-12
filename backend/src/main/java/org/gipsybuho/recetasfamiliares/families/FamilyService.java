@@ -1,9 +1,13 @@
 package org.gipsybuho.recetasfamiliares.families;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
+import org.gipsybuho.recetasfamiliares.auth.AccountActionTokenService;
+import org.gipsybuho.recetasfamiliares.auth.AccountActionTokenType;
+import org.gipsybuho.recetasfamiliares.auth.AccountEmailService;
 import org.gipsybuho.recetasfamiliares.auth.RefreshTokenService;
 import org.gipsybuho.recetasfamiliares.favorites.FavoriteRecipeRepository;
 import org.gipsybuho.recetasfamiliares.menus.MenuItemRepository;
@@ -15,6 +19,7 @@ import org.gipsybuho.recetasfamiliares.stock.StockItemRepository;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,6 +33,8 @@ public class FamilyService {
     private final FamilyRepository familyRepository;
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
+    private final AccountActionTokenService accountActionTokenService;
+    private final AccountEmailService accountEmailService;
     private final RecipeRepository recipeRepository;
     private final StockItemRepository stockItemRepository;
     private final MenuItemRepository menuItemRepository;
@@ -37,12 +44,16 @@ public class FamilyService {
     private final PasswordEncoder passwordEncoder;
     private final org.gipsybuho.recetasfamiliares.photos.FileStorageService fileStorageService;
     private final StarterRecipeSeeder starterRecipeSeeder;
+    private final Duration passwordResetTokenTtl;
+    private final Duration emailVerificationTokenTtl;
 
     public FamilyService(
             FamilyMemberRepository familyMemberRepository,
             FamilyRepository familyRepository,
             UserRepository userRepository,
             RefreshTokenService refreshTokenService,
+            AccountActionTokenService accountActionTokenService,
+            AccountEmailService accountEmailService,
             RecipeRepository recipeRepository,
             StockItemRepository stockItemRepository,
             MenuItemRepository menuItemRepository,
@@ -51,12 +62,16 @@ public class FamilyService {
             FavoriteRecipeRepository favoriteRecipeRepository,
             PasswordEncoder passwordEncoder,
             org.gipsybuho.recetasfamiliares.photos.FileStorageService fileStorageService,
-            StarterRecipeSeeder starterRecipeSeeder
+            StarterRecipeSeeder starterRecipeSeeder,
+            @Value("${app.account.password-reset-token-ttl-minutes:30}") long passwordResetTokenTtlMinutes,
+            @Value("${app.account.email-verification-token-ttl-hours:24}") long emailVerificationTokenTtlHours
     ) {
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
         this.userRepository = userRepository;
         this.refreshTokenService = refreshTokenService;
+        this.accountActionTokenService = accountActionTokenService;
+        this.accountEmailService = accountEmailService;
         this.recipeRepository = recipeRepository;
         this.stockItemRepository = stockItemRepository;
         this.menuItemRepository = menuItemRepository;
@@ -66,6 +81,8 @@ public class FamilyService {
         this.passwordEncoder = passwordEncoder;
         this.fileStorageService = fileStorageService;
         this.starterRecipeSeeder = starterRecipeSeeder;
+        this.passwordResetTokenTtl = Duration.ofMinutes(passwordResetTokenTtlMinutes);
+        this.emailVerificationTokenTtl = Duration.ofHours(emailVerificationTokenTtlHours);
     }
 
     @Transactional(readOnly = true)
@@ -131,6 +148,94 @@ public class FamilyService {
         }
         target.setRole(newRole);
         return toMemberResponse(familyMemberRepository.save(target));
+    }
+
+    @Transactional
+    public FamilyMemberResponse updateMember(String familyId, String targetUserId,
+            String callerUserId, UpdateFamilyMemberRequest request) {
+        requireAdminOrAbove(familyId, callerUserId);
+        if (targetUserId.equals(callerUserId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot edit yourself as a family member");
+        }
+
+        FamilyMemberEntity target = requireActiveMember(familyId, targetUserId);
+        if (target.getRole() == FamilyRole.OWNER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot edit OWNER account");
+        }
+
+        UserEntity user = target.getUser();
+        String displayName = request.displayName().trim();
+        if (displayName.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Display name is required");
+        }
+        boolean belongsToMultipleFamilies = familyMemberRepository
+                .findByUser_IdAndDeletedFalse(targetUserId).size() > 1;
+
+        String email = normalizeEmail(request.email());
+        boolean revokeSessions = false;
+        boolean emailChanged = !email.equalsIgnoreCase(user.getEmail());
+        if (emailChanged) {
+            if (belongsToMultipleFamilies) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Cannot change this member's email directly; send a password reset email instead");
+            }
+            if (userRepository.existsByEmailIgnoreCase(email)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
+            }
+            user.changeEmail(email);
+            revokeSessions = true;
+        }
+
+        user.setDisplayName(displayName);
+
+        UpdateFamilyMemberRequest.PasswordAction passwordAction = request.passwordAction() != null
+                ? request.passwordAction()
+                : UpdateFamilyMemberRequest.PasswordAction.NONE;
+        String temporaryPassword = request.temporaryPassword();
+        boolean sendPasswordReset = false;
+        switch (passwordAction) {
+            case NONE -> {
+                if (temporaryPassword != null && !temporaryPassword.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password action is required");
+                }
+            }
+            case SEND_RESET -> {
+                if (temporaryPassword != null && !temporaryPassword.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Temporary password is not allowed for reset email");
+                }
+                requireEmailDeliveryConfigured();
+                sendPasswordReset = true;
+            }
+            case SET_TEMPORARY -> {
+                if (temporaryPassword == null || temporaryPassword.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Temporary password is required");
+                }
+                if (belongsToMultipleFamilies) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Cannot set a temporary password for this member directly; send a password reset email instead");
+                }
+                user.setPasswordHash(passwordEncoder.encode(temporaryPassword));
+                revokeSessions = true;
+            }
+        }
+
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered", ex);
+        }
+        if (revokeSessions) {
+            refreshTokenService.revokeAllForUser(user.getId());
+        }
+        String emailVerificationToken = emailChanged ? issueEmailVerificationTokenIfEnabled(user) : null;
+        String passwordResetToken = sendPasswordReset ? issuePasswordResetToken(user) : null;
+        if (emailVerificationToken != null) {
+            accountEmailService.sendEmailVerification(user, emailVerificationToken);
+        }
+        if (passwordResetToken != null) {
+            accountEmailService.sendPasswordReset(user, passwordResetToken);
+        }
+        return toMemberResponse(target);
     }
 
     @Transactional
@@ -266,6 +371,32 @@ public class FamilyService {
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered", ex);
         }
+    }
+
+    private String issuePasswordResetToken(UserEntity user) {
+        requireEmailDeliveryConfigured();
+        return accountActionTokenService.issue(
+                user,
+                AccountActionTokenType.PASSWORD_RESET,
+                passwordResetTokenTtl
+        ).rawToken();
+    }
+
+    private void requireEmailDeliveryConfigured() {
+        if (!accountEmailService.isDeliveryEnabled()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Email delivery is not configured");
+        }
+    }
+
+    private String issueEmailVerificationTokenIfEnabled(UserEntity user) {
+        if (!accountEmailService.isDeliveryEnabled()) {
+            return null;
+        }
+        return accountActionTokenService.issue(
+                user,
+                AccountActionTokenType.EMAIL_VERIFICATION,
+                emailVerificationTokenTtl
+        ).rawToken();
     }
 
     private String normalizeEmail(String email) {
