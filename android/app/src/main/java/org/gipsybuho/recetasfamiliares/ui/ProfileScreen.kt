@@ -81,6 +81,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
     var showInvite  by remember { mutableStateOf(false) }
     var showVerifyCode by remember { mutableStateOf(false) }
     var showDeleteAccount by remember { mutableStateOf(false) }
+    var showLogoutConfirm by remember { mutableStateOf(false) }
     var showFamilySelector by remember { mutableStateOf(false) }
     var showCreateFamily by remember { mutableStateOf(false) }
     var memberRoleChange by remember { mutableStateOf<MemberRoleChange?>(null) }
@@ -107,6 +108,17 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
         DeleteAccountDialog(
             viewModel = viewModel,
             onDismiss = { showDeleteAccount = false }
+        )
+    }
+
+    if (showLogoutConfirm) {
+        LogoutConfirmDialog(
+            onDismiss = { showLogoutConfirm = false },
+            onConfirm = {
+                if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showLogoutConfirm = false
+                viewModel.logout()
+            }
         )
     }
 
@@ -494,7 +506,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
         Spacer(Modifier.height(Spacing.xl))
 
         Button(
-            onClick = { viewModel.logout() },
+            onClick = { showLogoutConfirm = true },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -767,6 +779,38 @@ private fun ChangeMemberRoleDialog(
         confirmButton = {
             Button(onClick = onConfirm) {
                 Text("Cambiar")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+private fun LogoutConfirmDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cerrar sesión") },
+        text = {
+            Text("Se cerrará tu sesión y se borrarán los datos guardados en este dispositivo, " +
+                "incluidos los cambios que aún no se hayan sincronizado. " +
+                "Tus recetas y datos familiares siguen a salvo en el servidor.")
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text("Cerrar sesión")
             }
         },
         dismissButton = {

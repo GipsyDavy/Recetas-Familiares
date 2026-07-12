@@ -90,6 +90,7 @@ class SyncRepositoryTest {
 
         savedLastSyncTime = null
         every { sessionStore.familyId } returns FAMILY_ID
+        every { sessionStore.userId } returns USER_ID
         every { sessionStore.familyIdFlow } returns MutableStateFlow(FAMILY_ID)
         every { sessionStore.lastSyncTimeFor(FAMILY_ID) } returns null
         every { sessionStore.setLastSyncTime(FAMILY_ID, any()) } answers { savedLastSyncTime = secondArg() }
@@ -135,6 +136,23 @@ class SyncRepositoryTest {
 
         assertNull("lastSyncTime no debe avanzar si quedan paginas pendientes", savedLastSyncTime)
         coVerify(exactly = 50) { api.pullSync(FAMILY_ID, any(), any()) }
+    }
+
+    @Test
+    fun `pull en vuelo no aplica datos si la sesion del usuario murio`() = runTest {
+        // Primera lectura de userId captura el dueño del sync; la segunda
+        // (guard post-respuesta) simula un logout en vuelo devolviendo null.
+        var reads = 0
+        every { sessionStore.userId } answers { if (reads++ == 0) USER_ID else null }
+        coEvery { api.pullSync(FAMILY_ID, null, any()) } returns emptyPull(
+            serverTime = "T1",
+            recipes = listOf(recipeDto("r-1"))
+        )
+
+        repository.pullOnce()
+
+        coVerify(exactly = 0) { recipeDao.upsertAll(any()) }
+        assertNull("el cursor no debe avanzar tras un logout en vuelo", savedLastSyncTime)
     }
 
     @Test
@@ -241,6 +259,7 @@ class SyncRepositoryTest {
 
     private companion object {
         const val FAMILY_ID = "fam-1"
+        const val USER_ID = "user-1"
 
         fun emptyPull(
             serverTime: String,

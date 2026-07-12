@@ -102,11 +102,20 @@ class SessionStore(context: Context) {
         get() = preferences.getString("user_id", null)
             ?: preferences.getString("last_user_id", null)
 
+    /** true mientras un vaciado de cache local esta pendiente o fallo a
+     *  mitad; el siguiente login debe forzar el vaciado aunque el usuario
+     *  coincida. Sobrevive a clear(). */
+    var pendingWipe: Boolean
+        get() = preferences.getBoolean("pending_wipe", false)
+        set(value) = preferences.edit { putBoolean("pending_wipe", value) }
+
     fun clear() {
         val lastUser = lastKnownUserId
+        val wipePending = pendingWipe
         preferences.edit {
             clear()
             if (lastUser != null) putString("last_user_id", lastUser)
+            if (wipePending) putBoolean("pending_wipe", true)
         }
         _familyId.value = null
         _familyRole.value = null

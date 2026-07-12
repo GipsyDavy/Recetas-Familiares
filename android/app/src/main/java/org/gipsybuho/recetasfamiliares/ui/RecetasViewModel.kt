@@ -158,6 +158,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     fun login(email: String, password: String, onError: (String) -> Unit) {
         viewModelScope.launch {
             runCatching {
+                // Un wipe de logout aun en vuelo debe terminar antes de cargar
+                // la sesion nueva: si no, podria borrar datos recien sincronizados.
+                wipeJob?.join()
                 container.authRepository.login(email, password)
                 _isLoggedIn.value = true
                 refresh()
@@ -178,12 +181,18 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _emailVerified.value = null
     }
 
+    private var wipeJob: Job? = null
+
     /** Privacidad en dispositivos compartidos: al cerrar sesion no queda
      *  contenido familiar en Room. Los datos maestros viven en el servidor;
-     *  los cambios offline aun no sincronizados se pierden. */
+     *  los cambios offline aun no sincronizados se pierden. Si el vaciado
+     *  falla o no llega a correr, pendingWipe fuerza el reintento en el
+     *  siguiente login (fail-closed). */
     private fun wipeLocalCaches() {
-        viewModelScope.launch(Dispatchers.IO) {
+        container.sessionStore.pendingWipe = true
+        wipeJob = viewModelScope.launch(Dispatchers.IO) {
             runCatching { container.database.clearAllTables() }
+                .onSuccess { container.sessionStore.pendingWipe = false }
         }
     }
 

@@ -123,8 +123,9 @@ class AuthRepository(
     suspend fun login(email: String, password: String) {
         val response = api.login(LoginRequestDto(email.trim(), password))
         val previousUser = sessionStore.lastKnownUserId
-        if (previousUser != null && previousUser != response.user.id) {
+        if (sessionStore.pendingWipe || (previousUser != null && previousUser != response.user.id)) {
             clearLocalData()
+            sessionStore.pendingWipe = false
         }
         sessionStore.accessToken  = response.accessToken
         sessionStore.refreshToken = response.refreshToken
@@ -440,17 +441,22 @@ class SyncRepository(
 ) {
     suspend fun pullOnce() {
         val familyId = sessionStore.familyId ?: return
-        pullOnce(familyId, protectPending = true)
+        val ownerUserId = sessionStore.userId ?: return
+        pullOnce(familyId, ownerUserId, protectPending = true)
     }
 
     /** Opera SIEMPRE sobre la familia capturada por el llamador: si el usuario
      *  cambia de familia con un sync en vuelo, ni el cursor ni el pull sin
      *  proteccion pueden tocar la familia nueva. */
-    private suspend fun pullOnce(familyId: String, protectPending: Boolean) {
+    private suspend fun pullOnce(familyId: String, ownerUserId: String, protectPending: Boolean) {
         var since = sessionStore.lastSyncTimeFor(familyId)
         var pages = 0
         while (true) {
             val response = api.pullSync(familyId, since, PULL_PAGE_SIZE)
+            // Guard de sesion: cambiar de familia con un sync en vuelo es
+            // legitimo (cursor por familia), pero tras logout o cambio de
+            // usuario este pull no debe repoblar Room ni tocar el cursor.
+            if (sessionStore.userId != ownerUserId) return
             applyPullPage(familyId, response, protectPending)
             val hasNextPage = response.hasMore == true && response.nextSince != null
             if (!hasNextPage) {
@@ -504,6 +510,7 @@ class SyncRepository(
 
     suspend fun pushThenPull() {
         val familyId = sessionStore.familyId ?: return
+        val ownerUserId = sessionStore.userId ?: return
 
         val pendingRecipes        = database.recipeDao().findPendingCreate(familyId)
         val pendingRecipeDel      = database.recipeDao().findPendingDelete(familyId)
@@ -591,11 +598,14 @@ class SyncRepository(
             if (e.code() == 409) {
                 // Conflicto de lote completo: descartar la version local pendiente
                 // y traer la version canonical del servidor.
-                pullOnce(familyId, protectPending = false)
+                pullOnce(familyId, ownerUserId, protectPending = false)
                 return
             }
             throw e
         }
+
+        // Mismo guard que el pull: no aplicar ACKs de una sesion que ya no existe.
+        if (sessionStore.userId != ownerUserId) return
 
         // La respuesta de push solo contiene ACKs de lo empujado, no los cambios de otros
         // miembros: aplicar upserts SIN avanzar lastSyncTime y traer el resto con pullOnce().
@@ -610,7 +620,7 @@ class SyncRepository(
         database.familyNoteDao().upsertAll(response.familyNotes.orEmpty().map { it.toEntity() })
         database.recipePhotoDao().upsertAll(response.recipePhotos.orEmpty().map { it.toEntity() })
 
-        pullOnce(familyId, protectPending = true)
+        pullOnce(familyId, ownerUserId, protectPending = true)
     }
 
     private companion object {

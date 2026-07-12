@@ -72,6 +72,7 @@ class SyncRepositoryE2eTest {
         familyIdFlow.value = FAMILY_ID
         lastSyncTimes.clear()
         every { sessionStore.familyId } answers { familyId }
+        every { sessionStore.userId } returns "user-e2e"
         every { sessionStore.familyIdFlow } returns familyIdFlow
         every { sessionStore.lastSyncTimeFor(any()) } answers { lastSyncTimes[firstArg()] }
         every { sessionStore.setLastSyncTime(any(), any()) } answers {
