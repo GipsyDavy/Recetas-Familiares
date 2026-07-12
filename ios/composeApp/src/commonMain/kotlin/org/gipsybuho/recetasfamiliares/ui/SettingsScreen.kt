@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,10 +47,12 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 import org.gipsybuho.recetasfamiliares.core.rememberImagePickerLauncher
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
+import org.gipsybuho.recetasfamiliares.network.UserRecipeRankingDto
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.theme.ThemeMode
 import org.gipsybuho.recetasfamiliares.theme.lightColors
@@ -78,6 +81,17 @@ fun SettingsScreen(
         mutableStateOf(serverUrlPreference?.baseUrl.orEmpty())
     }
     var serverUrlMessage by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
+    var recipeRanking by androidx.compose.runtime.remember(session?.familyId, familyMemberRepository) {
+        mutableStateOf<List<UserRecipeRankingDto>>(emptyList())
+    }
+
+    LaunchedEffect(familyMemberRepository, session?.familyId) {
+        recipeRanking = if (familyMemberRepository != null && session?.familyId != null) {
+            runCatching { familyMemberRepository.recipeRanking() }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+    }
 
     val imagePicker = rememberImagePickerLauncher { bytes ->
         if (bytes != null && userRepository != null) {
@@ -173,6 +187,13 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        if (recipeRanking.isNotEmpty()) {
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+            RecipeRankingPreview(recipeRanking.take(5))
             Spacer(Modifier.height(8.dp))
         }
 
@@ -319,6 +340,34 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun RecipeRankingPreview(ranking: List<UserRecipeRankingDto>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        Text("Ranking de recetas", style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ranking.forEach { item ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("#${item.rank}", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.displayName, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "${item.recipesCreated} recetas · ${item.ratingsReceived} valoraciones · ${rankingAverageLabel(item.averageStars)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text("${item.score} pts", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
 private fun InviteMemberDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String) -> Unit
@@ -371,6 +420,12 @@ private fun InviteMemberDialog(
             }
         }
     )
+}
+
+private fun rankingAverageLabel(value: Double?): String {
+    if (value == null) return "sin media"
+    val rounded = (value * 10.0).roundToInt() / 10.0
+    return "media $rounded"
 }
 
 @Composable
