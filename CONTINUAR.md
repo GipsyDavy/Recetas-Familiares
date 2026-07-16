@@ -3310,3 +3310,16 @@ Cierre Git y punto exacto para la siguiente sesion:
 - Gate recomendado cuando haya macOS: ejecutar `FamilyViewModelTest` y un smoke iOS de
   listar/cambiar/crear familia. El limite de lista vacia/contexto local queda como
   deuda de seguridad/arquitectura separada.
+
+Resultado Git/CI posterior al checkpoint:
+- Commit funcional/documental del hotfix: `f367c30` (`fix(ios): sincroniza la familia
+  activa con la sesion`). Push correcto: `f5ec383..f367c30 main -> main`.
+- El push publico tambien los 14 commits locales anteriores. Como ese rango contenia
+  cambios Backend, GitHub ejecuto `Backend CI/CD` run `29525357829`.
+- Workflow completado con `success` el 2026-07-16 a las 20:49:58 +02:00:
+  `https://github.com/GipsyDavy/Recetas-Familiares/actions/runs/29525357829`.
+- Health publico posterior al despliegue comprobado el 2026-07-16 a las 20:50:10
+  +02:00: `GET https://recetas.167.233.213.242.sslip.io/api/v1/health` -> HTTP 200,
+  `{"status":"UP"}`.
+- Esta ultima anotacion se versiona en un commit solo documental; no coincide con las
+  rutas que activan `backend-ci-cd.yml`.
