@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.network
 
 import io.ktor.client.*
 import io.ktor.client.call.body
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.authProvider
@@ -19,13 +20,20 @@ import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 
 class ApiClient(
     private val session: SessionStore,
-    private val serverUrlPreference: ServerUrlPreference = ServerUrlPreference()
+    private val serverUrlPreference: ServerUrlPreference = ServerUrlPreference(),
+    engine: HttpClientEngine? = null
 ) {
 
     val baseUrl: String
         get() = serverUrlPreference.baseUrl
 
-    val http: HttpClient = HttpClient {
+    val http: HttpClient = if (engine != null) {
+        HttpClient(engine) { configureClient() }
+    } else {
+        HttpClient { configureClient() }
+    }
+
+    private fun HttpClientConfig<*>.configureClient() {
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
