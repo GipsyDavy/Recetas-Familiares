@@ -6,6 +6,8 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.network.ApiClient
+import org.gipsybuho.recetasfamiliares.network.CreateFamilyRequestDto
+import org.gipsybuho.recetasfamiliares.network.FamilyDto
 import org.gipsybuho.recetasfamiliares.network.FamilyMemberResponseDto
 import org.gipsybuho.recetasfamiliares.network.InviteMemberRequestDto
 import org.gipsybuho.recetasfamiliares.network.UserRecipeRankingDto
@@ -24,5 +26,18 @@ class FamilyMemberRepository(
     suspend fun recipeRanking(): List<UserRecipeRankingDto> {
         val familyId = session.familyId ?: return emptyList()
         return apiClient.http.get("api/v1/families/$familyId/recipe-rankings/users").body()
+    }
+
+    suspend fun families(): List<FamilyDto> =
+        apiClient.http.get("api/v1/families").body()
+
+    suspend fun createFamily(name: String): FamilyDto =
+        apiClient.http.post("api/v1/families") {
+            setBody(CreateFamilyRequestDto(name))
+        }.body()
+
+    fun setActiveFamily(family: FamilyDto) {
+        session.familyId = family.id
+        session.familyRole = family.role
     }
 }
