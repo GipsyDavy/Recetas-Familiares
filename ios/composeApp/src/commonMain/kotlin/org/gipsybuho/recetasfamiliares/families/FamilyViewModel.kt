@@ -28,7 +28,13 @@ class FamilyViewModel(
                 .onSuccess { list ->
                     _families.value = list
                     val currentId = session.familyId
-                    _activeFamily.value = list.firstOrNull { it.id == currentId } ?: list.firstOrNull()
+                    val activeFamily = list.firstOrNull { it.id == currentId } ?: list.firstOrNull()
+                    if (activeFamily != null &&
+                        (activeFamily.id != currentId || activeFamily.role != session.familyRole)
+                    ) {
+                        repository.setActiveFamily(activeFamily)
+                    }
+                    _activeFamily.value = activeFamily
                 }
                 .onFailure { _errorMessage.value = "No se pudieron cargar las familias" }
         }

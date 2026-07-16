@@ -3155,3 +3155,158 @@ Estado:
 - No se hizo commit ni staging. `paraImplementar.txt` no se leyo ni modifico.
 - El instalador/app-image de `desktop/output` sigue anterior al fuente actual; no se
   reconstruyo porque el usuario no lo solicito.
+
+### Sincronizacion de sesion al resolver la familia activa iOS - 2026-07-16 - Codex
+
+Estado recibido de Claude Code:
+- Las Tasks 1-5 de `docs/superpowers/plans/2026-07-13-ios-multi-family.md` ya estaban
+  implementadas y commiteadas en `2dc7e4f`, `efae913`, `477af53`, `6805c13` y
+  `b270ab0` (HEAD al iniciar). El checkpoint iOS historico que aun indicaba retomar
+  Task 1 estaba, por tanto, obsoleto; para ese avance manda Git.
+- El unico delta tracked sin commit era el comienzo de un test de regresion en
+  `FamilyViewModelTest`: al caer desde un `familyId` obsoleto a la primera familia,
+  tambien debian quedar actualizados `SessionStore.familyId` y `familyRole`.
+
+Causa y correccion:
+- `FamilyViewModel.loadFamilies()` publicaba la familia elegida en `_activeFamily`,
+  pero no sincronizaba `SessionStore`. La UI podia mostrar `f1` mientras recetas,
+  stock, notas, menu, compra y sincronizacion seguian leyendo el id obsoleto.
+- Ahora se calcula una unica `activeFamily`. Si su id o rol difieren de la sesion,
+  se llama a `repository.setActiveFamily(activeFamily)` antes de publicar
+  `_activeFamily`. Es la misma condicion utilizada por Android y evita escrituras
+  innecesarias en Keychain.
+- El test recibido conserva el caso de id obsoleto y se reforzo el caso de id valido
+  con rol persistido obsoleto (`OWNER` local frente a `MEMBER` remoto). Asi se cubren
+  tanto el cambio de familia como una degradacion/cambio de rol sin cambio de id.
+
+TDD y validacion:
+- Antes del parche se intento ejecutar el caso focal con
+  `:composeApp:iosX64Test --tests ...`; el fuente de test compilo, pero Gradle marco
+  `linkDebugTestIosX64` e `iosX64Test` como `SKIPPED` porque el host es Windows. Por
+  ello el RED se comprobo por la logica previa y los asserts no pudieron ejecutarse
+  en runtime local.
+- Tras el parche se compilaron correctamente produccion y tests para los tres targets:
+  `compileTestKotlinIosX64`, `compileTestKotlinIosArm64` y
+  `compileTestKotlinIosSimulatorArm64`; resultado `BUILD SUCCESSFUL` (29 tareas, 19
+  ejecutadas y 10 up-to-date). `compileKotlinMetadata` quedo `SKIPPED` por la
+  configuracion actual, no por error.
+- Una segunda ejecucion focal de `iosX64Test` termino `BUILD SUCCESSFUL`, pero volvio
+  a quedar `SKIPPED`; sigue pendiente ejecutar los asserts en macOS/simulador iOS.
+- Los warnings de expect/actual, interop de Keychain y opt-in de coroutines ya existian
+  y no son bloqueantes de esta correccion.
+
+Seguridad y limite deliberado:
+- VibeSec y dos revisiones independientes confirmaron que la sesion se corrige antes
+  que la UI y que el backend sigue siendo la autoridad para membresia y rol.
+- `GET /families` puede devolver una lista vacia. No se limpio el contexto en este
+  hotfix porque `SessionStore.isLoggedIn` exige `familyId` y el login backend rechaza
+  usuarios sin familia; limpiar solo aqui podria dejarlos sin acceso al flujo que si
+  permite crear una familia con token valido. Ese estado requiere una tarea separada:
+  contexto familiar observable/atomico, borrado de vistas/cache familiar y una ruta
+  autenticada de "sin familia" para crear o aceptar una invitacion. Mientras no se
+  resuelva, el backend impide acceso online a la familia revocada, pero persiste el
+  riesgo de contexto/cache local obsoleto cuando la lista sea vacia.
+- `superpowers` y `security-review` no estaban disponibles en esta sesion; se siguio
+  manualmente RED-logico -> GREEN-de-compilacion y se uso VibeSec con revision paralela.
+
+Estado para retomar:
+- Modificados sin commit ni staging:
+  `ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/families/FamilyViewModel.kt`,
+  `ios/composeApp/src/commonTest/kotlin/org/gipsybuho/recetasfamiliares/families/FamilyViewModelTest.kt`
+  y este checkpoint.
+- Ejecutar `FamilyViewModelTest` en macOS antes de integrar. Si pasa, pedir
+  autorizacion antes de commitear esta correccion.
+- `paraImplementar.txt` sigue untracked, fuera de alcance y no se leyo ni modifico.
+- La Spec 2 de copia de recetas iOS sigue pendiente y no forma parte de este hotfix.
+
+### Cierre de sesion, hotfix iOS y EXE Desktop regenerado - 2026-07-16 - Codex
+
+Autorizacion recibida:
+- El usuario autorizo cerrar la sesion, regenerar los `.exe` con el fuente actual,
+  documentar el punto exacto, commitear y hacer push de todo lo necesario.
+- La autorizacion permite integrar el hotfix iOS con el gate disponible en Windows,
+  dejando explicito que la ejecucion nativa de tests sigue pendiente en macOS.
+- `paraImplementar.txt` permanece expresamente fuera del alcance, sin lectura, cambios,
+  staging ni commit.
+
+Hotfix iOS integrado en el cierre:
+- `FamilyViewModel.loadFamilies()` calcula una sola familia activa y, si cambia el id
+  o el rol respecto a Keychain, llama a `repository.setActiveFamily()` antes de
+  publicar `_activeFamily`.
+- El test cubre dos regresiones: `familyId` obsoleto que cae a la primera familia y
+  rol local obsoleto aunque el id siga siendo valido.
+- VibeSec y una revision paralela de solo lectura confirmaron que la correccion evita
+  que UI y repositorios apunten a familias diferentes en respuestas no vacias. El
+  backend sigue siendo la autoridad efectiva de membresia/rol.
+- Riesgo separado conservado: una respuesta `GET /families` vacia deja el contexto
+  local anterior. No se limpio dentro de este hotfix porque el flujo actual de login
+  exige `familyId` y podria bloquear a un usuario sin familia para crear otra. Resolver
+  como sprint propio con estado autenticado "sin familia", contexto observable/atomico
+  y limpieza de vistas/cache familiar.
+
+Validacion iOS/KMP de esta sesion:
+- Desde `ios`: `compileTestKotlinIosX64`, `compileTestKotlinIosArm64` y
+  `compileTestKotlinIosSimulatorArm64` -> `BUILD SUCCESSFUL`; 29 tareas, una ejecutada
+  y 28 `UP-TO-DATE`.
+- `:composeApp:iosX64Test --tests FamilyViewModelTest` -> el fuente y test estan
+  compilados, pero `linkDebugTestIosX64` e `iosX64Test` quedan `SKIPPED` en Windows.
+- No se afirma ejecucion runtime de los asserts. Sigue recomendado ejecutarlos en
+  macOS/Xcode cuando haya un host disponible.
+
+Windows Desktop - instalador y app-image regenerados:
+- Comando desde la raiz:
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File .\desktop\build-installer.ps1`.
+- Resultado: codigo 0 / `BUILD COMPLETADO` en 94,7 s, usando JDK 21.0.11 LTS,
+  Maven, `jpackage` y NSIS. API embebida:
+  `https://recetas.167.233.213.242.sslip.io/`.
+- Instalador: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe`.
+  - Tamano: **52.790.520 bytes**.
+  - Fecha local: `2026-07-16T20:43:22.2053962+02:00`.
+  - SHA-256: `00132EA7DD6A45C52C9294639B776AEA4B52ACE36F36AC5679CF9DD911976C95`.
+  - Sustituye realmente al anterior del 13 de julio, cuyo SHA-256 era
+    `2829C685D5092B33E6CFB1E12AFCB79741FB1757F64FA39A6059DB8F5B4C452E`.
+- Lanzador portable/app-image:
+  `desktop/output/RecetasFamiliares/RecetasFamiliares.exe`.
+  - Tamano: **458.752 bytes**.
+  - Fecha local: `2026-07-16T20:42:08.8172117+02:00`.
+  - SHA-256: `BFB9F6FBC3E692CAAE672BC8AC3E58C6F682706716367959599186C64B8D6713`.
+  - El hash del stub de `jpackage` coincide con el anterior, pero el app-image fue
+    recreado y su JAR interno si cambio.
+- JAR empaquetado: `desktop/output/RecetasFamiliares/app/RecetasFamiliares.jar`.
+  - Tamano: **21.428.905 bytes**.
+  - Fecha local: `2026-07-16T20:42:00.7126896+02:00`.
+  - SHA-256: `D9C09AD2FD2C8E900D2C0F6BE52AC2400730E56CCF003CD42E441AE11767188D`.
+  - Coincide byte a byte con
+    `desktop/target/recetas-familiares-desktop-1.1.jar`.
+- Runtime verificado: `JAVA_VERSION="21.0.11"`; configuracion verificada con
+  `org.gipsybuho.recetasfamiliares.Launcher` y la URL de produccion anterior.
+- Instalador y lanzador devuelven `NotSigned` en `Get-AuthenticodeSignature`; Windows
+  puede mostrar editor desconocido. No hay certificado de firma disponible.
+- No se instalo el EXE ni se modifico la instalacion existente. Los artefactos de
+  `desktop/output/` estan ignorados y se entregan localmente; no se fuerzan en Git.
+
+Validacion Desktop de esta sesion:
+- El script empaqueta con `-DskipTests`; por eso se ejecuto despues `mvn test` desde
+  `desktop`.
+- Resultado: `BUILD SUCCESS`, 7 suites, **27 tests**, 0 fallos, 0 errores y 0 omitidos.
+- Los warnings de modelo JavaFX y recursos/clases solapados del shaded JAR son los ya
+  conocidos y no bloquearon el build.
+- No hubo cambios de dependencias ni backend; OWASP Dependency-Check no se repitio.
+  VibeSec se aplico al diff de familias. `security-review` no esta disponible como
+  skill callable en Codex; se sustituyo por VibeSec y revision paralela independiente.
+
+Cierre Git y punto exacto para la siguiente sesion:
+- Este checkpoint y el hotfix iOS forman el commit de cierre autorizado. El `.exe` y
+  el app-image no entran en el commit porque `desktop/output/` esta ignorado.
+- Antes del push, `main` estaba 14 commits por delante y 0 por detras de
+  `origin/main`; el push autorizado publica tambien esos commits locales previos.
+- Al retomar: ejecutar primero `git status --short`, `git log -1 --oneline` y comparar
+  `origin/main`. Git es la fuente de verdad del hash final del commit/push.
+- No reconstruir el EXE salvo que cambie fuente Desktop o se solicite firma/version
+  nueva. Si se distribuye, instalar manualmente el nuevo instalador y hacer smoke.
+- Siguiente sprint funcional recomendado y aun NO iniciado: **Spec 2 iOS - copiar una
+  receta entre familias**. No existe todavia spec/plan propio; comenzar con
+  brainstorming, contrato/UI/seguridad, plan TDD y autorizacion antes de implementar.
+- Gate recomendado cuando haya macOS: ejecutar `FamilyViewModelTest` y un smoke iOS de
+  listar/cambiar/crear familia. El limite de lista vacia/contexto local queda como
+  deuda de seguridad/arquitectura separada.

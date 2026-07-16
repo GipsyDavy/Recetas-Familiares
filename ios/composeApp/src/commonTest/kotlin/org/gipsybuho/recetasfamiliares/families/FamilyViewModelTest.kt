@@ -24,7 +24,11 @@ class FamilyViewModelTest {
                 headers = headersOf(HttpHeaders.ContentType, "application/json")
             )
         }
-        val session = SessionStore().apply { accessToken = "token"; familyId = "f2" }
+        val session = SessionStore().apply {
+            accessToken = "token"
+            familyId = "f2"
+            familyRole = "OWNER"
+        }
         val repository = FamilyMemberRepository(ApiClient(session, engine = engine), session)
         val viewModel = FamilyViewModel(repository, session, this)
 
@@ -33,6 +37,8 @@ class FamilyViewModelTest {
 
         assertEquals("f2", viewModel.activeFamily.value?.id)
         assertEquals(2, viewModel.families.value.size)
+        assertEquals("f2", session.familyId)
+        assertEquals("MEMBER", session.familyRole)
     }
 
     @Test
@@ -52,6 +58,8 @@ class FamilyViewModelTest {
         advanceUntilIdle()
 
         assertEquals("f1", viewModel.activeFamily.value?.id)
+        assertEquals("f1", session.familyId)
+        assertEquals("OWNER", session.familyRole)
     }
 
     @Test
