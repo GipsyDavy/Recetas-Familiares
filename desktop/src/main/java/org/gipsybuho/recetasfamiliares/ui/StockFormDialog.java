@@ -65,6 +65,11 @@ public class StockFormDialog {
         build();
         dialog.setOnShown(e -> {
             Node dialogRoot = dialog.getScene().getRoot();
+            if (MotionPreferences.isReducedMotion()) {
+                dialogRoot.setScaleX(1.0);
+                dialogRoot.setScaleY(1.0);
+                return;
+            }
             dialogRoot.setScaleX(0.95);
             dialogRoot.setScaleY(0.95);
             ScaleTransition st = new ScaleTransition(Duration.millis(200), dialogRoot);

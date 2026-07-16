@@ -320,6 +320,11 @@ public class NotesView extends ScrollPane {
     private void animateDelete(SyncDtos.NoteDtos.FamilyNoteDto note, Runnable afterAnimation) {
         ListCell<?> cell = findCell(note);
         Node target = cell != null ? cell : listView;
+        if (MotionPreferences.isReducedMotion()) {
+            target.setOpacity(1.0);
+            afterAnimation.run();
+            return;
+        }
 
         FadeTransition fade = new FadeTransition(Duration.millis(150), target);
         fade.setFromValue(1.0);
@@ -382,10 +387,10 @@ public class NotesView extends ScrollPane {
         emojiLabel.setStyle("-fx-font-size: 48px;");
 
         Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #3D2B1F;");
+        titleLabel.getStyleClass().add("empty-state-title");
 
         Label subtitleLabel = new Label(subtitle);
-        subtitleLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #8B6F5E; -fx-text-alignment: center;");
+        subtitleLabel.getStyleClass().add("empty-state-subtitle");
         subtitleLabel.setWrapText(true);
         subtitleLabel.setMaxWidth(320);
         subtitleLabel.setAlignment(Pos.CENTER);

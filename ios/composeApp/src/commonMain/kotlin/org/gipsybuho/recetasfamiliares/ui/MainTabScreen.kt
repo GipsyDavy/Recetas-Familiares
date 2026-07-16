@@ -1,5 +1,14 @@
 package org.gipsybuho.recetasfamiliares.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -44,6 +53,7 @@ fun MainTabScreen(
     selectedTheme: AppTheme,
     themeMode: ThemeMode,
     hapticsEnabled: Boolean,
+    reduceMotion: Boolean,
     serverUrlPreference: ServerUrlPreference,
     onThemeChange: (AppTheme) -> Unit,
     onModeChange: (ThemeMode) -> Unit,
@@ -59,7 +69,6 @@ fun MainTabScreen(
     val familyMemberRepo = remember { FamilyMemberRepository(apiClient, session) }
 
     var selectedTab by remember { mutableStateOf(Tab.RECIPES) }
-
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -103,25 +112,40 @@ fun MainTabScreen(
         }
     ) { paddingValues ->
         Box(Modifier.fillMaxSize().padding(paddingValues)) {
-            when (selectedTab) {
-                Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo, syncRepo = syncRepo, stockRepo = stockRepo)
-                Tab.STOCK    -> StockScreen(repository = stockRepo, syncRepo = syncRepo)
-                Tab.NOTES    -> NotesScreen(repository = noteRepo)
-                Tab.SHOPPING -> ShoppingListScreen(repository = shoppingRepo)
-                Tab.MENU     -> MenuScreen(repository = menuRepo)
-                Tab.SETTINGS -> SettingsScreen(
-                    selectedTheme   = selectedTheme,
-                    themeMode       = themeMode,
-                    hapticsEnabled  = hapticsEnabled,
-                    onThemeChange   = onThemeChange,
-                    onModeChange    = onModeChange,
-                    onHapticsChange = onHapticsChange,
-                    onLogout        = onLogout,
-                    session         = session,
-                    serverUrlPreference = serverUrlPreference,
-                    userRepository  = userRepo,
-                    familyMemberRepository = familyMemberRepo
-                )
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    if (reduceMotion) {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    } else {
+                        val direction = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                        (fadeIn(tween(220)) + slideInHorizontally(tween(280)) { direction * it / 10 }) togetherWith
+                            (fadeOut(tween(180)) + slideOutHorizontally(tween(240)) { -direction * it / 12 })
+                    }
+                },
+                label = "main_tab_transition"
+            ) { tab ->
+                when (tab) {
+                    Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo, syncRepo = syncRepo, stockRepo = stockRepo)
+                    Tab.STOCK    -> StockScreen(repository = stockRepo, syncRepo = syncRepo)
+                    Tab.NOTES    -> NotesScreen(repository = noteRepo)
+                    Tab.SHOPPING -> ShoppingListScreen(repository = shoppingRepo)
+                    Tab.MENU     -> MenuScreen(repository = menuRepo)
+                    Tab.SETTINGS -> SettingsScreen(
+                        selectedTheme   = selectedTheme,
+                        themeMode       = themeMode,
+                        hapticsEnabled  = hapticsEnabled,
+                        reduceMotion    = reduceMotion,
+                        onThemeChange   = onThemeChange,
+                        onModeChange    = onModeChange,
+                        onHapticsChange = onHapticsChange,
+                        onLogout        = onLogout,
+                        session         = session,
+                        serverUrlPreference = serverUrlPreference,
+                        userRepository  = userRepo,
+                        familyMemberRepository = familyMemberRepo
+                    )
+                }
             }
         }
     }

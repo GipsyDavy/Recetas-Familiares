@@ -30,6 +30,7 @@ import java.util.Locale;
 public class ProfileView extends ScrollPane {
 
     private static final int AVATAR_SIZE = 88;
+    private static final int FAMILY_AVATAR_SIZE = 40;
 
     private final AppContext context;
     private final Stage stage;
@@ -118,13 +119,21 @@ public class ProfileView extends ScrollPane {
         Label sectionTitle = new Label("Mi familia");
         sectionTitle.getStyleClass().add("settings-section-title");
 
-        familyAvatarSlot.setPrefSize(44, 44);
-        familyAvatarSlot.setMinSize(44, 44);
-        familyAvatarSlot.setMaxSize(44, 44);
+        familyAvatarSlot.setPrefSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
+        familyAvatarSlot.setMinSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
+        familyAvatarSlot.setMaxSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
 
         familyLabel.getStyleClass().add("profile-family-name");
-        roleBadge.getStyleClass().add("profile-role-badge");
-        HBox familyRow = new HBox(10, familyAvatarSlot, familyLabel, roleBadge);
+        familyLabel.setWrapText(true);
+        familyLabel.setMinWidth(0);
+        roleBadge.getStyleClass().addAll("profile-role-badge", "profile-family-role-badge");
+        roleBadge.setMaxWidth(Region.USE_PREF_SIZE);
+
+        VBox familyDetails = new VBox(3, familyLabel, roleBadge);
+        familyDetails.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(familyDetails, Priority.ALWAYS);
+
+        HBox familyRow = new HBox(12, familyAvatarSlot, familyDetails);
         familyRow.setAlignment(Pos.CENTER_LEFT);
 
         changeFamilyPhotoBtn.getStyleClass().add("action-button-secondary");
@@ -170,7 +179,7 @@ public class ProfileView extends ScrollPane {
         dangerLabel.setWrapText(true);
 
         Button deleteAccountBtn = new Button("Eliminar cuenta");
-        deleteAccountBtn.getStyleClass().add("logout-button");
+        deleteAccountBtn.getStyleClass().add("danger-button");
         deleteAccountBtn.setOnAction(e -> confirmDeleteAccount());
 
         VBox card = new VBox(10, sectionTitle, verificationLabel, verificationActions,
@@ -301,7 +310,10 @@ public class ProfileView extends ScrollPane {
             }
         }
         roleBadge.setText(role != null ? role.displayName() : "");
-        roleBadge.setVisible(role != null);
+        boolean hasRole = role != null;
+        roleBadge.setVisible(hasRole);
+        roleBadge.setManaged(hasRole);
+        roleBadge.setAccessibleText(hasRole ? "Rol familiar: " + role.displayName() : null);
     }
 
     /**
@@ -351,28 +363,31 @@ public class ProfileView extends ScrollPane {
         int generation = ++familyAvatarLoadGeneration;
         Label fallback = new Label(familyName != null && !familyName.isBlank()
                 ? String.valueOf(Character.toUpperCase(familyName.charAt(0))) : "👪");
-        fallback.getStyleClass().add("profile-avatar-circle");
-        fallback.setTextFill(javafx.scene.paint.Color.WHITE);
-        fallback.setFont(Font.font("System", FontWeight.BOLD, 18));
+        fallback.getStyleClass().add("profile-family-avatar-circle");
         fallback.setAlignment(Pos.CENTER);
-        fallback.setMinSize(44, 44);
-        fallback.setPrefSize(44, 44);
+        fallback.setMinSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
+        fallback.setPrefSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
+        fallback.setMaxSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
         familyAvatarSlot.getChildren().setAll(fallback);
         if (avatarUrl == null || avatarUrl.isBlank()) return;
         // Carga autenticada en segundo plano: /uploads/** requiere JWT (SEC-3)
         Thread.ofVirtual().start(() -> {
             try {
                 byte[] bytes = context.getApiClient().fetchImage(avatarUrl);
-                Image image = new Image(new java.io.ByteArrayInputStream(bytes), 44, 44, true, true);
+                Image image = new Image(new java.io.ByteArrayInputStream(bytes),
+                        FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE, true, true);
                 Platform.runLater(() -> {
                     if (generation != familyAvatarLoadGeneration) return;
                     ImageView imageView = new ImageView(image);
-                    imageView.setFitWidth(44);
-                    imageView.setFitHeight(44);
+                    imageView.setFitWidth(FAMILY_AVATAR_SIZE);
+                    imageView.setFitHeight(FAMILY_AVATAR_SIZE);
                     imageView.setPreserveRatio(false);
                     StackPane pane = new StackPane(imageView);
-                    pane.setPrefSize(44, 44);
-                    pane.setClip(new Circle(22, 22, 22));
+                    pane.setMinSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
+                    pane.setPrefSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
+                    pane.setMaxSize(FAMILY_AVATAR_SIZE, FAMILY_AVATAR_SIZE);
+                    double radius = FAMILY_AVATAR_SIZE / 2.0;
+                    pane.setClip(new Circle(radius, radius, radius));
                     familyAvatarSlot.getChildren().setAll(pane);
                 });
             } catch (Exception ignored) {
@@ -638,7 +653,7 @@ public class ProfileView extends ScrollPane {
         dialog.getDialogPane().getButtonTypes().addAll(deleteType, ButtonType.CANCEL);
         DialogStyler.apply(dialog);
         Button deleteBtn = (Button) dialog.getDialogPane().lookupButton(deleteType);
-        deleteBtn.getStyleClass().add("logout-button");
+        deleteBtn.getStyleClass().add("danger-button");
         deleteBtn.disableProperty().bind(passwordField.textProperty().isEmpty());
 
         dialog.showAndWait().ifPresent(result -> {

@@ -26,6 +26,7 @@ import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
  */
 public class DashboardView extends ScrollPane {
 
+    private static final String CARD_SCALE_TRANSITION_KEY = "dashboardCardScaleTransition";
     private final AppContext context;
     private final VBox recipesSection  = new VBox(8);
     private final VBox stockSection    = new VBox(6);
@@ -325,18 +326,8 @@ public class DashboardView extends ScrollPane {
         HBox card = new HBox(16);
         card.getStyleClass().add("dashboard-recipe-card");
         card.setPadding(new Insets(12, 16, 12, 16));
-        card.setOnMouseEntered(e -> {
-            ScaleTransition st = new ScaleTransition(Duration.millis(100), card);
-            st.setToX(1.02);
-            st.setToY(1.02);
-            st.play();
-        });
-        card.setOnMouseExited(e -> {
-            ScaleTransition st = new ScaleTransition(Duration.millis(100), card);
-            st.setToX(1.0);
-            st.setToY(1.0);
-            st.play();
-        });
+        card.setOnMouseEntered(e -> animateRecipeCard(card, 1.02));
+        card.setOnMouseExited(e -> animateRecipeCard(card, 1.0));
 
         VBox info = new VBox(4);
         HBox.setHgrow(info, Priority.ALWAYS);
@@ -360,6 +351,25 @@ public class DashboardView extends ScrollPane {
 
         card.getChildren().add(info);
         return card;
+    }
+
+    private void animateRecipeCard(HBox card, double scale) {
+        Object running = card.getProperties().remove(CARD_SCALE_TRANSITION_KEY);
+        if (running instanceof ScaleTransition previous) {
+            previous.stop();
+        }
+        if (MotionPreferences.isReducedMotion()) {
+            card.setScaleX(1.0);
+            card.setScaleY(1.0);
+            return;
+        }
+        ScaleTransition transition = new ScaleTransition(Duration.millis(100), card);
+        transition.setToX(scale);
+        transition.setToY(scale);
+        card.getProperties().put(CARD_SCALE_TRANSITION_KEY, transition);
+        transition.setOnFinished(e ->
+                card.getProperties().remove(CARD_SCALE_TRANSITION_KEY, transition));
+        transition.play();
     }
 
     private void renderExpiringStock(List<StockDtos.StockItemDto> items) {

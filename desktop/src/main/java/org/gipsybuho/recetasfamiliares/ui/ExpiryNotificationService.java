@@ -87,11 +87,15 @@ public final class ExpiryNotificationService {
         });
         toast.show();
 
-        TranslateTransition slide = new TranslateTransition(Duration.millis(220), content);
-        slide.setFromY(60);
-        slide.setToY(0);
-        slide.setInterpolator(Interpolator.EASE_OUT);
-        slide.play();
+        if (MotionPreferences.isReducedMotion()) {
+            content.setTranslateY(0.0);
+        } else {
+            TranslateTransition slide = new TranslateTransition(Duration.millis(220), content);
+            slide.setFromY(60);
+            slide.setToY(0);
+            slide.setInterpolator(Interpolator.EASE_OUT);
+            slide.play();
+        }
 
         // ── Auto-dismiss after 5 s ─────────────────────────────────────────────
         Timeline dismiss = new Timeline(new KeyFrame(Duration.seconds(5), e -> toast.close()));

@@ -14,7 +14,9 @@ import org.gipsybuho.recetasfamiliares.R
 
 enum class AppTheme {
     BOSQUE, TERRACOTA, OCASO, MEDITERRANEO, LAVANDA,
-    OLIVA, CANELA, MENTA, FRAMBUESA, NOCHE_VERANO;
+    OLIVA, CANELA, MENTA, FRAMBUESA, NOCHE_VERANO,
+    RUBI_NOCTURNO, AURORA_BOREAL, JADE_IMPERIAL,
+    COBRE_LUNAR, CIRUELA_SOLAR, CORAL_ABISAL;
 
     val displayName: String get() = when (this) {
         BOSQUE        -> "Bosque"
@@ -27,6 +29,12 @@ enum class AppTheme {
         MENTA         -> "Menta"
         FRAMBUESA     -> "Frambuesa"
         NOCHE_VERANO  -> "Noche de Verano"
+        RUBI_NOCTURNO  -> "Rubí Nocturno"
+        AURORA_BOREAL  -> "Aurora Boreal"
+        JADE_IMPERIAL  -> "Jade Imperial"
+        COBRE_LUNAR    -> "Cobre Lunar"
+        CIRUELA_SOLAR  -> "Ciruela Solar"
+        CORAL_ABISAL   -> "Coral Abisal"
     }
 
     val emoji: String get() = when (this) {
@@ -40,7 +48,35 @@ enum class AppTheme {
         MENTA         -> "🍃"
         FRAMBUESA     -> "🍓"
         NOCHE_VERANO  -> "🌙"
+        RUBI_NOCTURNO  -> "💎"
+        AURORA_BOREAL  -> "🌌"
+        JADE_IMPERIAL  -> "🪷"
+        COBRE_LUNAR    -> "🌘"
+        CIRUELA_SOLAR  -> "☀️"
+        CORAL_ABISAL   -> "🪸"
     }
+
+    val description: String get() = when (this) {
+        BOSQUE        -> "Verde bosque y tierra cálida"
+        TERRACOTA     -> "Arcilla, arena y hogar"
+        OCASO         -> "Coral, naranja y luz dorada"
+        MEDITERRANEO  -> "Azul marino, olivo y sol"
+        LAVANDA       -> "Violeta suave y rosa"
+        OLIVA         -> "Oliva, cereal y agua serena"
+        CANELA        -> "Canela, crema y salvia"
+        MENTA         -> "Menta fresca y cítricos"
+        FRAMBUESA     -> "Frambuesa, rosa y miel"
+        NOCHE_VERANO  -> "Azul nocturno y luz ámbar"
+        RUBI_NOCTURNO -> "Carbón, borgoña y luz rubí"
+        AURORA_BOREAL -> "Índigo, menta y violeta"
+        JADE_IMPERIAL -> "Jade, celadón y cobre"
+        COBRE_LUNAR   -> "Grafito, cobre y amatista"
+        CIRUELA_SOLAR -> "Ciruela, ámbar y seda"
+        CORAL_ABISAL  -> "Océano profundo y coral"
+    }
+
+    val isFeatured: Boolean get() = this == RUBI_NOCTURNO
+    val recommendedDark: Boolean get() = this == RUBI_NOCTURNO
 }
 
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
@@ -296,6 +332,12 @@ fun AppTheme.lightColors(): ColorScheme = when (this) {
         errorContainer       = Color(0xFFFFDAD6),
         onErrorContainer     = Color(0xFF410002),
     )
+    AppTheme.RUBI_NOCTURNO -> rubiNocturnoLightColors()
+    AppTheme.AURORA_BOREAL -> auroraBorealLightColors()
+    AppTheme.JADE_IMPERIAL -> jadeImperialLightColors()
+    AppTheme.COBRE_LUNAR -> cobreLunarLightColors()
+    AppTheme.CIRUELA_SOLAR -> ciruelaSolarLightColors()
+    AppTheme.CORAL_ABISAL -> coralAbisalLightColors()
 }
 
 fun AppTheme.darkColors(): ColorScheme = when (this) {
@@ -549,6 +591,12 @@ fun AppTheme.darkColors(): ColorScheme = when (this) {
         errorContainer       = Color(0xFF93000A),
         onErrorContainer     = Color(0xFFFFDAD6),
     )
+    AppTheme.RUBI_NOCTURNO -> rubiNocturnoDarkColors()
+    AppTheme.AURORA_BOREAL -> auroraBorealDarkColors()
+    AppTheme.JADE_IMPERIAL -> jadeImperialDarkColors()
+    AppTheme.COBRE_LUNAR -> cobreLunarDarkColors()
+    AppTheme.CIRUELA_SOLAR -> ciruelaSolarDarkColors()
+    AppTheme.CORAL_ABISAL -> coralAbisalDarkColors()
 }
 
 // Fuentes empaquetadas en res/font (UX-1): sin dependencia de red ni Play Services.

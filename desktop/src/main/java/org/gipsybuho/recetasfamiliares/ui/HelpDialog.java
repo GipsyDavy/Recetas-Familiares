@@ -55,12 +55,14 @@ final class HelpDialog {
             "El propietario y los administradores pueden cambiar roles o expulsar miembros.",
             "Los datos familiares solo son visibles para los miembros."))),
         Map.entry("settings", new Topic("⚙", "Ajustes", List.of(
+            "Perfil y cuenta está disponible para todos los usuarios junto con Apariencia y Acerca de.",
             "Cambia tema de color, modo oscuro, tipografía y sonidos.",
             "Accede a Ajustes rápidamente con Ctrl + Coma (Ctrl+,).",
-            "En Diagnóstico puedes probar la conexión con el backend."))),
-        Map.entry("profile", new Topic("👤", "Mi perfil", List.of(
+            "Los administradores también pueden revisar el servidor y el diagnóstico."))),
+        Map.entry("profile", new Topic("👤", "Ajustes > Perfil y cuenta", List.of(
             "Cambia tu foto y tu nombre, que serán visibles para toda la familia.",
             "Consulta tu familia, tu rol y la actividad compartida.",
+            "Verifica tu correo o gestiona la eliminación de tu propia cuenta desde la sección Cuenta.",
             "Desde aquí puedes volver a ver la guía de bienvenida.")))
     );
 
@@ -108,15 +110,21 @@ final class HelpDialog {
             e.consume();
         });
 
-        dialog.getDialogPane().setOpacity(0);
-        dialog.setOnShown(e -> {
-            var pane = dialog.getDialogPane();
-            pane.setOpacity(1);
-            ScaleTransition scale = new ScaleTransition(Duration.millis(200), pane);
-            scale.setFromX(0.95); scale.setFromY(0.95);
-            scale.setToX(1.0);    scale.setToY(1.0);
-            scale.play();
-        });
+        if (MotionPreferences.isReducedMotion()) {
+            dialog.getDialogPane().setOpacity(1.0);
+            dialog.getDialogPane().setScaleX(1.0);
+            dialog.getDialogPane().setScaleY(1.0);
+        } else {
+            dialog.getDialogPane().setOpacity(0);
+            dialog.setOnShown(e -> {
+                var pane = dialog.getDialogPane();
+                pane.setOpacity(1);
+                ScaleTransition scale = new ScaleTransition(Duration.millis(200), pane);
+                scale.setFromX(0.95); scale.setFromY(0.95);
+                scale.setToX(1.0);    scale.setToY(1.0);
+                scale.play();
+            });
+        }
 
         dialog.showAndWait();
     }

@@ -158,22 +158,28 @@ public class LoginView extends ScrollPane {
         content.getChildren().add(card);
 
         // ── Entry animation (FadeIn + slight scale-up) ────────────────────────
-        card.setOpacity(0);
-        card.setScaleX(0.97);
-        card.setScaleY(0.97);
+        if (MotionPreferences.isReducedMotion()) {
+            card.setOpacity(1.0);
+            card.setScaleX(1.0);
+            card.setScaleY(1.0);
+        } else {
+            card.setOpacity(0);
+            card.setScaleX(0.97);
+            card.setScaleY(0.97);
 
-        FadeTransition fade = new FadeTransition(Duration.millis(400), card);
-        fade.setFromValue(0.0);
-        fade.setToValue(1.0);
+            FadeTransition fade = new FadeTransition(Duration.millis(400), card);
+            fade.setFromValue(0.0);
+            fade.setToValue(1.0);
 
-        ScaleTransition scale = new ScaleTransition(Duration.millis(300), card);
-        scale.setFromX(0.97);
-        scale.setFromY(0.97);
-        scale.setToX(1.0);
-        scale.setToY(1.0);
-        scale.setInterpolator(Interpolator.EASE_OUT);
+            ScaleTransition scale = new ScaleTransition(Duration.millis(300), card);
+            scale.setFromX(0.97);
+            scale.setFromY(0.97);
+            scale.setToX(1.0);
+            scale.setToY(1.0);
+            scale.setInterpolator(Interpolator.EASE_OUT);
 
-        new ParallelTransition(fade, scale).play();
+            new ParallelTransition(fade, scale).play();
+        }
     }
 
     private void setRegisterMode(boolean enabled) {

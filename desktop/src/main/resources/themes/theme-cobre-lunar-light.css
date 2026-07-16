@@ -1,0 +1,29 @@
+.root {
+    recetas-bg:             #FFF8F4;
+    recetas-surface:        #FFF8F4;
+    recetas-surface-alt:    #F8F0EB;
+    recetas-surface-var:    #ECE0D8;
+    recetas-surface-border: #D0C3BB;
+    recetas-form-bg:        #F4E9E1;
+    recetas-primary:        #8B4A1A;
+    recetas-primary-hover:  #6D568C;
+    recetas-primary-fg:     #FFFFFF;
+    recetas-primary-cont:   #FFDCC3;
+    recetas-on-primary-cont:#321300;
+    recetas-sidebar-bg:     #555D72;
+    recetas-sidebar-hdr:    #3D4457;
+    recetas-sidebar-fg:     #FFF8F4;
+    recetas-sidebar-active: #FFF0E5;
+    recetas-text-primary:   #211A16;
+    recetas-text-second:    #4D453F;
+    recetas-text-body:      #38302B;
+    recetas-text-muted:     #655C55;
+    recetas-border:         #7F746C;
+    recetas-separator:      #D9CDC5;
+    recetas-header-bg:      #F4E0D2;
+    recetas-cell-selected:  #FFDCC3;
+    recetas-error:          #BA1A1A;
+    recetas-error-bg:       #FFDAD6;
+    recetas-expiry-bg:      #FFF0F0;
+    recetas-focus-border:   #8B4A1A;
+}

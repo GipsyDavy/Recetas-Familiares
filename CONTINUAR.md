@@ -2630,3 +2630,528 @@ o `superpowers:executing-plans`), y ejecutar las 5 tareas en orden empezando por
 Task 1 (bootstrap `commonTest` + `engine` inyectable en `ApiClient.kt`). No hace falta
 repetir el brainstorming ni la escritura del plan, ya estan aprobados. Tras cerrar Spec 1
 (multi-familia), el Spec 2 (copiar receta en iOS) queda pendiente de brainstorming propio.
+
+### Sprint visual: seis temas contemporaneos y selectores renovados - 2026-07-13 - Codex
+
+Autorizacion del usuario: mantener los 10 temas existentes y añadir 6 identidades
+nuevas con claro/oscuro/sistema, profundidad 2.5D, animaciones y transiciones. Este
+sprint cambio temporalmente la prioridad frente al plan iOS multi-familia, que sigue
+pendiente y no fue modificado.
+
+Catalogo añadido al final de los enums persistidos, sin renombrar ni alterar los 10 IDs
+historicos ni los fallbacks `BOSQUE` / `SYSTEM`:
+- `RUBI_NOCTURNO`: tema principal/recomendado oscuro; carbon, borgoña, rubi y coral.
+- `AURORA_BOREAL`: indigo, menta y violeta.
+- `JADE_IMPERIAL`: jade, celadon y cobre.
+- `COBRE_LUNAR`: grafito, cobre y amatista.
+- `CIRUELA_SOLAR`: ciruela, ambar y seda.
+- `CORAL_ABISAL`: oceano profundo, turquesa y coral.
+
+Implementacion:
+- Android: 12 paletas Material 3 nuevas en `NewThemePalettes.kt`, roles extendidos,
+  formas premium, interpolacion de 300 ms solo entre temas del mismo modo, barras de
+  sistema con iconos legibles sin interferir con `decorFitsSystemWindows`, selector
+  adaptativo/desplazable con gradiente, badge Principal, semantica radio y presion
+  2.5D. Los nombres/descripciones no se truncan por limite fijo de lineas.
+- Desktop: 12 CSS nuevos; total 32 recursos con contrato exacto de 27 tokens. Apariencia
+  es accesible a todos los miembros sin exponer Servidor/Diagnostico/admin. Selector
+  con cards redondeadas, preview, descripcion, badge, foco/tooltip, ToggleButton con
+  rol radio, `Sistema / Claro / Oscuro`, transicion de tema y hover cancelable. La
+  deteccion de modo Windows tiene cache y timeout. Nuevo toggle local `Reducir
+  movimiento` se aplica globalmente a movimiento cosmetico (navegacion, login,
+  dashboard, dialogos, toast, borrados y shimmer) sin desactivar temporizadores
+  funcionales.
+- iOS/KMP: 12 paletas nuevas, roles `inverse`/surface soportados por Compose 1.7,
+  formas premium, transicion de color segura, selector desplazable que cambia entre
+  una y dos columnas segun ancho/Dynamic Type, cards 2.5D y transicion de tabs. Nuevo
+  `expect/actual` observa `UIAccessibilityIsReduceMotionEnabled` y omite las
+  animaciones nuevas cuando el sistema lo pide, incluso si cambia con la app abierta.
+  Los roles Material `*Fixed` no existen
+  en la version Compose 1.7 de iOS y por eso no se fuerzan artificialmente.
+- `Interfaz.md`: catalogo 16 temas, excepcion semantica del rojo de identidad,
+  profundidad, contraste durante cambios claro/oscuro y reduccion de movimiento.
+
+Hallazgos de la revision paralela y correcciones integradas:
+- Interpolar fondo y texto al pasar claro<->oscuro podia bajar el contraste durante el
+  punto medio; ahora ese cambio aplica el esquema completo y solo se interpolan temas
+  dentro del mismo modo. Android añade test de contraste para todos los pares de temas.
+- Android `enableEdgeToEdge` chocaba con la restauracion del modo cocina; eliminado del
+  sistema de temas.
+- Desktop consultaba `reg query` una vez por preview en modo Sistema; resuelto con cache
+  y timeout. Tambien se completo el estado accesible de seleccion.
+- iOS tenia layout fijo y roles extendidos incompletos; corregidos dentro de las APIs
+  disponibles en Compose 1.7.
+- Reduccion de movimiento global, jitter de hover y carrera de cambio rapido de tema
+  Desktop resueltos antes del gate final.
+
+Validacion final real de esta sesion:
+- Android: `.\gradlew.bat testDebugUnitTest assembleDebug` -> `BUILD SUCCESSFUL`;
+  **53 tests**, 0 fallos/errores/omitidos. APK:
+  `android/app/build/outputs/apk/debug/app-debug.apk`, 24.716.342 bytes,
+  SHA-256 `EA3D33D0F9EB39B79148DD5855889650DF370FB0883C3934E0C32A030AC0E1F5`.
+- Desktop: `mvn test` -> `BUILD SUCCESS`; **27 tests**, 0 fallos/errores/omitidos.
+  Incluye catalogo/metadata, 32 CSS, contrato de tokens y contraste AA de los temas
+  nuevos, ademas de persistencia aislada de la preferencia de movimiento.
+- iOS: `:composeApp:compileCommonMainKotlinMetadata --rerun-tasks` y, tras añadir
+  Reduce Motion nativo, `:composeApp:compileKotlinIosX64 --rerun-tasks` ->
+  `BUILD SUCCESSFUL`. Persisten warnings preexistentes de `expect/actual`, KLIB y casts
+  Keychain; no se introdujo un warning nuevo bloqueante.
+- `git diff --check` -> OK; solo avisos CRLF normales de Windows.
+- VibeSec aplicado como checklist de cierre: el diff no añade red, URLs, input remoto,
+  archivos, secretos, auth ni acceso a datos familiares. La nueva entrada Apariencia
+  Desktop no abre las vistas administrativas.
+- Revision multiagente: auditorias Android/Desktop/iOS y una revision transversal final
+  en solo lectura. Los hallazgos se verificaron contra codigo antes de corregirlos.
+
+Limitaciones y siguiente punto:
+- No hubo ADB/emulador conectado, prueba GUI JavaFX ni macOS/Xcode; quedan pendientes
+  smoke tests visuales reales, lector de pantalla y Dynamic Type en dispositivo.
+- No se regenero el instalador Desktop. El APK debug si fue regenerado.
+- iOS sigue sin `commonTest`; se valido compilacion comun y Kotlin/Native, no runtime.
+- No se tocaron backend, contratos API, base de datos, auth, ownership ni sync.
+- No se hizo commit en esta sesion. `paraImplementar.txt` sigue sin trackear y sin tocar.
+- Al retomar funcionalidad, vuelve a aplicar el plan aprobado iOS multi-familia salvo
+  nueva prioridad explicita del usuario.
+
+### Cierre de sesion y checkpoint exacto del sprint visual - 2026-07-13 06:20 CEST - Codex
+
+Estado de la entrega al cerrar:
+- El sprint visual esta **implementado y validado por compilacion/tests**, pero sigue
+  **sin commit** y sin smoke test grafico en dispositivos reales. No debe confundirse
+  "build correcto" con aprobacion visual final del usuario.
+- La interfaz conserva los 10 temas historicos y suma 6; total: 16 temas. Los nuevos
+  son `RUBI_NOCTURNO`, `AURORA_BOREAL`, `JADE_IMPERIAL`, `COBRE_LUNAR`,
+  `CIRUELA_SOLAR` y `CORAL_ABISAL`. Solo `RUBI_NOCTURNO` lleva el distintivo
+  `Principal` y una preview predominantemente oscura.
+- Seleccionar `RUBI_NOCTURNO` no fuerza el modo oscuro: la preferencia independiente
+  `SYSTEM` / `LIGHT` / `DARK` sigue mandando. Los fallbacks y valores por defecto
+  siguen siendo `BOSQUE` y `SYSTEM`; no se migra silenciosamente a usuarios actuales.
+- Los IDs, el orden y las paletas de los 10 temas antiguos no se renombraron ni
+  reordenaron. Esta compatibilidad es deliberada porque los IDs se persisten.
+- El efecto pedido como "3D" se implemento como profundidad 2.5D usable: elevacion,
+  gradientes, brillo, sombra y desplazamiento corto al pulsar; no como escena 3D que
+  dificulte la lectura o la navegacion.
+- Al cambiar entre claro y oscuro se aplica el esquema completo sin interpolar colores
+  opuestos, para no perder contraste en el punto medio. Los 300 ms de interpolacion se
+  reservan a cambios entre temas dentro del mismo modo.
+
+Estado exacto de Git al documentar este cierre:
+- Rama: `main`.
+- HEAD: `2e16da42a808cadf9122dff145d6bfbd4f715606` (`docs: registra punto de
+  retomada para sprint iOS multi-familia`).
+- Upstream local (sin ejecutar `fetch` en este cierre):
+  `origin/main=f5ec3837c880a829fa4e150e67cb614f5f3c7dc9`; divergencia
+  `main...origin/main [ahead 8, behind 0]`.
+- El worktree **no esta limpio**: 22 archivos trackeados modificados, 19 archivos
+  nuevos del sprint visual y `paraImplementar.txt` como untracked preexistente ajeno.
+  Son 41 archivos del sprint visual sin commit y 20 entradas untracked en total.
+- No hay archivos staged/preparados para commit.
+- No ejecutar `git reset --hard`, `git checkout -- .`, `git clean` ni `git add .`:
+  destruirian o mezclarian trabajo valido y podrian incluir `paraImplementar.txt`.
+- `paraImplementar.txt` no se leyo, modifico, agrego ni adopto como parte del sprint.
+
+Inventario exhaustivo de archivos trackeados modificados:
+- Documentacion: `CONTINUAR.md`, `Interfaz.md`.
+- Android:
+  - `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/ThemePickerDialog.kt`
+  - `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/theme/AppTheme.kt`
+  - `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/theme/Theme.kt`
+- Desktop:
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/DashboardView.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/ExpiryNotificationService.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/HelpDialog.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/LoginView.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/MainWindow.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/NotesView.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/OnboardingDialog.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/RecipeFormDialog.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/RecipeListView.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/StockFormDialog.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/StockView.java`
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/ThemeManager.java`
+  - `desktop/src/main/resources/style.css`
+- iOS/KMP:
+  - `ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/App.kt`
+  - `ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/theme/AppTheme.kt`
+  - `ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/ui/MainTabScreen.kt`
+  - `ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/ui/SettingsScreen.kt`
+
+Inventario exhaustivo de archivos nuevos del sprint visual:
+- Android:
+  - `android/app/src/main/java/org/gipsybuho/recetasfamiliares/ui/theme/NewThemePalettes.kt`
+  - `android/app/src/test/java/org/gipsybuho/recetasfamiliares/ui/theme/AppThemeTest.kt`
+- Desktop:
+  - `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/MotionPreferences.java`
+  - `desktop/src/test/java/org/gipsybuho/recetasfamiliares/ui/MotionPreferencesTest.java`
+  - `desktop/src/test/java/org/gipsybuho/recetasfamiliares/ui/ThemeManagerTest.java`
+  - `desktop/src/main/resources/themes/theme-rubi-nocturno-light.css`
+  - `desktop/src/main/resources/themes/theme-rubi-nocturno-dark.css`
+  - `desktop/src/main/resources/themes/theme-aurora-boreal-light.css`
+  - `desktop/src/main/resources/themes/theme-aurora-boreal-dark.css`
+  - `desktop/src/main/resources/themes/theme-jade-imperial-light.css`
+  - `desktop/src/main/resources/themes/theme-jade-imperial-dark.css`
+  - `desktop/src/main/resources/themes/theme-cobre-lunar-light.css`
+  - `desktop/src/main/resources/themes/theme-cobre-lunar-dark.css`
+  - `desktop/src/main/resources/themes/theme-ciruela-solar-light.css`
+  - `desktop/src/main/resources/themes/theme-ciruela-solar-dark.css`
+  - `desktop/src/main/resources/themes/theme-coral-abisal-light.css`
+  - `desktop/src/main/resources/themes/theme-coral-abisal-dark.css`
+- iOS/KMP:
+  - `ios/composeApp/src/commonMain/kotlin/org/gipsybuho/recetasfamiliares/theme/ReducedMotion.kt`
+  - `ios/composeApp/src/iosMain/kotlin/org/gipsybuho/recetasfamiliares/theme/ReducedMotion.ios.kt`
+
+Gate tecnico confirmado antes del cierre:
+- Android, desde `android`: `.\gradlew.bat testDebugUnitTest assembleDebug --console=plain`.
+  Resultado: `BUILD SUCCESSFUL`; los XML actuales suman 53 tests, 0 fallos, 0 errores,
+  0 omitidos. `AppThemeTest` comprueba total/orden/metadata, contraste de paletas nuevas
+  y contraste durante pasos de interpolacion dentro del mismo modo. Los 9 reportes XML
+  quedaron generados alrededor de las 02:41 CEST.
+- Desktop, desde `desktop`: `mvn test`. Resultado: `BUILD SUCCESS`; los XML actuales
+  suman 27 tests, 0 fallos, 0 errores, 0 omitidos. Incluyen los 32 CSS, sus 27 tokens,
+  contraste WCAG AA de pares semanticos y persistencia aislada de Reduce Motion. Los 7
+  reportes XML quedaron generados alrededor de las 02:53 CEST.
+- iOS, desde `ios`: `.\gradlew.bat :composeApp:compileKotlinIosX64 --rerun-tasks
+  --console=plain`. Resultado: `BUILD SUCCESSFUL`; valida el `actual` UIKit de Reduce
+  Motion en Kotlin/Native. No equivale a tests de runtime ni a build Xcode en macOS.
+- Raiz: `git diff --check`. Resultado: codigo 0; solo avisos informativos de futura
+  conversion LF/CRLF en Windows.
+- No hace falta repetir estos gates al abrir la proxima sesion si el diff no ha cambiado.
+  Si se edita codigo, repetir como minimo el gate de la plataforma afectada y
+  `git diff --check`; antes de commit conviene repetir los tres.
+
+Artefactos y distribucion:
+- APK actual: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- Tamano actual: 24.716.342 bytes.
+- SHA-256 actual: `EA3D33D0F9EB39B79148DD5855889650DF370FB0883C3934E0C32A030AC0E1F5`.
+- Fecha local del APK: `2026-07-13T02:41:20.1909940+02:00`.
+- El instalador Desktop `desktop/output/RecetasFamiliares-Instalador-v1.1.exe` pertenece
+  a una regeneracion anterior (`2026-07-12 21:20:17`, 52.772.077 bytes, SHA-256
+  `064E06DE1A2C2E3386DC22AABF6FE2CFD2B5836685279C88730EABB739A6012E`) y **no
+  contiene este sprint visual**. No presentarlo como instalador actualizado hasta
+  ejecutar `desktop/build-installer.ps1`.
+- No existe artefacto iOS distribuible generado en Windows.
+
+Alcance de seguridad y datos:
+- No se tocaron backend, endpoints, DTO de red, autenticacion, autorizacion, ownership,
+  base de datos, migraciones, sincronizacion ni secretos.
+- VibeSec se uso como checklist final. La entrada Apariencia Desktop esta disponible a
+  miembros normales, pero no desbloquea Servidor, Diagnostico ni acciones admin.
+- La preferencia Desktop `reduceMotion` vive en `Preferences.userRoot().node("recetas/ui")`;
+  sus tests usan nodos aislados y los eliminan.
+- Los temporizadores funcionales (cocina y autocierre) siguen activos al reducir
+  movimiento; solo se eliminan animaciones cosmeticas.
+
+Pruebas manuales aun pendientes, no defectos confirmados:
+- Android real/emulador: abrir Apariencia; recorrer los 16 temas en Sistema/Claro/Oscuro;
+  verificar Rubi Nocturno, scroll, seleccion, rotacion, barras del sistema y modo cocina;
+  activar la escala de animacion/reducir movimiento y comprobar que no hay movimiento
+  innecesario. `adb` no estaba disponible en `PATH` al cerrar esta sesion.
+- Desktop JavaFX: probar 16 temas, selector de modo, hover/foco/teclado, cambio rapido de
+  temas, toggle Reducir movimiento, login/dashboard/dialogos/toasts y acceso Apariencia
+  con un miembro sin rol admin.
+- iOS en macOS/dispositivo: probar Dynamic Type, una/dos columnas, VoiceOver, Reduce
+  Motion cambiado con la app abierta, tabs y todos los temas en claro/oscuro.
+- `ios/composeApp/src/commonTest` no existe todavia; no atribuir tests iOS a este sprint.
+- Confirmar visualmente el contraste de estados disabled/focus/hover y textos largos;
+  los tests cubren contraste semantico, no sustituyen una inspeccion GUI.
+
+PUNTO EXACTO PARA RETOMAR EN LA PROXIMA SESION:
+1. Leer esta seccion y la inmediatamente anterior; no repetir auditoria ni redisenar las
+   seis identidades salvo que el usuario pida cambios.
+2. Ejecutar `git status --short --untracked-files=all` y confirmar que HEAD sigue siendo
+   `2e16da4`, que aparecen los 22 modificados + 19 nuevos descritos y que
+   `paraImplementar.txt` sigue fuera de alcance. Si el estado difiere, investigar antes
+   de editar o limpiar nada.
+3. Preguntar al usuario si quiere primero (A) smoke test visual/ajustes, (B) regenerar el
+   instalador Desktop, o (C) cerrar el sprint visual con commit. No asumir aprobacion
+   estetica ni autorizacion de commit.
+4. Si se autoriza commit: volver a ejecutar los gates afectados, revisar el diff y
+   agregar **solo** el inventario visual anterior; excluir expresamente
+   `paraImplementar.txt`. Registrar hash del commit y cualquier artefacto regenerado en
+   este archivo.
+5. No empezar otro sprint funcional encima de este worktree sin decidir antes que hacer
+   con el sprint visual sin commit. Cuando quede cerrado, retomar el plan ya aprobado
+   `docs/superpowers/plans/2026-07-13-ios-multi-family.md`, empezando por elegir
+   Subagent-Driven vs Inline y luego Task 1. El posterior Spec 2 para copiar recetas en
+   iOS sigue pendiente y depende de completar multi-familia.
+
+Regla de honestidad para la siguiente sesion: declarar como ya confirmado unicamente
+los gates enumerados aqui. Las pruebas visuales, el instalador Desktop actualizado, el
+runtime iOS y el commit siguen pendientes hasta que se ejecuten y se documenten.
+
+### Regeneracion de APK y EXE con el sprint visual - 2026-07-13 06:31 CEST - Codex
+
+Autorizacion y alcance:
+- El usuario pidio expresamente reescribir el APK y el EXE con los cambios visuales
+  implementados. Esta seccion **supersede solo el estado de artefactos** del checkpoint
+  anterior: el codigo visual continua sin commit y las pruebas GUI siguen pendientes.
+- No se edito codigo fuente para esta tarea. Solo se limpiaron/reconstruyeron salidas,
+  se ejecutaron tests y se actualizo `CONTINUAR.md`.
+- `paraImplementar.txt` no se leyo, modifico, agrego ni incluyo en ningun paquete.
+- La ruta recursiva que limpia `build-installer.ps1` se verifico antes de ejecutarlo:
+  `desktop/output/RecetasFamiliares`, dentro del workspace esperado.
+- Habia dos procesos de una instalacion anterior ejecutandose desde
+  `%LOCALAPPDATA%/RecetasFamiliares`, no desde `desktop/output`; no bloquearon el build
+  y no se cerraron ni alteraron.
+
+Android - APK regenerado desde limpio:
+- Comando final, desde `android`:
+  `.\gradlew.bat clean testDebugUnitTest assembleDebug --console=plain`.
+- Resultado final: `BUILD SUCCESSFUL` en 1 min 09 s; 47 tareas, 46 ejecutadas y una
+  `UP-TO-DATE`.
+- Reportes: 9 suites XML, **53 tests**, 0 fallos, 0 errores y 0 omitidos.
+- APK: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- Tamano: **24.055.919 bytes** (22,94 MiB).
+- Fecha local: `2026-07-13T06:29:09.8461980+02:00`.
+- SHA-256: `C5AA287C5CBA7DAF4F587629819732BCA2D7DBE0A1AC3E7E1D65DF013B51D30B`.
+- Incidencia transitoria: una primera invocacion quedo con dos daemons despues de un
+  timeout corto y produjo una colision de cache Kotlin. No se acepto ese intento como
+  gate; se ejecuto `gradlew --stop` y el comando limpio completo anterior paso.
+- Warnings no bloqueantes: dos librerias nativas no se pudieron strippear y se
+  empaquetaron tal cual; tambien aparecieron deprecaciones/safe call/condicion siempre
+  true ya conocidas y sugerencias de configuration cache.
+- Es un APK `debug`; no se genero ni firmo un APK `release` en esta tarea.
+
+Windows - instalador y app-image regenerados:
+- Comando principal desde la raiz:
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File desktop/build-installer.ps1`.
+- Resultado: codigo 0 / `BUILD COMPLETADO` en 118,8 s con PowerShell 7, JDK 21.0.11,
+  Maven, `jpackage` y NSIS.
+- El script compila con `mvn clean package -Ppackage-windows -DskipTests`; por eso,
+  despues se ejecuto `mvn test` desde `desktop`.
+- Tests Desktop: `BUILD SUCCESS`, 7 suites XML, **27 tests**, 0 fallos, 0 errores y
+  0 omitidos.
+- Instalador: `desktop/output/RecetasFamiliares-Instalador-v1.1.exe`.
+  - Tamano: **52.784.693 bytes** (50,339 MiB).
+  - Fecha local: `2026-07-13T06:27:49.7706424+02:00`.
+  - SHA-256: `2829C685D5092B33E6CFB1E12AFCB79741FB1757F64FA39A6059DB8F5B4C452E`.
+- Lanzador portable/app-image: `desktop/output/RecetasFamiliares/RecetasFamiliares.exe`.
+  - Tamano: **458.752 bytes**.
+  - Fecha local: `2026-07-13T06:26:16.6667390+02:00`.
+  - SHA-256: `BFB9F6FBC3E692CAAE672BC8AC3E58C6F682706716367959599186C64B8D6713`.
+- JAR realmente empaquetado:
+  `desktop/output/RecetasFamiliares/app/RecetasFamiliares.jar`.
+  - Tamano: **21.426.203 bytes** (20,434 MiB).
+  - Fecha local: `2026-07-13T06:26:06.7454658+02:00`.
+  - SHA-256: `77931418582A62765E88A375AC5F90DF7486195ACE18B300B8ED9C720E85AECE`.
+  - Coincide byte a byte con `desktop/target/recetas-familiares-desktop-1.1.jar`.
+  - Inspeccionado con `jar tf`: contiene exactamente los 12 CSS nuevos, claro/oscuro
+    para Rubi Nocturno, Aurora Boreal, Jade Imperial, Cobre Lunar, Ciruela Solar y
+    Coral Abisal.
+- Runtime embebido verificado en `desktop/output/RecetasFamiliares/runtime/release`:
+  `JAVA_VERSION="21.0.11"`.
+- Configuracion embebida verificada en `RecetasFamiliares.cfg`:
+  `-Dapi.base.url=https://recetas.167.233.213.242.sslip.io/` y main class
+  `org.gipsybuho.recetasfamiliares.Launcher`.
+- `Get-AuthenticodeSignature` devuelve `NotSigned` para el instalador y el lanzador.
+  No se dispone de certificado de firma de codigo en este flujo; Windows puede mostrar
+  advertencia de editor desconocido.
+
+Comprobaciones finales de esta regeneracion:
+- Los hashes se recalcularon desde la raiz despues de que todos los procesos de build
+  terminaran; no se calcularon sobre archivos parciales.
+- `git diff --check` continua en codigo 0, solo con avisos LF/CRLF normales de Windows.
+- Los artefactos de `android/app/build` y `desktop/output` estan ignorados por Git; el
+  status de fuentes conserva el sprint visual sin commit y no suma binarios trackeados.
+- No se hizo commit.
+- No se ejecuto smoke test visual ni se instalo el nuevo EXE. La instalacion abierta en
+  `%LOCALAPPDATA%` sigue siendo la version que ya estaba instalada hasta que el usuario
+  ejecute el instalador nuevo.
+
+PUNTO EXACTO ACTUALIZADO PARA RETOMAR:
+1. El APK y los dos EXE de `desktop/output` ya estan actualizados con el sprint visual;
+   no volver a regenerarlos salvo que cambie codigo o se necesite firma/release.
+2. Si se desea validar distribucion, instalar el APK en dispositivo/emulador y ejecutar
+   `RecetasFamiliares-Instalador-v1.1.exe`; hacer el smoke visual descrito en el
+   checkpoint anterior y documentar el resultado.
+3. Sigue pendiente pedir autorizacion antes de commitear los 41 archivos del sprint
+   visual. Excluir `paraImplementar.txt` de cualquier staging.
+4. Una vez aceptado/commiteado el sprint visual, retomar
+   `docs/superpowers/plans/2026-07-13-ios-multi-family.md` desde la eleccion de metodo y
+   Task 1, salvo nueva prioridad explicita del usuario.
+
+### Ajuste de navegacion y Apariencia Desktop - 2026-07-16 - Codex
+
+Alcance autorizado:
+- Se reviso Desktop completo con foco en la barra lateral y `Ajustes > Apariencia`.
+- Se elimino la entrada/ruta independiente `Apariencia` del sidebar. `Ajustes` pasa a
+  ser comun para todos los usuarios autenticados; `Apariencia` y `Acerca de` son
+  accesibles para todos, mientras `Servidor` y `Diagnostico` solo se construyen para
+  OWNER/ADMIN. `Ctrl+,` respeta el mismo acceso y no actua en Login.
+- El bloque central del sidebar ahora tiene scroll propio; Ayuda, Sincronizar, Cerrar
+  sesion y Salir permanecen visibles en ventanas bajas. Se corrigieron colores del
+  usuario, rol y acciones del lateral para usar tokens con contraste en temas oscuros.
+- Las 16 tarjetas de tema se compactaron de 212 px y 160 px minimos a 160 px y 104 px
+  minimos, con preview de 158 x 54 px, separacion de 10 px, altura uniforme y distintivo
+  `Principal` superpuesto. Se retiraron descripciones visibles y sombras permanentes;
+  nombre, descripcion y estado radio siguen expuestos mediante tooltip/accesibilidad.
+- Flechas de teclado aplican tema/modo y restauran el foco tras reconstruir Ajustes.
+  El `TabPane`, checks, inputs, combos, busqueda y estados vacios afectados usan tokens
+  del tema; se retiraron colores fijos de la paleta clara en esos componentes.
+
+Archivos de este ajuste:
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/MainWindow.java`
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/HelpDialog.java`
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/GlobalSearchView.java`
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/ShoppingListView.java`
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/StockView.java`
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/NotesView.java`
+- `desktop/src/main/resources/style.css`
+- `Interfaz.md` y este checkpoint.
+
+Validacion ejecutada en esta sesion:
+- `mvn -DskipTests compile` desde `desktop`: `BUILD SUCCESS`.
+- `mvn test` desde `desktop`: `BUILD SUCCESS`, **27 tests**, 0 fallos/errores/omitidos.
+- Smoke nativo JavaFX desde fuentes con sesion OWNER: claro y oscuro, 16 tarjetas,
+  reflow, scroll central del sidebar, pestañas admin, seleccion y foco con flechas.
+  Capturas de QA en `desktop/target/ui-smoke/` (generadas/ignoradas, no versionadas).
+- La preferencia de prueba se restauro a Rubi Nocturno + Claro al terminar.
+- `git diff --check`: codigo 0; solo avisos LF/CRLF normales de Windows.
+
+Agentes, skills y seguridad:
+- Browser skill inspeccionada, pero no usada para automatizar la UI porque Desktop es
+  JavaFX nativo, no una aplicacion web. El smoke uso accesibilidad nativa de Windows y
+  captura directa de la ventana.
+- VibeSec aplicado como checklist final: no cambian red, auth, backend, datos familiares,
+  contratos ni secretos. Las pestañas locales sensibles no se construyen para MEMBER.
+- Tres revisiones paralelas en solo lectura cubrieron navegacion/permisos, tarjetas y
+  contraste transversal; los hallazgos se verificaron antes de integrarlos.
+- `superpowers` no estaba instalado/activo; se uso plan explicito y validacion local.
+
+Estado y limitaciones:
+- No se hizo commit ni staging. `paraImplementar.txt` sigue fuera de alcance y sin tocar.
+- No hubo login real como MEMBER; su matriz de pestañas se valido por codigo/compilacion,
+  no por smoke de cuenta. Falta ese smoke si se quiere cierre manual de permisos UI.
+- El instalador y app-image de `desktop/output` son anteriores a este ajuste y ya no
+  representan el fuente actual. Regenerarlos solo si el usuario pide distribuirlo.
+
+### Scrollbars tematicos y Perfil dentro de Ajustes Desktop - 2026-07-16 - Codex
+
+Alcance autorizado:
+- Se modernizaron los scrollbars de Desktop y se traslado la entrada lateral
+  `Mi perfil y cuenta` a una pestaña comun de `Ajustes`.
+- No se cambiaron contratos, backend, persistencia de datos, autenticacion ni acciones
+  de cuenta. `paraImplementar.txt` no se leyo, modifico ni incluyo en el trabajo.
+
+Implementacion:
+- `style.css` tematiza ahora todos los `ScrollBar` JavaFX: ScrollPane, listas, tablas,
+  arboles, TextArea y scroll horizontal. El area interactiva conserva un minimo de
+  16 px; carril y thumb se muestran estrechos, redondeados y sin cambios de geometria
+  en hover. Los estados normal, hover, pulsado y foco usan respectivamente tokens de
+  texto, primario, primario-hover y foco del tema activo.
+- El scroll del bloque central del sidebar tiene override propio con
+  `recetas-sidebar-hdr` y `recetas-sidebar-active`. Las esquinas de scroll tambien se
+  tematizan y se conservaron botones direccionales discretos para no colapsar la
+  geometria que calcula `ScrollBarSkin`.
+- Auditoria transversal sobre las 32 variantes CSS: contraste minimo del thumb de
+  3,19:1 en reposo, 3,67:1 en hover/foco, 4,69:1 pulsado y 7,51:1 en sidebar.
+- Se elimino `btnProfile`, su ruta `profile` y su estado activo independiente. La unica
+  entrada textual del sidebar es `Ajustes`; dentro aparecen `Apariencia`,
+  `Perfil y cuenta` y `Acerca de` para todo usuario autenticado. `Servidor` y
+  `Diagnostico` siguen construyendose solo para OWNER/ADMIN.
+- La tarjeta superior del usuario abre directamente `Ajustes > Perfil y cuenta` por
+  raton, Enter o Espacio, con rol y texto accesibles. `Ctrl+,` conserva la ultima
+  pestaña valida y una pestaña administrativa recordada cae a Apariencia si el rol ya
+  no la permite.
+- `ProfileView` se mantiene como instancia unica de la sesion. Su `Tab` se retira del
+  TabPane anterior antes de reconstruir Ajustes, evitando doble padre JavaFX y cargas
+  duplicadas. Se refresca solo al seleccionar Perfil.
+- La ayuda F1 distingue la pestaña Perfil y documenta su nueva ruta. `Interfaz.md`
+  registra la matriz de pestañas y el contrato visual de scrollbars.
+- VibeSec detecto que `Eliminar cuenta` reutilizaba el color de `Cerrar sesion` del
+  sidebar. Se acoto `.logout-button` al lateral y ambos botones de borrado usan ahora
+  `.danger-button` con tokens de error; el flujo sensible conserva contraseña,
+  confirmacion, manejo de 403 y callback originales. Contraste del boton destructivo
+  verificado por revision en las 32 variantes: minimo 5:1.
+
+Archivos de este ajuste:
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/MainWindow.java`
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/ProfileView.java`
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/HelpDialog.java`
+- `desktop/src/main/resources/style.css`
+- `Interfaz.md` y este checkpoint.
+
+Validacion final:
+- `mvn -DskipTests compile` desde `desktop`: `BUILD SUCCESS`.
+- `mvn test` desde `desktop`: `BUILD SUCCESS`, **27 tests**, 0 fallos, 0 errores y
+  0 omitidos.
+- `git diff --check`: codigo 0; solo avisos LF/CRLF normales de Windows.
+- Smoke JavaFX nativo desde fuentes con sesion OWNER y accesibilidad de Windows:
+  - no existe el boton lateral `Mi perfil y cuenta`;
+  - la user card abre Perfil con Enter y Espacio;
+  - Perfil sigue seleccionado al salir y volver a Ajustes, sin excepcion de
+    reparentado;
+  - cambio claro/oscuro reconstruye Ajustes y conserva la pestaña esperada;
+  - scrollbars de sidebar y contenido, rueda, ventana 1100 x 650, hover y posicion al
+    final se comprobaron visualmente;
+  - stderr del proceso JavaFX quedo en 0 bytes, sin avisos del parser CSS.
+- Capturas ignoradas/no versionadas en `desktop/target/ui-smoke/`, entre ellas
+  `profile-scroll-light.png`, `appearance-scroll-dark.png`,
+  `profile-account-scroll-dark.png` y `profile-scroll-dark-compact.png`.
+- La preferencia de prueba se restauro a Rubi Nocturno + Claro y se detuvo unicamente
+  el arbol de procesos Maven/JavaFX lanzado para el smoke. No se altero la instalacion
+  existente.
+- Tres revisiones finales en solo lectura (scrollbars, navegacion y VibeSec) no
+  encontraron bloqueantes.
+
+Estado y limites:
+- No se hizo commit ni staging. El worktree sigue incluyendo el sprint visual previo.
+- No hubo login real como MEMBER; la matriz MEMBER se verifico por codigo, compilacion
+  y revision independiente. Sigue recomendado un smoke manual con una cuenta MEMBER.
+- No se ejecuto un borrado real de cuenta ni una subida de avatar durante el smoke;
+  se conservaron y revisaron sus guardias existentes.
+- Riesgo previo no bloqueante: un rol administrativo persistido puede seguir mostrando
+  controles locales durante un arranque offline tras degradacion; el backend mantiene
+  la autorizacion efectiva. No fue introducido por este ajuste.
+- El instalador y app-image de `desktop/output` vuelven a quedar anteriores al fuente
+  actual. Regenerarlos solo si se solicita distribucion.
+
+### Correccion visual de Mi familia en Perfil Desktop - 2026-07-16 - Codex
+
+Alcance y causa:
+- El usuario autorizo corregir exclusivamente el bloque `Ajustes > Perfil y cuenta >
+  Mi familia`, donde la inicial del grupo pisaba el titulo y el nombre familiar.
+- La causa exacta era una colision de estilos: `familyAvatarSlot` media 44 x 44 px,
+  pero su fallback reutilizaba `.profile-avatar-circle`, clase del avatar personal que
+  fuerza 88 x 88 px. El hijo sobresalia 22 px por cada lado porque StackPane no recorta.
+
+Implementacion:
+- Se creo `FAMILY_AVATAR_SIZE = 40` y la clase exclusiva
+  `.profile-family-avatar-circle`; fallback e imagen remota usan ahora el mismo tamano,
+  clip y limites min/pref/max. El avatar personal de 88 px y el del sidebar no cambian.
+- La inicial usa `recetas-primary`/`recetas-primary-fg` y tamano relativo, por lo que
+  conserva contraste y se adapta al tema activo.
+- Nombre familiar y rol pasan a un VBox de dos lineas junto al avatar. El nombre puede
+  replegarse, el badge tiene tipografia/padding mas contenidos y el conjunto mantiene
+  12 px de separacion.
+- Visibilidad y `managed` del badge se sincronizan; su texto accesible queda como
+  `Rol familiar: <rol>`.
+- No se tocaron permisos, repositorios, endpoints, validacion de archivos, subida de
+  imagen, datos familiares ni acciones de cuenta.
+
+Archivos modificados en este ajuste:
+- `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/ProfileView.java`
+- `desktop/src/main/resources/style.css`
+- Este checkpoint.
+
+Validacion:
+- `mvn -DskipTests compile`: `BUILD SUCCESS`.
+- `mvn test`: `BUILD SUCCESS`, **27 tests**, 0 fallos, 0 errores y 0 omitidos.
+- `git diff --check`: codigo 0; solo avisos LF/CRLF normales de Windows.
+- Smoke JavaFX nativo desde fuentes con sesion OWNER:
+  - claro y oscuro sin solapamiento;
+  - ventana compacta de 900 x 620 sin invasion del titulo o del nombre;
+  - bounds accesibles separados para `Mi familia`, `GipsyFamily` y el badge de rol;
+  - stderr del proceso JavaFX en 0 bytes, sin avisos CSS.
+- Capturas ignoradas/no versionadas:
+  `desktop/target/ui-smoke/family-avatar-fixed-light.png`,
+  `family-avatar-fixed-dark.png` y `family-avatar-fixed-compact.png`.
+- Se restauro Rubi Nocturno + Claro y se detuvo solo el arbol Maven/JavaFX iniciado
+  para este smoke. Otro proceso JavaFX previo ajeno al smoke se dejo intacto.
+
+Estado:
+- VibeSec se uso como control de regresion del area Perfil/Cuenta; este cambio es solo
+  visual y de accesibilidad, sin ampliar autorizaciones.
+- No se hizo commit ni staging. `paraImplementar.txt` no se leyo ni modifico.
+- El instalador/app-image de `desktop/output` sigue anterior al fuente actual; no se
+  reconstruyo porque el usuario no lo solicito.

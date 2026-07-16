@@ -16,11 +16,14 @@ import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
 import org.gipsybuho.recetasfamiliares.network.ApiClient
 import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
+import org.gipsybuho.recetasfamiliares.theme.AppShapes
 import org.gipsybuho.recetasfamiliares.theme.AppTypography
 import org.gipsybuho.recetasfamiliares.theme.ThemeMode
 import org.gipsybuho.recetasfamiliares.theme.ThemePreference
+import org.gipsybuho.recetasfamiliares.theme.animateAppColorScheme
 import org.gipsybuho.recetasfamiliares.theme.darkColors
 import org.gipsybuho.recetasfamiliares.theme.lightColors
+import org.gipsybuho.recetasfamiliares.theme.rememberReduceMotionEnabled
 import org.gipsybuho.recetasfamiliares.ui.MainTabScreen
 
 @Composable
@@ -56,10 +59,21 @@ fun App() {
         ThemeMode.DARK   -> true
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
+    val targetColorScheme = if (darkTheme) selectedTheme.darkColors() else selectedTheme.lightColors()
+    val reduceMotion = rememberReduceMotionEnabled()
+    // Evita interpolar texto claro y fondo oscuro en direcciones opuestas: al
+    // cambiar de modo se aplica el esquema completo; entre temas del mismo modo
+    // se mantiene la transicion suave.
+    val animatedColorScheme = if (reduceMotion) {
+        targetColorScheme
+    } else {
+        key(darkTheme) { animateAppColorScheme(targetColorScheme) }
+    }
 
     MaterialTheme(
-        colorScheme = if (darkTheme) selectedTheme.darkColors() else selectedTheme.lightColors(),
-        typography  = AppTypography
+        colorScheme = animatedColorScheme,
+        typography  = AppTypography,
+        shapes      = AppShapes
     ) {
         if (!onboardingDone) {
             OnboardingScreen(onFinished = { onboardingPref.onboardingDone = true; onboardingDone = true })
@@ -78,6 +92,7 @@ fun App() {
                 selectedTheme   = selectedTheme,
                 themeMode       = themeMode,
                 hapticsEnabled  = hapticsEnabled,
+                reduceMotion    = reduceMotion,
                 serverUrlPreference = serverUrlPreference,
                 onThemeChange   = { t -> selectedTheme = t; themePref.selectedTheme = t },
                 onModeChange    = { m -> themeMode = m; themePref.themeMode = m },

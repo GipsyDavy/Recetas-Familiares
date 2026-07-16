@@ -48,7 +48,7 @@ public class GlobalSearchView extends VBox {
 
         if (recipes.isEmpty() && stock.isEmpty() && notes.isEmpty()) {
             Label empty = new Label("Sin resultados para «" + q + "»");
-            empty.setStyle("-fx-font-size: 14px; -fx-text-fill: #8B6F5E;");
+            empty.getStyleClass().add("search-empty");
             VBox.setMargin(empty, new Insets(48, 0, 0, 0));
             getChildren().add(empty);
             return;
@@ -100,12 +100,12 @@ public class GlobalSearchView extends VBox {
 
     private Button resultRow(String title, String meta, String viewKey) {
         Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #3D2B1F;");
+        titleLabel.getStyleClass().add("search-result-title");
 
         VBox box = new VBox(2, titleLabel);
         if (meta != null && !meta.isBlank()) {
             Label metaLabel = new Label(meta);
-            metaLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #8B6F5E;");
+            metaLabel.getStyleClass().add("search-result-meta");
             metaLabel.setMaxWidth(Double.MAX_VALUE);
             box.getChildren().add(metaLabel);
         }
@@ -115,22 +115,14 @@ public class GlobalSearchView extends VBox {
         btn.setMaxWidth(Double.MAX_VALUE);
         btn.setAlignment(Pos.CENTER_LEFT);
         btn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-        btn.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; " +
-                     "-fx-cursor: hand; -fx-padding: 8 12 8 12;");
-        btn.setOnMouseEntered(e -> btn.setStyle(
-                "-fx-background-color: #EDD9C8; -fx-border-color: transparent; " +
-                "-fx-cursor: hand; -fx-padding: 8 12 8 12;"));
-        btn.setOnMouseExited(e -> btn.setStyle(
-                "-fx-background-color: transparent; -fx-border-color: transparent; " +
-                "-fx-cursor: hand; -fx-padding: 8 12 8 12;"));
+        btn.getStyleClass().add("search-result-row");
         btn.setOnAction(e -> onNavigate.accept(viewKey));
         return btn;
     }
 
     private static Label sectionHeader(String text, int count) {
         Label label = new Label(text + "  (" + count + ")");
-        label.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #8B6F5E; " +
-                       "-fx-padding: 14 0 4 4;");
+        label.getStyleClass().add("search-result-section");
         return label;
     }
 

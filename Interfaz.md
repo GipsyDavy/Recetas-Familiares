@@ -58,6 +58,16 @@ Temas actuales/documentados:
 9. Frambuesa.
 10. Noche de Verano.
 
+Temas de identidad contemporanea añadidos en 2026:
+11. Rubi Nocturno: tema principal, con carbon, borgoña, rubi y luz coral/cobre. Su
+    expresion de referencia es la variante oscura, premium y calida, sin estetica
+    agresiva ni de videojuego.
+12. Aurora Boreal: indigo, menta luminosa y violeta.
+13. Jade Imperial: jade profundo, celadon y cobre.
+14. Cobre Lunar: grafito, cobre y amatista.
+15. Ciruela Solar: ciruela, ambar y seda.
+16. Coral Abisal: oceano profundo, turquesa y coral.
+
 Cada tema debe tener:
 - modo claro,
 - modo oscuro,
@@ -67,9 +77,18 @@ Cada tema debe tener:
 
 Reglas:
 - No introducir colores sueltos fuera de tokens o variables del tema.
-- Rojo solo para errores o acciones destructivas.
+- Rojo solo para errores o acciones destructivas, salvo el rojo de identidad de
+  Rubi Nocturno. En ese tema, error y peligro deben conservar tokens propios y
+  diferenciarse tambien mediante icono, texto, contexto y confirmacion; nunca solo
+  por el color.
 - Amarillo/ambar solo para advertencias o caducidad.
 - El modo oscuro debe ser premium y legible, no negro plano.
+- Los diez identificadores historicos no se renombran ni se eliminan: forman parte
+  de las preferencias persistidas de los clientes.
+- Rubi Nocturno se presenta como tema principal y recomienda modo oscuro, pero no
+  fuerza el modo ni sustituye una seleccion guardada por el usuario.
+- Los selectores deben mostrar nombre completo, identidad cromatica y seleccion
+  accesible; no deben depender de una cuadricula fija que recorte temas o contenido.
 
 ---
 
@@ -117,6 +136,14 @@ Elevacion:
 - Usar elevacion para jerarquia funcional, no decoracion.
 - Evitar sombras duras.
 - En Desktop, hover y estado activo deben sustituir exceso de sombra.
+
+Profundidad contemporanea:
+- Los temas nuevos pueden combinar gradientes de sus colores semanticos, bordes
+  luminosos muy sutiles y sombras tintadas en elementos destacados.
+- El efecto 2.5D se limita a seleccion, hover o pulsacion: escala aproximada
+  `0.98-1.02`, desplazamiento de `1-2 px/dp` e inclinacion minima.
+- No aplicar blur, parallax o rotacion continua a listas, texto ni pantallas
+  completas. La legibilidad y el rendimiento tienen prioridad.
 
 ---
 
@@ -170,6 +197,7 @@ Duraciones recomendadas:
 - Hover / press: 80-120ms.
 - Mostrar/ocultar panel: 200-250ms.
 - Transicion de pantalla: 250-350ms.
+- Interpolacion al cambiar tema: 280-320ms.
 - Modal/sheet entrada: 200-300ms.
 - Skeleton a contenido: 300-400ms.
 - Reordenacion/lista: 200-250ms.
@@ -191,6 +219,18 @@ Feedback:
 - Visual siempre presente.
 - Haptico activado si la plataforma lo soporta y con toggle.
 - Sonido desactivado por defecto y con toggle.
+
+Reglas de movimiento:
+- La interpolacion de color se usa entre temas del mismo modo. El cambio
+  claro/oscuro aplica el esquema completo para no perder contraste durante el
+  punto medio de la transicion.
+- Android respeta la escala de animacion configurada en el sistema.
+- iOS consulta `Reducir movimiento` del sistema para omitir transiciones de tema,
+  pestañas y profundidad interactiva, y reacciona si el ajuste cambia con la app
+  abierta.
+- Desktop ofrece `Ajustes > Apariencia > Movimiento > Reducir movimiento` y, al activarlo,
+  omite fades, escalado, entradas de dialogo, desplazamientos y shimmer cosmeticos;
+  los temporizadores funcionales se mantienen.
 
 ---
 
@@ -293,6 +333,11 @@ MVP de ayuda:
 
 ### Desktop
 - Sidebar productiva con estado activo.
+- `Perfil y cuenta` vive como pestaña comun dentro de `Ajustes`; Apariencia y Acerca de
+  tambien son comunes, mientras Servidor y Diagnostico permanecen limitados a roles
+  administrativos.
+- Scrollbars estrechos y redondeados, con area interactiva estable y colores derivados
+  de los tokens del tema activo; el sidebar usa sus propios tokens de contraste.
 - Busqueda global accesible.
 - Atajos de teclado.
 - Tablas virtualizadas.
@@ -313,13 +358,13 @@ MVP de ayuda:
 Resuelto recientemente (no retomar sin motivo):
 - Fuentes reales empaquetadas: Nunito/Lato en `res/font` Android (Sprint 44). Desktop mantiene fallback del sistema segun seccion 4.
 - Stats familiares en perfil/dashboard: Android y Desktop (Sprint 43).
+- Perfil Desktop completo e integrado en `Ajustes > Perfil y cuenta`.
 - Onboarding Desktop de primer arranque, reabrible desde Ajustes > Acerca de (Sprint 44).
 - Shortcuts completos en modo cocina Desktop (Sprint 44).
 
 Prioridad alta:
 1. Completar paridad iOS en busqueda, filtros y skeletons.
-2. Crear perfil Desktop completo.
-3. Toggle global para hapticos.
+2. Toggle global para hapticos.
 
 Prioridad media:
 1. Ayuda contextual MVP.

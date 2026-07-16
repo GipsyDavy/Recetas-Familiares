@@ -149,6 +149,11 @@ public class RecipeListView extends ScrollPane {
 
     private void startSkeletonShimmer() {
         if (skeletonShimmer != null) skeletonShimmer.stop();
+        skeletonShimmer = null;
+        if (MotionPreferences.isReducedMotion()) {
+            skeletonPane.setOpacity(0.55);
+            return;
+        }
         skeletonPane.setOpacity(0.3);
         skeletonShimmer = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(skeletonPane.opacityProperty(), 0.3)),

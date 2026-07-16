@@ -94,6 +94,8 @@
     -fx-background-radius: 8;
     -fx-padding: 10 42 10 14;
     -fx-font-size: 14px;
+    -fx-text-fill: recetas-text-primary;
+    -fx-prompt-text-fill: recetas-text-muted;
 }
 
 .login-field:focused {
@@ -165,7 +167,8 @@
 }
 
 .avatar-circle {
-    -fx-background-color: derive(recetas-primary, 40%);
+    -fx-background-color: recetas-primary-cont;
+    -fx-text-fill: recetas-on-primary-cont;
     -fx-background-radius: 19px;
     -fx-min-width: 38px;
     -fx-min-height: 38px;
@@ -176,12 +179,30 @@
 .sidebar-user-name {
     -fx-font-weight: bold;
     -fx-font-size: 13px;
-    -fx-text-fill: recetas-surface;
+    -fx-text-fill: recetas-sidebar-active;
 }
 
 .sidebar-user-email {
     -fx-font-size: 11px;
-    -fx-text-fill: derive(recetas-surface, -30%);
+    -fx-text-fill: recetas-sidebar-fg;
+}
+
+.sidebar-user-card {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.sidebar-user-card:hover {
+    -fx-background-color: recetas-sidebar-hdr;
+}
+
+.sidebar-user-card:focused {
+    -fx-background-color: recetas-sidebar-hdr;
+    -fx-border-color: recetas-sidebar-active;
 }
 
 .sidebar-nav-button {
@@ -205,12 +226,28 @@
     -fx-font-weight: bold;
 }
 
-.sync-button {
-    -fx-text-fill: #8DBF8A;
+.sidebar-navigation {
+    -fx-background-color: transparent;
+    -fx-padding: 0 0 4 0;
 }
 
-.logout-button {
-    -fx-text-fill: #D4837A;
+.sidebar-navigation-scroll {
+    -fx-background: recetas-sidebar-bg;
+    -fx-background-color: recetas-sidebar-bg;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.sidebar-navigation-scroll > .viewport {
+    -fx-background-color: recetas-sidebar-bg;
+}
+
+.sync-button {
+    -fx-text-fill: recetas-sidebar-active;
+}
+
+.sidebar .logout-button {
+    -fx-text-fill: recetas-sidebar-fg;
 }
 
 /* ── Recipe list ─────────────────────────────────────────────────────────────── */
@@ -224,6 +261,13 @@
     -fx-border-radius: 8;
     -fx-background-radius: 8;
     -fx-padding: 8 12;
+    -fx-text-fill: recetas-text-primary;
+    -fx-prompt-text-fill: recetas-text-muted;
+}
+
+.search-field .list-cell {
+    -fx-background-color: recetas-surface;
+    -fx-text-fill: recetas-text-primary;
 }
 
 .search-field:focused {
@@ -361,6 +405,194 @@
     -fx-background-color: transparent;
 }
 
+/* ── Scrollbars modernos y adaptativos al tema ────────────────────────────── */
+.scroll-bar {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.scroll-bar:vertical {
+    -fx-min-width: 16px;
+    -fx-pref-width: 1.1em;
+}
+
+.scroll-bar:horizontal {
+    -fx-min-height: 16px;
+    -fx-pref-height: 1.1em;
+}
+
+.scroll-bar > .track-background {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar > .track {
+    -fx-background-color: recetas-surface-var;
+    -fx-background-radius: 8;
+}
+
+.scroll-bar:vertical > .track {
+    -fx-background-insets: 0 5;
+}
+
+.scroll-bar:horizontal > .track {
+    -fx-background-insets: 5 0;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-color: recetas-text-second;
+    -fx-background-radius: 8;
+}
+
+.scroll-bar:vertical > .thumb {
+    -fx-background-insets: 1 3;
+}
+
+.scroll-bar:horizontal > .thumb {
+    -fx-background-insets: 3 1;
+}
+
+.scroll-bar > .thumb:hover {
+    -fx-background-color: recetas-primary;
+}
+
+.scroll-bar > .thumb:pressed {
+    -fx-background-color: recetas-primary-hover;
+}
+
+.scroll-bar:focused {
+    -fx-background-color: recetas-focus-border, transparent;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 8, 7;
+}
+
+.scroll-bar > .increment-button,
+.scroll-bar > .decrement-button {
+    -fx-min-width: 16px;
+    -fx-min-height: 16px;
+    -fx-pref-width: 1.1em;
+    -fx-pref-height: 1.1em;
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-background-insets: 1;
+    -fx-padding: 0.2em;
+}
+
+.scroll-bar > .increment-button:hover,
+.scroll-bar > .decrement-button:hover {
+    -fx-background-color: recetas-surface-alt;
+}
+
+.scroll-bar > .increment-button:pressed,
+.scroll-bar > .decrement-button:pressed {
+    -fx-background-color: recetas-surface-var;
+}
+
+.scroll-bar > .increment-button > .increment-arrow,
+.scroll-bar > .decrement-button > .decrement-arrow {
+    -fx-background-color: recetas-text-second;
+}
+
+.scroll-bar > .increment-button:hover > .increment-arrow,
+.scroll-bar > .decrement-button:hover > .decrement-arrow {
+    -fx-background-color: recetas-primary;
+}
+
+.scroll-bar > .increment-button:pressed > .increment-arrow,
+.scroll-bar > .decrement-button:pressed > .decrement-arrow {
+    -fx-background-color: recetas-primary-hover;
+}
+
+.scroll-pane > .corner,
+.list-view > .virtual-flow > .corner,
+.table-view > .virtual-flow > .corner,
+.tree-view > .virtual-flow > .corner,
+.tree-table-view > .virtual-flow > .corner {
+    -fx-background-color: recetas-surface-var;
+}
+
+.sidebar-navigation-scroll > .scroll-bar > .track {
+    -fx-background-color: recetas-sidebar-hdr;
+}
+
+.sidebar-navigation-scroll > .scroll-bar > .thumb,
+.sidebar-navigation-scroll > .scroll-bar > .increment-button > .increment-arrow,
+.sidebar-navigation-scroll > .scroll-bar > .decrement-button > .decrement-arrow,
+.sidebar-navigation-scroll > .scroll-bar > .increment-button:hover > .increment-arrow,
+.sidebar-navigation-scroll > .scroll-bar > .decrement-button:hover > .decrement-arrow,
+.sidebar-navigation-scroll > .scroll-bar > .increment-button:pressed > .increment-arrow,
+.sidebar-navigation-scroll > .scroll-bar > .decrement-button:pressed > .decrement-arrow {
+    -fx-background-color: recetas-sidebar-active;
+}
+
+.sidebar-navigation-scroll > .scroll-bar > .thumb:hover {
+    -fx-background-insets: 1 2;
+}
+
+.sidebar-navigation-scroll > .scroll-bar > .thumb:pressed {
+    -fx-background-insets: 1;
+}
+
+.sidebar-navigation-scroll > .scroll-bar > .increment-button:hover,
+.sidebar-navigation-scroll > .scroll-bar > .decrement-button:hover {
+    -fx-background-color: recetas-sidebar-hdr;
+}
+
+.sidebar-navigation-scroll > .scroll-bar > .increment-button:pressed,
+.sidebar-navigation-scroll > .scroll-bar > .decrement-button:pressed {
+    -fx-background-color: recetas-sidebar-bg;
+}
+
+.sidebar-navigation-scroll > .scroll-bar:focused {
+    -fx-background-color: recetas-sidebar-active, transparent;
+}
+
+.empty-state-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: recetas-text-primary;
+}
+
+.empty-state-subtitle {
+    -fx-font-size: 13px;
+    -fx-text-fill: recetas-text-second;
+    -fx-text-alignment: center;
+}
+
+.search-empty {
+    -fx-font-size: 14px;
+    -fx-text-fill: recetas-text-second;
+}
+
+.search-result-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: recetas-text-primary;
+}
+
+.search-result-meta {
+    -fx-font-size: 12px;
+    -fx-text-fill: recetas-text-second;
+}
+
+.search-result-row {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
+    -fx-padding: 8 12;
+}
+
+.search-result-row:hover,
+.search-result-row:focused {
+    -fx-background-color: recetas-surface-alt;
+}
+
+.search-result-section {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: recetas-text-second;
+    -fx-padding: 14 0 4 4;
+}
+
 .separator .line {
     -fx-border-color: recetas-separator;
     -fx-border-width: 1 0 0 0;
@@ -424,6 +656,34 @@
 
 .action-button-secondary:hover {
     -fx-background-color: recetas-header-bg;
+}
+
+.danger-button {
+    -fx-background-color: recetas-error-bg;
+    -fx-text-fill: recetas-error;
+    -fx-border-color: recetas-error;
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 10 20;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.danger-button:hover,
+.danger-button:pressed {
+    -fx-background-color: recetas-error;
+    -fx-text-fill: recetas-error-bg;
+}
+
+.danger-button:focused {
+    -fx-border-color: recetas-focus-border;
+    -fx-border-width: 2;
+}
+
+.danger-button:disabled {
+    -fx-opacity: 0.55;
 }
 
 .delete-button {
@@ -582,6 +842,8 @@
     -fx-background-radius: 6;
     -fx-padding: 8 10;
     -fx-font-size: 13px;
+    -fx-text-fill: recetas-text-primary;
+    -fx-prompt-text-fill: recetas-text-muted;
 }
 
 .form-field:focused {
@@ -595,6 +857,14 @@
     -fx-background-radius: 6;
     -fx-padding: 6 8;
     -fx-font-size: 13px;
+    -fx-text-fill: recetas-text-primary;
+    -fx-prompt-text-fill: recetas-text-muted;
+}
+
+.form-field .list-cell,
+.form-field-small .list-cell {
+    -fx-background-color: recetas-form-bg;
+    -fx-text-fill: recetas-text-primary;
 }
 
 .form-add-button {
@@ -688,6 +958,32 @@
     -fx-font-weight: bold;
 }
 
+.settings-tabs {
+    -fx-background-color: recetas-bg;
+}
+
+.settings-tabs > .tab-header-area > .tab-header-background {
+    -fx-background-color: recetas-surface;
+}
+
+.settings-tabs .tab {
+    -fx-background-color: recetas-surface-var;
+    -fx-background-radius: 7 7 0 0;
+}
+
+.settings-tabs .tab:selected {
+    -fx-background-color: recetas-bg;
+}
+
+.settings-tabs .tab .tab-label {
+    -fx-text-fill: recetas-text-primary;
+    -fx-font-weight: bold;
+}
+
+.settings-tabs > .tab-content-area {
+    -fx-background-color: recetas-bg;
+}
+
 .settings-scroll {
     -fx-background: recetas-bg;
     -fx-background-color: recetas-bg;
@@ -696,6 +992,11 @@
 .settings-tab-content {
     -fx-background-color: recetas-bg;
     -fx-padding: 18;
+}
+
+.settings-tab-content .check-box,
+.settings-typography .label {
+    -fx-text-fill: recetas-text-primary;
 }
 
 .settings-shell {
@@ -818,67 +1119,141 @@
 
 .settings-theme-cards {
     -fx-background-color: transparent;
+    -fx-padding: 2 4 8 2;
 }
 
 .settings-theme-card {
     -fx-background-color: recetas-surface;
-    -fx-border-color: recetas-border;
+    -fx-border-color: recetas-surface-border;
     -fx-border-width: 1;
-    -fx-background-radius: 0;
-    -fx-border-radius: 0;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
     -fx-padding: 0;
-    -fx-pref-width: 148px;
-    -fx-pref-height: 98px;
+    -fx-pref-width: 160px;
+    -fx-min-width: 160px;
+    -fx-min-height: 104px;
+    -fx-alignment: TOP-LEFT;
     -fx-cursor: hand;
 }
 
-.settings-theme-card-active {
+.settings-theme-card:hover {
     -fx-border-color: recetas-primary;
-    -fx-border-width: 3;
+    -fx-effect: dropshadow(gaussian, recetas-primary, 12, 0.06, 0, 3);
+}
+
+.settings-theme-card:focused {
+    -fx-border-color: recetas-focus-border;
+    -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, recetas-primary, 11, 0.08, 0, 2);
+}
+
+.settings-theme-card:selected {
+    -fx-border-color: recetas-primary;
+    -fx-border-width: 2;
+    -fx-background-color: recetas-surface-alt;
+}
+
+.settings-theme-card:selected:focused {
+    -fx-border-color: recetas-focus-border;
+    -fx-border-width: 2;
+}
+
+.settings-theme-card-content {
+    -fx-pref-width: 158px;
+    -fx-alignment: TOP-LEFT;
 }
 
 .settings-theme-preview-strip {
-    -fx-pref-width: 148px;
-    -fx-pref-height: 60px;
+    -fx-pref-width: 158px;
+    -fx-pref-height: 54px;
     -fx-background-color: recetas-bg;
+    -fx-background-radius: 11 11 0 0;
 }
 
 .settings-theme-mini-sidebar {
     -fx-background-color: recetas-sidebar-bg;
-    -fx-padding: 8;
-    -fx-pref-width: 44px;
+    -fx-background-radius: 11 0 0 0;
+    -fx-padding: 6;
+    -fx-pref-width: 42px;
 }
 
 .settings-theme-mini-line {
-    -fx-background-color: rgba(255,255,255,0.28);
-    -fx-pref-height: 4px;
+    -fx-background-color: recetas-sidebar-fg;
+    -fx-opacity: 0.45;
+    -fx-pref-height: 3px;
 }
 
 .settings-theme-mini-body {
     -fx-background-color: recetas-bg;
-    -fx-padding: 8;
+    -fx-background-radius: 0 11 0 0;
+    -fx-padding: 6;
 }
 
 .settings-theme-mini-primary {
     -fx-background-color: recetas-primary;
-    -fx-pref-height: 5px;
+    -fx-pref-height: 4px;
 }
 
 .settings-theme-mini-accent {
     -fx-background-color: recetas-primary-cont;
-    -fx-pref-height: 4px;
+    -fx-pref-height: 3px;
 }
 
 .settings-theme-mini-border {
     -fx-background-color: recetas-border;
-    -fx-pref-height: 4px;
+    -fx-pref-height: 3px;
 }
 
 .settings-theme-card-name {
     -fx-font-size: 12px;
     -fx-font-weight: bold;
     -fx-text-fill: recetas-text-primary;
-    -fx-padding: 7 4;
+}
+
+.settings-theme-card-heading {
+    -fx-padding: 8 9 10 9;
+}
+
+.settings-theme-badge {
+    -fx-background-color: recetas-primary-cont;
+    -fx-background-radius: 10;
+    -fx-text-fill: recetas-on-primary-cont;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 5;
+}
+
+.settings-mode-selector {
+    -fx-background-color: recetas-surface-var;
+    -fx-background-radius: 10;
+    -fx-padding: 3;
+}
+
+.settings-mode-toggle {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-border-radius: 8;
+    -fx-text-fill: recetas-text-second;
+    -fx-font-weight: bold;
+    -fx-padding: 8 18;
+    -fx-cursor: hand;
+}
+
+.settings-mode-toggle:hover {
+    -fx-background-color: recetas-surface-alt;
+    -fx-text-fill: recetas-text-primary;
+}
+
+.settings-mode-toggle:selected {
+    -fx-background-color: recetas-primary;
+    -fx-text-fill: recetas-primary-fg;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 6, 0.08, 0, 1);
+}
+
+.settings-mode-toggle:focused {
+    -fx-border-color: recetas-focus-border;
+    -fx-border-width: 1;
 }
 
 .settings-about-header {
@@ -1012,6 +1387,21 @@
     -fx-max-height: 88px;
 }
 
+.profile-family-avatar-circle {
+    -fx-background-color: recetas-primary;
+    -fx-background-radius: 20px;
+    -fx-text-fill: recetas-primary-fg;
+    -fx-font-size: 1.1em;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+    -fx-min-width: 40px;
+    -fx-pref-width: 40px;
+    -fx-max-width: 40px;
+    -fx-min-height: 40px;
+    -fx-pref-height: 40px;
+    -fx-max-height: 40px;
+}
+
 .profile-name {
     -fx-font-size: 22px;
     -fx-font-weight: bold;
@@ -1019,7 +1409,7 @@
 }
 
 .profile-family-name {
-    -fx-font-size: 15px;
+    -fx-font-size: 1em;
     -fx-font-weight: bold;
     -fx-text-fill: recetas-text-primary;
 }
@@ -1034,6 +1424,11 @@
     -fx-font-size: 12px;
     -fx-font-weight: bold;
     -fx-padding: 3 10;
+}
+
+.profile-family-role-badge {
+    -fx-font-size: 0.82em;
+    -fx-padding: 2 8;
 }
 
 /* ── Chat familiar ─────────────────────────────────────────────────────────────── */

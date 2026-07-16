@@ -1,9 +1,13 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
 import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.ScaleTransition;
+import javafx.animation.SequentialTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -41,6 +45,10 @@ import java.util.prefs.Preferences;
 
 public class MainWindow {
 
+    private static final String THEME_CARD_TRANSITION_KEY = "themeCardScaleTransition";
+    private static final String SETTINGS_TAB_APPEARANCE = "appearance";
+    private static final String SETTINGS_TAB_PROFILE = "profile";
+
     private final Stage stage;
     private final AppContext context;
     private final BorderPane root = new BorderPane();
@@ -54,11 +62,16 @@ public class MainWindow {
     private GlobalSearchView searchResultsView;
     private FamilyMembersView familyMembersView;
     private ProfileView profileView;
+    private Tab profileSettingsTab;
+    private TabPane settingsTabPane;
     private String activeView = "dashboard";
+    private String activeSettingsTab = SETTINGS_TAB_APPEARANCE;
     private boolean navigating = false;
     private boolean updatingFamilySelector = false;
     private ComboBox<FamilyChoice> familySelector;
-    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnProfile, btnSettings, btnMembers;
+    private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat,
+            btnSettings, btnMembers;
+    private SequentialTransition themeTransition;
     private final TextField globalSearch = new TextField();
     private final Label statusBar = new Label("");
 
@@ -85,11 +98,11 @@ public class MainWindow {
                 globalSearch.requestFocus();
                 e.consume();
             } else if (e.isControlDown() && e.getCode() == KeyCode.COMMA
-                    && context.getSession().isAdmin()) {
-                navigateTo("settings");
+                    && context.getSession().isLoggedIn()) {
+                openSettingsTab(activeSettingsTab);
                 e.consume();
             } else if (e.getCode() == KeyCode.F1 && context.getSession().isLoggedIn()) {
-                HelpDialog.show(stage, activeView);
+                HelpDialog.show(stage, activeHelpTopic());
                 e.consume();
             }
         });
@@ -136,6 +149,9 @@ public class MainWindow {
         chatView.startRealtime();
         profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus,
                 this::showLogin);
+        profileSettingsTab = null;
+        settingsTabPane = null;
+        activeSettingsTab = SETTINGS_TAB_APPEARANCE;
         if (context.getSession().isAdmin()) {
             familyMembersView = new FamilyMembersView(context);
         }
@@ -191,12 +207,11 @@ public class MainWindow {
         btnShopping  = sidebarButton("🛒  Lista de la compra", "shopping");
         btnNotes     = sidebarButton("📝  Notas familiares", "notes");
         btnChat      = sidebarButton("💬  Chat familiar", "chat");
-        // Hallazgo Sprint D: el usuario no encontraba "Eliminar cuenta"
-        // (vive en Perfil, antes solo accesible desde la user card).
-        btnProfile   = sidebarButton("👤  Mi perfil y cuenta", "profile");
-
-        Region spacer = new Region();
-        VBox.setVgrow(spacer, Priority.ALWAYS);
+        btnSettings  = sidebarButton("⚙  Ajustes", "settings");
+        btnSettings.setOnAction(e -> openSettingsTab(activeSettingsTab));
+        Tooltip settingsTooltip = new Tooltip("Ajustes (Ctrl+,)");
+        settingsTooltip.setShowDelay(Duration.millis(400));
+        Tooltip.install(btnSettings, settingsTooltip);
 
         Button syncBtn = new Button("Sincronizar");
         syncBtn.getStyleClass().addAll("sidebar-nav-button", "sync-button");
@@ -225,16 +240,19 @@ public class MainWindow {
         Tooltip helpTooltip = new Tooltip("Ayuda (F1)");
         helpTooltip.setShowDelay(Duration.millis(400));
         Tooltip.install(helpBtn, helpTooltip);
-        helpBtn.setOnAction(e -> HelpDialog.show(stage, activeView));
+        helpBtn.setOnAction(e -> HelpDialog.show(stage, activeHelpTopic()));
 
         VBox bottom = new VBox(8, helpBtn, syncBtn, logoutBtn, exitBtn);
         bottom.setPadding(new Insets(8, 16, 24, 16));
 
         HBox userCard = buildUserCard();
 
-        // ── Common buttons ────────────────────────────────────────────────────
-        sidebar.getChildren().addAll(header, globalSearch, userCard, buildFamilySelector(),
-                btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnProfile);
+        // ── Navegacion desplazable: mantiene siempre accesibles las acciones ─
+        VBox navigation = new VBox();
+        navigation.getStyleClass().add("sidebar-navigation");
+        navigation.getChildren().addAll(
+                btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat,
+                btnSettings);
 
         // ── Admin-only buttons ────────────────────────────────────────────────
         if (context.getSession().isAdmin()) {
@@ -242,13 +260,19 @@ public class MainWindow {
             VBox.setMargin(adminSep, new Insets(4, 16, 4, 16));
 
             btnMembers  = sidebarButton("👨‍👩‍👧  Miembros", "members");
-            btnSettings = sidebarButton("⚙  Ajustes", "settings");
-            Tooltip.install(btnSettings, new Tooltip("Ajustes (Ctrl+,)"));
-
-            sidebar.getChildren().addAll(adminSep, btnMembers, btnSettings);
+            navigation.getChildren().addAll(adminSep, btnMembers);
         }
 
-        sidebar.getChildren().addAll(spacer, bottom);
+        ScrollPane navigationScroll = new ScrollPane(navigation);
+        navigationScroll.getStyleClass().add("sidebar-navigation-scroll");
+        navigationScroll.setFitToWidth(true);
+        navigationScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        navigationScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        navigationScroll.setPannable(true);
+        VBox.setVgrow(navigationScroll, Priority.ALWAYS);
+
+        sidebar.getChildren().addAll(header, globalSearch, userCard, buildFamilySelector(),
+                navigationScroll, bottom);
         return sidebar;
     }
 
@@ -358,12 +382,21 @@ public class MainWindow {
             userCard.getChildren().addAll(avatarNode, textBox);
         }
 
-        // UX-5: la card completa navega al perfil (foto y nombre se editan alli)
-        userCard.setStyle("-fx-cursor: hand;");
-        Tooltip profileTooltip = new Tooltip("Ver mi perfil");
+        // UX-5: la card completa abre Perfil y cuenta dentro de Ajustes.
+        userCard.getStyleClass().add("sidebar-user-card");
+        userCard.setFocusTraversable(true);
+        userCard.setAccessibleRole(AccessibleRole.BUTTON);
+        userCard.setAccessibleText("Abrir Perfil y cuenta en Ajustes");
+        Tooltip profileTooltip = new Tooltip("Abrir Perfil y cuenta en Ajustes");
         profileTooltip.setShowDelay(Duration.millis(400));
         Tooltip.install(userCard, profileTooltip);
-        userCard.setOnMouseClicked(e -> navigateTo("profile"));
+        userCard.setOnMouseClicked(e -> openSettingsTab(SETTINGS_TAB_PROFILE));
+        userCard.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
+                openSettingsTab(SETTINGS_TAB_PROFILE);
+                e.consume();
+            }
+        });
 
         return userCard;
     }
@@ -374,6 +407,11 @@ public class MainWindow {
         if (sidebar == null) return;
         Node oldCard = sidebar.getChildren().get(2);
         HBox newCard = buildUserCard();
+        if (MotionPreferences.isReducedMotion()) {
+            newCard.setOpacity(1.0);
+            sidebar.getChildren().set(2, newCard);
+            return;
+        }
         FadeTransition fadeOut = new FadeTransition(Duration.millis(180), oldCard);
         fadeOut.setFromValue(1.0);
         fadeOut.setToValue(0.0);
@@ -414,7 +452,6 @@ public class MainWindow {
         String text = (displayName != null && !displayName.isBlank()) ? initials(displayName) : "👤";
         Label label = new Label(text);
         label.getStyleClass().add("avatar-circle");
-        label.setTextFill(javafx.scene.paint.Color.WHITE);
         label.setFont(Font.font("System", FontWeight.BOLD, 18));
         label.setAlignment(javafx.geometry.Pos.CENTER);
         return label;
@@ -504,19 +541,13 @@ public class MainWindow {
                 setCenterWithFade(chatView);
                 chatView.onShown();
             }
-            case "profile" -> {
-                setCenterWithFade(profileView);
-                profileView.refresh();
-            }
             case "members" -> {
                 if (context.getSession().isAdmin() && familyMembersView != null) {
                     setCenterWithFade(familyMembersView);
                     familyMembersView.refresh();
                 }
             }
-            case "settings" -> {
-                if (context.getSession().isAdmin()) setCenterWithFade(buildSettingsView());
-            }
+            case "settings" -> setCenterWithFade(buildSettingsView());
         }
     }
 
@@ -525,6 +556,11 @@ public class MainWindow {
     }
 
     private void setCenterWithFade(Node nextNode) {
+        if (MotionPreferences.isReducedMotion()) {
+            nextNode.setOpacity(1.0);
+            root.setCenter(nextNode);
+            return;
+        }
         Node prev = root.getCenter();
         if (prev != null) {
             FadeTransition out = new FadeTransition(Duration.millis(180), prev);
@@ -583,7 +619,8 @@ public class MainWindow {
     // ── Logout ───────────────────────────────────────────────────────────────
 
     private void updateActiveSidebarButton(String view) {
-        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat, btnProfile, btnSettings, btnMembers};
+        Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping,
+                btnNotes, btnChat, btnSettings, btnMembers};
         for (Button btn : navButtons) {
             if (btn != null) btn.getStyleClass().remove("sidebar-nav-button-active");
         }
@@ -595,7 +632,6 @@ public class MainWindow {
             case "shopping"  -> btnShopping;
             case "notes"     -> btnNotes;
             case "chat"      -> btnChat;
-            case "profile"   -> btnProfile;
             case "settings"  -> btnSettings;
             case "members"   -> btnMembers;
             default          -> null;
@@ -632,27 +668,93 @@ public class MainWindow {
         CheckBox cbSounds = new CheckBox("Efectos de sonido");
         cbSounds.setSelected(SoundPlayer.isSoundEnabled());
 
-        TabPane tabs = new TabPane(
-                new Tab("Apariencia", buildAppearanceTab(cbSounds)),
-                new Tab("Servidor", buildServerTab()),
-                new Tab("Acerca de", buildAboutTab()),
-                new Tab("Diagnostico", buildDiagnosticsTab())
-        );
+        String requestedTabKey = activeSettingsTab;
+        if (profileSettingsTab == null) {
+            profileSettingsTab = settingsTab("Perfil y cuenta", SETTINGS_TAB_PROFILE, profileView);
+        } else if (profileSettingsTab.getTabPane() != null) {
+            profileSettingsTab.getTabPane().getTabs().remove(profileSettingsTab);
+        }
+        List<Tab> settingsTabs = new ArrayList<>();
+        Tab appearanceTab = settingsTab(
+                "Apariencia", SETTINGS_TAB_APPEARANCE, buildAppearanceTab(cbSounds));
+        settingsTabs.add(appearanceTab);
+        settingsTabs.add(profileSettingsTab);
+        if (context.getSession().isAdmin()) {
+            settingsTabs.add(settingsTab("Servidor", "server", buildServerTab()));
+        }
+        settingsTabs.add(settingsTab("Acerca de", "about", buildAboutTab()));
+        if (context.getSession().isAdmin()) {
+            settingsTabs.add(settingsTab("Diagnostico", "diagnostics", buildDiagnosticsTab()));
+        }
+
+        TabPane tabs = new TabPane(settingsTabs.toArray(Tab[]::new));
+        settingsTabPane = tabs;
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         tabs.getStyleClass().add("settings-tabs");
+        Tab requestedTab = settingsTabs.stream()
+                .filter(tab -> Objects.equals(requestedTabKey, tab.getUserData()))
+                .findFirst()
+                .orElse(appearanceTab);
+        tabs.getSelectionModel().select(requestedTab);
+        activeSettingsTab = (String) requestedTab.getUserData();
+        if (requestedTab == profileSettingsTab) {
+            profileView.refresh();
+        }
+        tabs.getSelectionModel().selectedItemProperty().addListener((obs, previous, selected) -> {
+            if (selected == null) return;
+            activeSettingsTab = (String) selected.getUserData();
+            if (selected == profileSettingsTab) {
+                profileView.refresh();
+            }
+        });
 
-        VBox shell = new VBox(12, settingsHeader(), tabs);
+        VBox shell = new VBox(12, settingsHeader(
+                "Configuracion",
+                "Gestiona tu cuenta, personaliza la aplicacion y consulta su informacion en este equipo."), tabs);
         shell.getStyleClass().add("settings-shell");
         shell.setPadding(new Insets(24));
         VBox.setVgrow(tabs, Priority.ALWAYS);
         return shell;
     }
 
-    private HBox settingsHeader() {
-        Label title = new Label("Configuracion");
+    private Tab settingsTab(String title, String key, Node content) {
+        Tab tab = new Tab(title, content);
+        tab.setUserData(key);
+        return tab;
+    }
+
+    private void openSettingsTab(String tabKey) {
+        activeSettingsTab = tabKey;
+        if (settingsTabPane != null && settingsTabPane.getScene() != null) {
+            Tab targetTab = settingsTabPane.getTabs().stream()
+                    .filter(tab -> Objects.equals(tabKey, tab.getUserData()))
+                    .findFirst()
+                    .orElse(null);
+            if (targetTab != null) {
+                if (settingsTabPane.getSelectionModel().getSelectedItem() == targetTab
+                        && targetTab == profileSettingsTab) {
+                    profileView.refresh();
+                } else {
+                    settingsTabPane.getSelectionModel().select(targetTab);
+                }
+                return;
+            }
+        }
+        navigateTo("settings");
+    }
+
+    private String activeHelpTopic() {
+        return "settings".equals(activeView) && SETTINGS_TAB_PROFILE.equals(activeSettingsTab)
+                ? SETTINGS_TAB_PROFILE
+                : activeView;
+    }
+
+    private HBox settingsHeader(String heading, String description) {
+        Label title = new Label(heading);
         title.getStyleClass().add("settings-title");
-        Label subtitle = new Label("Preferencias visuales, informacion de la aplicacion y diagnostico del equipo.");
+        Label subtitle = new Label(description);
         subtitle.getStyleClass().add("settings-muted");
+        subtitle.setWrapText(true);
         VBox text = new VBox(3, title, subtitle);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -670,13 +772,31 @@ public class MainWindow {
         HBox soundRow = new HBox(cbSounds);
         soundRow.setAlignment(Pos.CENTER_LEFT);
 
+        CheckBox reduceMotion = new CheckBox("Reducir movimiento");
+        reduceMotion.setSelected(MotionPreferences.isReducedMotion());
+        reduceMotion.setOnAction(e -> {
+            MotionPreferences.setReducedMotion(reduceMotion.isSelected());
+            setStatus(reduceMotion.isSelected()
+                    ? "Animaciones reducidas"
+                    : "Animaciones completas activadas");
+        });
+        HBox motionRow = new HBox(reduceMotion);
+        motionRow.setAlignment(Pos.CENTER_LEFT);
+
         VBox content = new VBox(16);
         content.getStyleClass().add("settings-tab-content");
         content.getChildren().add(configPanel(
                 "Tema de color",
                 "Cambia al instante el aspecto visual completo de la aplicacion.",
                 createThemeCards()));
-        content.getChildren().add(configPanel("Modo oscuro", null, createModeSelector()));
+        content.getChildren().add(configPanel(
+                "Modo de color",
+                "Sigue el sistema o fija una apariencia clara u oscura.",
+                createModeSelector()));
+        content.getChildren().add(configPanel(
+                "Movimiento",
+                "Reduce transiciones, escalado y profundidad animada para una experiencia mas calmada.",
+                motionRow));
         content.getChildren().add(configPanel("Sonido", null, soundRow));
         content.getChildren().add(configPanel(
                 "Tipografia",
@@ -712,33 +832,55 @@ public class MainWindow {
     }
 
     private Node createThemeCards() {
-        FlowPane cards = new FlowPane(12, 12);
+        FlowPane cards = new FlowPane(10, 10);
         cards.getStyleClass().add("settings-theme-cards");
+        ToggleGroup themeGroup = new ToggleGroup();
         for (ThemeManager.AppTheme theme : ThemeManager.AppTheme.values()) {
-            cards.getChildren().add(createThemeCard(theme));
+            cards.getChildren().add(createThemeCard(theme, themeGroup));
         }
+        themeGroup.selectedToggleProperty().addListener((obs, previous, selected) -> {
+            if (selected instanceof ToggleButton button
+                    && button.getUserData() instanceof ThemeManager.AppTheme theme
+                    && theme != ThemeManager.getInstance().loadTheme()) {
+                applyThemeWithTransition(theme, ThemeManager.getInstance().loadMode(),
+                        "Tema aplicado: " + theme.displayName(), themeControlId(theme));
+            }
+        });
         return cards;
     }
 
-    private Button createThemeCard(ThemeManager.AppTheme theme) {
-        Button card = new Button();
+    private ToggleButton createThemeCard(ThemeManager.AppTheme theme, ToggleGroup themeGroup) {
+        ToggleButton card = new ToggleButton();
+        card.setToggleGroup(themeGroup);
+        card.setUserData(theme);
+        card.setId(themeControlId(theme));
+        boolean active = theme == ThemeManager.getInstance().loadTheme();
+        card.setSelected(active);
+        card.setAccessibleRole(AccessibleRole.RADIO_BUTTON);
         card.getStyleClass().add("settings-theme-card");
-        if (theme == ThemeManager.getInstance().loadTheme()) {
-            card.getStyleClass().add("settings-theme-card-active");
-        }
         card.setGraphic(themeCardGraphic(theme));
+        card.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        card.setAccessibleText(theme.displayName() + ". " + theme.description()
+                + (theme.isFeatured() ? ". Tema principal" : ""));
+        Tooltip tooltip = new Tooltip("Aplicar " + theme.displayName() + " · " + theme.description());
+        tooltip.setShowDelay(Duration.millis(400));
+        card.setTooltip(tooltip);
+        card.setOnMouseEntered(e -> animateThemeCard(card, 1.015));
+        card.setOnMouseExited(e -> animateThemeCard(card, 1.0));
         card.setOnAction(e -> {
-            ThemeManager.getInstance().applyTheme(theme, ThemeManager.getInstance().loadMode());
-            setStatus("Tema aplicado: " + theme.displayName());
-            root.setCenter(buildSettingsView());
+            if (!card.isSelected()) {
+                card.setSelected(true);
+            }
         });
         return card;
     }
 
     private VBox themeCardGraphic(ThemeManager.AppTheme theme) {
-        HBox preview = new HBox();
-        preview.getStyleClass().addAll("root", "settings-theme-preview-strip");
-        updateThemePreview(preview, theme, ThemeManager.getInstance().loadMode());
+        HBox previewStrip = new HBox();
+        previewStrip.getStyleClass().add("settings-theme-preview-strip");
+        ThemeManager.ThemeMode previewMode = theme.recommendedDark()
+                ? ThemeManager.ThemeMode.DARK
+                : ThemeManager.getInstance().loadMode();
 
         VBox sidebar = new VBox(4);
         sidebar.getStyleClass().add("settings-theme-mini-sidebar");
@@ -752,14 +894,30 @@ public class MainWindow {
         body.getStyleClass().add("settings-theme-mini-body");
         body.getChildren().addAll(miniStripe("primary"), miniStripe("accent"), miniStripe("border"));
         HBox.setHgrow(body, Priority.ALWAYS);
-        preview.getChildren().addAll(sidebar, body);
+        previewStrip.getChildren().addAll(sidebar, body);
 
-        Label name = new Label(theme.displayName() + (theme == ThemeManager.getInstance().loadTheme() ? "  ✓" : ""));
+        StackPane preview = new StackPane(previewStrip);
+        preview.getStyleClass().add("root");
+        updateThemePreview(preview, theme, previewMode);
+        if (theme.isFeatured()) {
+            Label badge = new Label("Principal");
+            badge.getStyleClass().add("settings-theme-badge");
+            StackPane.setAlignment(badge, Pos.TOP_RIGHT);
+            StackPane.setMargin(badge, new Insets(5));
+            preview.getChildren().add(badge);
+        }
+
+        Label name = new Label(theme.displayName());
         name.getStyleClass().add("settings-theme-card-name");
         name.setMaxWidth(Double.MAX_VALUE);
-        name.setAlignment(Pos.CENTER);
+        HBox.setHgrow(name, Priority.ALWAYS);
 
-        VBox box = new VBox(preview, name);
+        HBox heading = new HBox(name);
+        heading.getStyleClass().add("settings-theme-card-heading");
+        heading.setAlignment(Pos.CENTER_LEFT);
+
+        VBox box = new VBox(preview, heading);
+        box.getStyleClass().add("settings-theme-card-content");
         box.setFillWidth(true);
         return box;
     }
@@ -771,18 +929,136 @@ public class MainWindow {
     }
 
     private Node createModeSelector() {
-        CheckBox darkMode = new CheckBox("Ejecutar la aplicacion en modo oscuro");
-        darkMode.setSelected(ThemeManager.getInstance().isDarkModeActive(ThemeManager.getInstance().loadMode()));
-        darkMode.setOnAction(e -> {
-            ThemeManager.ThemeMode mode = darkMode.isSelected()
-                    ? ThemeManager.ThemeMode.DARK : ThemeManager.ThemeMode.LIGHT;
-            ThemeManager.getInstance().applyTheme(ThemeManager.getInstance().loadTheme(), mode);
-            setStatus(darkMode.isSelected() ? "Modo oscuro activado" : "Modo claro activado");
-            root.setCenter(buildSettingsView());
-        });
-        HBox row = new HBox(darkMode);
+        ToggleGroup group = new ToggleGroup();
+        HBox row = new HBox(0);
+        row.getStyleClass().add("settings-mode-selector");
         row.setAlignment(Pos.CENTER_LEFT);
+
+        ThemeManager.ThemeMode selectedMode = ThemeManager.getInstance().loadMode();
+        for (ThemeManager.ThemeMode mode : List.of(
+                ThemeManager.ThemeMode.SYSTEM,
+                ThemeManager.ThemeMode.LIGHT,
+                ThemeManager.ThemeMode.DARK)) {
+            ToggleButton button = new ToggleButton(modeLabel(mode));
+            button.getStyleClass().add("settings-mode-toggle");
+            button.setToggleGroup(group);
+            button.setUserData(mode);
+            button.setId(modeControlId(mode));
+            button.setSelected(mode == selectedMode);
+            button.setAccessibleRole(AccessibleRole.RADIO_BUTTON);
+            button.setAccessibleText("Modo de color " + modeLabel(mode));
+            Tooltip tooltip = new Tooltip(modeTooltip(mode));
+            tooltip.setShowDelay(Duration.millis(400));
+            button.setTooltip(tooltip);
+            button.setOnAction(e -> {
+                if (!button.isSelected()) {
+                    button.setSelected(true);
+                }
+            });
+            row.getChildren().add(button);
+        }
+        group.selectedToggleProperty().addListener((obs, previous, selected) -> {
+            if (selected instanceof ToggleButton button
+                    && button.getUserData() instanceof ThemeManager.ThemeMode mode
+                    && mode != ThemeManager.getInstance().loadMode()) {
+                applyThemeWithTransition(ThemeManager.getInstance().loadTheme(), mode,
+                        "Modo aplicado: " + modeLabel(mode), modeControlId(mode));
+            }
+        });
         return row;
+    }
+
+    private String modeLabel(ThemeManager.ThemeMode mode) {
+        return switch (mode) {
+            case SYSTEM -> "Sistema";
+            case LIGHT -> "Claro";
+            case DARK -> "Oscuro";
+        };
+    }
+
+    private String modeTooltip(ThemeManager.ThemeMode mode) {
+        return switch (mode) {
+            case SYSTEM -> "Usar el modo claro u oscuro configurado en el sistema";
+            case LIGHT -> "Mantener siempre la apariencia clara";
+            case DARK -> "Mantener siempre la apariencia oscura";
+        };
+    }
+
+    private String themeControlId(ThemeManager.AppTheme theme) {
+        return "theme-" + theme.name();
+    }
+
+    private String modeControlId(ThemeManager.ThemeMode mode) {
+        return "theme-mode-" + mode.name();
+    }
+
+    private void animateThemeCard(Node card, double scale) {
+        Object running = card.getProperties().remove(THEME_CARD_TRANSITION_KEY);
+        if (running instanceof ScaleTransition previous) {
+            previous.stop();
+        }
+        if (MotionPreferences.isReducedMotion()) {
+            card.setScaleX(1.0);
+            card.setScaleY(1.0);
+            return;
+        }
+        ScaleTransition transition = new ScaleTransition(Duration.millis(110), card);
+        transition.setToX(scale);
+        transition.setToY(scale);
+        transition.setInterpolator(Interpolator.EASE_OUT);
+        card.getProperties().put(THEME_CARD_TRANSITION_KEY, transition);
+        transition.setOnFinished(e -> card.getProperties().remove(THEME_CARD_TRANSITION_KEY, transition));
+        transition.play();
+    }
+
+    private void applyThemeWithTransition(ThemeManager.AppTheme theme,
+                                          ThemeManager.ThemeMode mode,
+                                          String status,
+                                          String focusControlId) {
+        if (themeTransition != null) {
+            themeTransition.stop();
+            themeTransition = null;
+        }
+        root.setOpacity(1.0);
+        if (MotionPreferences.isReducedMotion()) {
+            ThemeManager.getInstance().applyTheme(theme, mode);
+            refreshSettingsView(focusControlId);
+            setStatus(status);
+            return;
+        }
+
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(110), root);
+        fadeOut.setFromValue(1.0);
+        fadeOut.setToValue(0.78);
+        fadeOut.setInterpolator(Interpolator.EASE_OUT);
+        fadeOut.setOnFinished(e -> {
+            ThemeManager.getInstance().applyTheme(theme, mode);
+            refreshSettingsView(focusControlId);
+            setStatus(status);
+        });
+
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(180), root);
+        fadeIn.setFromValue(0.78);
+        fadeIn.setToValue(1.0);
+        fadeIn.setInterpolator(Interpolator.EASE_OUT);
+
+        themeTransition = new SequentialTransition(fadeOut, fadeIn);
+        themeTransition.setOnFinished(e -> {
+            root.setOpacity(1.0);
+            themeTransition = null;
+        });
+        themeTransition.play();
+    }
+
+    private void refreshSettingsView(String focusControlId) {
+        VBox settingsView = buildSettingsView();
+        root.setCenter(settingsView);
+        Platform.runLater(() -> {
+            Node control = settingsView.lookup("#" + focusControlId);
+            if (control != null) {
+                control.requestFocus();
+            }
+        });
     }
 
     private Node createTypographySelector() {
@@ -790,10 +1066,12 @@ public class MainWindow {
         ComboBox<String> fontCombo = new ComboBox<>();
         fontCombo.getItems().addAll("Segoe UI", "Arial", "Calibri", "Georgia", "Consolas", "Trebuchet MS", "Verdana");
         fontCombo.setValue(prefs.get("fontFamily", "Segoe UI"));
+        fontCombo.getStyleClass().add("form-field");
 
         ComboBox<String> sizeCombo = new ComboBox<>();
         sizeCombo.getItems().addAll("Pequeño", "Normal", "Grande", "Muy grande");
         sizeCombo.setValue(prefs.get("fontSizeLabel", "Normal"));
+        sizeCombo.getStyleClass().add("form-field");
 
         Button applyFont = new Button("Aplicar tipografia");
         applyFont.getStyleClass().add("action-button-primary");
@@ -806,6 +1084,7 @@ public class MainWindow {
         });
 
         GridPane grid = new GridPane();
+        grid.getStyleClass().add("settings-typography");
         grid.setHgap(12);
         grid.setVgap(12);
         grid.add(new Label("Fuente:"), 0, 0);
@@ -818,6 +1097,7 @@ public class MainWindow {
 
     private Node createServerConfigEditor() {
         TextField serverUrl = new TextField(backendUrl());
+        serverUrl.getStyleClass().add("form-field");
         serverUrl.setPromptText(ServerConfig.DEFAULT_API_BASE_URL);
         serverUrl.setMaxWidth(Double.MAX_VALUE);
         serverUrl.setDisable(ServerConfig.hasSystemOverride());

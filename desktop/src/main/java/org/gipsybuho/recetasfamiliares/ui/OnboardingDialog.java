@@ -129,21 +129,31 @@ final class OnboardingDialog {
             e.consume();
         });
 
-        dialog.getDialogPane().setOpacity(0);
-        dialog.setOnShown(e -> {
-            var pane = dialog.getDialogPane();
-            pane.setOpacity(1);
-            ScaleTransition scale = new ScaleTransition(Duration.millis(200), pane);
-            scale.setFromX(0.95); scale.setFromY(0.95);
-            scale.setToX(1.0);    scale.setToY(1.0);
-            scale.play();
-        });
+        if (MotionPreferences.isReducedMotion()) {
+            dialog.getDialogPane().setOpacity(1.0);
+            dialog.getDialogPane().setScaleX(1.0);
+            dialog.getDialogPane().setScaleY(1.0);
+        } else {
+            dialog.getDialogPane().setOpacity(0);
+            dialog.setOnShown(e -> {
+                var pane = dialog.getDialogPane();
+                pane.setOpacity(1);
+                ScaleTransition scale = new ScaleTransition(Duration.millis(200), pane);
+                scale.setFromX(0.95); scale.setFromY(0.95);
+                scale.setToX(1.0);    scale.setToY(1.0);
+                scale.play();
+            });
+        }
 
         dialog.showAndWait();
         PREFS.putBoolean(SEEN_KEY, true);
     }
 
     private static void fade(VBox content) {
+        if (MotionPreferences.isReducedMotion()) {
+            content.setOpacity(1.0);
+            return;
+        }
         FadeTransition fade = new FadeTransition(Duration.millis(200), content);
         fade.setFromValue(0.4);
         fade.setToValue(1.0);

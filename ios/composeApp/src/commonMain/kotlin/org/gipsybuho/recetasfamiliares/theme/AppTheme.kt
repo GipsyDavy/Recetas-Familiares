@@ -1,18 +1,27 @@
 package org.gipsybuho.recetasfamiliares.theme
 
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Composable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 enum class AppTheme {
     BOSQUE, TERRACOTA, OCASO, MEDITERRANEO, LAVANDA,
-    OLIVA, CANELA, MENTA, FRAMBUESA, NOCHE_VERANO;
+    OLIVA, CANELA, MENTA, FRAMBUESA, NOCHE_VERANO,
+    RUBI_NOCTURNO, AURORA_BOREAL, JADE_IMPERIAL,
+    COBRE_LUNAR, CIRUELA_SOLAR, CORAL_ABISAL;
 
     val displayName: String get() = when (this) {
         BOSQUE        -> "Bosque"
@@ -25,7 +34,54 @@ enum class AppTheme {
         MENTA         -> "Menta"
         FRAMBUESA     -> "Frambuesa"
         NOCHE_VERANO  -> "Noche de Verano"
+        RUBI_NOCTURNO -> "Rubí Nocturno"
+        AURORA_BOREAL -> "Aurora Boreal"
+        JADE_IMPERIAL -> "Jade Imperial"
+        COBRE_LUNAR   -> "Cobre Lunar"
+        CIRUELA_SOLAR -> "Ciruela Solar"
+        CORAL_ABISAL  -> "Coral Abisal"
     }
+
+    val description: String get() = when (this) {
+        BOSQUE        -> "Verde bosque y tierra cálida"
+        TERRACOTA     -> "Arcilla, arena y luz suave"
+        OCASO         -> "Naranja, miel y atardecer"
+        MEDITERRANEO  -> "Azul mar, oliva y sol"
+        LAVANDA       -> "Lavanda, rosa y oro"
+        OLIVA         -> "Oliva, trigo y agua"
+        CANELA        -> "Canela, crema y hojas"
+        MENTA         -> "Menta, agua y lima suave"
+        FRAMBUESA     -> "Frambuesa, rosa y miel"
+        NOCHE_VERANO  -> "Azul noche y luz dorada"
+        RUBI_NOCTURNO -> "Carbón, borgoña y luz rubí"
+        AURORA_BOREAL -> "Índigo, menta y violeta"
+        JADE_IMPERIAL -> "Jade, celadón y cobre"
+        COBRE_LUNAR   -> "Grafito, cobre y amatista"
+        CIRUELA_SOLAR -> "Ciruela, ámbar y seda"
+        CORAL_ABISAL  -> "Océano profundo y coral"
+    }
+
+    val emoji: String get() = when (this) {
+        BOSQUE -> "🌿"
+        TERRACOTA -> "🏺"
+        OCASO -> "🌅"
+        MEDITERRANEO -> "🌊"
+        LAVANDA -> "💜"
+        OLIVA -> "🫒"
+        CANELA -> "🫚"
+        MENTA -> "🍃"
+        FRAMBUESA -> "🍓"
+        NOCHE_VERANO -> "🌙"
+        RUBI_NOCTURNO -> "💎"
+        AURORA_BOREAL -> "🌌"
+        JADE_IMPERIAL -> "🪷"
+        COBRE_LUNAR -> "🌘"
+        CIRUELA_SOLAR -> "☀️"
+        CORAL_ABISAL -> "🪸"
+    }
+
+    val isFeatured: Boolean get() = this == RUBI_NOCTURNO
+    val recommendedDark: Boolean get() = this == RUBI_NOCTURNO
 }
 
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
@@ -161,6 +217,84 @@ fun AppTheme.lightColors(): ColorScheme = when (this) {
         outline = Color(0xFF72748B), error = Color(0xFFBA1A1A), onError = Color(0xFFFFFFFF),
         errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
     )
+    AppTheme.RUBI_NOCTURNO -> lightColorScheme(
+        primary = Color(0xFF8F1236), onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFFFD9E2), onPrimaryContainer = Color(0xFF3F0014),
+        secondary = Color(0xFF6A4D57), onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFFFD9E2), onSecondaryContainer = Color(0xFF2B151D),
+        tertiary = Color(0xFF80542C), onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFFFDCBA), onTertiaryContainer = Color(0xFF2E1600),
+        background = Color(0xFFFFF8F8), onBackground = Color(0xFF211A1C),
+        surface = Color(0xFFFFF8F8), onSurface = Color(0xFF211A1C),
+        surfaceVariant = Color(0xFFF2DDE2), onSurfaceVariant = Color(0xFF514347),
+        outline = Color(0xFF847176), error = Color(0xFFBA1A1A), onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    ).withModernSurfaceRoles(isDark = false, inversePrimary = Color(0xFFFF9EB4))
+    AppTheme.AURORA_BOREAL -> lightColorScheme(
+        primary = Color(0xFF3555A5), onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFDCE1FF), onPrimaryContainer = Color(0xFF00164D),
+        secondary = Color(0xFF006B62), onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFF75F8E6), onSecondaryContainer = Color(0xFF00201D),
+        tertiary = Color(0xFF77558E), onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFF3DAFF), onTertiaryContainer = Color(0xFF2E0D46),
+        background = Color(0xFFFAF8FF), onBackground = Color(0xFF1B1B23),
+        surface = Color(0xFFFAF8FF), onSurface = Color(0xFF1B1B23),
+        surfaceVariant = Color(0xFFE4E1EE), onSurfaceVariant = Color(0xFF46464F),
+        outline = Color(0xFF777681), error = Color(0xFFBA1A1A), onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    ).withModernSurfaceRoles(isDark = false, inversePrimary = Color(0xFFB8C4FF))
+    AppTheme.JADE_IMPERIAL -> lightColorScheme(
+        primary = Color(0xFF006B52), onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFF8DF8D1), onPrimaryContainer = Color(0xFF002117),
+        secondary = Color(0xFF5A622B), onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFDFE9A2), onSecondaryContainer = Color(0xFF191E00),
+        tertiary = Color(0xFF8A4E23), onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFFFDBC7), onTertiaryContainer = Color(0xFF351000),
+        background = Color(0xFFF5FBF6), onBackground = Color(0xFF171D1A),
+        surface = Color(0xFFF5FBF6), onSurface = Color(0xFF171D1A),
+        surfaceVariant = Color(0xFFDCE8E1), onSurfaceVariant = Color(0xFF3F4944),
+        outline = Color(0xFF6F7974), error = Color(0xFFBA1A1A), onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    ).withModernSurfaceRoles(isDark = false, inversePrimary = Color(0xFF70DBB5))
+    AppTheme.COBRE_LUNAR -> lightColorScheme(
+        primary = Color(0xFF8B4A1A), onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFFFDCC3), onPrimaryContainer = Color(0xFF321200),
+        secondary = Color(0xFF555D72), onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFDCE2FA), onSecondaryContainer = Color(0xFF121A2C),
+        tertiary = Color(0xFF6D568C), onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFECDDFB), onTertiaryContainer = Color(0xFF27133F),
+        background = Color(0xFFFFF8F4), onBackground = Color(0xFF211A16),
+        surface = Color(0xFFFFF8F4), onSurface = Color(0xFF211A16),
+        surfaceVariant = Color(0xFFECE0D8), onSurfaceVariant = Color(0xFF4D453F),
+        outline = Color(0xFF7F746C), error = Color(0xFFBA1A1A), onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    ).withModernSurfaceRoles(isDark = false, inversePrimary = Color(0xFFFFB783))
+    AppTheme.CIRUELA_SOLAR -> lightColorScheme(
+        primary = Color(0xFF7B2B64), onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFFFD7EE), onPrimaryContainer = Color(0xFF31002A),
+        secondary = Color(0xFF8A4F00), onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFFFDCB4), onSecondaryContainer = Color(0xFF2C1600),
+        tertiary = Color(0xFF575B91), onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFE0E1FF), onTertiaryContainer = Color(0xFF121747),
+        background = Color(0xFFFFF7FC), onBackground = Color(0xFF20191F),
+        surface = Color(0xFFFFF7FC), onSurface = Color(0xFF20191F),
+        surfaceVariant = Color(0xFFEEDFE8), onSurfaceVariant = Color(0xFF50434B),
+        outline = Color(0xFF82727D), error = Color(0xFFBA1A1A), onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    ).withModernSurfaceRoles(isDark = false, inversePrimary = Color(0xFFF4AFDB))
+    AppTheme.CORAL_ABISAL -> lightColorScheme(
+        primary = Color(0xFF006875), onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFF97F0FF), onPrimaryContainer = Color(0xFF001F24),
+        secondary = Color(0xFF9B4047), onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFFFDADB), onSecondaryContainer = Color(0xFF40000A),
+        tertiary = Color(0xFF6E5D00), onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFF7E47B), onTertiaryContainer = Color(0xFF211B00),
+        background = Color(0xFFF5FAFC), onBackground = Color(0xFF171C1E),
+        surface = Color(0xFFF5FAFC), onSurface = Color(0xFF171C1E),
+        surfaceVariant = Color(0xFFDAE7EA), onSurfaceVariant = Color(0xFF3F494C),
+        outline = Color(0xFF6F7A7E), error = Color(0xFFBA1A1A), onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    ).withModernSurfaceRoles(isDark = false, inversePrimary = Color(0xFF4FD8E9))
 }
 
 fun AppTheme.darkColors(): ColorScheme = when (this) {
@@ -293,6 +427,155 @@ fun AppTheme.darkColors(): ColorScheme = when (this) {
         surfaceVariant = Color(0xFF33374A), onSurfaceVariant = Color(0xFFBDBFC9),
         outline = Color(0xFF8C8FA4), error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
         errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    )
+    AppTheme.RUBI_NOCTURNO -> darkColorScheme(
+        primary = Color(0xFFFF9EB4), onPrimary = Color(0xFF5F0024),
+        primaryContainer = Color(0xFF850032), onPrimaryContainer = Color(0xFFFFD9E2),
+        secondary = Color(0xFFE1BEC7), onSecondary = Color(0xFF402932),
+        secondaryContainer = Color(0xFF59404A), onSecondaryContainer = Color(0xFFFFD9E2),
+        tertiary = Color(0xFFF0BD8A), onTertiary = Color(0xFF452B08),
+        tertiaryContainer = Color(0xFF60411E), onTertiaryContainer = Color(0xFFFFDCBA),
+        background = Color(0xFF100A0D), onBackground = Color(0xFFF0DEE3),
+        surface = Color(0xFF190E13), onSurface = Color(0xFFF0DEE3),
+        surfaceVariant = Color(0xFF49323A), onSurfaceVariant = Color(0xFFD6C0C6),
+        outline = Color(0xFFA18A91), error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    ).withModernSurfaceRoles(isDark = true, inversePrimary = Color(0xFF8F1236))
+    AppTheme.AURORA_BOREAL -> darkColorScheme(
+        primary = Color(0xFFB8C4FF), onPrimary = Color(0xFF002B72),
+        primaryContainer = Color(0xFF1E438C), onPrimaryContainer = Color(0xFFDCE1FF),
+        secondary = Color(0xFF5DDBCD), onSecondary = Color(0xFF003733),
+        secondaryContainer = Color(0xFF005048), onSecondaryContainer = Color(0xFF75F8E6),
+        tertiary = Color(0xFFDFB7F5), onTertiary = Color(0xFF452455),
+        tertiaryContainer = Color(0xFF5D3B6C), onTertiaryContainer = Color(0xFFF3DAFF),
+        background = Color(0xFF0C1020), onBackground = Color(0xFFE4E1ED),
+        surface = Color(0xFF14182A), onSurface = Color(0xFFE4E1ED),
+        surfaceVariant = Color(0xFF383D52), onSurfaceVariant = Color(0xFFC3C5D4),
+        outline = Color(0xFF8D91A4), error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    ).withModernSurfaceRoles(isDark = true, inversePrimary = Color(0xFF3555A5))
+    AppTheme.JADE_IMPERIAL -> darkColorScheme(
+        primary = Color(0xFF70DBB5), onPrimary = Color(0xFF00382A),
+        primaryContainer = Color(0xFF00513E), onPrimaryContainer = Color(0xFF8DF8D1),
+        secondary = Color(0xFFC5CE88), onSecondary = Color(0xFF2E3500),
+        secondaryContainer = Color(0xFF444C13), onSecondaryContainer = Color(0xFFDFE9A2),
+        tertiary = Color(0xFFFFB68B), onTertiary = Color(0xFF512100),
+        tertiaryContainer = Color(0xFF71360F), onTertiaryContainer = Color(0xFFFFDBC7),
+        background = Color(0xFF091713), onBackground = Color(0xFFDCE5DF),
+        surface = Color(0xFF111F1B), onSurface = Color(0xFFDCE5DF),
+        surfaceVariant = Color(0xFF344943), onSurfaceVariant = Color(0xFFBAC9C1),
+        outline = Color(0xFF84978E), error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    ).withModernSurfaceRoles(isDark = true, inversePrimary = Color(0xFF006B52))
+    AppTheme.COBRE_LUNAR -> darkColorScheme(
+        primary = Color(0xFFFFB783), onPrimary = Color(0xFF522300),
+        primaryContainer = Color(0xFF723600), onPrimaryContainer = Color(0xFFFFDCC3),
+        secondary = Color(0xFFBEC6DC), onSecondary = Color(0xFF283044),
+        secondaryContainer = Color(0xFF3E475C), onSecondaryContainer = Color(0xFFDCE2FA),
+        tertiary = Color(0xFFD7BDF7), onTertiary = Color(0xFF3D275C),
+        tertiaryContainer = Color(0xFF554074), onTertiaryContainer = Color(0xFFECDDFB),
+        background = Color(0xFF111319), onBackground = Color(0xFFE2E2EA),
+        surface = Color(0xFF191C23), onSurface = Color(0xFFE2E2EA),
+        surfaceVariant = Color(0xFF40444F), onSurfaceVariant = Color(0xFFC4C6D0),
+        outline = Color(0xFF90939F), error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    ).withModernSurfaceRoles(isDark = true, inversePrimary = Color(0xFF8B4A1A))
+    AppTheme.CIRUELA_SOLAR -> darkColorScheme(
+        primary = Color(0xFFF4AFDB), onPrimary = Color(0xFF4B043E),
+        primaryContainer = Color(0xFF66214F), onPrimaryContainer = Color(0xFFFFD7EE),
+        secondary = Color(0xFFFFB865), onSecondary = Color(0xFF4A2800),
+        secondaryContainer = Color(0xFF693B00), onSecondaryContainer = Color(0xFFFFDCB4),
+        tertiary = Color(0xFFC1C4FF), onTertiary = Color(0xFF2B2F62),
+        tertiaryContainer = Color(0xFF444779), onTertiaryContainer = Color(0xFFE0E1FF),
+        background = Color(0xFF180E17), onBackground = Color(0xFFEADFE8),
+        surface = Color(0xFF211520), onSurface = Color(0xFFEADFE8),
+        surfaceVariant = Color(0xFF4E3A4C), onSurfaceVariant = Color(0xFFD2C0CE),
+        outline = Color(0xFF9B8796), error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    ).withModernSurfaceRoles(isDark = true, inversePrimary = Color(0xFF7B2B64))
+    AppTheme.CORAL_ABISAL -> darkColorScheme(
+        primary = Color(0xFF4FD8E9), onPrimary = Color(0xFF00363D),
+        primaryContainer = Color(0xFF004F59), onPrimaryContainer = Color(0xFF97F0FF),
+        secondary = Color(0xFFFFB3B5), onSecondary = Color(0xFF5F121A),
+        secondaryContainer = Color(0xFF812933), onSecondaryContainer = Color(0xFFFFDADB),
+        tertiary = Color(0xFFDBC65E), onTertiary = Color(0xFF393000),
+        tertiaryContainer = Color(0xFF514700), onTertiaryContainer = Color(0xFFF7E47B),
+        background = Color(0xFF06161A), onBackground = Color(0xFFDDE4E6),
+        surface = Color(0xFF0E2024), onSurface = Color(0xFFDDE4E6),
+        surfaceVariant = Color(0xFF30494E), onSurfaceVariant = Color(0xFFB6CACE),
+        outline = Color(0xFF82999E), error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    ).withModernSurfaceRoles(isDark = true, inversePrimary = Color(0xFF006875))
+}
+
+private fun ColorScheme.withModernSurfaceRoles(
+    isDark: Boolean,
+    inversePrimary: Color,
+): ColorScheme = copy(
+    surfaceTint = primary,
+    outlineVariant = lerp(surfaceVariant, outline, 0.30f),
+    scrim = Color.Black,
+    inverseSurface = onSurface,
+    inverseOnSurface = if (isDark) background else surface,
+    inversePrimary = inversePrimary,
+    surfaceDim = if (isDark) background else lerp(surfaceVariant, surface, 0.28f),
+    surfaceBright = if (isDark) lerp(surface, surfaceVariant, 0.76f) else surface,
+    surfaceContainerLowest = if (isDark) background else surface,
+    surfaceContainerLow = lerp(surface, surfaceVariant, if (isDark) 0.14f else 0.18f),
+    surfaceContainer = lerp(surface, surfaceVariant, if (isDark) 0.28f else 0.34f),
+    surfaceContainerHigh = lerp(surface, surfaceVariant, if (isDark) 0.46f else 0.52f),
+    surfaceContainerHighest = lerp(surface, surfaceVariant, if (isDark) 0.64f else 0.70f),
+)
+
+val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(22.dp),
+    extraLarge = RoundedCornerShape(30.dp),
+)
+
+@Composable
+fun animateAppColorScheme(target: ColorScheme): ColorScheme {
+    val spec = tween<Color>(durationMillis = 300)
+    @Composable fun animated(color: Color, label: String) =
+        animateColorAsState(color, spec, label = label).value
+
+    return target.copy(
+        primary = animated(target.primary, "theme_primary"),
+        onPrimary = animated(target.onPrimary, "theme_on_primary"),
+        primaryContainer = animated(target.primaryContainer, "theme_primary_container"),
+        onPrimaryContainer = animated(target.onPrimaryContainer, "theme_on_primary_container"),
+        secondary = animated(target.secondary, "theme_secondary"),
+        onSecondary = animated(target.onSecondary, "theme_on_secondary"),
+        secondaryContainer = animated(target.secondaryContainer, "theme_secondary_container"),
+        onSecondaryContainer = animated(target.onSecondaryContainer, "theme_on_secondary_container"),
+        tertiary = animated(target.tertiary, "theme_tertiary"),
+        onTertiary = animated(target.onTertiary, "theme_on_tertiary"),
+        tertiaryContainer = animated(target.tertiaryContainer, "theme_tertiary_container"),
+        onTertiaryContainer = animated(target.onTertiaryContainer, "theme_on_tertiary_container"),
+        background = animated(target.background, "theme_background"),
+        onBackground = animated(target.onBackground, "theme_on_background"),
+        surface = animated(target.surface, "theme_surface"),
+        onSurface = animated(target.onSurface, "theme_on_surface"),
+        surfaceVariant = animated(target.surfaceVariant, "theme_surface_variant"),
+        onSurfaceVariant = animated(target.onSurfaceVariant, "theme_on_surface_variant"),
+        outline = animated(target.outline, "theme_outline"),
+        outlineVariant = animated(target.outlineVariant, "theme_outline_variant"),
+        inverseSurface = animated(target.inverseSurface, "theme_inverse_surface"),
+        inverseOnSurface = animated(target.inverseOnSurface, "theme_inverse_on_surface"),
+        inversePrimary = animated(target.inversePrimary, "theme_inverse_primary"),
+        surfaceDim = animated(target.surfaceDim, "theme_surface_dim"),
+        surfaceBright = animated(target.surfaceBright, "theme_surface_bright"),
+        surfaceContainerLowest = animated(target.surfaceContainerLowest, "theme_surface_container_lowest"),
+        surfaceContainerLow = animated(target.surfaceContainerLow, "theme_surface_container_low"),
+        surfaceContainer = animated(target.surfaceContainer, "theme_surface_container"),
+        surfaceContainerHigh = animated(target.surfaceContainerHigh, "theme_surface_container_high"),
+        surfaceContainerHighest = animated(target.surfaceContainerHighest, "theme_surface_container_highest"),
+        error = animated(target.error, "theme_error"),
+        onError = animated(target.onError, "theme_on_error"),
+        errorContainer = animated(target.errorContainer, "theme_error_container"),
+        onErrorContainer = animated(target.onErrorContainer, "theme_on_error_container"),
     )
 }
 

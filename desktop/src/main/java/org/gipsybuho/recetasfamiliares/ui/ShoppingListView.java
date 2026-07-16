@@ -252,10 +252,10 @@ public class ShoppingListView extends VBox {
         emojiLabel.setStyle("-fx-font-size: 48px;");
 
         Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #3D2B1F;");
+        titleLabel.getStyleClass().add("empty-state-title");
 
         Label subtitleLabel = new Label(subtitle);
-        subtitleLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #8B6F5E; -fx-text-alignment: center;");
+        subtitleLabel.getStyleClass().add("empty-state-subtitle");
         subtitleLabel.setWrapText(true);
         subtitleLabel.setMaxWidth(320);
         subtitleLabel.setAlignment(Pos.CENTER);

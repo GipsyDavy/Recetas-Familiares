@@ -1,10 +1,20 @@
 package org.gipsybuho.recetasfamiliares.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,10 +23,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
@@ -31,18 +41,29 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.flowOf
@@ -55,6 +76,7 @@ import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
 import org.gipsybuho.recetasfamiliares.network.UserRecipeRankingDto
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.theme.ThemeMode
+import org.gipsybuho.recetasfamiliares.theme.darkColors
 import org.gipsybuho.recetasfamiliares.theme.lightColors
 import org.gipsybuho.recetasfamiliares.users.UserRepository
 
@@ -63,6 +85,7 @@ fun SettingsScreen(
     selectedTheme: AppTheme,
     themeMode: ThemeMode,
     hapticsEnabled: Boolean,
+    reduceMotion: Boolean,
     onThemeChange: (AppTheme) -> Unit,
     onModeChange: (ThemeMode) -> Unit,
     onHapticsChange: (Boolean) -> Unit,
@@ -84,6 +107,8 @@ fun SettingsScreen(
     var recipeRanking by androidx.compose.runtime.remember(session?.familyId, familyMemberRepository) {
         mutableStateOf<List<UserRecipeRankingDto>>(emptyList())
     }
+    val systemDark = isSystemInDarkTheme()
+    val previewDark = themeMode == ThemeMode.DARK || (themeMode == ThemeMode.SYSTEM && systemDark)
 
     LaunchedEffect(familyMemberRepository, session?.familyId) {
         recipeRanking = if (familyMemberRepository != null && session?.familyId != null) {
@@ -119,7 +144,10 @@ fun SettingsScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text("Ajustes", style = MaterialTheme.typography.headlineSmall,
@@ -310,21 +338,30 @@ fun SettingsScreen(
         Text("Color del tema", style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(5),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(AppTheme.entries) { theme ->
-                ThemeSwatchItem(
-                    theme    = theme,
-                    selected = selectedTheme == theme,
-                    onClick  = { onThemeChange(theme) }
-                )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val fontScale = LocalDensity.current.fontScale
+            val columnCount = if (maxWidth < 420.dp || fontScale >= 1.35f) 1 else 2
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AppTheme.entries.chunked(columnCount).forEach { themes ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        themes.forEach { theme ->
+                            ThemePreviewCard(
+                                theme = theme,
+                                selected = selectedTheme == theme,
+                                previewDark = previewDark,
+                                reduceMotion = reduceMotion,
+                                onClick = { onThemeChange(theme) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
             }
         }
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(24.dp))
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
         Text(
@@ -429,39 +466,114 @@ private fun rankingAverageLabel(value: Double?): String {
 }
 
 @Composable
-private fun ThemeSwatchItem(theme: AppTheme, selected: Boolean, onClick: () -> Unit) {
-    val lc = theme.lightColors()
+private fun ThemePreviewCard(
+    theme: AppTheme,
+    selected: Boolean,
+    previewDark: Boolean,
+    reduceMotion: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = if (theme.recommendedDark || previewDark) theme.darkColors() else theme.lightColors()
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (!reduceMotion && pressed) 0.975f else 1f,
+        animationSpec = if (reduceMotion) snap() else spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "theme_card_scale_${theme.name}"
+    )
+    val elevation by animateDpAsState(
+        targetValue = if (pressed) 2.dp else if (selected) 10.dp else 5.dp,
+        animationSpec = if (reduceMotion) snap() else spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "theme_card_elevation_${theme.name}"
+    )
+    val shape = MaterialTheme.shapes.large
+    val selectedBorder = if (selected) 2.dp else 1.dp
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary else colors.outline.copy(alpha = 0.42f)
+
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.clickable(onClick = onClick)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(lc.primaryContainer)
-                .let { m -> if (selected) m.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape) else m }
-        ) {
-            Box(
-                modifier = Modifier.size(26.dp).clip(CircleShape).background(lc.primary)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = if (!reduceMotion && pressed) 2.dp.toPx() else 0f
+            }
+            .shadow(elevation = elevation, shape = shape, clip = false)
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    listOf(colors.surface, colors.primaryContainer.copy(alpha = if (previewDark || theme.recommendedDark) 0.72f else 0.58f))
+                )
             )
-            if (selected) {
+            .border(selectedBorder, borderColor, shape)
+            .selectable(
+                selected = selected,
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.RadioButton,
+                onClick = onClick
+            )
+            .semantics(mergeDescendants = true) {
+                this.contentDescription = "${theme.displayName}. ${theme.description}"
+                this.selected = selected
+                this.stateDescription = if (selected) "Tema seleccionado" else "Tema disponible"
+            }
+            .padding(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(theme.emoji, style = MaterialTheme.typography.titleLarge)
+            if (theme.isFeatured) {
+                Surface(
+                    color = colors.primary,
+                    contentColor = colors.onPrimary,
+                    shape = CircleShape
+                ) {
+                    Text(
+                        "Principal",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            } else if (selected) {
                 Icon(
                     Icons.Filled.Check,
                     contentDescription = null,
-                    tint     = lc.onPrimary,
-                    modifier = Modifier.size(14.dp)
+                    tint = colors.primary,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
         Text(
             theme.displayName,
-            style    = MaterialTheme.typography.labelSmall,
-            color    = if (selected) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
+            style = MaterialTheme.typography.titleSmall,
+            color = colors.onSurface,
         )
+        Text(
+            theme.description,
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(colors.primary, colors.secondary, colors.tertiary).forEach { color ->
+                Box(
+                    Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .border(1.dp, colors.outline.copy(alpha = 0.45f), CircleShape)
+                )
+            }
+        }
     }
 }
