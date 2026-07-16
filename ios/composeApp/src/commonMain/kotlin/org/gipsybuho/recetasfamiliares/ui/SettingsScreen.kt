@@ -72,7 +72,9 @@ import kotlin.math.roundToInt
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 import org.gipsybuho.recetasfamiliares.core.rememberImagePickerLauncher
+import org.gipsybuho.recetasfamiliares.families.FamilyListSheet
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
+import org.gipsybuho.recetasfamiliares.families.FamilyViewModel
 import org.gipsybuho.recetasfamiliares.network.UserRecipeRankingDto
 import org.gipsybuho.recetasfamiliares.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.theme.ThemeMode
@@ -93,10 +95,12 @@ fun SettingsScreen(
     session: SessionStore? = null,
     serverUrlPreference: ServerUrlPreference? = null,
     userRepository: UserRepository? = null,
-    familyMemberRepository: FamilyMemberRepository? = null
+    familyMemberRepository: FamilyMemberRepository? = null,
+    familyViewModel: FamilyViewModel? = null
 ) {
     val scope = rememberCoroutineScope()
     var showInviteDialog by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var showFamilyList by androidx.compose.runtime.remember { mutableStateOf(false) }
     var inviteMessage by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
     val familyRole by (session?.familyRoleFlow ?: flowOf(null)).collectAsState(initial = session?.familyRole)
     val isAdmin = familyRole == "ADMIN" || familyRole == "OWNER"
@@ -140,6 +144,13 @@ fun SettingsScreen(
                     }
                 }
             }
+        )
+    }
+
+    if (showFamilyList && familyViewModel != null) {
+        FamilyListSheet(
+            viewModel = familyViewModel,
+            onDismiss = { showFamilyList = false }
         )
     }
 
@@ -277,6 +288,16 @@ fun SettingsScreen(
                 ) {
                     Text("Guardar")
                 }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        if (familyViewModel != null) {
+            OutlinedButton(
+                onClick = { showFamilyList = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Familias")
             }
             Spacer(Modifier.height(8.dp))
         }

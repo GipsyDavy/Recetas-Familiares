@@ -26,6 +26,7 @@ import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.core.ServerUrlPreference
 import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
+import org.gipsybuho.recetasfamiliares.families.FamilyViewModel
 import org.gipsybuho.recetasfamiliares.menu.MenuRepository
 import org.gipsybuho.recetasfamiliares.menu.MenuScreen
 import org.gipsybuho.recetasfamiliares.network.ApiClient
@@ -67,6 +68,8 @@ fun MainTabScreen(
     val menuRepo     = remember { MenuRepository(apiClient, session) }
     val userRepo     = remember { UserRepository(apiClient, session) }
     val familyMemberRepo = remember { FamilyMemberRepository(apiClient, session) }
+    val scope = rememberCoroutineScope()
+    val familyViewModel = remember { FamilyViewModel(familyMemberRepo, session, scope) }
 
     var selectedTab by remember { mutableStateOf(Tab.RECIPES) }
     Scaffold(
@@ -143,7 +146,8 @@ fun MainTabScreen(
                         session         = session,
                         serverUrlPreference = serverUrlPreference,
                         userRepository  = userRepo,
-                        familyMemberRepository = familyMemberRepo
+                        familyMemberRepository = familyMemberRepo,
+                        familyViewModel = familyViewModel
                     )
                 }
             }
