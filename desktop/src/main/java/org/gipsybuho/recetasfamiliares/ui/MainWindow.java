@@ -69,6 +69,7 @@ public class MainWindow {
     private boolean navigating = false;
     private boolean updatingFamilySelector = false;
     private ComboBox<FamilyChoice> familySelector;
+    private Label familySelectorStatus;
     private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat,
             btnSettings, btnMembers;
     private SequentialTransition themeTransition;
@@ -153,7 +154,7 @@ public class MainWindow {
         settingsTabPane = null;
         activeSettingsTab = SETTINGS_TAB_APPEARANCE;
         if (context.getSession().isAdmin()) {
-            familyMembersView = new FamilyMembersView(context);
+            familyMembersView = new FamilyMembersView(context, this::reloadFamilyChoices);
         }
 
         VBox sidebar = buildSidebar();
@@ -290,6 +291,7 @@ public class MainWindow {
         Label status = new Label("");
         status.getStyleClass().add("sidebar-user-email");
         status.setWrapText(true);
+        familySelectorStatus = status;
 
         selector.setOnAction(e -> {
             if (updatingFamilySelector) return;
@@ -344,6 +346,13 @@ public class MainWindow {
                 });
             }
         });
+    }
+
+    /** Recarga el selector de familias del sidebar (p.ej. tras crear una familia). */
+    private void reloadFamilyChoices() {
+        if (familySelector != null && familySelectorStatus != null) {
+            loadFamilyChoices(familySelector, familySelectorStatus);
+        }
     }
 
     private void switchActiveFamily(FamilyChoice selected) {

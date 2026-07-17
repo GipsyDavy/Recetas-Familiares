@@ -27,9 +27,12 @@ public class FamilyMembersView extends ScrollPane {
     private final Button editBtn       = new Button("Editar");
     private final Button changeRoleBtn = new Button("Cambiar rol");
     private final Button removeBtn     = new Button("Expulsar");
+    private final Button createFamilyBtn = new Button("Crear familia");
+    private final Runnable onFamiliesChanged;
 
-    public FamilyMembersView(AppContext context) {
+    public FamilyMembersView(AppContext context, Runnable onFamiliesChanged) {
         this.context = context;
+        this.onFamiliesChanged = onFamiliesChanged;
         build();
         refresh();
     }
@@ -92,7 +95,11 @@ public class FamilyMembersView extends ScrollPane {
         removeBtn.setOnAction(e -> onRemoveMember());
         Tooltip.install(removeBtn, new Tooltip("Expulsar miembro seleccionado de la familia"));
 
-        FlowPane toolbar = new FlowPane(8, 8, addBtn, editBtn, changeRoleBtn, removeBtn);
+        createFamilyBtn.getStyleClass().add("action-button-secondary");
+        createFamilyBtn.setOnAction(e -> onCreateFamily());
+        Tooltip.install(createFamilyBtn, new Tooltip("Crear una nueva familia; serás su propietario"));
+
+        FlowPane toolbar = new FlowPane(8, 8, addBtn, editBtn, changeRoleBtn, removeBtn, createFamilyBtn);
         toolbar.setAlignment(Pos.CENTER_LEFT);
 
         boolean isAdmin = context.getSession().isAdmin();
@@ -210,6 +217,49 @@ public class FamilyMembersView extends ScrollPane {
                 }
             });
         });
+    }
+
+    private void onCreateFamily() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Crear familia");
+        dialog.setHeaderText("Crear una nueva familia");
+        dialog.setContentText("Nombre de la nueva familia:");
+        DialogStyler.apply(dialog);
+
+        Optional<String> result = dialog.showAndWait();
+        result.map(String::trim).filter(name -> !name.isEmpty()).ifPresent(name -> {
+            statusLabel.setText("Creando familia...");
+            createFamilyBtn.setDisable(true);
+            Thread.ofVirtual().start(() -> {
+                try {
+                    FamilyDtos.FamilyResponse created = context.getFamilyRepository().createFamily(name);
+                    Platform.runLater(() -> {
+                        createFamilyBtn.setDisable(false);
+                        statusLabel.setText("Familia creada: " + created.name()
+                                + ". Cámbiala desde el selector del menú lateral.");
+                        if (onFamiliesChanged != null) onFamiliesChanged.run();
+                    });
+                } catch (ApiException ex) {
+                    Platform.runLater(() -> {
+                        createFamilyBtn.setDisable(false);
+                        statusLabel.setText(createFamilyErrorMessage(ex));
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        createFamilyBtn.setDisable(false);
+                        statusLabel.setText("No se pudo crear la familia.");
+                    });
+                }
+            });
+        });
+    }
+
+    private String createFamilyErrorMessage(ApiException ex) {
+        return switch (ex.getHttpStatus()) {
+            case 403 -> "Necesitas ser propietario o administrador para crear familias.";
+            case 400 -> "No se pudo crear: revisa el nombre o has alcanzado el límite de familias.";
+            default -> "No se pudo crear la familia.";
+        };
     }
 
     private void onEditMember() {
