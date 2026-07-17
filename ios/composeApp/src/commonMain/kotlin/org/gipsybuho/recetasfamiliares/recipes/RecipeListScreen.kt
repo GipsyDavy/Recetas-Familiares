@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.Spacing
 import org.gipsybuho.recetasfamiliares.cooking.CookingScreen
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
+import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
 import org.gipsybuho.recetasfamiliares.stock.StockRepository
 import org.gipsybuho.recetasfamiliares.sync.SyncRepository
@@ -46,7 +47,8 @@ import org.gipsybuho.recetasfamiliares.sync.SyncRepository
 fun RecipeListScreen(
     repository: RecipeRepository,
     syncRepo: SyncRepository,
-    stockRepo: StockRepository? = null
+    stockRepo: StockRepository? = null,
+    familyRepo: FamilyMemberRepository? = null
 ) {
     var recipes          by remember { mutableStateOf<List<RecipeDto>>(emptyList()) }
     var stockNames       by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -124,6 +126,7 @@ fun RecipeListScreen(
                 RecipeDetailScreen(
                     recipe                  = targetRecipe,
                     repository              = repository,
+                    familyRepository        = familyRepo,
                     onBack                  = { selectedRecipe = null },
                     onCookingMode           = { cookingMode = true },
                     sharedTransitionScope   = this@SharedTransitionLayout,

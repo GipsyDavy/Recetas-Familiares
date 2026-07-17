@@ -129,7 +129,7 @@ fun MainTabScreen(
                 label = "main_tab_transition"
             ) { tab ->
                 when (tab) {
-                    Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo, syncRepo = syncRepo, stockRepo = stockRepo)
+                    Tab.RECIPES  -> RecipeListScreen(repository = recipeRepo, syncRepo = syncRepo, stockRepo = stockRepo, familyRepo = familyMemberRepo)
                     Tab.STOCK    -> StockScreen(repository = stockRepo, syncRepo = syncRepo)
                     Tab.NOTES    -> NotesScreen(repository = noteRepo)
                     Tab.SHOPPING -> ShoppingListScreen(repository = shoppingRepo)

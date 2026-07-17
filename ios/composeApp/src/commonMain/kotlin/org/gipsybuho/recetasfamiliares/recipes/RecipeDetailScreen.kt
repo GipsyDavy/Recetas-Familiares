@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@file:OptIn(
+    androidx.compose.animation.ExperimentalSharedTransitionApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class
+)
 
 package org.gipsybuho.recetasfamiliares.recipes
 
@@ -15,12 +18,14 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
@@ -35,6 +40,8 @@ import kotlinx.coroutines.launch
 import org.gipsybuho.recetasfamiliares.core.formatOneDecimal
 import org.gipsybuho.recetasfamiliares.core.rememberHapticFeedback
 import org.gipsybuho.recetasfamiliares.core.shareText
+import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository
+import org.gipsybuho.recetasfamiliares.network.FamilyDto
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
 import org.gipsybuho.recetasfamiliares.network.RecipeIngredientDto
 import org.gipsybuho.recetasfamiliares.network.RecipeStepDto
@@ -43,6 +50,7 @@ import org.gipsybuho.recetasfamiliares.network.RecipeStepDto
 fun RecipeDetailScreen(
     recipe: RecipeDto,
     repository: RecipeRepository,
+    familyRepository: FamilyMemberRepository? = null,
     onBack: () -> Unit,
     onCookingMode: (() -> Unit)? = null,
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -55,6 +63,9 @@ fun RecipeDetailScreen(
     val favoriteScale = remember { Animatable(1f) }
     val haptic      = rememberHapticFeedback()
     val scope       = rememberCoroutineScope()
+    var copyTargetFamilies by remember { mutableStateOf<List<FamilyDto>>(emptyList()) }
+    var showCopySheet      by remember { mutableStateOf(false) }
+    val snackbarHostState  = remember { SnackbarHostState() }
 
     LaunchedEffect(recipe.id) {
         isFavorite = repository.loadIsFavorite(recipe.id)
@@ -63,6 +74,9 @@ fun RecipeDetailScreen(
             steps       = repository.loadSteps(recipe.id)
         }
         loading = false
+        familyRepository?.let { repo ->
+            runCatching { copyTargetFamilies = repo.copyTargetFamilies() }
+        }
     }
 
     val sharedMod = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
@@ -105,6 +119,11 @@ fun RecipeDetailScreen(
                     tint               = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier           = Modifier.graphicsLayer { scaleX = favoriteScale.value; scaleY = favoriteScale.value }
                 )
+            }
+            if (copyTargetFamilies.isNotEmpty()) {
+                IconButton(onClick = { haptic.selection(); showCopySheet = true }) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copiar a otra familia")
+                }
             }
             IconButton(onClick = {
                 haptic.selection()
@@ -254,6 +273,54 @@ fun RecipeDetailScreen(
                 icon     = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
                 text     = { Text("Cocinar") }
             )
+        }
+        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+
+        if (showCopySheet) {
+            ModalBottomSheet(onDismissRequest = { showCopySheet = false }) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text("Copiar a otra familia", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "La receta y sus fotos se copiarán a la familia elegida.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    copyTargetFamilies.forEach { family ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable {
+                                    showCopySheet = false
+                                    scope.launch {
+                                        val ok = repository.copyToFamily(recipe.id, family.id)
+                                        if (ok) haptic.success() else haptic.error()
+                                        snackbarHostState.showSnackbar(
+                                            if (ok) "Receta y fotos copiadas a ${family.name}"
+                                            else "No se pudo copiar la receta"
+                                        )
+                                    }
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(family.name, style = MaterialTheme.typography.bodyLarge)
+                                family.role?.let {
+                                    Text(
+                                        it,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
         }
     }
 }
