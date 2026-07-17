@@ -3323,3 +3323,64 @@ Resultado Git/CI posterior al checkpoint:
   `{"status":"UP"}`.
 - Esta ultima anotacion se versiona en un commit solo documental; no coincide con las
   rutas que activan `backend-ci-cd.yml`.
+
+### Sprint: iOS copiar receta entre familias + Desktop crear familia - 2026-07-17 - Claude Code
+
+Alcance autorizado por el usuario en el chat: Spec 2 iOS (copiar receta entre familias,
+recomendada tras cerrar Spec 1 el 2026-07-16) + aclaracion del usuario en la misma sesion
+(crear familia nueva en Desktop con paridad Android, y ocultar el boton "Crear familia" en
+iOS a quien el backend rechazaria). Flujo `superpowers:brainstorming` + `writing-plans`
+completo, spec y plan aprobados antes de tocar codigo.
+
+- Spec: `docs/superpowers/specs/2026-07-17-ios-copy-recipe-desktop-create-family-design.md`.
+- Plan (7 tareas TDD): `docs/superpowers/plans/2026-07-17-ios-copy-recipe-desktop-create-family.md`.
+- Ejecucion inline (no subagentes) en la misma sesion. Una interrupcion breve por activacion
+  accidental de Plan Mode (comandos `/plan`/`/model` sueltos del usuario) se resolvio
+  documentando que no habia diseno nuevo pendiente, solo retomar el plan ya aprobado.
+
+Commits (7, sin cambios de backend):
+- `0b487a5` iOS: `RecipeRepository.copyToFamily` + `CopyRecipeRequestDto`, test con
+  MockEngine (201/403/sin sesion).
+- `348a0a9` iOS: `copyTargets`/`canCreateFamily` puras en `FamilyPermissions.kt` +
+  `FamilyMemberRepository.copyTargetFamilies`, tests unitarios.
+- `6e39854` iOS: UI de copia en `RecipeDetailScreen` (icono directo en top bar, decision UX
+  del usuario frente a menu "⋮"; `ModalBottomSheet` + `SnackbarHost` local + haptico
+  distinto en exito/error) e inyeccion de `FamilyMemberRepository` desde `MainTabScreen` /
+  `RecipeListScreen`.
+- `57a701d` iOS: `FamilyListSheet` oculta "Crear familia" si `canCreateFamily(families)` es
+  falso (mismo criterio que `FamilyService.createFamily` del backend: exige rol OWNER/ADMIN
+  en alguna familia, o ninguna membresia).
+- `5d00d08` Desktop: `FamilyRepository.createFamily` (TDD, MockWebServer) +
+  `FamilyDtos.CreateFamilyRequest`. Hallazgo en RED: `AppSession(Preferences)` era
+  package-private y el test vive en `data.repository`, no en `core` como los tests HTTP
+  existentes; se amplio a `public` (la encriptacion DPAPI via `TokenVault` no depende del
+  nodo `Preferences` inyectado, sin riesgo nuevo).
+- `683ccc2` Desktop: boton "Crear familia" en la toolbar admin de `FamilyMembersView`
+  (dialogo `TextInputDialog`, errores 403/400 mapeados a mensaje claro sin exponer el texto
+  crudo del backend) + `MainWindow.reloadFamilyChoices()` para refrescar el selector de
+  familia activa del sidebar tras crear.
+
+Validacion ejecutada en esta sesion:
+- iOS: `compileTestKotlinIosX64`, `compileTestKotlinIosArm64`,
+  `compileTestKotlinIosSimulatorArm64` -> `BUILD SUCCESSFUL` (29 tareas). Solo compilacion;
+  el runtime de `RecipeRepositoryTest` y `FamilyPermissionsTest` sigue SKIPPED en Windows
+  (sin macOS/Xcode). No se afirma que los asserts se hayan ejecutado.
+- Desktop: `mvn -f desktop/pom.xml test` -> `BUILD SUCCESS`, **29 tests, 0 fallos** (27
+  previos + 2 nuevos de `FamilyRepositoryHttpTest`).
+- Seguridad: `VibeSec` invocado sobre el diff completo (`0c520ea..683ccc2`). Sin hallazgos
+  bloqueantes: autorizacion sigue siendo autoridad del backend (el filtro cliente es solo
+  UX), sin secretos nuevos, mensajes de error no filtran texto crudo del backend, sin riesgo
+  XSS (renderizado nativo Compose/JavaFX, no HTML). `security-review` no aplica: sin cambios
+  en `backend/**`.
+
+Riesgos residuales:
+- Gate diferido a macOS: ejecutar en runtime `RecipeRepositoryTest`,
+  `FamilyPermissionsTest` y un smoke real de copia de receta entre dos familias.
+- Prueba manual interactiva pendiente del usuario en Desktop: dialogo "Crear familia" desde
+  Miembros (nombre vacio, 403 sin rol, refresco del selector del sidebar tras crear).
+- Deuda ya documentada 2026-07-16 sigue viva sin tocar en este sprint: respuesta
+  `GET /families` vacia deja el contexto local anterior (sprint propio "sin familia").
+- Binarios (instalador Windows, APK) NO regenerados con estos cambios; solo aplica cuando
+  se decida distribuir.
+- Sin push: cambios solo commiteados en local `main`, pendientes de autorizacion explicita
+  del usuario para publicar.
