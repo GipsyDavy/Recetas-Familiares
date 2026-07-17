@@ -70,11 +70,13 @@ fun FamilyListSheet(
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = { showCreateDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text("Crear familia")
+            if (canCreateFamily(families)) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = { showCreateDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text("Crear familia")
+                }
             }
             Spacer(Modifier.height(16.dp))
         }
