@@ -39,6 +39,9 @@ data class FamilyDto(
 data class CreateFamilyRequestDto(val name: String)
 
 @Serializable
+data class CopyRecipeRequestDto(val targetFamilyId: String)
+
+@Serializable
 data class FamilyMemberResponseDto(
     val userId: String,
     val displayName: String? = null,

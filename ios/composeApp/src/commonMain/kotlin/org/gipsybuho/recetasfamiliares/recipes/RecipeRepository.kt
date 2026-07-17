@@ -2,11 +2,13 @@ package org.gipsybuho.recetasfamiliares.recipes
 
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.http.isSuccess
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.database.AppDatabase
 import org.gipsybuho.recetasfamiliares.database.DatabaseDriverFactory
 import org.gipsybuho.recetasfamiliares.database.Recipes
 import org.gipsybuho.recetasfamiliares.network.ApiClient
+import org.gipsybuho.recetasfamiliares.network.CopyRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.network.PageDto
 import org.gipsybuho.recetasfamiliares.network.RecipeDto
 import org.gipsybuho.recetasfamiliares.network.FavoriteRecipeDto
@@ -89,6 +91,19 @@ class RecipeRepository(
         val familyId = session.familyId ?: return false
         return try { apiClient.http.delete("api/v1/families/$familyId/recipes/$recipeId/favorites"); true }
         catch (e: Exception) { false }
+    }
+
+    /** Copia la receta a otra familia. Nota: ApiClient no usa expectSuccess,
+     *  por eso el estado HTTP se comprueba explícitamente. */
+    suspend fun copyToFamily(recipeId: String, targetFamilyId: String): Boolean {
+        val familyId = session.familyId ?: return false
+        return try {
+            apiClient.http.post("api/v1/families/$familyId/recipes/$recipeId/copy") {
+                setBody(CopyRecipeRequestDto(targetFamilyId))
+            }.status.isSuccess()
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun loadLocalIngredients(): List<Pair<String, String>> =
