@@ -22,6 +22,13 @@ public class FamilyRepository {
         return result != null ? result : new FamilyDtos.FamilyResponse[0];
     }
 
+    /** Creates an additional family; the caller becomes its OWNER (backend enforces role and limits). */
+    public FamilyDtos.FamilyResponse createFamily(String name) throws ApiException {
+        return api.post("api/v1/families",
+                new FamilyDtos.CreateFamilyRequest(name),
+                FamilyDtos.FamilyResponse.class);
+    }
+
     /** Returns all members of the given family. */
     public FamilyDtos.FamilyMemberResponse[] loadMembers(String familyId) throws ApiException {
         FamilyDtos.FamilyMemberResponse[] result = api.get(

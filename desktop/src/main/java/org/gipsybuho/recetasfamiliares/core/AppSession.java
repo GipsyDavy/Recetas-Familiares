@@ -40,7 +40,8 @@ public class AppSession {
         this(Preferences.userRoot().node(PREF_NODE));
     }
 
-    AppSession(Preferences prefs) {
+    /** Visible para tests: permite inyectar un nodo de Preferences aislado. */
+    public AppSession(Preferences prefs) {
         this.prefs = prefs;
         this.accessToken  = readToken(KEY_ACCESS);
         this.refreshToken = readToken(KEY_REFRESH);
