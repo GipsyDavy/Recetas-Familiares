@@ -36,6 +36,9 @@ class FamilyMemberRepository(
             setBody(CreateFamilyRequestDto(name))
         }.body()
 
+    suspend fun copyTargetFamilies(): List<FamilyDto> =
+        copyTargets(families(), session.familyId)
+
     fun setActiveFamily(family: FamilyDto) {
         session.familyId = family.id
         session.familyRole = family.role
