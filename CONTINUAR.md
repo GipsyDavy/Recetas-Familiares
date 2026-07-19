@@ -3504,3 +3504,86 @@ acumula datos entre sesiones, patron ya aceptado en el proyecto).
 `paraImplementar.txt`: (10) creador de receta, (11) ranking (depende de 10), (20) presencia
 online/avisos, (22) scroll Desktop al redimensionar, (14) chat 1:1. Alternativa: gate macOS
 diferido (ejecutar en runtime real los tests iOS acumulados de Spec 1 y Spec 2).
+
+---
+
+## Sprint 2026-07-19: Presencia online de miembros (Backend + Desktop + Android)
+
+Ejecutado en worktree aislado `.claude/worktrees/presencia-online` (branch
+`worktree-presencia-online`), via `superpowers:brainstorming` -> `writing-plans` ->
+`subagent-driven-development` (11 tareas, cada una con implementador + reviewer subagent
+dedicados, mas revision final whole-branch). Spec: `docs/superpowers/specs/2026-07-19-presencia-online-design.md`.
+Plan: `docs/superpowers/plans/2026-07-19-presencia-online.md`. Ledger completo (por tarea,
+con hallazgos Minor diferidos): `.superpowers/sdd/progress.md` (git-ignored, solo en el
+worktree).
+
+**Alcance:** punto verde/gris en tiempo real (WebSocket activo, sin `lastSeenAt`, sin
+heartbeat) junto a cada miembro en la pantalla Miembros, Backend + Desktop + Android. Sin
+toast, sin contador en sidebar. iOS fuera (sin macOS disponible). Segundo topic STOMP
+(`/topic/families/{familyId}/presence`) sobre la misma conexion WebSocket que ya usa el chat
+familiar, mas snapshot inicial via `GET /api/v1/families/{familyId}/presence`. Estado 100% en
+memoria en el backend (`PresenceRegistry`, contador por familia/usuario para soportar
+multi-dispositivo); si el proceso reinicia, los clientes se reconectan solos (backoff ya
+existente de `ChatSocket`) y repueblan el registro sin persistencia.
+
+**Commits:** `466138e..4033f35` (13 commits: 5 backend, 3 desktop, 3 android, 1 fix
+dependencia circular Spring, 1 fix accesibilidad post-revision-final).
+
+**Hallazgo critico encontrado y corregido durante el sprint (no en el diseño original):**
+dependencia circular de bean Spring (`ChatStompAuthChannelInterceptor` -> `PresencePublisher`
+-> `SimpMessagingTemplate`/broker -> `WebSocketConfig` -> el propio interceptor), que rompia
+el arranque completo del `ApplicationContext` (116/168 tests backend fallando en cascada).
+Detectado por el controlador de la sesion (no por ningun reviewer de tarea) al correr la
+suite completa tras la Task 4, root-caused via el stack trace real en
+`surefire-reports/*.txt` (no visible en el resumen de consola). Fix: `@Lazy` en el parametro
+constructor `presencePublisher` unicamente (commit `beb4276`). Verificado: 168/168 tests
+backend, 0 errores.
+
+**Revision final whole-branch (opus, rango `466138e..3c3a584`):** Ready to merge — With
+fixes. 0 Critical. Seguridad, aislamiento multi-familia y el fix `@Lazy` confirmados solidos
+por lectura independiente del reviewer. 1 Important: el indicador de presencia era solo
+color, sin alternativa de texto para lectores de pantalla (contradice la regla explicita de
+"accesibilidad real, no decorativa" del propio `CLAUDE.md`) — corregido por el controlador
+(commit `4033f35`: `Modifier.semantics { contentDescription }` en Android, `Tooltip` en
+Desktop). Resto de hallazgos Minor quedan como deuda tecnica aceptada (detalle completo en el
+ledger `.superpowers/sdd/progress.md`), ninguno bloqueante.
+
+**Nota recurrente de entorno (ya documentada en sprints previos):** varios subagentes
+reviewer tuvieron su mensaje final truncado/reemplazado por un stub generico sobre un
+mecanismo interno "fp-check/stop-hook" no aplicable a revisiones de codigo normales. Recuperado
+via `SendMessage` en la mayoria de casos; en 2 casos (Task 10 y la revision final) el reintento
+tambien fallo y se opto por verificar independientemente leyendo el codigo fuente en vez de
+insistir mas.
+
+**Validacion ejecutada en esta sesion (worktree, no checkout principal):**
+- Backend: `mvn -f backend/pom.xml test` contra `recetas_familiares_test` real (WireGuard,
+  credenciales de `herztner/recetas_app.env`, copiadas al worktree por no ser un fichero
+  versionado que los worktrees compartan). 170 tests, 101 fallos — **patron preexistente ya
+  documentado** (emails fijos de tests antiguos vs. datos acumulados en la BD compartida de
+  test, 409 en `register()`, no relacionado con este diff). Las 5 clases nuevas de presencia
+  (`PresenceRegistryTest`, `PresencePublisherTest`, `PresenceControllerTest`,
+  `PresenceDisconnectListenerTest`) y `ChatStompAuthChannelInterceptorTest` (12 tests,
+  incluye los 4 nuevos de presencia): **100% limpias, 0 fallos**. El `ApplicationContext`
+  arranca correctamente (confirma que el fix `@Lazy` sigue solido).
+- Desktop: `mvn -f desktop/pom.xml test` — exit 0, sin fallos (incluye el fix de accesibilidad
+  del `Tooltip`).
+- Android: `gradlew testDebugUnitTest assembleDebug` — `BUILD SUCCESSFUL`, sin tests nuevos
+  fallidos, solo los 2 warnings preexistentes de `menuAnchor()` deprecado (no relacionados).
+- VibeSec (skill invocada en esta sesion sobre el diff completo del sprint, foco en
+  autorizacion STOMP/REST y aislamiento multi-familia): sin hallazgos criticos ni
+  importantes. Membership check verificado antes de registrar/publicar presencia en ambos
+  caminos (SUBSCRIBE STOMP y `GET` REST), sin via de fuga entre familias, sin secretos, sin
+  superficie de inyeccion nueva (mapas en memoria indexados por `familyId` solo alcanzable
+  tras pasar el check de membership).
+- **NO ejecutado en esta sesion (bloqueado por el mismo motivo de sprints previos):**
+  prueba manual con dos sesiones reales (verificar que el punto se enciende/apaga en vivo al
+  conectar/desconectar cada una) — requiere clic interactivo del usuario, la automatizacion
+  de clics sigue bloqueada por el clasificador de permisos del entorno para toda herramienta
+  disponible. Riesgo residual: el comportamiento en tiempo real (WebSocket) no se ha verificado
+  end-to-end con ojos humanos, solo por tests automatizados de las piezas por separado
+  (backend, parsing de frames, wiring de UI). Recomendado antes de considerar el sprint
+  cerrado de cara al usuario final.
+
+**Pendiente antes de fusionar a `main`:** decidir con el usuario como aterriza esta rama
+(merge directo, PR, o squash) via `superpowers:finishing-a-development-branch` — no
+ejecutado aun en esta sesion. Prueba manual de dos sesiones tambien pendiente (ver arriba).
