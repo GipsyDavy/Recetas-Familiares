@@ -36,6 +36,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.EmailVerificationRequestD
 import org.gipsybuho.recetasfamiliares.data.remote.dto.LoginRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PasswordResetRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PageDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PresenceResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateRatingRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.RecipePhotoDto
@@ -386,4 +387,9 @@ interface RecetasApi {
     suspend fun exportChat(
         @Path("familyId") familyId: String
     ): ChatExportDto
+
+    @GET("api/v1/families/{familyId}/presence")
+    suspend fun presence(
+        @Path("familyId") familyId: String
+    ): PresenceResponseDto
 }

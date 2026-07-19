@@ -327,6 +327,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private fun clearFamilyScopedState() {
         _familyStats.value = null
         _familyMembers.value = emptyList()
+        _onlineUserIds.value = emptySet()
         _userRecipeRankings.value = emptyList()
         _familyInfo.value = null
         _recipeRatings.value = emptyList()
@@ -340,6 +341,9 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _familyMembers = MutableStateFlow<List<FamilyMemberDto>>(emptyList())
     val familyMembers: StateFlow<List<FamilyMemberDto>> = _familyMembers.asStateFlow()
+
+    private val _onlineUserIds = MutableStateFlow<Set<String>>(emptySet())
+    val onlineUserIds: StateFlow<Set<String>> = _onlineUserIds.asStateFlow()
 
     private val _userRecipeRankings = MutableStateFlow<List<UserRecipeRankingDto>>(emptyList())
     val userRecipeRankings: StateFlow<List<UserRecipeRankingDto>> = _userRecipeRankings.asStateFlow()
@@ -448,6 +452,19 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 .onSuccess {
                     // Descarta respuestas tardias si el usuario ya cambio de familia.
                     if (familyId == container.sessionStore.familyId) _familyMembers.value = it
+                }
+        }
+    }
+
+    /** Snapshot inicial de presencia; las actualizaciones en vivo llegan por WebSocket. */
+    fun loadPresence() {
+        viewModelScope.launch {
+            val familyId = container.sessionStore.familyId ?: return@launch
+            runCatching { container.familyMemberRepository.presence() }
+                .onSuccess {
+                    if (familyId == container.sessionStore.familyId) {
+                        _onlineUserIds.value = it.onlineUserIds.toSet()
+                    }
                 }
         }
     }
@@ -910,7 +927,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                     _chatUnread.update { it + 1 }
                 }
             },
-            onConnectionChange = {}
+            onConnectionChange = {},
+            onPresenceUpdate = { online -> _onlineUserIds.value = online }
         )
     }
 
@@ -938,7 +956,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         }
         chatSocket = container.chatRepository.openRealtime(
             onMessage = { msg -> _chatMessages.update { mergeChat(it, listOf(msg)) } },
-            onConnectionChange = { connected -> _chatConnected.value = connected }
+            onConnectionChange = { connected -> _chatConnected.value = connected },
+            onPresenceUpdate = { online -> _onlineUserIds.value = online }
         )
         startChatPolling()
     }

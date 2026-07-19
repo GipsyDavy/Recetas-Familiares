@@ -40,6 +40,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateRecipeRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateMemberRoleRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UserRecipeRankingDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PresenceResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FavoriteRecipeDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyMemberDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyDto
@@ -203,6 +204,11 @@ class FamilyMemberRepository(
     suspend fun userRecipeRankings(): List<UserRecipeRankingDto> {
         val familyId = sessionStore.familyId ?: return emptyList()
         return api.userRecipeRankings(familyId)
+    }
+
+    suspend fun presence(): PresenceResponseDto {
+        val familyId = sessionStore.familyId ?: return PresenceResponseDto(emptyList())
+        return api.presence(familyId)
     }
 
     suspend fun updateRole(userId: String, role: String): FamilyMemberDto {

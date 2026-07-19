@@ -102,7 +102,8 @@ class ChatRepository(
      */
     fun openRealtime(
         onMessage: (ChatMessageDto) -> Unit,
-        onConnectionChange: (Boolean) -> Unit
+        onConnectionChange: (Boolean) -> Unit,
+        onPresenceUpdate: (Set<String>) -> Unit
     ): ChatSocket? {
         val family = familyId ?: return null
         val socket = ChatSocket(
@@ -112,7 +113,8 @@ class ChatRepository(
             familyId = family,
             gson = gson,
             onMessage = { msg -> onMessage(normalizeAttachments(msg)) },
-            onConnectionChange = onConnectionChange
+            onConnectionChange = onConnectionChange,
+            onPresenceUpdate = onPresenceUpdate
         )
         socket.connect()
         return socket
