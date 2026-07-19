@@ -6,6 +6,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos;
@@ -34,6 +35,8 @@ public class FamilyMembersView extends ScrollPane {
         this.context = context;
         this.onFamiliesChanged = onFamiliesChanged;
         build();
+        context.getChatRepository().setPresenceListener(online ->
+                Platform.runLater(() -> applyPresence(online)));
         refresh();
     }
 
@@ -134,6 +137,27 @@ public class FamilyMembersView extends ScrollPane {
         tv.setPlaceholder(new Label("Sin miembros"));
         tv.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
+        TableColumn<MemberRow, MemberRow> onlineCol = new TableColumn<>("");
+        onlineCol.setCellValueFactory(data -> new javafx.beans.property.SimpleObjectProperty<>(data.getValue()));
+        onlineCol.setCellFactory(col -> new TableCell<>() {
+            private final Circle dot = new Circle(5);
+
+            @Override
+            protected void updateItem(MemberRow row, boolean empty) {
+                super.updateItem(row, empty);
+                if (empty || row == null) {
+                    setGraphic(null);
+                    return;
+                }
+                dot.getStyleClass().setAll(row.isOnline() ? "presence-dot-online" : "presence-dot-offline");
+                setGraphic(dot);
+            }
+        });
+        onlineCol.setSortable(false);
+        onlineCol.setResizable(false);
+        onlineCol.setMinWidth(28);
+        onlineCol.setMaxWidth(28);
+
         TableColumn<MemberRow, String> nameCol = new TableColumn<>("Nombre");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("displayName"));
         nameCol.setMinWidth(160);
@@ -146,6 +170,7 @@ public class FamilyMembersView extends ScrollPane {
         roleCol.setCellValueFactory(new PropertyValueFactory<>("roleLabel"));
         roleCol.setMinWidth(120);
 
+        tv.getColumns().add(onlineCol);
         tv.getColumns().add(nameCol);
         tv.getColumns().add(emailCol);
         tv.getColumns().add(roleCol);
@@ -180,12 +205,23 @@ public class FamilyMembersView extends ScrollPane {
                         table.getItems().add(new MemberRow(
                                 m.userId(), m.displayName(), m.email(), m.role(), isSelf));
                     }
+                    applyPresence(context.getChatRepository().lastOnlineUserIds());
                     statusLabel.setText(members.length + " miembro(s)");
                 });
+                FamilyDtos.PresenceResponse presence = context.getFamilyRepository().loadPresence(familyId);
+                Platform.runLater(() -> applyPresence(new java.util.HashSet<>(presence.onlineUserIds())));
             } catch (Exception ex) {
                 Platform.runLater(() -> statusLabel.setText("Error al cargar: " + ex.getMessage()));
             }
         });
+    }
+
+    /** Aplica un snapshot de presencia a las filas ya cargadas. Llamado en el hilo JavaFX. */
+    private void applyPresence(java.util.Set<String> onlineUserIds) {
+        for (MemberRow row : table.getItems()) {
+            row.setOnline(onlineUserIds.contains(row.getUserId()));
+        }
+        table.refresh();
     }
 
     private void onChangeRole() {
@@ -609,6 +645,7 @@ public class FamilyMembersView extends ScrollPane {
         private final String email;
         private final String role;
         private final boolean self;
+        private boolean online;
 
         public MemberRow(String userId, String displayName, String email, String role, boolean self) {
             this.userId      = userId;
@@ -623,6 +660,8 @@ public class FamilyMembersView extends ScrollPane {
         public String getEmail()       { return email; }
         public String getRole()        { return role; }
         public boolean isSelf()        { return self; }
+        public boolean isOnline()      { return online; }
+        public void setOnline(boolean online) { this.online = online; }
 
         /** Label shown in the table — includes "(Tú)" marker for self. */
         public String getRoleLabel() {

@@ -742,6 +742,14 @@
     -fx-font-weight: bold;
 }
 
+.presence-dot-online {
+    -fx-fill: #22C55E;
+}
+
+.presence-dot-offline {
+    -fx-fill: recetas-text-muted;
+}
+
 .no-data-label {
     -fx-font-size: 13px;
     -fx-text-fill: recetas-text-muted;
