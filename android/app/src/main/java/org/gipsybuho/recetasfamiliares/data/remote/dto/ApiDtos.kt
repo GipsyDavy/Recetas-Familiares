@@ -550,3 +550,7 @@ data class ChatExportDto(
     val totalMessages: Int,
     val messages: List<ChatMessageDto>
 )
+
+data class PresenceResponseDto(
+    val onlineUserIds: List<String>
+)

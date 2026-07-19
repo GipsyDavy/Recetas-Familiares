@@ -10,6 +10,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PresenceResponseDto
 
 /**
  * Cliente STOMP minimo sobre el WebSocket nativo de OkHttp (sin dependencias
@@ -29,11 +30,13 @@ class ChatSocket(
     private val familyId: String,
     private val gson: Gson,
     private val onMessage: (ChatMessageDto) -> Unit,
-    private val onConnectionChange: (Boolean) -> Unit
+    private val onConnectionChange: (Boolean) -> Unit,
+    private val onPresenceUpdate: (Set<String>) -> Unit
 ) {
 
     private val wsUrl: String = toWebSocketUrl(baseUrl)
     private val topic: String = "/topic/families/$familyId/chat"
+    private val presenceTopic: String = "/topic/families/$familyId/presence"
     private val mainHandler = Handler(Looper.getMainLooper())
     private val reconnectRunnable = Runnable {
         if (!closedByClient) {
@@ -123,22 +126,30 @@ class ChatSocket(
         val command = frame.substringBefore('\n').trim()
         when (command) {
             "CONNECTED" -> {
-                val subscribe = "SUBSCRIBE\n" +
+                val subscribeChat = "SUBSCRIBE\n" +
                     "id:sub-chat\n" +
                     "destination:$topic\n" +
                     "\n" +
                     NUL
-                webSocket.send(subscribe)
+                webSocket.send(subscribeChat)
+                val subscribePresence = "SUBSCRIBE\n" +
+                    "id:sub-presence\n" +
+                    "destination:$presenceTopic\n" +
+                    "\n" +
+                    NUL
+                webSocket.send(subscribePresence)
                 reconnectAttempt = 0
                 onConnectionChange(true)
             }
             "MESSAGE" -> {
+                val destination = extractStompHeader(frame, "destination")
                 val body = frame.substringAfter("\n\n", "").trim()
-                if (body.isNotEmpty()) {
-                    runCatching { gson.fromJson(body, ChatMessageDto::class.java) }
-                        .getOrNull()
-                        ?.takeIf { it.isUsableChatMessage() }
-                        ?.let(onMessage)
+                if (body.isEmpty()) {
+                    // no-op
+                } else if (destination == presenceTopic) {
+                    handlePresenceMessage(body)
+                } else {
+                    handleChatMessage(body)
                 }
             }
             "ERROR" -> {
@@ -146,6 +157,20 @@ class ChatSocket(
                 webSocket.close(1000, null)
             }
         }
+    }
+
+    private fun handleChatMessage(body: String) {
+        runCatching { gson.fromJson(body, ChatMessageDto::class.java) }
+            .getOrNull()
+            ?.takeIf { it.isUsableChatMessage() }
+            ?.let(onMessage)
+    }
+
+    private fun handlePresenceMessage(body: String) {
+        runCatching { gson.fromJson(body, PresenceResponseDto::class.java) }
+            .getOrNull()
+            ?.onlineUserIds
+            ?.let { onPresenceUpdate(it.toSet()) }
     }
 
     private fun toWebSocketUrl(baseUrl: String): String {
@@ -177,4 +202,11 @@ class ChatSocket(
         const val RECONNECT_MAX_MS = 30_000L
         const val RECONNECT_SHIFT_LIMIT = 4
     }
+}
+
+internal fun extractStompHeader(frame: String, name: String): String? {
+    val headersEnd = frame.indexOf("\n\n")
+    val headerBlock = if (headersEnd >= 0) frame.substring(0, headersEnd) else frame
+    val prefix = "$name:"
+    return headerBlock.lineSequence().firstOrNull { it.startsWith(prefix) }?.removePrefix(prefix)
 }
