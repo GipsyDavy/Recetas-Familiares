@@ -3439,8 +3439,68 @@ Lo que se intento:
    clasificador de permisos en este entorno para cualquier herramienta disponible.
 7. Al terminar: cerrar backend local y app Desktop (`Stop-Process` o cerrar ventana).
 
+### Prueba manual Desktop "Crear familia" completada - 2026-07-19 - Claude Code
+
+Retomada la prueba manual pendiente desde 2026-07-17/18 (seccion anterior). Autorizada por
+el usuario en el chat ("Retomar prueba manual Desktop").
+
+Entorno:
+- Backend dev local contra `recetas_familiares_test` (WireGuard, nunca produccion) en
+  `localhost:8080`, `JWT_SECRET` aleatorio efimero de esta sesion, seed reutilizado sin
+  cambios (`existsByEmailIgnoreCaseAndDeletedFalse` hizo no-op):
+  `desktop.manualtest.20260717@example.test` / `ManualTest2026!`.
+- App Desktop lanzada con `mvn -f desktop/pom.xml javafx:run -Dapi.base.url=http://localhost:8080/`.
+
+Hallazgo nuevo (bug de entorno de desarrollo, no del producto): `-Dapi.base.url` pasado a
+`mvn javafx:run` **no llega a la app**. `javafx-maven-plugin` (`desktop/pom.xml:94-101`, sin
+`<options>` configurado) lanza el proceso JavaFX en una JVM forkeada que no hereda las `-D`
+del proceso `mvn` externo. Evidencia: el campo URL del login mostraba el valor por defecto de
+produccion (`ServerConfig.DEFAULT_API_BASE_URL`), campo editable
+(`ServerConfig.hasSystemOverride()` = false), y el backend local no registro conexion alguna
+tras el primer intento de login. Diagnosticado con `superpowers:systematic-debugging`
+(Fase 1, causa raiz antes de proponer fix).
+- Fix aplicado sin tocar codigo: `LoginView.java:81-86` ya expone ese mismo campo como
+  editable en runtime; `doSubmit()` (linea 244-252) guarda su valor via
+  `ServerConfig.saveUserBaseUrl()` antes de intentar login si no hay system override. Escribir
+  `http://localhost:8080/` ahi resolvio el login contra el backend local.
+- Nota para futuras sesiones: el comando de la seccion "Arranque Dev" (linea 156,
+  `mvn javafx:run -Dapi.base.url=...`) no es fiable para apuntar el cliente Desktop a un
+  backend distinto del default compilado. Usar el campo URL de la pantalla de login en su
+  lugar, o anadir `<options>` al plugin si se quiere automatizar en el futuro.
+
+Prueba ejecutada (clic real del usuario; automatizacion de clics sigue bloqueada por el
+clasificador de permisos del entorno para toda herramienta disponible):
+1. "Cerrar sesion" (limpia cache stale de la sesion real) -> OK.
+2. Login con cuenta seed corrigiendo la URL a `localhost:8080` -> OK. Verificado por captura:
+   usuario `ManualTestUser` / `desktop.manualtest.2026...`, familia activa
+   `FamiliaManualTest`.
+3. Miembros -> "Crear familia" -> nombre `FamilyPrueba` -> confirmar -> OK. Verificado por
+   captura: el selector de familia activa cambio solo a `FamilyPrueba`, la barra de estado
+   inferior confirma "Familia activa: FamilyPrueba", la familia nueva aparece con las 5
+   recetas por defecto, 1 miembro, 0 en despensa y ultima actividad `2026-07-19` (hoy).
+   Consistente con un `POST /api/v1/families` 201 real, no con datos de cache.
+
+Limitacion de la verificacion: el backend dev no tiene logging de acceso HTTP por peticion
+habilitado (comportamiento por defecto de Spring Boot), asi que no hay linea de log explicita
+`POST /api/v1/families`. La evidencia de UI (selector refrescado + contenido nuevo de la
+familia via `MainWindow.reloadFamilyChoices()`, revisado en el sprint del 2026-07-17) se
+considera suficiente porque ese flujo solo se dispara tras una respuesta 2xx real del backend.
+
+Casos NO probados en esta sesion (fuera del alcance minimo pedido): nombre vacio, 403 sin rol
+OWNER/ADMIN. Solo se verifico el happy path (rol OWNER, nombre valido).
+
+**Cierre de Task 6: completo.** El sprint "iOS copiar receta entre familias + Desktop crear
+familia" (2026-07-17) queda totalmente cerrado, sin puntos abiertos.
+
+Seguridad: sin cambios de codigo en esta sesion (solo verificacion manual); no aplica
+re-invocar VibeSec/security-review, la superficie ya se reviso en el sprint original.
+
+Entorno dev dejado en marcha al escribir este checkpoint (backend PID `10672`, wrapper
+Desktop PID `7344`, ventana Java PID `8852`); pendiente decidir con el usuario si se cierran
+ahora. Cuenta seed y familia `FamilyPrueba` quedan en `recetas_familiares_test` (BD de test
+acumula datos entre sesiones, patron ya aceptado en el proyecto).
+
 **Siguiente sprint funcional (NO iniciado, sin spec/plan):** a elegir por el usuario entre
-Spec 2... ya cerrado -> ver `paraImplementar.txt` para candidatos: (10) creador de receta,
-(11) ranking (depende de 10), (20) presencia online/avisos, (22) scroll Desktop al
-redimensionar, (14) chat 1:1. Alternativa: gate macOS diferido (ejecutar en runtime real
-los tests iOS acumulados de Spec 1 y Spec 2).
+`paraImplementar.txt`: (10) creador de receta, (11) ranking (depende de 10), (20) presencia
+online/avisos, (22) scroll Desktop al redimensionar, (14) chat 1:1. Alternativa: gate macOS
+diferido (ejecutar en runtime real los tests iOS acumulados de Spec 1 y Spec 2).
