@@ -1,6 +1,8 @@
 package org.gipsybuho.recetasfamiliares.chat;
 
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
+import org.gipsybuho.recetasfamiliares.presence.PresencePublisher;
+import org.gipsybuho.recetasfamiliares.presence.PresenceRegistry;
 import org.gipsybuho.recetasfamiliares.security.InvalidJwtException;
 import org.gipsybuho.recetasfamiliares.security.JwtService;
 import org.springframework.messaging.Message;
@@ -13,32 +15,47 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
 /**
- * Seguridad del canal STOMP entrante:
+ * Seguridad del canal STOMP entrante (unico interceptor registrado para todo
+ * el endpoint {@code /ws}, no solo para chat):
  * <ul>
  *   <li>CONNECT: exige JWT valido en la cabecera Authorization (nunca en la URL,
  *       que se loggea). Resuelve el userId y lo fija como Principal de la sesion.</li>
  *   <li>SUBSCRIBE: valida membership de familia contra el destino
- *       {@code /topic/families/{familyId}/chat}. Se re-valida en cada nueva
- *       suscripcion, de modo que un usuario expulsado no puede resuscribirse.</li>
+ *       {@code /topic/families/{familyId}/chat} o
+ *       {@code /topic/families/{familyId}/presence}. Se re-valida en cada nueva
+ *       suscripcion, de modo que un usuario expulsado no puede resuscribirse.
+ *       Una suscripcion de presencia autorizada, ademas, registra la conexion
+ *       en {@link PresenceRegistry} y difunde el snapshot actualizado.</li>
  *   <li>SEND: se rechaza siempre. Los clientes publican por REST; permitir un
  *       SEND directo al broker simple dejaria inyectar mensajes falsos en el
  *       topic de cualquier familia saltandose ownership, persistencia y rate
  *       limit. El broadcast legitimo lo emite el servidor via
- *       {@link ChatRealtimePublisher}, que no pasa por este canal entrante.</li>
+ *       {@link ChatRealtimePublisher} / {@link PresencePublisher}, que no pasan
+ *       por este canal entrante.</li>
  * </ul>
  */
 @Component
 public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
 
     private static final String TOPIC_PREFIX = "/topic/families/";
-    private static final String TOPIC_SUFFIX = "/chat";
+    private static final String CHAT_SUFFIX = "/chat";
+    private static final String PRESENCE_SUFFIX = "/presence";
 
     private final JwtService jwtService;
     private final FamilyMemberRepository familyMemberRepository;
+    private final PresenceRegistry presenceRegistry;
+    private final PresencePublisher presencePublisher;
 
-    public ChatStompAuthChannelInterceptor(JwtService jwtService, FamilyMemberRepository familyMemberRepository) {
+    public ChatStompAuthChannelInterceptor(
+            JwtService jwtService,
+            FamilyMemberRepository familyMemberRepository,
+            PresenceRegistry presenceRegistry,
+            PresencePublisher presencePublisher
+    ) {
         this.jwtService = jwtService;
         this.familyMemberRepository = familyMemberRepository;
+        this.presenceRegistry = presenceRegistry;
+        this.presencePublisher = presencePublisher;
     }
 
     @Override
@@ -85,6 +102,10 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
         if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(familyId, userId)) {
             throw new MessagingException("Family subscription denied");
         }
+        if (destination.endsWith(PRESENCE_SUFFIX)) {
+            presenceRegistry.subscribe(accessor.getSessionId(), familyId, userId);
+            presencePublisher.publish(familyId);
+        }
     }
 
     private String currentUserId(StompHeaderAccessor accessor) {
@@ -95,12 +116,18 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
     }
 
     private String extractFamilyId(String destination) {
-        if (destination == null
-                || !destination.startsWith(TOPIC_PREFIX)
-                || !destination.endsWith(TOPIC_SUFFIX)) {
+        if (destination == null || !destination.startsWith(TOPIC_PREFIX)) {
             return null;
         }
-        String familyId = destination.substring(TOPIC_PREFIX.length(), destination.length() - TOPIC_SUFFIX.length());
+        String suffix;
+        if (destination.endsWith(CHAT_SUFFIX)) {
+            suffix = CHAT_SUFFIX;
+        } else if (destination.endsWith(PRESENCE_SUFFIX)) {
+            suffix = PRESENCE_SUFFIX;
+        } else {
+            return null;
+        }
+        String familyId = destination.substring(TOPIC_PREFIX.length(), destination.length() - suffix.length());
         return familyId.isBlank() ? null : familyId;
     }
 }

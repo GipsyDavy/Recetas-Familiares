@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
+import org.gipsybuho.recetasfamiliares.presence.PresencePublisher;
+import org.gipsybuho.recetasfamiliares.presence.PresenceRegistry;
 import org.gipsybuho.recetasfamiliares.security.InvalidJwtException;
 import org.gipsybuho.recetasfamiliares.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,9 +25,12 @@ class ChatStompAuthChannelInterceptorTest {
     private static final String USER_ID = "user-123";
     private static final String FAMILY_ID = "fam-abc";
     private static final String TOPIC = "/topic/families/" + FAMILY_ID + "/chat";
+    private static final String PRESENCE_TOPIC = "/topic/families/" + FAMILY_ID + "/presence";
 
     private JwtService jwtService;
     private FamilyMemberRepository familyMemberRepository;
+    private PresenceRegistry presenceRegistry;
+    private PresencePublisher presencePublisher;
     private MessageChannel channel;
     private ChatStompAuthChannelInterceptor interceptor;
 
@@ -33,8 +38,11 @@ class ChatStompAuthChannelInterceptorTest {
     void setUp() {
         jwtService = Mockito.mock(JwtService.class);
         familyMemberRepository = Mockito.mock(FamilyMemberRepository.class);
+        presenceRegistry = Mockito.mock(PresenceRegistry.class);
+        presencePublisher = Mockito.mock(PresencePublisher.class);
         channel = Mockito.mock(MessageChannel.class);
-        interceptor = new ChatStompAuthChannelInterceptor(jwtService, familyMemberRepository);
+        interceptor = new ChatStompAuthChannelInterceptor(
+                jwtService, familyMemberRepository, presenceRegistry, presencePublisher);
     }
 
     @Test
@@ -94,6 +102,47 @@ class ChatStompAuthChannelInterceptorTest {
         assertThrows(MessagingException.class, () -> interceptor.preSend(send, channel));
     }
 
+    @Test
+    void allowsSubscribeToPresenceForFamilyMember() {
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(eq(FAMILY_ID), eq(USER_ID)))
+                .thenReturn(true);
+        Message<byte[]> subscribe = subscribe(PRESENCE_TOPIC, new StompPrincipal(USER_ID));
+
+        assertDoesNotThrow(() -> interceptor.preSend(subscribe, channel));
+    }
+
+    @Test
+    void rejectsSubscribeToPresenceForNonMember() {
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(eq(FAMILY_ID), eq(USER_ID)))
+                .thenReturn(false);
+        Message<byte[]> subscribe = subscribe(PRESENCE_TOPIC, new StompPrincipal(USER_ID));
+
+        assertThrows(MessagingException.class, () -> interceptor.preSend(subscribe, channel));
+    }
+
+    @Test
+    void registersPresenceAndPublishesOnAuthorizedSubscribe() {
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(eq(FAMILY_ID), eq(USER_ID)))
+                .thenReturn(true);
+        Message<byte[]> subscribe = subscribe(PRESENCE_TOPIC, new StompPrincipal(USER_ID));
+
+        interceptor.preSend(subscribe, channel);
+
+        Mockito.verify(presenceRegistry).subscribe(Mockito.anyString(), eq(FAMILY_ID), eq(USER_ID));
+        Mockito.verify(presencePublisher).publish(FAMILY_ID);
+    }
+
+    @Test
+    void chatSubscribeDoesNotTouchPresenceRegistry() {
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(eq(FAMILY_ID), eq(USER_ID)))
+                .thenReturn(true);
+        Message<byte[]> subscribe = subscribe(TOPIC, new StompPrincipal(USER_ID));
+
+        interceptor.preSend(subscribe, channel);
+
+        Mockito.verifyNoInteractions(presenceRegistry, presencePublisher);
+    }
+
     private Message<byte[]> send(String destination, StompPrincipal principal) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
         accessor.setDestination(destination);
@@ -117,6 +166,8 @@ class ChatStompAuthChannelInterceptorTest {
     private Message<byte[]> subscribe(String destination, StompPrincipal principal) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
         accessor.setDestination(destination);
+        // Un SUBSCRIBE real siempre lleva el sessionId de la conexion STOMP que lo envia.
+        accessor.setSessionId("session-1");
         if (principal != null) {
             accessor.setUser(principal);
         }
