@@ -75,4 +75,21 @@ class FamilyRepositoryHttpTest {
 
         assertEquals(403, error.getHttpStatus());
     }
+
+    @Test
+    void loadPresenceDevuelveSnapshotDeUsuariosOnline() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                        {"onlineUserIds":["user-a","user-b"]}
+                        """));
+
+        FamilyDtos.PresenceResponse presence = repository.loadPresence("fam-1");
+
+        assertEquals(java.util.List.of("user-a", "user-b"), presence.onlineUserIds());
+        RecordedRequest request = server.takeRequest();
+        assertEquals("GET", request.getMethod());
+        assertEquals("/api/v1/families/fam-1/presence", request.getPath());
+    }
 }

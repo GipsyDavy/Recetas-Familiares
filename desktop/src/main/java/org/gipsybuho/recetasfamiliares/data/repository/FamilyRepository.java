@@ -42,6 +42,11 @@ public class FamilyRepository {
         return api.get("api/v1/families/" + familyId + "/stats", FamilyDtos.FamilyStatsResponse.class);
     }
 
+    /** Snapshot inicial de miembros conectados ahora mismo (WebSocket activo). */
+    public FamilyDtos.PresenceResponse loadPresence(String familyId) throws ApiException {
+        return api.get("api/v1/families/" + familyId + "/presence", FamilyDtos.PresenceResponse.class);
+    }
+
     /** Returns recipe contribution ranking for active family members. */
     public FamilyDtos.UserRecipeRankingResponse[] loadRecipeRanking(String familyId) throws ApiException {
         FamilyDtos.UserRecipeRankingResponse[] result = api.get(

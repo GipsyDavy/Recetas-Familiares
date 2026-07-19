@@ -8,10 +8,13 @@ import org.gipsybuho.recetasfamiliares.api.dto.ChatDtos;
 import org.gipsybuho.recetasfamiliares.core.AppSession;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -29,9 +32,29 @@ public class ChatRepository {
     private final AppSession session;
     private final Gson gson = new Gson();
 
+    private final AtomicReference<Set<String>> lastOnlineUserIds = new AtomicReference<>(Set.of());
+    private volatile Consumer<Set<String>> presenceListener;
+
     public ChatRepository(ApiClient api, AppSession session) {
         this.api = api;
         this.session = session;
+    }
+
+    public void setPresenceListener(Consumer<Set<String>> listener) {
+        this.presenceListener = listener;
+    }
+
+    public Set<String> lastOnlineUserIds() {
+        return lastOnlineUserIds.get();
+    }
+
+    private void handlePresenceUpdate(Set<String> onlineUserIds) {
+        Set<String> snapshot = Collections.unmodifiableSet(onlineUserIds);
+        lastOnlineUserIds.set(snapshot);
+        Consumer<Set<String>> listener = presenceListener;
+        if (listener != null) {
+            listener.accept(snapshot);
+        }
     }
 
     public String familyId() {
@@ -141,7 +164,8 @@ public class ChatRepository {
                 family,
                 gson,
                 onMessage,
-                onConnectionChange);
+                onConnectionChange,
+                this::handlePresenceUpdate);
         socket.connect();
         return socket;
     }
