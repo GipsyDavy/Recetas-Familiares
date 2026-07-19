@@ -141,15 +141,20 @@ public class FamilyMembersView extends ScrollPane {
         onlineCol.setCellValueFactory(data -> new javafx.beans.property.SimpleObjectProperty<>(data.getValue()));
         onlineCol.setCellFactory(col -> new TableCell<>() {
             private final Circle dot = new Circle(5);
+            private final Tooltip tooltip = new Tooltip();
 
             @Override
             protected void updateItem(MemberRow row, boolean empty) {
                 super.updateItem(row, empty);
                 if (empty || row == null) {
                     setGraphic(null);
+                    Tooltip.uninstall(dot, tooltip);
                     return;
                 }
-                dot.getStyleClass().setAll(row.isOnline() ? "presence-dot-online" : "presence-dot-offline");
+                boolean online = row.isOnline();
+                dot.getStyleClass().setAll(online ? "presence-dot-online" : "presence-dot-offline");
+                tooltip.setText(online ? "En línea" : "Desconectado");
+                Tooltip.install(dot, tooltip);
                 setGraphic(dot);
             }
         });

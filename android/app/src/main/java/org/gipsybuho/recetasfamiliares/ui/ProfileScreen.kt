@@ -65,6 +65,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -811,6 +813,9 @@ private fun FamilyMembersSection(
                                     shape = CircleShape
                                 )
                                 .border(1.5.dp, MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                .semantics {
+                                    contentDescription = if (online) "En línea" else "Desconectado"
+                                }
                         )
                     }
                     Spacer(Modifier.size(Spacing.md))
