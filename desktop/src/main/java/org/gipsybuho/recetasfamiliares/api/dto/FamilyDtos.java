@@ -27,6 +27,9 @@ public final class FamilyDtos {
     /** Matches backend FamilyStatsResponse: {totalRecipes, totalMembers, totalStockItems, lastActivityAt} */
     public record FamilyStatsResponse(long totalRecipes, long totalMembers, long totalStockItems, String lastActivityAt) {}
 
+    /** Snapshot de miembros conectados ahora mismo (WebSocket activo). */
+    public record PresenceResponse(java.util.List<String> onlineUserIds) {}
+
     /** Matches backend UserRecipeRankingResponse. */
     public record UserRecipeRankingResponse(
             int rank,

@@ -6,7 +6,10 @@ import okhttp3.Response;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 import org.gipsybuho.recetasfamiliares.api.dto.ChatDtos;
+import org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,9 +45,11 @@ public class ChatSocket {
     private final String familyId;
     private final String wsUrl;
     private final String topic;
+    private final String presenceTopic;
     private final Gson gson;
     private final Consumer<ChatDtos.ChatMessage> onMessage;
     private final Consumer<Boolean> onConnectionChange;
+    private final Consumer<Set<String>> onPresenceUpdate;
 
     private final ScheduledExecutorService scheduler =
             Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -64,16 +69,19 @@ public class ChatSocket {
             String familyId,
             Gson gson,
             Consumer<ChatDtos.ChatMessage> onMessage,
-            Consumer<Boolean> onConnectionChange
+            Consumer<Boolean> onConnectionChange,
+            Consumer<Set<String>> onPresenceUpdate
     ) {
         this.apiClient = apiClient;
         this.tokenSupplier = tokenSupplier;
         this.familyId = familyId;
         this.wsUrl = toWebSocketUrl(apiClient.getBaseUrl());
         this.topic = "/topic/families/" + familyId + "/chat";
+        this.presenceTopic = "/topic/families/" + familyId + "/presence";
         this.gson = gson;
         this.onMessage = onMessage;
         this.onConnectionChange = onConnectionChange;
+        this.onPresenceUpdate = onPresenceUpdate;
     }
 
     public synchronized void connect() {
@@ -155,27 +163,31 @@ public class ChatSocket {
         String command = (newline >= 0 ? frame.substring(0, newline) : frame).trim();
         switch (command) {
             case "CONNECTED" -> {
-                String subscribe = "SUBSCRIBE\n"
+                String subscribeChat = "SUBSCRIBE\n"
                         + "id:sub-chat\n"
                         + "destination:" + topic + "\n"
                         + "\n"
                         + NUL;
-                socket.send(subscribe);
+                socket.send(subscribeChat);
+                String subscribePresence = "SUBSCRIBE\n"
+                        + "id:sub-presence\n"
+                        + "destination:" + presenceTopic + "\n"
+                        + "\n"
+                        + NUL;
+                socket.send(subscribePresence);
                 reconnectAttempt = 0;
                 onConnectionChange.accept(true);
             }
             case "MESSAGE" -> {
+                String destination = extractHeader(frame, "destination");
                 int split = frame.indexOf("\n\n");
                 String body = split >= 0 ? frame.substring(split + 2).trim() : "";
-                if (!body.isEmpty()) {
-                    try {
-                        ChatDtos.ChatMessage message = gson.fromJson(body, ChatDtos.ChatMessage.class);
-                        if (message != null && message.isUsable() && familyId.equals(message.familyId())) {
-                            onMessage.accept(message);
-                        }
-                    } catch (RuntimeException ignored) {
-                        // Frame no parseable: se descarta sin romper la conexion.
-                    }
+                if (body.isEmpty()) {
+                    // no-op
+                } else if (presenceTopic.equals(destination)) {
+                    handlePresenceMessage(body);
+                } else {
+                    handleChatMessage(body);
                 }
             }
             case "ERROR" -> {
@@ -186,6 +198,40 @@ public class ChatSocket {
                 // RECEIPT u otros comandos no usados en fase 1.
             }
         }
+    }
+
+    private void handleChatMessage(String body) {
+        try {
+            ChatDtos.ChatMessage message = gson.fromJson(body, ChatDtos.ChatMessage.class);
+            if (message != null && message.isUsable() && familyId.equals(message.familyId())) {
+                onMessage.accept(message);
+            }
+        } catch (RuntimeException ignored) {
+            // Frame no parseable: se descarta sin romper la conexion.
+        }
+    }
+
+    private void handlePresenceMessage(String body) {
+        try {
+            FamilyDtos.PresenceResponse presence = gson.fromJson(body, FamilyDtos.PresenceResponse.class);
+            if (presence != null && presence.onlineUserIds() != null) {
+                onPresenceUpdate.accept(new HashSet<>(presence.onlineUserIds()));
+            }
+        } catch (RuntimeException ignored) {
+            // Frame no parseable: se descarta sin romper la conexion.
+        }
+    }
+
+    static String extractHeader(String frame, String name) {
+        int headersEnd = frame.indexOf("\n\n");
+        String headerBlock = headersEnd >= 0 ? frame.substring(0, headersEnd) : frame;
+        String prefix = name + ":";
+        for (String line : headerBlock.split("\n")) {
+            if (line.startsWith(prefix)) {
+                return line.substring(prefix.length());
+            }
+        }
+        return null;
     }
 
     private synchronized void scheduleReconnect() {
