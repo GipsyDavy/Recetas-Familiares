@@ -2,6 +2,8 @@ package org.gipsybuho.recetasfamiliares.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -327,6 +330,7 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
             viewModel.loadFamilyStats()
             viewModel.loadAccountStatus()
             viewModel.loadFamilyMembers()
+            viewModel.loadPresence()
             viewModel.loadUserRecipeRankings()
             viewModel.loadFamilyInfo()
         }
@@ -414,10 +418,12 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
         }
 
         val familyMembers by viewModel.familyMembers.collectAsState()
+        val onlineUserIds by viewModel.onlineUserIds.collectAsState()
         if (familyMembers.isNotEmpty()) {
             Spacer(Modifier.height(Spacing.lg))
             FamilyMembersSection(
                 members = familyMembers,
+                onlineUserIds = onlineUserIds,
                 isAdmin = isAdmin,
                 myUserId = myUserId,
                 onChangeRole = { member, newRole ->
@@ -747,6 +753,7 @@ private fun UserRecipeRankingSection(rankings: List<UserRecipeRankingDto>) {
 @Composable
 private fun FamilyMembersSection(
     members: List<FamilyMemberDto>,
+    onlineUserIds: Set<String>,
     isAdmin: Boolean,
     myUserId: String?,
     onChangeRole: (FamilyMemberDto, String) -> Unit,
@@ -774,24 +781,37 @@ private fun FamilyMembersSection(
                         .fillMaxWidth()
                         .clickable(enabled = canManage) { onEditMember(member) }
                 ) {
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(36.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            if (!member.avatarUrl.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = member.avatarUrl,
-                                    contentDescription = "Foto de ${member.displayName}",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
-                                )
-                            } else {
-                                Text(
-                                    member.displayName.split(" ").filter { it.isNotBlank() }.take(2)
-                                        .map { it.first().uppercaseChar() }.joinToString(""),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                    Box {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(36.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (!member.avatarUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = member.avatarUrl,
+                                        contentDescription = "Foto de ${member.displayName}",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                    )
+                                } else {
+                                    Text(
+                                        member.displayName.split(" ").filter { it.isNotBlank() }.take(2)
+                                            .map { it.first().uppercaseChar() }.joinToString(""),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
                             }
                         }
+                        val online = member.userId in onlineUserIds
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(10.dp)
+                                .background(
+                                    color = if (online) Color(0xFF22C55E) else MaterialTheme.colorScheme.outline,
+                                    shape = CircleShape
+                                )
+                                .border(1.5.dp, MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                        )
                     }
                     Spacer(Modifier.size(Spacing.md))
                     Column(modifier = Modifier.weight(1f)) {
