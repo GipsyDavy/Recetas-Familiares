@@ -5,6 +5,7 @@ import org.gipsybuho.recetasfamiliares.presence.PresencePublisher;
 import org.gipsybuho.recetasfamiliares.presence.PresenceRegistry;
 import org.gipsybuho.recetasfamiliares.security.InvalidJwtException;
 import org.gipsybuho.recetasfamiliares.security.JwtService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
@@ -50,7 +51,7 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
             JwtService jwtService,
             FamilyMemberRepository familyMemberRepository,
             PresenceRegistry presenceRegistry,
-            PresencePublisher presencePublisher
+            @Lazy PresencePublisher presencePublisher
     ) {
         this.jwtService = jwtService;
         this.familyMemberRepository = familyMemberRepository;
