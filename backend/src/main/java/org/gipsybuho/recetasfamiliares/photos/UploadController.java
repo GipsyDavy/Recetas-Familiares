@@ -9,6 +9,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.gipsybuho.recetasfamiliares.chat.ChatAttachmentRepository;
+import org.gipsybuho.recetasfamiliares.dm.PrivateConversationRepository;
+import org.gipsybuho.recetasfamiliares.dm.PrivateMessageAttachmentRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
 import org.gipsybuho.recetasfamiliares.users.UserRepository;
@@ -37,6 +39,8 @@ public class UploadController {
     private final Path uploadDir;
     private final RecipePhotoRepository photoRepository;
     private final ChatAttachmentRepository chatAttachmentRepository;
+    private final PrivateMessageAttachmentRepository privateMessageAttachmentRepository;
+    private final PrivateConversationRepository privateConversationRepository;
     private final UserRepository userRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final FamilyRepository familyRepository;
@@ -47,6 +51,8 @@ public class UploadController {
             @Value("${app.upload.base-url:http://localhost:8080}") String uploadBaseUrl,
             RecipePhotoRepository photoRepository,
             ChatAttachmentRepository chatAttachmentRepository,
+            PrivateMessageAttachmentRepository privateMessageAttachmentRepository,
+            PrivateConversationRepository privateConversationRepository,
             UserRepository userRepository,
             FamilyMemberRepository familyMemberRepository,
             FamilyRepository familyRepository
@@ -55,6 +61,8 @@ public class UploadController {
         this.uploadBaseUrl = trimTrailingSlash(uploadBaseUrl);
         this.photoRepository = photoRepository;
         this.chatAttachmentRepository = chatAttachmentRepository;
+        this.privateMessageAttachmentRepository = privateMessageAttachmentRepository;
+        this.privateConversationRepository = privateConversationRepository;
         this.userRepository = userRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.familyRepository = familyRepository;
@@ -118,6 +126,20 @@ public class UploadController {
         return serveFile(uploadDir.resolve("chat_thumbnails").resolve(filename), filename);
     }
 
+    @GetMapping("/uploads/dm/{filename}")
+    public ResponseEntity<byte[]> privateMessageImage(@PathVariable String filename, Authentication authentication) {
+        requireSafeFilename(filename);
+        requirePrivateAttachmentAccess("/uploads/dm/" + filename, authentication.getName());
+        return serveFile(uploadDir.resolve("dm").resolve(filename), filename);
+    }
+
+    @GetMapping("/uploads/dm_thumbnails/{filename}")
+    public ResponseEntity<byte[]> privateMessageThumbnail(@PathVariable String filename, Authentication authentication) {
+        requireSafeFilename(filename);
+        requirePrivateAttachmentAccess("/uploads/dm_thumbnails/" + filename, authentication.getName());
+        return serveFile(uploadDir.resolve("dm_thumbnails").resolve(filename), filename);
+    }
+
     private boolean sharesFamilyWithAny(String requesterId, List<String> ownerIds) {
         if (ownerIds.isEmpty()) {
             return false;
@@ -136,6 +158,24 @@ public class UploadController {
         boolean allowed = owningFamilyIds.stream()
                 .anyMatch(familyId -> familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(
                         familyId, requesterId));
+        if (!allowed) {
+            throw notFound();
+        }
+    }
+
+    /**
+     * A diferencia de requireChatAttachmentAccess (membership de familia,
+     * correcto para el chat familiar compartido), esta comprobacion es por
+     * PARTICIPANTE de la conversacion: el resto de la familia no debe poder
+     * ver fotos de una conversacion privada ajena aunque comparta familia con
+     * uno de los dos participantes.
+     */
+    private void requirePrivateAttachmentAccess(String storagePath, String requesterId) {
+        List<String> owningConversationIds = privateMessageAttachmentRepository
+                .findOwningConversationIdsByStoragePath(storagePath);
+        boolean allowed = owningConversationIds.stream()
+                .anyMatch(conversationId -> privateConversationRepository
+                        .existsByIdAndParticipant(conversationId, requesterId));
         if (!allowed) {
             throw notFound();
         }

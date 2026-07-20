@@ -114,6 +114,52 @@ class UploadControllerTest {
                 .andExpect(content().contentType(MediaType.IMAGE_JPEG));
     }
 
+    @Test
+    void privateMessageImageOnlyAccessibleForConversationParticipants() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("upload-dm-owner"), "Familia Upload DM");
+        String guestEmail = uniqueEmail("upload-dm-guest");
+        RegisteredUser guest = register(guestEmail, "Familia Upload DM Guest");
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
+                .andExpect(status().isCreated());
+        RegisteredUser outsider = register(uniqueEmail("upload-dm-outsider"), "Familia Upload DM Otra");
+
+        MvcResult conversationResult = mockMvc.perform(post(
+                        "/api/v1/families/{familyId}/conversations/with/{otherUserId}",
+                        owner.familyId(), guest.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        String conversationId = objectMapper.readTree(
+                        conversationResult.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .get("conversationId").asText();
+
+        MvcResult imageResult = mockMvc.perform(multipart(
+                                "/api/v1/families/{familyId}/conversations/{conversationId}/messages/images",
+                                owner.familyId(), conversationId)
+                        .file(new MockMultipartFile("files", "photo.jpg", "image/jpeg", validJpeg()))
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String attachmentUrl = objectMapper.readTree(
+                        imageResult.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .get("attachments").get(0).get("url").asText();
+        String path = attachmentUrl.substring(attachmentUrl.indexOf("/uploads/"));
+
+        mockMvc.perform(get(path).header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk());
+        mockMvc.perform(get(path).header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isOk());
+        // outsider comparte la app pero no la conversacion: debe ser 404, aunque
+        // no comparta familia con ninguno de los dos participantes.
+        mockMvc.perform(get(path).header("Authorization", "Bearer " + outsider.accessToken()))
+                .andExpect(status().isNotFound());
+    }
+
     private String uploadRecipePhoto(RegisteredUser user, String recipeId) throws Exception {
         MvcResult result = mockMvc.perform(multipart(
                         "/api/v1/families/{familyId}/recipes/{recipeId}/photos/upload",
@@ -188,8 +234,13 @@ class UploadControllerTest {
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         return new RegisteredUser(
                 response.get("accessToken").asText(),
-                response.get("family").get("id").asText()
+                response.get("family").get("id").asText(),
+                response.get("user").get("id").asText()
         );
+    }
+
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
     }
 
     private String read(MvcResult result, String field) throws Exception {
@@ -206,6 +257,6 @@ class UploadControllerTest {
         return out.toByteArray();
     }
 
-    private record RegisteredUser(String accessToken, String familyId) {
+    private record RegisteredUser(String accessToken, String familyId, String userId) {
     }
 }
