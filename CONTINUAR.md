@@ -3673,3 +3673,36 @@ a `uniqueEmail()` (patron ya usado en `PrivateChatControllerTest`) o limpiar la 
 **Siguiente sprint (NO iniciado, sin spec/plan):** clientes del chat privado (Android/Desktop/iOS)
 sobre este backend, o alguno de los pendientes de `paraImplementar.txt`: (10) creador de receta,
 (11) ranking, (20) presencia online cliente iOS, (22) scroll Desktop al redimensionar.
+
+### Cierre de sesion 2026-07-20 — push a produccion autorizado y verificado
+
+Usuario pidio cerrar sesion, documentar todo y pushear lo que considerara. Se commiteo
+`paraImplementar.txt` (nunca trackeado, referenciado repetidamente desde este documento —
+`9e0611e`) y se pusheo `origin/main`: `0812866..9e0611e` (35 commits), incluyendo **dos sprints
+backend nunca pusheados hasta ahora**: presencia online (2026-07-19, `466138e..73384e0`) y chat
+privado 1:1 (2026-07-20, `0fff256..8e26baf`, mas el commit de este cierre).
+
+Como ambos tocan `backend/**`, se aviso explicitamente al usuario antes de pushear: el workflow
+`backend-ci-cd.yml` construye+testea en Postgres efimero y, si pasa, despliega automaticamente a
+la VPS de produccion, aplicando via Flyway las migraciones nuevas (V19 chat privado + las de
+presencia) sobre la BD real. Usuario autorizo explicitamente ("Si, push y que despliegue").
+
+**Resultado verificado (no solo asumido):**
+- CI/CD run `29780650962` (`Backend CI/CD`, commit `9e0611e`): `completed` / `success` (polling
+  vigilado ~2.5 min via API publica de GitHub, PowerShell — `curl` de git-bash sigue roto por el
+  MITM de Avast, ver hallazgo anterior en este documento).
+- Health de produccion tras el deploy: `GET /api/v1/health` -> `{"status":"UP", ...}` (no
+  `/actuator/health`, que da 401 — el proyecto expone su propio health controller en
+  `/api/v1/health`, sin autenticacion, distinto del actuator estandar).
+- Arranque exitoso implica Flyway aplico V19 (y las migraciones de presencia) sin error contra
+  la BD real de produccion.
+
+**Sin cliente todavia para ninguna de las dos features** (presencia online SI tiene UI
+Android/Desktop ya construida y revisada en su propio sprint, pero su prueba manual de dos
+sesiones reales sigue pendiente segun quedo documentado el 2026-07-19; chat privado no tiene UI
+en ningun cliente). Ambas quedan expuestas en produccion pero inertes de cara al usuario final
+hasta que exista cliente/prueba manual.
+
+**Estado para retomar en la proxima sesion:** `main` local y remoto sincronizados, arbol de
+trabajo limpio, sin worktrees activos, sin ramas de feature pendientes. Siguiente sprint a
+elegir por el usuario (ver arriba). `MEMORY.md`/`project_state.md` actualizados con este cierre.
