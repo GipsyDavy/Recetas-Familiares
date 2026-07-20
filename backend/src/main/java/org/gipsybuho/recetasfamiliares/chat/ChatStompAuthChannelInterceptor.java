@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.chat;
 
+import org.gipsybuho.recetasfamiliares.dm.PrivateConversationRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.presence.PresencePublisher;
 import org.gipsybuho.recetasfamiliares.presence.PresenceRegistry;
@@ -41,22 +42,28 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
     private static final String TOPIC_PREFIX = "/topic/families/";
     private static final String CHAT_SUFFIX = "/chat";
     private static final String PRESENCE_SUFFIX = "/presence";
+    private static final String CONVERSATION_TOPIC_PREFIX = "/topic/conversations/";
+    private static final String INBOX_TOPIC_PREFIX = "/topic/users/";
+    private static final String INBOX_TOPIC_SUFFIX = "/inbox";
 
     private final JwtService jwtService;
     private final FamilyMemberRepository familyMemberRepository;
     private final PresenceRegistry presenceRegistry;
     private final PresencePublisher presencePublisher;
+    private final PrivateConversationRepository privateConversationRepository;
 
     public ChatStompAuthChannelInterceptor(
             JwtService jwtService,
             FamilyMemberRepository familyMemberRepository,
             PresenceRegistry presenceRegistry,
-            @Lazy PresencePublisher presencePublisher
+            @Lazy PresencePublisher presencePublisher,
+            PrivateConversationRepository privateConversationRepository
     ) {
         this.jwtService = jwtService;
         this.familyMemberRepository = familyMemberRepository;
         this.presenceRegistry = presenceRegistry;
         this.presencePublisher = presencePublisher;
+        this.privateConversationRepository = privateConversationRepository;
     }
 
     @Override
@@ -96,6 +103,21 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
     private void authorizeSubscription(StompHeaderAccessor accessor) {
         String userId = currentUserId(accessor);
         String destination = accessor.getDestination();
+        if (destination == null) {
+            throw new MessagingException("Subscription destination not allowed");
+        }
+        if (destination.startsWith(TOPIC_PREFIX)) {
+            authorizeFamilyTopic(accessor, userId, destination);
+        } else if (destination.startsWith(CONVERSATION_TOPIC_PREFIX)) {
+            authorizeConversationTopic(userId, destination);
+        } else if (destination.startsWith(INBOX_TOPIC_PREFIX) && destination.endsWith(INBOX_TOPIC_SUFFIX)) {
+            authorizeInboxTopic(userId, destination);
+        } else {
+            throw new MessagingException("Subscription destination not allowed");
+        }
+    }
+
+    private void authorizeFamilyTopic(StompHeaderAccessor accessor, String userId, String destination) {
         String familyId = extractFamilyId(destination);
         if (familyId == null) {
             throw new MessagingException("Subscription destination not allowed");
@@ -106,6 +128,27 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
         if (destination.endsWith(PRESENCE_SUFFIX)) {
             presenceRegistry.subscribe(accessor.getSessionId(), familyId, userId);
             presencePublisher.publish(familyId);
+        }
+    }
+
+    private void authorizeConversationTopic(String userId, String destination) {
+        String conversationId = destination.substring(CONVERSATION_TOPIC_PREFIX.length());
+        if (conversationId.isBlank() || conversationId.contains("/")) {
+            throw new MessagingException("Subscription destination not allowed");
+        }
+        if (!privateConversationRepository.existsByIdAndParticipant(conversationId, userId)) {
+            throw new MessagingException("Conversation subscription denied");
+        }
+    }
+
+    private void authorizeInboxTopic(String userId, String destination) {
+        String targetUserId = destination.substring(
+                INBOX_TOPIC_PREFIX.length(), destination.length() - INBOX_TOPIC_SUFFIX.length());
+        // Solo el propio usuario puede suscribirse a su bandeja: sin esto, cualquier
+        // sesion autenticada podria enterarse de que otro usuario recibio un mensaje
+        // privado nuevo (metadata, no contenido, pero sigue siendo informacion ajena).
+        if (!targetUserId.equals(userId)) {
+            throw new MessagingException("Inbox subscription denied");
         }
     }
 

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import org.gipsybuho.recetasfamiliares.dm.PrivateConversationRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.presence.PresencePublisher;
 import org.gipsybuho.recetasfamiliares.presence.PresenceRegistry;
@@ -26,11 +27,16 @@ class ChatStompAuthChannelInterceptorTest {
     private static final String FAMILY_ID = "fam-abc";
     private static final String TOPIC = "/topic/families/" + FAMILY_ID + "/chat";
     private static final String PRESENCE_TOPIC = "/topic/families/" + FAMILY_ID + "/presence";
+    private static final String CONVERSATION_ID = "conv-xyz";
+    private static final String OTHER_USER_ID = "user-456";
+    private static final String CONVERSATION_TOPIC = "/topic/conversations/" + CONVERSATION_ID;
+    private static final String INBOX_TOPIC = "/topic/users/" + USER_ID + "/inbox";
 
     private JwtService jwtService;
     private FamilyMemberRepository familyMemberRepository;
     private PresenceRegistry presenceRegistry;
     private PresencePublisher presencePublisher;
+    private PrivateConversationRepository privateConversationRepository;
     private MessageChannel channel;
     private ChatStompAuthChannelInterceptor interceptor;
 
@@ -40,9 +46,10 @@ class ChatStompAuthChannelInterceptorTest {
         familyMemberRepository = Mockito.mock(FamilyMemberRepository.class);
         presenceRegistry = Mockito.mock(PresenceRegistry.class);
         presencePublisher = Mockito.mock(PresencePublisher.class);
+        privateConversationRepository = Mockito.mock(PrivateConversationRepository.class);
         channel = Mockito.mock(MessageChannel.class);
         interceptor = new ChatStompAuthChannelInterceptor(
-                jwtService, familyMemberRepository, presenceRegistry, presencePublisher);
+                jwtService, familyMemberRepository, presenceRegistry, presencePublisher, privateConversationRepository);
     }
 
     @Test
@@ -141,6 +148,39 @@ class ChatStompAuthChannelInterceptorTest {
         interceptor.preSend(subscribe, channel);
 
         Mockito.verifyNoInteractions(presenceRegistry, presencePublisher);
+    }
+
+    @Test
+    void allowsSubscribeToConversationForParticipant() {
+        when(privateConversationRepository.existsByIdAndParticipant(CONVERSATION_ID, USER_ID)).thenReturn(true);
+        Message<byte[]> subscribe = subscribe(CONVERSATION_TOPIC, new StompPrincipal(USER_ID));
+
+        assertDoesNotThrow(() -> interceptor.preSend(subscribe, channel));
+    }
+
+    @Test
+    void rejectsSubscribeToConversationForNonParticipant() {
+        when(privateConversationRepository.existsByIdAndParticipant(CONVERSATION_ID, USER_ID)).thenReturn(false);
+        Message<byte[]> subscribe = subscribe(CONVERSATION_TOPIC, new StompPrincipal(USER_ID));
+
+        assertThrows(MessagingException.class, () -> interceptor.preSend(subscribe, channel));
+    }
+
+    @Test
+    void allowsSubscribeToOwnInboxTopic() {
+        Message<byte[]> subscribe = subscribe(INBOX_TOPIC, new StompPrincipal(USER_ID));
+
+        assertDoesNotThrow(() -> interceptor.preSend(subscribe, channel));
+    }
+
+    @Test
+    void rejectsSubscribeToAnotherUsersInboxTopic() {
+        // USER_ID intenta suscribirse a la bandeja de OTHER_USER_ID: debe rechazarse
+        // sin siquiera consultar el repositorio de conversaciones.
+        Message<byte[]> subscribe = subscribe("/topic/users/" + OTHER_USER_ID + "/inbox", new StompPrincipal(USER_ID));
+
+        assertThrows(MessagingException.class, () -> interceptor.preSend(subscribe, channel));
+        Mockito.verifyNoInteractions(privateConversationRepository);
     }
 
     private Message<byte[]> send(String destination, StompPrincipal principal) {
