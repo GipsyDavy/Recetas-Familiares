@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +17,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -28,6 +31,9 @@ class PrivateChatControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private PrivateMessageRepository messageRepository;
 
     @Test
     void createsConversationBetweenTwoFamilyMembers() throws Exception {
@@ -256,6 +262,28 @@ class PrivateChatControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.body").value("editado"));
+    }
+
+    @Test
+    void rejectsEditAfterFifteenMinuteWindow() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("dm-edit-expired-owner"), "Familia DM Edit Expired");
+        RegisteredUser guest = invite(owner, uniqueEmail("dm-edit-expired-guest"));
+        String conversationId = createConversation(owner, guest.userId());
+        String messageId = sendText(owner, conversationId, "Mensaje antiguo");
+
+        PrivateMessageEntity message = messageRepository.findById(messageId).orElseThrow();
+        ReflectionTestUtils.setField(message, "createdAt", Instant.now().minus(Duration.ofMinutes(16)));
+        messageRepository.saveAndFlush(message);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/families/{familyId}/conversations/{conversationId}/messages/{messageId}",
+                        owner.familyId(), conversationId, messageId)
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"body": "Tarde"}
+                                """))
+                .andExpect(status().isConflict());
     }
 
     @Test
