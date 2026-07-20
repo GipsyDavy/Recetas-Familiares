@@ -1,0 +1,24 @@
+1. botón actualizar en notas Android
+2. botón salir en desktop y Android
+3. opción editar miembros desde la pantalla de miembros del propietario y del administrador, que al pinchar sobre un miembro se abra una ventana para editar los datos y la contraseña en caso de ser necesario por olvidarla
+4. opción cambiar de familia para todos los usuarios y de pertenecer a varias familias y poder cambiar de grupo en para interactuar con una u otra familia
+5. opción crear familia solo propietario y adminsitradores, en la pantalla de miembros de desktop para propietario y administradores implementar la opción de crear familia y poder cambiar de una a otra para añadir, eliminar o editar miembros
+6. opción de recuperar contraseña si se olvida implementa en desktop también la opción de validar email
+7. opción de añadir una imagen a la receta para identificarla también visualmente
+8. posibilidad de buscar recetas en internet, documentación o información sobre productos o alimentos, implementando un botón que permita esa opción al pinchar sobre el botón se accede a una pantalla donde se indica la receta, alimentos o documentación a buscar sobre las recetas y que busque en internet coincidencias y poder añadir esas recetas buscadas en internet a la aplicacion
+9. sistema de calificación por estrellas de 1 a 5 para indicar si te gusta o no la receta.
+10. constancia de que usuario es el que crea la receta
+11. ranking de usuarios en cuanto a recetas y calificación de las mismas
+12. posibilidad de exportar o copiar las recetas para llevarlas a otro grupo familiar y no tener que reescribirla si el usuario esta en varios grupos familiares
+13. posibilidad de estar en varios grupos familiares
+14. chat que pueda ser privado entre un usuario y otro y chat familiar con todos los usuarios de la familia
+15. posibilidad de subir imagen de grupo de familia
+16. posibilidad de comparar recetas con otras en internet y que tras comparativa de sugerencia sobre si modificar algo o no.
+17. que la aplicacion cada vez que se borre y se instale de nuevo o cuando se reinstale no se pierdan los datos, solo si el usuario es eliminado por el administrador o propietario se perderan los datos
+18. alojar en el servidor hertzner todos los datos de usuarios, chat y base de datos, con sus backups
+19. opción de poder listar los miembros del grupo familiar
+20. icono indicando miembros en linea o activos, asi como aviso de miembros que se han conectado y si ha habido actualizaciones de recetas, notas o stock
+21. incluye en la aplicación por defecto al menos 5 recetas muy conocidas 2 de dificultad fácil, dos de dificultad media y 1 de dificultad difícil
+22. scroll en desktop cuando se cambia tamaño de la ventana en los distintos apartados ya que al cambiar el tamaño hay campos de la interfaz que no se ven por quedar fuera de la ventana
+
+
