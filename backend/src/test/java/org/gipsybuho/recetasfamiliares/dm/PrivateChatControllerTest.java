@@ -239,6 +239,114 @@ class PrivateChatControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(429, lastStatus);
     }
 
+    @Test
+    void editsOwnMessageWithinWindow() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("dm-edit-owner"), "Familia DM Edit");
+        RegisteredUser guest = invite(owner, uniqueEmail("dm-edit-guest"));
+        String conversationId = createConversation(owner, guest.userId());
+        String messageId = sendText(owner, conversationId, "original");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/families/{familyId}/conversations/{conversationId}/messages/{messageId}",
+                        owner.familyId(), conversationId, messageId)
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"body": "editado"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.body").value("editado"));
+    }
+
+    @Test
+    void blocksEditingAnotherParticipantsMessage() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("dm-edit-block-owner"), "Familia DM Edit Block");
+        RegisteredUser guest = invite(owner, uniqueEmail("dm-edit-block-guest"));
+        String conversationId = createConversation(owner, guest.userId());
+        String messageId = sendText(owner, conversationId, "de owner");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/families/{familyId}/conversations/{conversationId}/messages/{messageId}",
+                        owner.familyId(), conversationId, messageId)
+                        .header("Authorization", "Bearer " + guest.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"body": "intento ajeno"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void softDeletesOwnMessage() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("dm-delete-owner"), "Familia DM Delete");
+        RegisteredUser guest = invite(owner, uniqueEmail("dm-delete-guest"));
+        String conversationId = createConversation(owner, guest.userId());
+        String messageId = sendText(owner, conversationId, "a borrar");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/api/v1/families/{familyId}/conversations/{conversationId}/messages/{messageId}",
+                        owner.familyId(), conversationId, messageId)
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(true))
+                .andExpect(jsonPath("$.body").doesNotExist());
+    }
+
+    @Test
+    void clearHidesHistoryOnlyForClearingUser() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("dm-clear-owner"), "Familia DM Clear");
+        RegisteredUser guest = invite(owner, uniqueEmail("dm-clear-guest"));
+        String conversationId = createConversation(owner, guest.userId());
+        sendText(owner, conversationId, "antes de limpiar");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/conversations/{conversationId}/clear",
+                        owner.familyId(), conversationId)
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/conversations/{conversationId}/messages",
+                        owner.familyId(), conversationId)
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(jsonPath("$.items.length()").value(0));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/conversations/{conversationId}/messages",
+                        owner.familyId(), conversationId)
+                        .header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(jsonPath("$.items.length()").value(1));
+    }
+
+    @Test
+    void exportsVisibleMessagesAscending() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("dm-export-owner"), "Familia DM Export");
+        RegisteredUser guest = invite(owner, uniqueEmail("dm-export-guest"));
+        String conversationId = createConversation(owner, guest.userId());
+        sendText(owner, conversationId, "primero");
+        sendText(guest, conversationId, "segundo");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/conversations/{conversationId}/export",
+                        owner.familyId(), conversationId)
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMessages").value(2))
+                .andExpect(jsonPath("$.messages[0].body").value("primero"))
+                .andExpect(jsonPath("$.messages[1].body").value("segundo"));
+    }
+
+    private String sendText(RegisteredUser sender, String conversationId, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post(
+                        "/api/v1/families/{familyId}/conversations/{conversationId}/messages",
+                        sender.familyId(), conversationId)
+                        .header("Authorization", "Bearer " + sender.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"body": "%s"}
+                                """.formatted(body)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        return response.get("id").asText();
+    }
+
     private String createConversation(RegisteredUser owner, String otherUserId) throws Exception {
         MvcResult result = mockMvc.perform(post(
                         "/api/v1/families/{familyId}/conversations/with/{otherUserId}",

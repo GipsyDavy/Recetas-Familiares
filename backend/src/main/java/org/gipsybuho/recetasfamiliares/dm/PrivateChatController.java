@@ -10,9 +10,11 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -82,5 +84,45 @@ public class PrivateChatController {
             Authentication authentication
     ) {
         return chatService.sendImageMessage(conversationId, authentication.getName(), id, body, files);
+    }
+
+    @PutMapping("/{conversationId}/messages/{messageId}")
+    public PrivateMessageResponse editMessage(
+            @PathVariable String familyId,
+            @PathVariable String conversationId,
+            @PathVariable @Size(max = 36) String messageId,
+            @Valid @RequestBody EditPrivateMessageRequest request,
+            Authentication authentication
+    ) {
+        return chatService.editMessage(conversationId, authentication.getName(), messageId, request);
+    }
+
+    @DeleteMapping("/{conversationId}/messages/{messageId}")
+    public PrivateMessageResponse deleteMessage(
+            @PathVariable String familyId,
+            @PathVariable String conversationId,
+            @PathVariable @Size(max = 36) String messageId,
+            Authentication authentication
+    ) {
+        return chatService.deleteMessage(conversationId, authentication.getName(), messageId);
+    }
+
+    @PostMapping("/{conversationId}/clear")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void clearConversation(
+            @PathVariable String familyId,
+            @PathVariable String conversationId,
+            Authentication authentication
+    ) {
+        chatService.clearForUser(conversationId, authentication.getName());
+    }
+
+    @GetMapping("/{conversationId}/export")
+    public PrivateMessageExportResponse exportConversation(
+            @PathVariable String familyId,
+            @PathVariable String conversationId,
+            Authentication authentication
+    ) {
+        return chatService.exportForUser(conversationId, authentication.getName());
     }
 }

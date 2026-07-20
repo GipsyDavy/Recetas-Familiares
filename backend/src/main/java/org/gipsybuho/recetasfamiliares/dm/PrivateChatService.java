@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.dm;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,6 +31,7 @@ public class PrivateChatService {
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_BODY_LENGTH = 2000;
     private static final int MAX_IMAGE_ATTACHMENTS = 5;
+    private static final Duration EDIT_WINDOW = Duration.ofMinutes(15);
 
     private final PrivateConversationRepository conversationRepository;
     private final PrivateMessageRepository messageRepository;
@@ -218,6 +220,86 @@ public class PrivateChatService {
             cleanupStoredFiles(storedFiles);
             throw e;
         }
+    }
+
+    @Transactional
+    public PrivateMessageResponse editMessage(
+            String conversationId,
+            String userId,
+            String messageId,
+            EditPrivateMessageRequest request
+    ) {
+        PrivateConversationEntity conversation = requireParticipantConversation(conversationId, userId);
+        PrivateMessageEntity message = findOwnEditableMessage(conversation.getId(), userId, messageId);
+        if (message.getCreatedAt().plus(EDIT_WINDOW).isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Message edit window has expired");
+        }
+
+        message.editBody(normalizeRequiredBody(request.body()));
+        PrivateMessageEntity saved = messageRepository.save(message);
+        PrivateMessageResponse response = PrivateMessageResponse.from(saved);
+        publishAfterCommit(response, conversation.otherParticipant(userId), null);
+        return response;
+    }
+
+    @Transactional
+    public PrivateMessageResponse deleteMessage(String conversationId, String userId, String messageId) {
+        PrivateConversationEntity conversation = requireParticipantConversation(conversationId, userId);
+        PrivateMessageEntity message = findOwnEditableMessage(conversation.getId(), userId, messageId);
+        message.softDelete();
+        PrivateMessageEntity saved = messageRepository.save(message);
+        PrivateMessageResponse response = PrivateMessageResponse.from(saved);
+        publishAfterCommit(response, conversation.otherParticipant(userId), null);
+        return response;
+    }
+
+    @Transactional
+    public void clearForUser(String conversationId, String userId) {
+        PrivateConversationEntity conversation = requireParticipantConversation(conversationId, userId);
+        Instant now = Instant.now();
+        PrivateMessageClearEntity clear = clearRepository
+                .findByConversation_IdAndUser_Id(conversation.getId(), userId).orElse(null);
+        if (clear == null) {
+            UserEntity user = userRepository.findByIdAndDeletedFalse(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            clear = new PrivateMessageClearEntity(conversation, user, now);
+        } else {
+            clear.setClearedBefore(now);
+        }
+        clearRepository.save(clear);
+    }
+
+    @Transactional(readOnly = true)
+    public PrivateMessageExportResponse exportForUser(String conversationId, String userId) {
+        PrivateConversationEntity conversation = requireParticipantConversation(conversationId, userId);
+        Instant clearedBefore = clearedBefore(conversation.getId(), userId);
+        List<PrivateMessageResponse> messages = messageRepository
+                .findVisibleForExport(conversation.getId(), clearedBefore)
+                .stream()
+                .map(PrivateMessageResponse::from)
+                .toList();
+        return new PrivateMessageExportResponse(conversation.getId(), Instant.now(), messages.size(), messages);
+    }
+
+    private String normalizeRequiredBody(String body) {
+        if (body == null || body.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message body is blank");
+        }
+        String text = body.trim();
+        if (text.length() > MAX_BODY_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message body is too long");
+        }
+        return text;
+    }
+
+    private PrivateMessageEntity findOwnEditableMessage(String conversationId, String userId, String messageId) {
+        PrivateMessageEntity message = messageRepository
+                .findByIdAndConversation_IdAndDeletedFalse(messageId, conversationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
+        if (!message.getAuthorUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found");
+        }
+        return message;
     }
 
     private void publishAfterCommit(
