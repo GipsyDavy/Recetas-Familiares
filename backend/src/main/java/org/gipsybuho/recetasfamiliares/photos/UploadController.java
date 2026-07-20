@@ -174,8 +174,11 @@ public class UploadController {
         List<String> owningConversationIds = privateMessageAttachmentRepository
                 .findOwningConversationIdsByStoragePath(storagePath);
         boolean allowed = owningConversationIds.stream()
-                .anyMatch(conversationId -> privateConversationRepository
-                        .existsByIdAndParticipant(conversationId, requesterId));
+                .anyMatch(conversationId -> privateConversationRepository.findByIdAndDeletedFalse(conversationId)
+                        .filter(conversation -> conversation.hasParticipant(requesterId))
+                        .filter(conversation -> familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(
+                                conversation.getFamilyId(), requesterId))
+                        .isPresent());
         if (!allowed) {
             throw notFound();
         }

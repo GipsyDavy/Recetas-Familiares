@@ -1,5 +1,6 @@
 package org.gipsybuho.recetasfamiliares.chat;
 
+import org.gipsybuho.recetasfamiliares.dm.PrivateConversationEntity;
 import org.gipsybuho.recetasfamiliares.dm.PrivateConversationRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.presence.PresencePublisher;
@@ -136,7 +137,10 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
         if (conversationId.isBlank() || conversationId.contains("/")) {
             throw new MessagingException("Subscription destination not allowed");
         }
-        if (!privateConversationRepository.existsByIdAndParticipant(conversationId, userId)) {
+        PrivateConversationEntity conversation = privateConversationRepository.findByIdAndDeletedFalse(conversationId)
+                .orElseThrow(() -> new MessagingException("Conversation subscription denied"));
+        if (!conversation.hasParticipant(userId)
+                || !familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(conversation.getFamilyId(), userId)) {
             throw new MessagingException("Conversation subscription denied");
         }
     }

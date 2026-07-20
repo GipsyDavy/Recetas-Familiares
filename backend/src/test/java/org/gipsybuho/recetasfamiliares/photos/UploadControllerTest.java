@@ -160,6 +160,59 @@ class UploadControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void blocksPrivateImageAccessAfterParticipantLeavesFamily() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("upload-dm-leave-owner"), "Familia Upload DM Leave");
+        String guestEmail = uniqueEmail("upload-dm-leave-guest");
+        RegisteredUser guest = register(guestEmail, "Familia Upload DM Leave Guest");
+        mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
+                .andExpect(status().isCreated());
+
+        MvcResult conversationResult = mockMvc.perform(post(
+                        "/api/v1/families/{familyId}/conversations/with/{otherUserId}",
+                        owner.familyId(), guest.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        String conversationId = objectMapper.readTree(
+                        conversationResult.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .get("conversationId").asText();
+
+        MvcResult imageResult = mockMvc.perform(multipart(
+                                "/api/v1/families/{familyId}/conversations/{conversationId}/messages/images",
+                                owner.familyId(), conversationId)
+                        .file(new MockMultipartFile("files", "photo.jpg", "image/jpeg", validJpeg()))
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String attachmentUrl = objectMapper.readTree(
+                        imageResult.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .get("attachments").get(0).get("url").asText();
+        String path = attachmentUrl.substring(attachmentUrl.indexOf("/uploads/"));
+
+        // Todavia participante y todavia miembro de la familia: acceso normal.
+        mockMvc.perform(get(path).header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isOk());
+
+        // Se expulsa a guest de la familia (owner es quien administra).
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), guest.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isNoContent());
+
+        // guest sigue siendo tecnicamente participante de la conversacion (esa
+        // relacion nunca se borra), pero ya no es miembro de la familia: debe
+        // perder el acceso a la imagen, igual que ya ocurre por REST.
+        mockMvc.perform(get(path).header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isNotFound());
+    }
+
     private String uploadRecipePhoto(RegisteredUser user, String recipeId) throws Exception {
         MvcResult result = mockMvc.perform(multipart(
                         "/api/v1/families/{familyId}/recipes/{recipeId}/photos/upload",

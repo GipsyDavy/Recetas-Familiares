@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import java.util.Optional;
+
+import org.gipsybuho.recetasfamiliares.dm.PrivateConversationEntity;
 import org.gipsybuho.recetasfamiliares.dm.PrivateConversationRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.presence.PresencePublisher;
@@ -152,7 +155,13 @@ class ChatStompAuthChannelInterceptorTest {
 
     @Test
     void allowsSubscribeToConversationForParticipant() {
-        when(privateConversationRepository.existsByIdAndParticipant(CONVERSATION_ID, USER_ID)).thenReturn(true);
+        PrivateConversationEntity conversation = Mockito.mock(PrivateConversationEntity.class);
+        when(conversation.hasParticipant(USER_ID)).thenReturn(true);
+        when(conversation.getFamilyId()).thenReturn(FAMILY_ID);
+        when(privateConversationRepository.findByIdAndDeletedFalse(CONVERSATION_ID))
+                .thenReturn(Optional.of(conversation));
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(FAMILY_ID, USER_ID))
+                .thenReturn(true);
         Message<byte[]> subscribe = subscribe(CONVERSATION_TOPIC, new StompPrincipal(USER_ID));
 
         assertDoesNotThrow(() -> interceptor.preSend(subscribe, channel));
@@ -160,7 +169,27 @@ class ChatStompAuthChannelInterceptorTest {
 
     @Test
     void rejectsSubscribeToConversationForNonParticipant() {
-        when(privateConversationRepository.existsByIdAndParticipant(CONVERSATION_ID, USER_ID)).thenReturn(false);
+        PrivateConversationEntity conversation = Mockito.mock(PrivateConversationEntity.class);
+        when(conversation.hasParticipant(USER_ID)).thenReturn(false);
+        when(privateConversationRepository.findByIdAndDeletedFalse(CONVERSATION_ID))
+                .thenReturn(Optional.of(conversation));
+        Message<byte[]> subscribe = subscribe(CONVERSATION_TOPIC, new StompPrincipal(USER_ID));
+
+        assertThrows(MessagingException.class, () -> interceptor.preSend(subscribe, channel));
+    }
+
+    @Test
+    void rejectsSubscribeToConversationForRemovedFamilyMember() {
+        // Regresion: el usuario sigue siendo participante de la conversacion (nunca
+        // se elimina esa relacion), pero ya no pertenece a la familia. Debe perder
+        // el acceso igual que en la via REST (requireParticipantConversation).
+        PrivateConversationEntity conversation = Mockito.mock(PrivateConversationEntity.class);
+        when(conversation.hasParticipant(USER_ID)).thenReturn(true);
+        when(conversation.getFamilyId()).thenReturn(FAMILY_ID);
+        when(privateConversationRepository.findByIdAndDeletedFalse(CONVERSATION_ID))
+                .thenReturn(Optional.of(conversation));
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(FAMILY_ID, USER_ID))
+                .thenReturn(false);
         Message<byte[]> subscribe = subscribe(CONVERSATION_TOPIC, new StompPrincipal(USER_ID));
 
         assertThrows(MessagingException.class, () -> interceptor.preSend(subscribe, channel));
