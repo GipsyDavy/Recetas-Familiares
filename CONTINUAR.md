@@ -3587,3 +3587,89 @@ insistir mas.
 **Pendiente antes de fusionar a `main`:** decidir con el usuario como aterriza esta rama
 (merge directo, PR, o squash) via `superpowers:finishing-a-development-branch` — no
 ejecutado aun en esta sesion. Prueba manual de dos sesiones tambien pendiente (ver arriba).
+
+---
+
+## Sprint 2026-07-20: Chat privado 1:1 — Backend completo (`dm/`, 10 tareas + fixes)
+
+Ejecutado en worktree aislado `.claude/worktrees/chat-privado-backend` (branch
+`worktree-chat-privado-backend`), via `superpowers:brainstorming` -> `writing-plans` ->
+`subagent-driven-development` (10 tareas del plan, cada una con implementador + reviewer
+dedicados, mas revision final whole-branch en opus). Spec: `docs/superpowers/specs/2026-07-19-chat-privado-design.md`.
+Plan: `docs/superpowers/plans/2026-07-20-chat-privado-backend.md`. Ledger completo (por tarea,
+con hallazgos y fixes detallados): `.superpowers/sdd/progress.md` (git-ignored, se pierde con el
+worktree ya borrado; este resumen es la unica traza que sobrevive).
+
+**Alcance:** backend completo de chat privado 1:1 entre miembros de una familia, paridad
+funcional completa con el chat familiar (`chat/`): texto, imagenes, editar/borrar mensaje propio,
+limpiar vista, exportar, rate limit compartido. Dos topics STOMP nuevos
+(`/topic/conversations/{id}` y `/topic/users/{userId}/inbox`, este ultimo sin cuerpo del mensaje).
+Servido autenticado de imagenes por participante de conversacion. Sin UI cliente todavia
+(Android/Desktop/iOS quedan para un sprint posterior).
+
+**Commits (fusionados a `main` en `e2d8bcf`):** `3b34529..65dbfa2` (13 commits: esquema V19,
+entidades/repos, DTOs, publisher STOMP, crear/listar conversaciones, enviar/historial,
+editar/borrar/limpiar/exportar, autorizacion STOMP, servido de imagenes, mas 3 fixes de
+seguridad/cobertura descritos abajo).
+
+**Hallazgos de seguridad encontrados y corregidos durante el sprint (no en el diseno original):**
+
+1. **VibeSec (Tasks 1-7):** `PrivateChatService.requireParticipantConversation` no re-verificaba
+   membership de familia en cada operacion REST (a diferencia de `ChatService`) — un usuario
+   expulsado de la familia conservaba acceso total al DM. Decision de producto (usuario, via
+   `AskUserQuestion`): revocar acceso. Fix + test (`blocksAccessAfterParticipantLeavesFamily`).
+2. **Revision final whole-branch (opus):** el fix anterior solo cubria la via REST — STOMP
+   (`authorizeConversationTopic`) y el servido de imagenes (`requirePrivateAttachmentAccess`)
+   seguian autorizando solo por participante. Tension sin resolver del propio plan (mandato
+   imagenes solo-por-participante antes de existir la decision de revocacion completa). Decision
+   de producto (usuario): extender el mismo criterio a las 3 vias. Fix + 2 tests nuevos,
+   `existsByIdAndParticipant` eliminado del repositorio (dead code).
+3. **Cobertura de test faltante (Task 7):** ventana de edicion de 15 min sin test del 409 de
+   expiracion. Fix: test `rejectsEditAfterFifteenMinuteWindow` (mismo patron que `ChatControllerTest`).
+
+Los 3 fixes tuvieron review dedicada (Approved, 0 Critical/Important en cada una tras el fix).
+
+**Validacion ejecutada en esta sesion (verificado de primera mano por el controlador, no solo
+por subagentes):**
+- Suite completa backend (`mvn test`) contra `recetas_familiares_test` real (WireGuard): **195
+  tests, 101 fallos** — mismo patron y mismo conteo exacto ya documentado en el sprint de
+  presencia online (170 tests/101 fallos entonces): emails fijos de tests antiguos vs. datos
+  acumulados en la BD compartida de test, no relacionado con este sprint. **0 fallos nuevos**,
+  confirmado por clase: `dm.PrivateChatControllerTest` 16/16, `dm.PrivateConversationRealtimePublisherTest`
+  2/2, `chat.ChatStompAuthChannelInterceptorTest` 17/17, `photos.UploadControllerTest` 7/7 con
+  5 fallos (los mismos 5 preexistentes, ambos tests nuevos de DM en verde).
+- Mismo resultado exacto verificado de nuevo tras el merge a `main` (195/101, 0 nuevos).
+- Compilacion completa (`mvn -DskipTests compile`): `BUILD SUCCESS`, antes y despues del merge.
+- Seguridad: `VibeSec` invocado sobre el diff completo del sprint (Tasks 1-7) y sobre el fix
+  final (revision manual OWASP A01 documentada en los reports de cada subagente). Sin hallazgos
+  criticos sin corregir. `/security-review` no se invoco como skill formal (no expuesta en el
+  flujo de subagentes); mitigado con revision manual documentada en cada report + revision final
+  whole-branch en opus.
+
+**Incidente de entorno resuelto en esta sesion (no del sprint):** el tunel WireGuard
+`RecetasHetzner` aparecio huerfano al retomar la sesion — el servicio Windows apuntaba a un
+`.conf` en el scratchpad efimero de una sesion Claude Code anterior, borrado junto con esa
+sesion. SSH root a la VPS bloqueado para el agente por el clasificador de seguridad del entorno
+(correctamente, es infraestructura de produccion) — reparado paso a paso con el usuario: clave
+nueva generada localmente, usuario registro el peer por SSH el mismo, conf final en ubicacion
+durable (`C:\Users\GipsyDavy\WireGuard-Configs\`), usuario activo el tunel desde la GUI (unica
+via que funciona para UAC en este entorno). Sin impacto en produccion (solo BD de test).
+
+**Limpieza:** se encontro y elimino un directorio `backend/.../dm/` sin trackear en el arbol
+principal (residuo de una sesion anterior, 10 archivos obsoletos de las Tasks 1-3, sin relacion
+con el trabajo commiteado en el worktree) que habria bloqueado el merge. Verificado antes de
+borrar que era subconjunto obsoleto, no trabajo unico.
+
+**Cierre via `superpowers:finishing-a-development-branch`:** merge local a `main` (autorizado
+por el usuario), sin conflictos, tests verificados sobre el resultado fusionado, worktree
+eliminado, rama `worktree-chat-privado-backend` borrada. **No pusheado a `origin`** — pendiente
+de autorizacion explicita separada del usuario, mismo patron que sprints anteriores.
+
+**Deuda no relacionada con este sprint (ya existia antes, no tocada ni empeorada):** 5 tests de
+`UploadControllerTest` en rojo por emails fijos colisionando con datos de sesiones previas en la
+BD de test compartida (persistente, sin reset entre ejecuciones). Recomendado: migrar esos tests
+a `uniqueEmail()` (patron ya usado en `PrivateChatControllerTest`) o limpiar la BD de test.
+
+**Siguiente sprint (NO iniciado, sin spec/plan):** clientes del chat privado (Android/Desktop/iOS)
+sobre este backend, o alguno de los pendientes de `paraImplementar.txt`: (10) creador de receta,
+(11) ranking, (20) presencia online cliente iOS, (22) scroll Desktop al redimensionar.
