@@ -158,6 +158,31 @@ class PrivateChatControllerTest {
     }
 
     @Test
+    void blocksAccessAfterParticipantLeavesFamily() throws Exception {
+        RegisteredUser owner = register(uniqueEmail("dm-leave-owner"), "Familia DM Leave");
+        RegisteredUser guest = invite(owner, uniqueEmail("dm-leave-guest"));
+        String conversationId = createConversation(owner, guest.userId());
+        sendText(owner, conversationId, "antes de salir");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/api/v1/families/{familyId}/members/{userId}",
+                        owner.familyId(), guest.userId())
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/conversations/{conversationId}/messages",
+                        owner.familyId(), conversationId)
+                        .header("Authorization", "Bearer " + guest.accessToken()))
+                .andExpect(status().isNotFound());
+
+        // El otro participante, que sigue en la familia, mantiene acceso normal.
+        mockMvc.perform(get("/api/v1/families/{familyId}/conversations/{conversationId}/messages",
+                        owner.familyId(), conversationId)
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void sendingTextMessageIsIdempotentByClientId() throws Exception {
         RegisteredUser owner = register(uniqueEmail("dm-idem-owner"), "Familia DM Idem");
         RegisteredUser guest = invite(owner, uniqueEmail("dm-idem-guest"));

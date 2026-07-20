@@ -348,6 +348,9 @@ public class PrivateChatService {
         if (!conversation.hasParticipant(userId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found");
         }
+        if (!familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(conversation.getFamilyId(), userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found");
+        }
         return conversation;
     }
 
