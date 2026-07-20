@@ -1263,10 +1263,11 @@ class PrivateChatControllerTest {
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         String conversationId = body.get("conversationId").asText();
 
-        // Idempotente: pedirla de nuevo devuelve el mismo id, sin importar quien la pide.
+        // Idempotente: pedirla de nuevo devuelve el mismo id, sin importar quien la pide
+        // (guest pide la conversacion con owner, direccion inversa a la primera peticion).
         mockMvc.perform(post(
                         "/api/v1/families/{familyId}/conversations/with/{otherUserId}",
-                        owner.familyId(), owner.userId().equals(guest.userId()) ? owner.userId() : guest.userId())
+                        owner.familyId(), owner.userId())
                         .header("Authorization", "Bearer " + guest.accessToken())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
