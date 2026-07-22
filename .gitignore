@@ -65,6 +65,9 @@ application-secret.properties
 application-secret.yml
 herztner/
 
+# Superpowers (brainstorming mockups, sesiones de desarrollo)
+.superpowers/
+
 # OS files
 .DS_Store
 Thumbs.db

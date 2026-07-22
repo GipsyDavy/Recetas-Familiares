@@ -1,7 +1,8 @@
 # Spec: Chat privado 1:1 entre miembros de una familia (Backend + Desktop + Android)
 
-Fecha: 2026-07-19
-Estado: aprobado en diseño (conversación), pendiente de revisión escrita del usuario.
+Fecha: 2026-07-19 (addendum de navegación Desktop: 2026-07-22)
+Estado: aprobado en diseño y confirmado por escrito el 2026-07-22 (navegación Desktop, vía
+companion visual de `superpowers:brainstorming`) — listo para `writing-plans`.
 
 ## Contexto
 
@@ -116,15 +117,21 @@ conversación a terceros).
 
 ### Desktop
 
-- `ConversationsView.java` (nueva, bandeja de entrada, análoga en estructura a `ChatView.java`).
+*(estructura de navegación detallada en el addendum 2026-07-22 más abajo)*
+
+- `ConversationsView.java` (nueva, extiende `ScrollPane`): bandeja de entrada. Contiene un
+  `SplitPane` — lista de conversaciones a la izquierda, `PrivateChatView` embebido a la
+  derecha (mismo patrón que `RecipeListView` + `RecipeDetailView`).
+- `PrivateChatView.java` (nueva, sub-panel embebido, no vista de navegación propia): mismo
+  patrón que `ChatView.java` — historial, enviar texto/imagen, editar/borrar propio, exportar,
+  borrar-para-mí.
 - `FamilyMembersView.java`: nuevo botón "Mensaje" en cada fila de miembro (misma zona que el
-  punto de presencia) → `POST /with/{userId}` → abre `PrivateChatView.java`.
-- `PrivateChatView.java` (nueva): mismo patrón que `ChatView.java` — historial, enviar
-  texto/imagen, editar/borrar propio, exportar.
+  punto de presencia) → `POST /with/{userId}` → navega a `ConversationsView` con esa
+  conversación ya seleccionada en el panel derecho.
 - `ChatSocket.java`: ya soporta múltiples SUBSCRIBE por conexión (chat + presence). Se
   extiende para suscribirse al topic de inbox propio al iniciar sesión (badge global en la
   sidebar, mismo mecanismo que `MainWindow.updateChatBadge()`), y al topic de una conversación
-  específica solo mientras `PrivateChatView` está abierta.
+  específica solo mientras esa conversación está seleccionada en `ConversationsView`.
 
 ### Android
 
@@ -176,6 +183,29 @@ conversación a terceros).
 - Prueba manual: dos sesiones (dos cuentas) en la misma familia, verificar mensaje en tiempo
   real, badge se actualiza con la pantalla de esa conversación cerrada, un tercer usuario no
   ve ni puede acceder a la conversación.
+
+## Addendum 2026-07-22: navegación Desktop confirmada
+
+Brainstorming visual (companion en navegador) con 3 opciones de navegación para el cliente
+Desktop, comparadas como mockups:
+
+- **A. Item propio en el sidebar** ("Chat privado" junto a "Chat familiar"), que abre una
+  bandeja de conversaciones (avatar/nombre/preview del último mensaje) en un `SplitPane`, con
+  el panel de mensajes de la conversación seleccionada a la derecha — mismo patrón ya
+  establecido por `RecipeListView` + `RecipeDetailView`.
+- B. Pestañas "Familiar / Privados" dentro de un único item "Chat" en el sidebar.
+- C. Sin item propio en el sidebar: solo se accede vía el botón "Mensaje" en Miembros, el chat
+  abre como diálogo flotante, sin bandeja central de conversaciones.
+
+**Decisión del usuario: opción A.** Confirma y concreta el punto 3 de "Decisiones tomadas en
+brainstorming (2026-07-19)": la "pantalla nueva Conversaciones" se implementa como
+`ConversationsView` (extiende `ScrollPane`, mismo patrón que las demás vistas de página del
+sidebar) conteniendo un `SplitPane` — lista de conversaciones a la izquierda,
+`PrivateChatView` embebido a la derecha — no como dos pantallas de navegación separadas.
+
+El botón "Mensaje" en `FamilyMembersView` (ya spec'd en el punto 3 original) sigue existiendo
+como atajo: crea/recupera la conversación (`POST /with/{otherUserId}`) y navega directamente a
+`ConversationsView` con esa conversación ya seleccionada en el panel derecho.
 
 ## Fuera de alcance
 

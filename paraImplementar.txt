@@ -20,5 +20,6 @@
 20. icono indicando miembros en linea o activos, asi como aviso de miembros que se han conectado y si ha habido actualizaciones de recetas, notas o stock
 21. incluye en la aplicación por defecto al menos 5 recetas muy conocidas 2 de dificultad fácil, dos de dificultad media y 1 de dificultad difícil
 22. scroll en desktop cuando se cambia tamaño de la ventana en los distintos apartados ya que al cambiar el tamaño hay campos de la interfaz que no se ven por quedar fuera de la ventana
+23. pulido visual del sidebar de Desktop: iconos con color/chip propio por item en vez del texto plano actual, mas compacto y agradable a la vista (idea surgida al comparar con un mockup durante el brainstorming del chat privado, 2026-07-22)
 
 
