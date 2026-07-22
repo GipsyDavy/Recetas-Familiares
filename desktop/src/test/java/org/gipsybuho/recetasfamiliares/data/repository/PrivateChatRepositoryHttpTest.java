@@ -11,6 +11,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.util.UUID;
 import java.util.prefs.Preferences;
 
@@ -207,5 +209,45 @@ class PrivateChatRepositoryHttpTest {
         RecordedRequest request = server.takeRequest();
         assertEquals("GET", request.getMethod());
         assertEquals("/api/v1/families/fam-1/conversations/c1/export", request.getPath());
+    }
+
+    @Test
+    void sendImageEnviaMultipartConCaptionYArchivoYDevuelveElMensajeCreado() throws Exception {
+        File tempFile = File.createTempFile("chat-privado-img", ".jpg");
+        tempFile.deleteOnExit();
+        try {
+            Files.write(tempFile.toPath(), new byte[]{1, 2, 3, 4});
+
+            server.enqueue(new MockResponse()
+                    .setResponseCode(201)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""
+                            {"id":"m2","conversationId":"c1","authorUserId":"u1","authorDisplayName":"Yo",
+                             "body":"Mira esto","attachments":[],"createdAt":"2026-07-22T10:00:00Z",
+                             "updatedAt":"2026-07-22T10:00:00Z","syncVersion":1,"deleted":false}
+                            """));
+
+            PrivateChatDtos.PrivateMessage sent = repository.sendImage("c1", "Mira esto", tempFile);
+
+            assertEquals("m2", sent.id());
+            RecordedRequest request = server.takeRequest();
+            assertEquals("POST", request.getMethod());
+            assertEquals("/api/v1/families/fam-1/conversations/c1/messages/images", request.getPath());
+            assertTrue(request.getHeader("Content-Type").startsWith("multipart/form-data"));
+            String body = request.getBody().readUtf8();
+            assertTrue(body.contains("Mira esto"));
+            assertTrue(body.contains(tempFile.getName()));
+        } finally {
+            Files.deleteIfExists(tempFile.toPath());
+        }
+    }
+
+    @Test
+    void sendImageConArchivoInexistenteLanzaIllegalArgumentSinLlamarAlServidor() {
+        File missing = new File("no-existe-" + UUID.randomUUID() + ".jpg");
+
+        assertThrows(IllegalArgumentException.class, () -> repository.sendImage("c1", "caption", missing));
+
+        assertEquals(0, server.getRequestCount());
     }
 }
