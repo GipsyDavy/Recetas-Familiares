@@ -90,6 +90,10 @@ public class MainWindow {
 
         stage.setTitle("Recetas Familiares");
         stage.setScene(scene);
+        // Sin minimo, la ventana se encoge sin limite y varias pantallas
+        // (sidebar 200px + contenido) quedan con campos inalcanzables (item 22).
+        stage.setMinWidth(960);
+        stage.setMinHeight(600);
         statusBar.getStyleClass().add("status-bar");
         root.setBottom(statusBar);
         BorderPane.setMargin(statusBar, new Insets(0, 12, 4, 12));

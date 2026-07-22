@@ -148,6 +148,10 @@ public class ChatView extends VBox {
         scrollPane.setFitToWidth(true);
         scrollPane.getStyleClass().add("chat-scroll");
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        // Sin esto, el VBox no encoge el area de mensajes por debajo de su alto
+        // preferido al redimensionar la ventana, y empuja la barra de entrada
+        // fuera del area visible (item 22 del roadmap).
+        scrollPane.setMinHeight(0);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
         // ── Barra de entrada ────────────────────────────────────────────────────

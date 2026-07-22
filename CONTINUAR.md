@@ -3706,3 +3706,49 @@ hasta que exista cliente/prueba manual.
 **Estado para retomar en la proxima sesion:** `main` local y remoto sincronizados, arbol de
 trabajo limpio, sin worktrees activos, sin ramas de feature pendientes. Siguiente sprint a
 elegir por el usuario (ver arriba). `MEMORY.md`/`project_state.md` actualizados con este cierre.
+
+### Sprint 2026-07-22: Fix scroll Desktop al redimensionar (item 22 de `paraImplementar.txt`)
+
+Elegido entre los pendientes sugeridos en el cierre anterior. Via `superpowers:systematic-debugging`
+(Fases 1-2: se leyeron las 8 vistas con `ScrollPane` sin el helper `DesktopScroll.configurePage`,
+mas `MainWindow.java` completo para entender el contenedor raiz). Sin Codex/Gemini: bug de UI
+puntual, sin ambiguedad de arquitectura ni contrato API que justificara segunda opinion.
+
+**Diagnostico:** de las 8 vistas candidatas, 7 (`DashboardView`, `ProfileView`, `RecipeDetailView`,
+`GlobalSearchView`, `ShoppingListView`, `RecipeFormDialog`, `StockFormDialog`) ya manejan el resize
+correctamente por mecanismos propios de JavaFX (`ScrollPane` con `vbar` por defecto `AS_NEEDED`,
+o `ListView` con scroll interno) — confirmado por el usuario tras probar manualmente. Solo
+`ChatView` (VBox sin ningun `ScrollPane` de pagina completa, a diferencia de todas las demas)
+dejaba la barra de entrada inalcanzable al encoger la ventana. Ademas, el `Stage` principal nunca
+tenia `setMinWidth`/`setMinHeight`, permitiendo encogerse sin limite.
+
+**Fix (2 archivos, cambio minimo):**
+- `ChatView.java`: `scrollPane.setMinHeight(0)` en el area de mensajes, para que ceda espacio
+  antes que la barra de entrada.
+- `MainWindow.java`: `stage.setMinWidth(960)` / `setMinHeight(600)`.
+
+**Scroll horizontal:** el usuario pregunto si añadirlo en todas las pantallas; se decidio que NO
+(acordado con el usuario) — `fitToWidth(true)` ya evita el overflow horizontal por diseño, y el
+minimo de ventana cubre el caso real sin recurrir a una scrollbar horizontal, inusual en el estilo
+premium del proyecto.
+
+**Validacion:**
+- `mvn -f desktop/pom.xml compile` -> `BUILD SUCCESS`.
+- `mvn -f desktop/pom.xml test` -> 33/33, `BUILD SUCCESS`, sin regresiones.
+- Prueba visual manual del usuario tras el fix: confirmado que el scroll funciona en todas las
+  pantallas (el agente no puede redimensionar ventanas interactivamente en este entorno).
+- Seguridad: `VibeSec`/`security-review` no aplican — cambio de layout JavaFX puro, sin
+  auth/ownership/imagenes/tokens/datos familiares.
+
+**Nota aparte (no de este sprint):** durante la prueba, el usuario reporto un error de red del
+chat apuntando a `localhost:8080`. Verificado: el default de la app es la URL de Hetzner (nunca
+localhost), `ChatSocket`/`ApiClient` leen la URL de forma dinamica sin cachear (sin bug de codigo),
+y el registro de Windows (`HKCU:\Software\JavaSoft\Prefs\recetas\api.base.url`) confirmo que la
+preferencia guardada en esta maquina ya apunta a Hetzner tras la correccion manual del usuario en
+Ajustes -> Servidor. Conclusion: preferencia local obsoleta de una sesion de desarrollo anterior,
+ya corregida, sin cambio de codigo necesario.
+
+**Tambien reportado (no relacionado, informativo):** tunel WireGuard del PC del usuario tuvo un
+problema y se creo uno nuevo; datos en `herztner/servidor wireguard.txt`. Sin impacto en la app
+(el tunel es para acceso directo del usuario a la BD de test/produccion, no parte del path de
+runtime de los clientes).
