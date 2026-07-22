@@ -35,6 +35,12 @@ public class ChatRepository {
     private final AtomicReference<Set<String>> lastOnlineUserIds = new AtomicReference<>(Set.of());
     private volatile Consumer<Set<String>> presenceListener;
 
+    private final java.util.Map<String, Integer> unreadByConversation = new java.util.concurrent.ConcurrentHashMap<>();
+    private volatile String activeConversationId;
+    private volatile java.util.function.Consumer<java.util.Map<String, Integer>> inboxListener;
+    private volatile java.util.function.Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> conversationMessageListener;
+    private volatile ChatSocket activeSocket;
+
     public ChatRepository(ApiClient api, AppSession session) {
         this.api = api;
         this.session = session;
@@ -54,6 +60,61 @@ public class ChatRepository {
         Consumer<Set<String>> listener = presenceListener;
         if (listener != null) {
             listener.accept(snapshot);
+        }
+    }
+
+    /** Socket compartido de esta sesion de chat (familiar + privado). Null si no hay ninguna conexion abierta. */
+    public ChatSocket activeSocket() {
+        return activeSocket;
+    }
+
+    /** Snapshot inmutable de no-leidos por conversacion, para pintar la bandeja/badge. */
+    public Map<String, Integer> unreadByConversation() {
+        return Map.copyOf(unreadByConversation);
+    }
+
+    /**
+     * Marca una conversacion como la que el usuario esta viendo ahora mismo:
+     * limpia su contador de no-leidos y evita que nuevos pings la vuelvan a
+     * marcar mientras siga activa. Pasar {@code null} cuando no hay ninguna
+     * conversacion abierta (p.ej. al salir de Conversaciones).
+     */
+    public void setActiveConversation(String conversationId) {
+        this.activeConversationId = conversationId;
+        if (conversationId != null && unreadByConversation.remove(conversationId) != null) {
+            notifyInboxListener();
+        }
+    }
+
+    public void setInboxListener(Consumer<Map<String, Integer>> listener) {
+        this.inboxListener = listener;
+    }
+
+    /** Recibe los mensajes en vivo de la conversacion actualmente suscrita en el socket. */
+    public void setConversationMessageListener(
+            Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> listener) {
+        this.conversationMessageListener = listener;
+    }
+
+    private void handleInboxPing(org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateInboxPing ping) {
+        if (ping.conversationId().equals(activeConversationId)) {
+            return;
+        }
+        unreadByConversation.merge(ping.conversationId(), 1, Integer::sum);
+        notifyInboxListener();
+    }
+
+    private void handlePrivateMessage(org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage message) {
+        Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> listener = conversationMessageListener;
+        if (listener != null) {
+            listener.accept(message);
+        }
+    }
+
+    private void notifyInboxListener() {
+        Consumer<Map<String, Integer>> listener = inboxListener;
+        if (listener != null) {
+            listener.accept(unreadByConversation());
         }
     }
 
@@ -162,11 +223,15 @@ public class ChatRepository {
                 api,
                 session::getAccessToken,
                 family,
+                session.getUserId(),
                 gson,
                 onMessage,
                 onConnectionChange,
-                this::handlePresenceUpdate);
+                this::handlePresenceUpdate,
+                this::handleInboxPing,
+                this::handlePrivateMessage);
         socket.connect();
+        this.activeSocket = socket;
         return socket;
     }
 

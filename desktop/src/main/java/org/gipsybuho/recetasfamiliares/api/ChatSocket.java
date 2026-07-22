@@ -46,10 +46,18 @@ public class ChatSocket {
     private final String wsUrl;
     private final String topic;
     private final String presenceTopic;
+    private final String inboxTopic;
     private final Gson gson;
     private final Consumer<ChatDtos.ChatMessage> onMessage;
     private final Consumer<Boolean> onConnectionChange;
     private final Consumer<Set<String>> onPresenceUpdate;
+    private final Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateInboxPing> onInboxPing;
+    private final Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> onPrivateMessage;
+
+    // Conversacion privada actualmente seleccionada (o null); mutable porque el
+    // usuario cambia de conversacion sin reabrir el WebSocket.
+    private volatile String currentConversationId;
+    private volatile String currentConversationTopic;
 
     private final ScheduledExecutorService scheduler =
             Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -67,10 +75,13 @@ public class ChatSocket {
             ApiClient apiClient,
             Supplier<String> tokenSupplier,
             String familyId,
+            String myUserId,
             Gson gson,
             Consumer<ChatDtos.ChatMessage> onMessage,
             Consumer<Boolean> onConnectionChange,
-            Consumer<Set<String>> onPresenceUpdate
+            Consumer<Set<String>> onPresenceUpdate,
+            Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateInboxPing> onInboxPing,
+            Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> onPrivateMessage
     ) {
         this.apiClient = apiClient;
         this.tokenSupplier = tokenSupplier;
@@ -78,10 +89,13 @@ public class ChatSocket {
         this.wsUrl = toWebSocketUrl(apiClient.getBaseUrl());
         this.topic = "/topic/families/" + familyId + "/chat";
         this.presenceTopic = "/topic/families/" + familyId + "/presence";
+        this.inboxTopic = "/topic/users/" + myUserId + "/inbox";
         this.gson = gson;
         this.onMessage = onMessage;
         this.onConnectionChange = onConnectionChange;
         this.onPresenceUpdate = onPresenceUpdate;
+        this.onInboxPing = onInboxPing;
+        this.onPrivateMessage = onPrivateMessage;
     }
 
     public synchronized void connect() {
@@ -101,6 +115,51 @@ public class ChatSocket {
         webSocket = null;
         scheduler.shutdownNow();
         onConnectionChange.accept(false);
+    }
+
+    /**
+     * Se suscribe al topic de una conversacion privada, sustituyendo cualquier
+     * suscripcion anterior. Sin efecto si el socket no esta conectado todavia
+     * (se reintenta en el proximo CONNECTED via {@code currentConversationId}).
+     */
+    public synchronized void subscribeConversation(String conversationId) {
+        unsubscribeConversationFrame();
+        this.currentConversationId = conversationId;
+        this.currentConversationTopic = conversationId != null
+                ? "/topic/conversations/" + conversationId : null;
+        if (conversationId != null) {
+            sendConversationSubscribe();
+        }
+    }
+
+    /** Cancela la suscripcion a la conversacion actual, si hay alguna. */
+    public synchronized void unsubscribeConversation() {
+        unsubscribeConversationFrame();
+        this.currentConversationId = null;
+        this.currentConversationTopic = null;
+    }
+
+    private void sendConversationSubscribe() {
+        WebSocket socket = this.webSocket;
+        if (socket == null || currentConversationTopic == null) {
+            return;
+        }
+        socket.send("SUBSCRIBE\n"
+                + "id:sub-conversation\n"
+                + "destination:" + currentConversationTopic + "\n"
+                + "\n"
+                + NUL);
+    }
+
+    private void unsubscribeConversationFrame() {
+        WebSocket socket = this.webSocket;
+        if (socket == null || currentConversationTopic == null) {
+            return;
+        }
+        socket.send("UNSUBSCRIBE\n"
+                + "id:sub-conversation\n"
+                + "\n"
+                + NUL);
     }
 
     private final WebSocketListener listener = new WebSocketListener() {
@@ -175,6 +234,15 @@ public class ChatSocket {
                         + "\n"
                         + NUL;
                 socket.send(subscribePresence);
+                String subscribeInbox = "SUBSCRIBE\n"
+                        + "id:sub-inbox\n"
+                        + "destination:" + inboxTopic + "\n"
+                        + "\n"
+                        + NUL;
+                socket.send(subscribeInbox);
+                if (currentConversationTopic != null) {
+                    sendConversationSubscribe();
+                }
                 reconnectAttempt = 0;
                 onConnectionChange.accept(true);
             }
@@ -186,7 +254,11 @@ public class ChatSocket {
                     // no-op
                 } else if (presenceTopic.equals(destination)) {
                     handlePresenceMessage(body);
-                } else {
+                } else if (inboxTopic.equals(destination)) {
+                    handleInboxPing(body);
+                } else if (destination != null && destination.equals(currentConversationTopic)) {
+                    handlePrivateMessage(body);
+                } else if (topic.equals(destination)) {
                     handleChatMessage(body);
                 }
             }
@@ -216,6 +288,30 @@ public class ChatSocket {
             FamilyDtos.PresenceResponse presence = gson.fromJson(body, FamilyDtos.PresenceResponse.class);
             if (presence != null && presence.onlineUserIds() != null) {
                 onPresenceUpdate.accept(new HashSet<>(presence.onlineUserIds()));
+            }
+        } catch (RuntimeException ignored) {
+            // Frame no parseable: se descarta sin romper la conexion.
+        }
+    }
+
+    private void handleInboxPing(String body) {
+        try {
+            var ping = gson.fromJson(body,
+                    org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateInboxPing.class);
+            if (ping != null && ping.conversationId() != null) {
+                onInboxPing.accept(ping);
+            }
+        } catch (RuntimeException ignored) {
+            // Frame no parseable: se descarta sin romper la conexion.
+        }
+    }
+
+    private void handlePrivateMessage(String body) {
+        try {
+            var message = gson.fromJson(body,
+                    org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage.class);
+            if (message != null && message.isUsable()) {
+                onPrivateMessage.accept(message);
             }
         } catch (RuntimeException ignored) {
             // Frame no parseable: se descarta sin romper la conexion.
