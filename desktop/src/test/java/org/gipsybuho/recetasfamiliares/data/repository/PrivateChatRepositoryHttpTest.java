@@ -101,4 +101,111 @@ class PrivateChatRepositoryHttpTest {
 
         assertEquals(404, error.getHttpStatus());
     }
+
+    @Test
+    void loadHistoryPideElCursorYElLimite() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                        {"items":[],"hasMore":false,"nextBefore":null}
+                        """));
+
+        repository.loadHistory("c1", "msg-9", 30);
+
+        RecordedRequest request = server.takeRequest();
+        assertEquals("GET", request.getMethod());
+        assertEquals("/api/v1/families/fam-1/conversations/c1/messages?limit=30&before=msg-9",
+                request.getPath());
+    }
+
+    @Test
+    void sendEnviaIdYBodyYDevuelveElMensajeCreado() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                        {"id":"m1","conversationId":"c1","authorUserId":"u1","authorDisplayName":"Yo",
+                         "body":"Hola","attachments":[],"createdAt":"2026-07-22T10:00:00Z",
+                         "updatedAt":"2026-07-22T10:00:00Z","syncVersion":1,"deleted":false}
+                        """));
+
+        PrivateChatDtos.PrivateMessage sent = repository.send("c1", "Hola");
+
+        assertEquals("m1", sent.id());
+        RecordedRequest request = server.takeRequest();
+        assertEquals("POST", request.getMethod());
+        assertEquals("/api/v1/families/fam-1/conversations/c1/messages", request.getPath());
+        assertTrue(request.getBody().readUtf8().contains("\"body\":\"Hola\""));
+    }
+
+    @Test
+    void sendVacioLanzaIllegalArgument() {
+        assertThrows(IllegalArgumentException.class, () -> repository.send("c1", "   "));
+    }
+
+    @Test
+    void editLlamaPutConElCuerpoNuevo() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                        {"id":"m1","conversationId":"c1","authorUserId":"u1","authorDisplayName":"Yo",
+                         "body":"Editado","attachments":[],"createdAt":"2026-07-22T10:00:00Z",
+                         "updatedAt":"2026-07-22T10:05:00Z","syncVersion":2,"deleted":false}
+                        """));
+
+        repository.edit("c1", "m1", "Editado");
+
+        RecordedRequest request = server.takeRequest();
+        assertEquals("PUT", request.getMethod());
+        assertEquals("/api/v1/families/fam-1/conversations/c1/messages/m1", request.getPath());
+    }
+
+    @Test
+    void deleteLlamaDelete() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                        {"id":"m1","conversationId":"c1","authorUserId":"u1","authorDisplayName":"Yo",
+                         "body":null,"attachments":[],"createdAt":"2026-07-22T10:00:00Z",
+                         "updatedAt":"2026-07-22T10:06:00Z","syncVersion":3,"deleted":true}
+                        """));
+
+        PrivateChatDtos.PrivateMessage deleted = repository.delete("c1", "m1");
+
+        assertTrue(deleted.deleted());
+        RecordedRequest request = server.takeRequest();
+        assertEquals("DELETE", request.getMethod());
+        assertEquals("/api/v1/families/fam-1/conversations/c1/messages/m1", request.getPath());
+    }
+
+    @Test
+    void clearLlamaAlEndpointDeClear() throws Exception {
+        server.enqueue(new MockResponse().setResponseCode(204));
+
+        repository.clear("c1");
+
+        RecordedRequest request = server.takeRequest();
+        assertEquals("POST", request.getMethod());
+        assertEquals("/api/v1/families/fam-1/conversations/c1/clear", request.getPath());
+    }
+
+    @Test
+    void exportDevuelveElHistorialCompleto() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                        {"conversationId":"c1","exportedAt":"2026-07-22T10:10:00Z","totalMessages":0,"messages":[]}
+                        """));
+
+        var export = repository.export("c1");
+
+        assertEquals("c1", export.conversationId());
+        RecordedRequest request = server.takeRequest();
+        assertEquals("GET", request.getMethod());
+        assertEquals("/api/v1/families/fam-1/conversations/c1/export", request.getPath());
+    }
 }
