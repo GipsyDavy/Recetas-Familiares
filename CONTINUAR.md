@@ -3752,3 +3752,100 @@ ya corregida, sin cambio de codigo necesario.
 problema y se creo uno nuevo; datos en `herztner/servidor wireguard.txt`. Sin impacto en la app
 (el tunel es para acceso directo del usuario a la BD de test/produccion, no parte del path de
 runtime de los clientes).
+
+### Sprint 2026-07-22/23: Chat privado 1:1 — Cliente Desktop (`dm/` ya en produccion)
+
+Ejecutado en worktree aislado `.claude/worktrees/chat-privado-desktop` (branch
+`worktree-chat-privado-desktop`), via `superpowers:brainstorming` (con companion visual, 3
+opciones de navegacion comparadas) -> `writing-plans` -> `subagent-driven-development` (12 tareas
+del plan, cada una con implementador + revision de spec + revision de calidad, mas revision final
+whole-branch). Spec: `docs/superpowers/specs/2026-07-19-chat-privado-design.md` (con addendum de
+navegacion 2026-07-22). Plan: `docs/superpowers/plans/2026-07-22-chat-privado-desktop.md`.
+
+**Alcance:** cliente Desktop completo para el chat privado 1:1 (backend ya en produccion desde el
+2026-07-20). Sigue paridad funcional con el chat familiar: texto, imagenes, editar/borrar propio,
+exportar, borrar-para-mi, badge de no-leidos. Navegacion: item propio "Chat privado" en el
+sidebar -> `ConversationsView` (SplitPane: bandeja de conversaciones + `PrivateChatView` embebido),
+mismo patron que `RecipeListView`+`RecipeDetailView`. Boton "Mensaje" nuevo por fila en
+`FamilyMembersView`, que ademas paso de ser solo-admin a visible para todos los roles (con su
+barra de gestion — Anadir/Editar/Cambiar rol/Expulsar/Crear familia — siguiendo gateada a
+admin/owner como ya estaba). Una sola conexion WebSocket compartida (la ya existente del chat
+familiar) extendida con topic de inbox propio (badge global) y suscripcion dinamica a la
+conversacion abierta, sin duplicar conexiones. Android e iOS quedan fuera de este sprint.
+
+**Commits (11, sin pushear a `origin` todavia):** `830e83a..8c6c3c2` en la rama
+`worktree-chat-privado-desktop` — DTOs, `PrivateChatRepository` (listar/crear conversaciones,
+historial/envio/edicion/borrado/export, con cobertura de `sendImage` añadida tras revision de
+calidad), extension de `ChatSocket`/`ChatRepository` (inbox + conversacion sobre la misma
+conexion), wiring en `AppContext`, `PrivateChatView`, `ConversationsView`, boton "Mensaje" +
+apertura de Miembros a todos los roles, wiring final en `MainWindow`, y un commit de fixes de la
+revision final (ver abajo).
+
+**Hallazgos de la revision final whole-branch (no detectados por las revisiones por tarea,
+corregidos en el mismo cierre, verificados por el controlador leyendo el codigo antes y despues
+de cada fix):**
+
+1. **Critical — thread safety:** `PrivateChatView.open()` y `MainWindow.showMain()` registraban
+   `setConversationMessageListener`/`setInboxListener` con el metodo crudo (`this::onRealtimeMessage`,
+   `this::updatePrivateChatBadge`), sin `Platform.runLater`. `ChatSocket` entrega esos callbacks en
+   hilo de OkHttp (documentado en su propio Javadoc). Al llegar el primer mensaje privado o ping de
+   inbox con la UI visible, tocar el scene graph desde ese hilo lanza `IllegalStateException`, que
+   OkHttp interpreta como fallo de conexion — tumbando el **WebSocket compartido** (chat familiar y
+   presencia incluidos, no solo el chat privado). Fix: envolver en `Platform.runLater` en el punto de
+   registro, replicando el patron ya correcto de `ChatView`/`FamilyMembersView`.
+2. **Important:** `loading` en `PrivateChatView` quedaba en `true` para siempre si el usuario abria
+   una segunda conversacion antes de que la respuesta de la primera llegara (el `return` por
+   conversacion obsoleta saltaba el reset de la bandera). Efecto: tras esa carrera, ninguna
+   conversacion volvia a mostrar su historial en toda la sesion, sin ningun error visible. Fix:
+   mover `loading = false` antes del chequeo de staleness, igual que ya hacia `sendMessage()`.
+3. **Important:** el estado de no-leidos de chat privado vive en `ChatRepository`, que es un
+   singleton (`AppContext`) — no se limpiaba al cerrar sesion ni cambiar de familia, mezclandose con
+   el del siguiente usuario/familia en un PC compartido (el escenario de uso real de esta app).
+   Fix: `ChatRepository.resetPrivateChatState()`, llamado desde
+   `AppContext.clearFamilyScopedCaches()` (cubre logout y cambio de familia en un solo punto).
+4. Minor (documentados, no corregidos — bajo riesgo, no bloquean): campo `currentConversationId`
+   sin uso real en `ChatSocket` (solo se lee `currentConversationTopic`); parametro `onSync` sin
+   invocar en `ConversationsView` (no hay sync offline para chat privado, a diferencia de
+   `RecipeListView`); nombres de clase totalmente cualificados en vez de imports en varios sitios
+   nuevos.
+
+Los 3 fixes (Critical + 2 Important) se aplicaron y verificaron en el mismo commit de cierre
+(`8c6c3c2`), releyendo el codigo real antes y despues de cada cambio (no solo el reporte del
+subagente revisor).
+
+**Validacion ejecutada en esta sesion (verificado de primera mano por el controlador, no solo por
+subagentes — cada tarea se reverifico de forma independiente: diff leido + `mvn test` reejecutado):**
+- Suite completa backend: no aplica (sprint 100% Desktop, sin cambios en `backend/**`).
+- Desktop: `mvn -f desktop/pom.xml test` — **48 tests, 0 fallos**, `BUILD SUCCESS`, verificado
+  repetidas veces a lo largo del sprint (tras cada tarea y tras los fixes finales). 15 tests nuevos
+  sobre el baseline de 33 (`PrivateChatRepositoryHttpTest`: 13; `ChatSocketFrameParsingTest`: +2).
+- Compilacion completa (`mvn -f desktop/pom.xml -DskipTests compile`): `BUILD SUCCESS` en cada
+  punto de integracion (incluidos los puntos intermedios donde el modulo no compilaba a proposito
+  por tareas acopladas — Task 4/5, Task 9/10 — confirmado que el unico error era el esperado).
+- Seguridad: `/VibeSec` invocado sobre el diff completo de la rama. Sin hallazgos Critical/Important
+  de seguridad (distinto de los 3 hallazgos de correctitud/calidad de la revision final, que no son
+  de naturaleza security). Verificado especificamente: barra de gestion de `FamilyMembersView`
+  sigue gateada a admin/owner pese a abrir la vista a todos los roles; boton "Mensaje" oculto en la
+  fila propia; guards anti-fuga-entre-conversaciones presentes en todos los callbacks async de
+  `PrivateChatView`; descarga de imagenes reutiliza el mismo `ApiClient.fetchImage` autenticado ya
+  usado por el chat familiar; sin logica de autorizacion propia en el cliente.
+- **NO ejecutado en esta sesion (bloqueado por el mismo motivo de sprints previos):** prueba manual
+  con dos cuentas reales de la misma familia (mensaje en vivo, badge, aislamiento de un tercer
+  miembro no participante) — requiere interaccion de clics del usuario, sigue bloqueada para el
+  agente en este entorno. Riesgo residual: el flujo end-to-end en tiempo real no se ha verificado
+  con ojos humanos, solo por las piezas automatizadas por separado (REST, parsing de frames,
+  wiring de UI) mas la correccion de los 2 bugs de thread-safety/estado que SI se detectaron por
+  lectura de codigo. Recomendado antes de considerar el sprint cerrado de cara al usuario final.
+
+**Nota sobre el proceso de subagentes:** varios subagentes (implementadores y revisores) devolvieron
+en su primera respuesta un stub generico ("hook fp-check no aplica") en vez del reporte real,
+patron ya documentado en sesiones previas. Recuperado en cada caso via `SendMessage` pidiendo
+reenvio integro; en dos casos el revisor de calidad y el revisor final whole-branch solo entregaron
+el reporte completo al segundo reintento. El hallazgo Critical de thread-safety llego precisamente
+en uno de esos reenvios completos — confirma que insistir en el reporte integro (no aceptar el
+stub) fue necesario, no cosmetico.
+
+**Pendiente antes de fusionar a `main`:** decidir con el usuario como aterriza esta rama (merge
+directo, PR, o squash) via `superpowers:finishing-a-development-branch` — no ejecutado aun en esta
+sesion. Prueba manual con dos cuentas tambien pendiente (ver arriba). Nada de esto esta pusheado a
+`origin` todavia.
