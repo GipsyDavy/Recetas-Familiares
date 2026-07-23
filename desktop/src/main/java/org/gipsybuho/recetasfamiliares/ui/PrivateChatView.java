@@ -189,7 +189,10 @@ public class PrivateChatView extends VBox {
 
     /** Abre esta conversacion: suscribe el socket compartido y carga el historial. */
     public void open(PrivateChatDtos.PrivateConversation conversation) {
-        context.getChatRepository().setConversationMessageListener(this::onRealtimeMessage);
+        // Los callbacks del socket llegan en hilos de OkHttp (ver ChatSocket): hay que
+        // marshalizar al hilo de JavaFX antes de tocar el scene graph, igual que ChatView.
+        context.getChatRepository().setConversationMessageListener(
+                message -> Platform.runLater(() -> onRealtimeMessage(message)));
         var socket = context.getChatRepository().activeSocket();
         if (socket != null) {
             socket.subscribeConversation(conversation.conversationId());
@@ -237,10 +240,10 @@ public class PrivateChatView extends VBox {
                 PrivateChatDtos.PrivateMessageHistory page =
                         privateChatRepository().loadHistory(targetConversation, null, PrivateChatRepository.PAGE_SIZE);
                 Platform.runLater(() -> {
+                    loading = false;
                     if (!targetConversation.equals(conversationId)) {
                         return;
                     }
-                    loading = false;
                     messages.clear();
                     List<PrivateChatDtos.PrivateMessage> items = page.items() != null ? page.items() : List.of();
                     for (int i = items.size() - 1; i >= 0; i--) {
@@ -276,11 +279,11 @@ public class PrivateChatView extends VBox {
                 PrivateChatDtos.PrivateMessageHistory page =
                         privateChatRepository().loadHistory(targetConversation, before, PrivateChatRepository.PAGE_SIZE);
                 Platform.runLater(() -> {
+                    loading = false;
+                    loadOlderBtn.setDisable(false);
                     if (!targetConversation.equals(conversationId)) {
                         return;
                     }
-                    loading = false;
-                    loadOlderBtn.setDisable(false);
                     List<PrivateChatDtos.PrivateMessage> items = page.items() != null ? page.items() : List.of();
                     boolean changed = false;
                     for (int i = items.size() - 1; i >= 0; i--) {

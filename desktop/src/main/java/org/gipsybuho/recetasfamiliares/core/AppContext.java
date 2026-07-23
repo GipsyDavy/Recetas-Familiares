@@ -84,6 +84,7 @@ public final class AppContext {
         menuRepository.clearCache();
         favoriteRepository.clearCache();
         noteRepository.clearCache();
+        chatRepository.resetPrivateChatState();
     }
 
     public void shutdown() {

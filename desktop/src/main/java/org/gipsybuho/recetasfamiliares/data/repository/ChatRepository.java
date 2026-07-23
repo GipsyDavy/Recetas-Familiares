@@ -68,6 +68,16 @@ public class ChatRepository {
         return activeSocket;
     }
 
+    /**
+     * Limpia el estado de no-leidos del chat privado al cerrar sesion o cambiar de
+     * familia: sin esto, el contador de un usuario/familia anterior sobrevive en este
+     * singleton y se mezcla con el del siguiente en un PC compartido.
+     */
+    public void resetPrivateChatState() {
+        unreadByConversation.clear();
+        activeConversationId = null;
+    }
+
     /** Snapshot inmutable de no-leidos por conversacion, para pintar la bandeja/badge. */
     public Map<String, Integer> unreadByConversation() {
         return Map.copyOf(unreadByConversation);

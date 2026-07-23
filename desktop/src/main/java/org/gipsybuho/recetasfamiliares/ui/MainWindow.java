@@ -154,7 +154,10 @@ public class MainWindow {
         // sidebar de mensajes nuevos aunque el chat no este abierto.
         chatView.startRealtime();
         conversationsView = new ConversationsView(context, this::triggerSync);
-        context.getChatRepository().setInboxListener(this::updatePrivateChatBadge);
+        // El ping de inbox llega en hilo de OkHttp (ver ChatSocket): marshalizar al
+        // hilo de JavaFX antes de tocar la sidebar, igual que chatView.setUnreadListener.
+        context.getChatRepository().setInboxListener(
+                unread -> Platform.runLater(() -> updatePrivateChatBadge(unread)));
         profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus,
                 this::showLogin);
         profileSettingsTab = null;
