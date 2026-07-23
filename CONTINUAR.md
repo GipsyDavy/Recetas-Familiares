@@ -3845,7 +3845,83 @@ el reporte completo al segundo reintento. El hallazgo Critical de thread-safety 
 en uno de esos reenvios completos — confirma que insistir en el reporte integro (no aceptar el
 stub) fue necesario, no cosmetico.
 
-**Pendiente antes de fusionar a `main`:** decidir con el usuario como aterriza esta rama (merge
-directo, PR, o squash) via `superpowers:finishing-a-development-branch` — no ejecutado aun en esta
-sesion. Prueba manual con dos cuentas tambien pendiente (ver arriba). Nada de esto esta pusheado a
-`origin` todavia.
+**Cierre via `superpowers:finishing-a-development-branch`:** usuario eligio "merge back to main
+locally". Merge fast-forward limpio (`05eb232..addc7eb`, sin conflictos), tests reverificados sobre
+`main` ya fusionado (48/48), worktree y rama `worktree-chat-privado-desktop` eliminados. Pusheado a
+`origin/main` con autorizacion explicita del usuario (`163d5e4..addc7eb`, 14 commits — incluye 2
+commits de docs de sesiones anteriores que llevaban sin pushear desde el brainstorming). Prueba
+manual con dos cuentas sigue pendiente (ver arriba) — riesgo residual documentado, no bloqueante
+para el merge/push segun decidio el usuario.
+
+### Cierre de sesion 2026-07-23 — siguiente sprint elegido, dos bloqueos ambientales, sin cerrar
+
+Tras el sprint de chat privado Desktop (arriba), el usuario pidio elegir el siguiente sprint.
+Candidatos presentados: chat privado Android, presencia iOS, item 16 (IA), item 23 (sidebar).
+Usuario delego la eleccion ("continua con el que estimes oportuno"); se eligio **chat privado
+Android** por completar paridad multiplataforma con backend y Desktop ya validados dos veces.
+
+**Investigacion previa a brainstorming (agente `Explore`, solo lectura, verificada):**
+- `FamilyMembersSection` (composable privado en `ProfileScreen.kt:756`, invocado desde
+  `ProfileScreen.kt:426`) ya es visible a **todos los roles** — a diferencia de Desktop, aqui NO
+  hace falta el fix de "abrir Miembros a todos los roles". Solo la gestion (editar/cambiar
+  rol/expulsar) esta gateada por `canManage = isAdmin && ...` por fila.
+- `ChatSocket.kt` (`android/.../data/remote/ChatSocket.kt`) sigue el mismo patron que el
+  `ChatSocket.java` de Desktop: topics fijos `/topic/families/{familyId}/chat` y `/presence`
+  suscritos en `CONNECTED`, ruteo de `MESSAGE` por `destination`, JWT en header del frame CONNECT,
+  reconexion con backoff. Mismo enfoque de extension (inbox + conversacion) deberia aplicar igual.
+- Navegacion: **Bottom Navigation** (Material3, 6 tabs: RECIPES/STOCK/SHOPPING/NOTES/MENU/PROFILE,
+  enum `MainTab` en `RecetasApp.kt:91`) — un septimo tab es demasiado para movil. El chat familiar
+  NO es tab: es un icono en el `TopAppBar` con `BadgedBox` que abre `ChatScreen` a pantalla
+  completa (`RecetasApp.kt:334`, `if (chatOpen) { ChatScreen(...); return }`).
+- Badge existente confirmado vigente: `_chatUnread`, `startChatBadge()/stopChatBadge()` en
+  `RecetasViewModel.kt:897-940` (el rango que cita la spec de julio sigue siendo exacto).
+- DTOs en un solo archivo `ApiDtos.kt` (data classes Kotlin), no un archivo por feature.
+- Nada de chat privado empezado en Android (busqueda exhaustiva sin resultados para `dm`,
+  `PrivateChat`, `Conversation`).
+
+**Bloqueo 1 — decision de navegacion sin resolver:** a diferencia de Desktop (sidebar permanente),
+el patron movil (bottom nav lleno + icono de TopAppBar que abre pantalla completa) no tiene un
+"lugar obvio" para chat privado. Se ofrecio el companion visual (mismo mecanismo que en el
+brainstorming de Desktop) para comparar opciones (A: icono propio en TopAppBar junto al de chat
+familiar, abre `ConversationsScreen` a pantalla completa con navegacion en pila hacia
+`PrivateChatScreen`; B: entrada dentro de `ProfileScreen`, sin icono propio; C: otra idea del
+usuario) — **usuario esta en movil, sin poder revisar el navegador local**. Documentado como item
+24 de `paraImplementar.txt` con toda la investigacion de arriba, para no repetirla en la proxima
+sesion. **No se ha escrito spec ni plan para chat privado Android — retomar el brainstorming desde
+la pregunta de navegacion en cuanto el usuario pueda usar el companion visual.**
+
+**Bloqueo 2 — WireGuard caido:** al intentar un segundo sprint (deuda tecnica: migrar los 5 tests
+de `UploadControllerTest` con email fijo a `uniqueEmail()`, causa raiz ya diagnosticada en sesiones
+anteriores), el fix se aplico (mecanico, mismo patron que los 2 tests de DM que ya usan
+`uniqueEmail()` en el mismo archivo) pero **no se pudo verificar contra la BD real**: primer
+intento sin credenciales cargadas (`No password provided`), segundo intento tras cargar
+`herztner/recetas_app.env` con `set -a && source ... && set +a` dio `PSQLException: El intento de
+conexion fallo` (SQL State 08001) — fallo de **red**, no de credenciales (confirma que estas se
+cargaron bien). El tunel WireGuard a Hetzner parece caido en esta sesion; reactivarlo requiere la
+GUI de Windows del usuario (patron ya documentado en sprints anteriores: es la unica via que
+funciona para el UAC de este entorno), y el usuario esta en movil.
+
+**Commiteado en esta sesion (sin verificar la parte de tests, marcado explicitamente en el mensaje
+de commit):** `922c8ee` — `UploadControllerTest.java` (5 tests migrados a `uniqueEmail()`) +
+`paraImplementar.txt` (item 24). **Verificado via `git fetch`:** `main` local queda 1 commit por
+delante de `origin/main` (`922c8ee` sin pushear) — pendiente de autorizacion explicita del usuario
+para ese push, mismo patron que el resto de la sesion.
+
+**Estado exacto para retomar en la proxima sesion:**
+1. **Primero:** reactivar el tunel WireGuard (GUI de Windows) y ejecutar
+   `mvn -f backend/pom.xml test -Dtest=UploadControllerTest` (cargando antes
+   `herztner/recetas_app.env` con `set -a && source herztner/recetas_app.env && set +a` en la misma
+   sesion de shell). Si pasa (7/7 esperado, los 5 migrados + los 2 de DM que ya usaban
+   `uniqueEmail()`), correr la suite completa del backend para confirmar si el conteo de 101 fallos
+   preexistentes baja o se mantiene igual (no deberia haber tests nuevos rotos).
+2. **Segundo:** retomar el brainstorming de chat privado Android exactamente en la pregunta de
+   navegacion (arriba, opciones A/B/C) — ofrecer el companion visual de nuevo, esta vez con el
+   usuario en un ordenador. Toda la investigacion del codigo Android ya esta hecha y documentada
+   arriba y en `paraImplementar.txt` item 24 — no repetir la exploracion, ir directo a la pregunta.
+3. Alternativa si el usuario prefiere otra cosa: presencia iOS (bloqueada por falta de macOS para
+   compilar/ejecutar, ver limitaciones conocidas del proyecto), item 16 (IA, requiere brainstorming
+   propio de alcance/consentimiento), item 23 (pulido visual sidebar Desktop, tambien necesita
+   companion visual).
+
+`main` local y remoto sincronizados (confirmar en la proxima sesion), arbol de trabajo limpio salvo
+lo ya commiteado arriba, sin worktrees activos, sin ramas de feature pendientes.
