@@ -12,6 +12,8 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatExportDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatHistoryDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.EditChatMessageRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateInboxPingDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SendChatMessageRequestDto
 import java.util.UUID
 
@@ -103,21 +105,54 @@ class ChatRepository(
     fun openRealtime(
         onMessage: (ChatMessageDto) -> Unit,
         onConnectionChange: (Boolean) -> Unit,
-        onPresenceUpdate: (Set<String>) -> Unit
+        onPresenceUpdate: (Set<String>) -> Unit,
+        conversationId: String? = null,
+        onInboxPing: (PrivateInboxPingDto) -> Unit = {},
+        onPrivateMessage: (PrivateMessageDto) -> Unit = {}
     ): ChatSocket? {
         val family = familyId ?: return null
+        val user = myUserId ?: return null
         val socket = ChatSocket(
             httpClient = httpClient,
             baseUrl = baseUrlProvider(),
             sessionStore = sessionStore,
             familyId = family,
+            myUserId = user,
             gson = gson,
             onMessage = { msg -> onMessage(normalizeAttachments(msg)) },
             onConnectionChange = onConnectionChange,
-            onPresenceUpdate = onPresenceUpdate
+            onPresenceUpdate = onPresenceUpdate,
+            conversationId = conversationId,
+            onInboxPing = onInboxPing,
+            onPrivateMessage = { msg -> onPrivateMessage(normalizePrivateMessage(msg)) }
         )
         socket.connect()
         return socket
+    }
+
+    /** Mismo criterio que normalizeAttachments, para adjuntos de chat privado (rutas /uploads/dm/). */
+    private fun normalizePrivateMessage(message: PrivateMessageDto): PrivateMessageDto {
+        val attachments = message.attachments
+        if (attachments.isNullOrEmpty()) return message
+        return message.copy(
+            attachments = attachments.map { attachment ->
+                attachment.copy(
+                    url = rewritePrivateUploadUrl(attachment.url),
+                    thumbnailUrl = attachment.thumbnailUrl?.let(::rewritePrivateUploadUrl)
+                )
+            }
+        )
+    }
+
+    private fun rewritePrivateUploadUrl(raw: String): String {
+        val path = try {
+            java.net.URI(raw).path
+        } catch (e: Exception) {
+            return raw
+        }
+        if (path.isNullOrBlank() || path.contains("..")) return raw
+        val allowed = path.startsWith("/uploads/dm/") || path.startsWith("/uploads/dm_thumbnails/")
+        return if (allowed) baseUrlProvider().trimEnd('/') + path else raw
     }
 
     private fun requireFamily(): String =

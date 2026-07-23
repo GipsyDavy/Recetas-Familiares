@@ -11,6 +11,8 @@ import okhttp3.WebSocketListener
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PresenceResponseDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateInboxPingDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
 
 /**
  * Cliente STOMP minimo sobre el WebSocket nativo de OkHttp (sin dependencias
@@ -28,15 +30,21 @@ class ChatSocket(
     baseUrl: String,
     private val sessionStore: SessionStore,
     private val familyId: String,
+    private val myUserId: String,
     private val gson: Gson,
     private val onMessage: (ChatMessageDto) -> Unit,
     private val onConnectionChange: (Boolean) -> Unit,
-    private val onPresenceUpdate: (Set<String>) -> Unit
+    private val onPresenceUpdate: (Set<String>) -> Unit,
+    private val conversationId: String? = null,
+    private val onInboxPing: (PrivateInboxPingDto) -> Unit = {},
+    private val onPrivateMessage: (PrivateMessageDto) -> Unit = {}
 ) {
 
     private val wsUrl: String = toWebSocketUrl(baseUrl)
     private val topic: String = "/topic/families/$familyId/chat"
     private val presenceTopic: String = "/topic/families/$familyId/presence"
+    private val inboxTopic: String = "/topic/users/$myUserId/inbox"
+    private val conversationTopic: String? = conversationId?.let { "/topic/conversations/$it" }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val reconnectRunnable = Runnable {
         if (!closedByClient) {
@@ -138,6 +146,20 @@ class ChatSocket(
                     "\n" +
                     NUL
                 webSocket.send(subscribePresence)
+                val subscribeInbox = "SUBSCRIBE\n" +
+                    "id:sub-inbox\n" +
+                    "destination:$inboxTopic\n" +
+                    "\n" +
+                    NUL
+                webSocket.send(subscribeInbox)
+                conversationTopic?.let { convTopic ->
+                    val subscribeConversation = "SUBSCRIBE\n" +
+                        "id:sub-conversation\n" +
+                        "destination:$convTopic\n" +
+                        "\n" +
+                        NUL
+                    webSocket.send(subscribeConversation)
+                }
                 reconnectAttempt = 0
                 onConnectionChange(true)
             }
@@ -148,7 +170,11 @@ class ChatSocket(
                     // no-op
                 } else if (destination == presenceTopic) {
                     handlePresenceMessage(body)
-                } else {
+                } else if (destination == inboxTopic) {
+                    handleInboxPing(body)
+                } else if (destination != null && destination == conversationTopic) {
+                    handlePrivateMessage(body)
+                } else if (destination == topic) {
                     handleChatMessage(body)
                 }
             }
@@ -171,6 +197,19 @@ class ChatSocket(
             .getOrNull()
             ?.onlineUserIds
             ?.let { onPresenceUpdate(it.toSet()) }
+    }
+
+    private fun handleInboxPing(body: String) {
+        runCatching { gson.fromJson(body, PrivateInboxPingDto::class.java) }
+            .getOrNull()
+            ?.let(onInboxPing)
+    }
+
+    private fun handlePrivateMessage(body: String) {
+        runCatching { gson.fromJson(body, PrivateMessageDto::class.java) }
+            .getOrNull()
+            ?.takeIf { it.id.isNotBlank() && it.conversationId == conversationId && it.authorUserId.isNotBlank() }
+            ?.let(onPrivateMessage)
     }
 
     private fun toWebSocketUrl(baseUrl: String): String {
