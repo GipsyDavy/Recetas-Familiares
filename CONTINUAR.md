@@ -3907,13 +3907,29 @@ de commit):** `922c8ee` — `UploadControllerTest.java` (5 tests migrados a `uni
 delante de `origin/main` (`922c8ee` sin pushear) — pendiente de autorizacion explicita del usuario
 para ese push, mismo patron que el resto de la sesion.
 
+**Push autorizado y CI/CD verificado (post-cierre, mismo dia):** usuario autorizo push de
+`922c8ee`+`d4b4bc5` (`addc7eb..d4b4bc5`). Como toca `backend/**`, se aviso del deploy automatico
+*despues* de pushear (deberia haberse avisado antes, mismo patron que sprints anteriores — anotado
+para no repetir el fallo de secuencia). CI/CD run `30001347091` (`Backend CI/CD`, commit
+`d4b4bc5`): **completed/success** (~75s, vigilado en vivo via API publica de GitHub, PowerShell).
+Salud de produccion tras el deploy: `GET /api/v1/health` -> `{"status":"UP", ...}`.
+
+**Importante — lo que el CI en verde SI y NO demuestra:** el pipeline usa Postgres **efimero**
+(BD nueva en cada run), por lo que los 5 tests migrados pasan alli sin problema — pero esto NO
+reproduce ni descarta especificamente el bug original (colision de emails fijos contra datos
+**acumulados** en la BD de test **persistente** de Hetzner), porque una BD efimera nunca tiene esa
+acumulacion, tengan los tests email fijo o unico. El CI en verde confirma que el cambio no rompio
+nada; NO confirma que el fix resuelva la colision real en la BD persistente. Eso sigue exigiendo el
+paso 1 de abajo.
+
 **Estado exacto para retomar en la proxima sesion:**
 1. **Primero:** reactivar el tunel WireGuard (GUI de Windows) y ejecutar
    `mvn -f backend/pom.xml test -Dtest=UploadControllerTest` (cargando antes
    `herztner/recetas_app.env` con `set -a && source herztner/recetas_app.env && set +a` en la misma
-   sesion de shell). Si pasa (7/7 esperado, los 5 migrados + los 2 de DM que ya usaban
-   `uniqueEmail()`), correr la suite completa del backend para confirmar si el conteo de 101 fallos
-   preexistentes baja o se mantiene igual (no deberia haber tests nuevos rotos).
+   sesion de shell) — esta vez contra la BD persistente real, la unica que puede confirmar de
+   verdad que el fix soluciona la colision original. Si pasa (7/7 esperado, los 5 migrados + los 2
+   de DM que ya usaban `uniqueEmail()`), correr la suite completa del backend para confirmar si el
+   conteo de 101 fallos preexistentes baja o se mantiene igual (no deberia haber tests nuevos rotos).
 2. **Segundo:** retomar el brainstorming de chat privado Android exactamente en la pregunta de
    navegacion (arriba, opciones A/B/C) — ofrecer el companion visual de nuevo, esta vez con el
    usuario en un ordenador. Toda la investigacion del codigo Android ya esta hecha y documentada
