@@ -1037,8 +1037,10 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     fun loadOlderPrivateChat() {
         val conversationId = activePrivateConversationId ?: return
+        if (_privateChatLoading.value) return
         if (!_privateChatHasMoreOlder.value) return
         val before = privateChatOldestCursor ?: return
+        _privateChatLoading.value = true
         viewModelScope.launch {
             runCatching { container.privateChatRepository.loadHistory(conversationId, before) }
                 .onSuccess { history ->
@@ -1046,6 +1048,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                     _privateChatHasMoreOlder.value = history.hasMore
                     privateChatOldestCursor = history.nextBefore
                 }
+                .onFailure { _userMessage.emit("No se pudieron cargar mensajes anteriores") }
+            _privateChatLoading.value = false
         }
     }
 
