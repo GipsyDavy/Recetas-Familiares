@@ -98,6 +98,16 @@ class PrivateChatRepositoryTest {
     }
 
     @Test
+    fun sendImagesConMasDeCincoImagenesLanzaIllegalArgument() = runTest {
+        every { sessionStore.familyId } returns "fam-1"
+        val images = (1..6).map { byteArrayOf(1, 2, 3) to "image/jpeg" }
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.sendImages("c1", "texto", images) }
+        }
+    }
+
+    @Test
     fun editLlamaConElCuerpoNuevo() = runTest {
         every { sessionStore.familyId } returns "fam-1"
         val message = PrivateMessageDto(
