@@ -1,6 +1,7 @@
 package org.gipsybuho.recetasfamiliares.data.repository
 
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -108,6 +109,40 @@ class PrivateChatRepositoryTest {
     }
 
     @Test
+    fun sendImagesFelizEnviaMultipartYNormalizaAdjuntos() = runTest {
+        every { sessionStore.familyId } returns "fam-1"
+        val image = byteArrayOf(1, 2, 3) to "image/jpeg"
+        val message = PrivateMessageDto(
+            id = "m1", conversationId = "c1", authorUserId = "u1", authorDisplayName = "Yo",
+            body = "pie de foto", attachments = listOf(
+                org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateAttachmentDto(
+                    id = "a1", url = "http://localhost:8080/uploads/dm/foo.jpg",
+                    thumbnailUrl = "http://localhost:8080/uploads/dm_thumbnails/foo.jpg",
+                    contentType = "image/jpeg", sizeBytes = 100
+                )
+            ),
+            createdAt = "2026-07-23T10:00:00Z", updatedAt = "2026-07-23T10:00:00Z",
+            syncVersion = 1, deleted = false
+        )
+        coEvery { api.sendPrivateImageMessage("fam-1", "c1", any(), any(), any()) } returns message
+
+        val result = repository.sendImages("c1", "pie de foto", listOf(image))
+
+        assertEquals("https://recetas.test/uploads/dm/foo.jpg", result.attachments!![0].url)
+        assertEquals("https://recetas.test/uploads/dm_thumbnails/foo.jpg", result.attachments!![0].thumbnailUrl)
+    }
+
+    @Test
+    fun sendImagesConTipoNoPermitidoLanzaIllegalArgument() = runTest {
+        every { sessionStore.familyId } returns "fam-1"
+        val images = listOf(byteArrayOf(1, 2, 3) to "image/gif")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.sendImages("c1", "texto", images) }
+        }
+    }
+
+    @Test
     fun editLlamaConElCuerpoNuevo() = runTest {
         every { sessionStore.familyId } returns "fam-1"
         val message = PrivateMessageDto(
@@ -137,6 +172,16 @@ class PrivateChatRepositoryTest {
         val result = repository.delete("c1", "m1")
 
         assertTrue(result.deleted)
+    }
+
+    @Test
+    fun clearLlamaAlEndpointDeLimpieza() = runTest {
+        every { sessionStore.familyId } returns "fam-1"
+        coEvery { api.clearPrivateConversation("fam-1", "c1") } returns Unit
+
+        repository.clear("c1")
+
+        coVerify { api.clearPrivateConversation("fam-1", "c1") }
     }
 
     @Test
@@ -174,5 +219,28 @@ class PrivateChatRepositoryTest {
 
         assertEquals("https://recetas.test/uploads/dm/foo.jpg", result.attachments!![0].url)
         assertEquals("https://recetas.test/uploads/dm_thumbnails/foo.jpg", result.attachments!![0].thumbnailUrl)
+    }
+
+    @Test
+    fun attachmentUrlFueraDeUploadsDmNoSeReescribe() = runTest {
+        every { sessionStore.familyId } returns "fam-1"
+        val message = PrivateMessageDto(
+            id = "m1", conversationId = "c1", authorUserId = "u1", authorDisplayName = "Yo",
+            body = "Mira", attachments = listOf(
+                org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateAttachmentDto(
+                    id = "a1", url = "http://localhost:8080/uploads/chat/foo.jpg",
+                    thumbnailUrl = "http://localhost:8080/uploads/chat_thumbnails/foo.jpg",
+                    contentType = "image/jpeg", sizeBytes = 100
+                )
+            ),
+            createdAt = "2026-07-23T10:00:00Z", updatedAt = "2026-07-23T10:00:00Z",
+            syncVersion = 1, deleted = false
+        )
+        coEvery { api.sendPrivateMessage("fam-1", "c1", any()) } returns message
+
+        val result = repository.send("c1", "Mira")
+
+        assertEquals("http://localhost:8080/uploads/chat/foo.jpg", result.attachments!![0].url)
+        assertEquals("http://localhost:8080/uploads/chat_thumbnails/foo.jpg", result.attachments!![0].thumbnailUrl)
     }
 }
