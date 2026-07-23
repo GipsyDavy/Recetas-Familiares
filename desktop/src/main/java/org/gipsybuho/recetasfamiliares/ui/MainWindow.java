@@ -61,6 +61,7 @@ public class MainWindow {
     private ChatView chatView;
     private GlobalSearchView searchResultsView;
     private FamilyMembersView familyMembersView;
+    private ConversationsView conversationsView;
     private ProfileView profileView;
     private Tab profileSettingsTab;
     private TabPane settingsTabPane;
@@ -71,7 +72,7 @@ public class MainWindow {
     private ComboBox<FamilyChoice> familySelector;
     private Label familySelectorStatus;
     private Button btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat,
-            btnSettings, btnMembers;
+            btnConversations, btnSettings, btnMembers;
     private SequentialTransition themeTransition;
     private final TextField globalSearch = new TextField();
     private final Label statusBar = new Label("");
@@ -152,14 +153,14 @@ public class MainWindow {
         // Conexion en segundo plano desde el login: permite avisar en la
         // sidebar de mensajes nuevos aunque el chat no este abierto.
         chatView.startRealtime();
+        conversationsView = new ConversationsView(context, this::triggerSync);
+        context.getChatRepository().setInboxListener(this::updatePrivateChatBadge);
         profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus,
                 this::showLogin);
         profileSettingsTab = null;
         settingsTabPane = null;
         activeSettingsTab = SETTINGS_TAB_APPEARANCE;
-        if (context.getSession().isAdmin()) {
-            familyMembersView = new FamilyMembersView(context, this::reloadFamilyChoices);
-        }
+        familyMembersView = new FamilyMembersView(context, this::reloadFamilyChoices, this::openConversationWith);
 
         VBox sidebar = buildSidebar();
         root.setLeft(sidebar);
@@ -212,6 +213,7 @@ public class MainWindow {
         btnShopping  = sidebarButton("🛒  Lista de la compra", "shopping");
         btnNotes     = sidebarButton("📝  Notas familiares", "notes");
         btnChat      = sidebarButton("💬  Chat familiar", "chat");
+        btnConversations = sidebarButton("🔒  Chat privado", "conversations");
         btnSettings  = sidebarButton("⚙  Ajustes", "settings");
         btnSettings.setOnAction(e -> openSettingsTab(activeSettingsTab));
         Tooltip settingsTooltip = new Tooltip("Ajustes (Ctrl+,)");
@@ -257,16 +259,12 @@ public class MainWindow {
         navigation.getStyleClass().add("sidebar-navigation");
         navigation.getChildren().addAll(
                 btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping, btnNotes, btnChat,
-                btnSettings);
+                btnConversations, btnSettings);
 
-        // ── Admin-only buttons ────────────────────────────────────────────────
-        if (context.getSession().isAdmin()) {
-            Separator adminSep = new Separator();
-            VBox.setMargin(adminSep, new Insets(4, 16, 4, 16));
-
-            btnMembers  = sidebarButton("👨‍👩‍👧  Miembros", "members");
-            navigation.getChildren().addAll(adminSep, btnMembers);
-        }
+        Separator membersSep = new Separator();
+        VBox.setMargin(membersSep, new Insets(4, 16, 4, 16));
+        btnMembers = sidebarButton("👨‍👩‍👧  Miembros", "members");
+        navigation.getChildren().addAll(membersSep, btnMembers);
 
         ScrollPane navigationScroll = new ScrollPane(navigation);
         navigationScroll.getStyleClass().add("sidebar-navigation-scroll");
@@ -514,6 +512,11 @@ public class MainWindow {
         }
     }
 
+    private void openConversationWith(String otherUserId) {
+        navigateTo("conversations");
+        conversationsView.openWith(otherUserId);
+    }
+
     private void navigateTo(String view) {
         navigating = true;
         activeView = view;
@@ -523,6 +526,9 @@ public class MainWindow {
         // vista como oculta para que los mensajes entrantes cuenten como no leidos.
         if (chatView != null && !"chat".equals(view)) {
             chatView.onHidden();
+        }
+        if (conversationsView != null && !"conversations".equals(view)) {
+            conversationsView.onHidden();
         }
         updateActiveSidebarButton(view);
         switch (view) {
@@ -554,11 +560,13 @@ public class MainWindow {
                 setCenterWithFade(chatView);
                 chatView.onShown();
             }
+            case "conversations" -> {
+                setCenterWithFade(conversationsView);
+                conversationsView.refresh();
+            }
             case "members" -> {
-                if (context.getSession().isAdmin() && familyMembersView != null) {
-                    setCenterWithFade(familyMembersView);
-                    familyMembersView.refresh();
-                }
+                setCenterWithFade(familyMembersView);
+                familyMembersView.refresh();
             }
             case "settings" -> setCenterWithFade(buildSettingsView());
         }
@@ -633,7 +641,7 @@ public class MainWindow {
 
     private void updateActiveSidebarButton(String view) {
         Button[] navButtons = {btnDashboard, btnRecipes, btnStock, btnMenu, btnShopping,
-                btnNotes, btnChat, btnSettings, btnMembers};
+                btnNotes, btnChat, btnConversations, btnSettings, btnMembers};
         for (Button btn : navButtons) {
             if (btn != null) btn.getStyleClass().remove("sidebar-nav-button-active");
         }
@@ -645,6 +653,7 @@ public class MainWindow {
             case "shopping"  -> btnShopping;
             case "notes"     -> btnNotes;
             case "chat"      -> btnChat;
+            case "conversations" -> btnConversations;
             case "settings"  -> btnSettings;
             case "members"   -> btnMembers;
             default          -> null;
@@ -659,6 +668,19 @@ public class MainWindow {
         }
         String base = "💬  Chat familiar";
         btnChat.setText(unread > 0 ? base + "  (" + (unread > 9 ? "9+" : unread) + ")" : base);
+    }
+
+    /** Badge de no-leidos del chat privado en la sidebar (suma de todas las conversaciones). */
+    private void updatePrivateChatBadge(java.util.Map<String, Integer> unreadByConversation) {
+        if (conversationsView != null) {
+            conversationsView.updateUnread(unreadByConversation);
+        }
+        if (btnConversations == null) {
+            return;
+        }
+        int total = unreadByConversation.values().stream().mapToInt(Integer::intValue).sum();
+        String base = "🔒  Chat privado";
+        btnConversations.setText(total > 0 ? base + "  (" + (total > 9 ? "9+" : total) + ")" : base);
     }
 
     private void doLogout() {

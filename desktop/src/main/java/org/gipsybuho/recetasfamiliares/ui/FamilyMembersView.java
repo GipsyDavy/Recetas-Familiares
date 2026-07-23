@@ -15,6 +15,7 @@ import org.gipsybuho.recetasfamiliares.core.FamilyRole;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public class FamilyMembersView extends ScrollPane {
 
@@ -30,10 +31,12 @@ public class FamilyMembersView extends ScrollPane {
     private final Button removeBtn     = new Button("Expulsar");
     private final Button createFamilyBtn = new Button("Crear familia");
     private final Runnable onFamiliesChanged;
+    private final Consumer<String> onMessageMember;
 
-    public FamilyMembersView(AppContext context, Runnable onFamiliesChanged) {
+    public FamilyMembersView(AppContext context, Runnable onFamiliesChanged, Consumer<String> onMessageMember) {
         this.context = context;
         this.onFamiliesChanged = onFamiliesChanged;
+        this.onMessageMember = onMessageMember;
         build();
         context.getChatRepository().setPresenceListener(online ->
                 Platform.runLater(() -> applyPresence(online)));
@@ -163,6 +166,33 @@ public class FamilyMembersView extends ScrollPane {
         onlineCol.setMinWidth(28);
         onlineCol.setMaxWidth(28);
 
+        TableColumn<MemberRow, MemberRow> messageCol = new TableColumn<>("");
+        messageCol.setCellValueFactory(data -> new javafx.beans.property.SimpleObjectProperty<>(data.getValue()));
+        messageCol.setCellFactory(col -> new TableCell<>() {
+            private final Button messageBtn = new Button("✉");
+
+            {
+                messageBtn.getStyleClass().add("action-button-secondary");
+                Tooltip.install(messageBtn, new Tooltip("Enviar mensaje privado"));
+                messageBtn.setOnAction(e -> {
+                    MemberRow row = getTableRow().getItem();
+                    if (row != null) {
+                        onMessageMember.accept(row.getUserId());
+                    }
+                });
+            }
+
+            @Override
+            protected void updateItem(MemberRow row, boolean empty) {
+                super.updateItem(row, empty);
+                setGraphic(empty || row == null || row.isSelf() ? null : messageBtn);
+            }
+        });
+        messageCol.setSortable(false);
+        messageCol.setResizable(false);
+        messageCol.setMinWidth(40);
+        messageCol.setMaxWidth(40);
+
         TableColumn<MemberRow, String> nameCol = new TableColumn<>("Nombre");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("displayName"));
         nameCol.setMinWidth(160);
@@ -176,6 +206,7 @@ public class FamilyMembersView extends ScrollPane {
         roleCol.setMinWidth(120);
 
         tv.getColumns().add(onlineCol);
+        tv.getColumns().add(messageCol);
         tv.getColumns().add(nameCol);
         tv.getColumns().add(emailCol);
         tv.getColumns().add(roleCol);
