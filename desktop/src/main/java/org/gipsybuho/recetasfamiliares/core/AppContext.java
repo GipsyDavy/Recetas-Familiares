@@ -3,6 +3,7 @@ package org.gipsybuho.recetasfamiliares.core;
 import org.gipsybuho.recetasfamiliares.api.ApiClient;
 import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.ChatRepository;
+import org.gipsybuho.recetasfamiliares.data.repository.PrivateChatRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.FavoriteRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.MenuRepository;
 import org.gipsybuho.recetasfamiliares.data.repository.NoteRepository;
@@ -31,6 +32,7 @@ public final class AppContext {
     private final UserRepository userRepository;
     private final FamilyRepository familyRepository;
     private final ChatRepository chatRepository;
+    private final PrivateChatRepository privateChatRepository;
 
     private AppContext() {
         session = new AppSession();
@@ -45,6 +47,7 @@ public final class AppContext {
         favoriteRepository = new FavoriteRepository(apiClient, session);
         noteRepository = new NoteRepository(apiClient, session);
         chatRepository = new ChatRepository(apiClient, session);
+        privateChatRepository = new PrivateChatRepository(apiClient, session);
         syncRepository = new SyncRepository(apiClient, session, recipeRepository, stockRepository,
                 menuRepository, shoppingListRepository, favoriteRepository, noteRepository);
     }
@@ -67,6 +70,7 @@ public final class AppContext {
     public UserRepository getUserRepository() { return userRepository; }
     public FamilyRepository getFamilyRepository() { return familyRepository; }
     public ChatRepository getChatRepository() { return chatRepository; }
+    public PrivateChatRepository getPrivateChatRepository() { return privateChatRepository; }
 
     public void switchActiveFamily(String familyId, FamilyRole role) {
         session.setFamilyId(familyId);
