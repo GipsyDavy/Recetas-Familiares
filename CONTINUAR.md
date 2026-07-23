@@ -3922,14 +3922,25 @@ acumulacion, tengan los tests email fijo o unico. El CI en verde confirma que el
 nada; NO confirma que el fix resuelva la colision real en la BD persistente. Eso sigue exigiendo el
 paso 1 de abajo.
 
-**Estado exacto para retomar en la proxima sesion:**
-1. **Primero:** reactivar el tunel WireGuard (GUI de Windows) y ejecutar
-   `mvn -f backend/pom.xml test -Dtest=UploadControllerTest` (cargando antes
-   `herztner/recetas_app.env` con `set -a && source herztner/recetas_app.env && set +a` en la misma
-   sesion de shell) — esta vez contra la BD persistente real, la unica que puede confirmar de
-   verdad que el fix soluciona la colision original. Si pasa (7/7 esperado, los 5 migrados + los 2
-   de DM que ya usaban `uniqueEmail()`), correr la suite completa del backend para confirmar si el
-   conteo de 101 fallos preexistentes baja o se mantiene igual (no deberia haber tests nuevos rotos).
+**Verificacion completada (misma sesion, WireGuard reactivado por el usuario):**
+`mvn -f backend/pom.xml test -Dtest=UploadControllerTest` -> **7/7, 0 fallos**, `BUILD SUCCESS`
+contra la BD persistente real. Confirma que el fix (migrar a `uniqueEmail()`) si resuelve la
+colision original, no solo el falso-positivo del CI efimero. Suite completa del backend:
+**195 tests, 96 fallos** (antes 101 — baja exactamente en 5, los migrados; sin tests nuevos rotos).
+
+**Hallazgo nuevo, alcance mayor de lo documentado hasta ahora:** los 96 fallos restantes son el
+**mismo patron** (email fijo colisionando con datos acumulados en la BD de test compartida), pero
+repartido en muchas mas clases de las que `CONTINUAR.md` tenia acotado hasta hoy (solo se mencionaba
+`UploadControllerTest`). Confirmado por clase, en esta sesion (`grep` sobre el resumen de Maven):
+`AuthControllerTest` (2), `ChatControllerTest` (14), `FamilyControllerTest` (6),
+`FamilyMemberControllerTest` (17), `FavoriteRecipeControllerTest` (3), `MenuItemControllerTest` (3),
+`FamilyNoteControllerTest` (3), `RecipePhotoControllerTest` (3), `RecipeRatingControllerTest` (5),
+`RecipeControllerTest` (12), `ShoppingListControllerTest` (4), `StockItemControllerTest` (3),
+`SyncControllerTest` (19), `UserControllerTest` (2) — suma 96. Migrar todas estas clases al mismo
+patron `uniqueEmail()` ya establecido (`UploadControllerTest`, `PrivateChatControllerTest`,
+`PresenceControllerTest`, `RecipeRankingControllerTest` ya lo usan) seria un sprint de limpieza de
+tests propio, mecanico pero mucho mas grande que lo hecho hoy — **no iniciado, pendiente de decision
+del usuario** (no se toco sin autorizacion, cambio de alcance mayor al ya cerrado).
 2. **Segundo:** retomar el brainstorming de chat privado Android exactamente en la pregunta de
    navegacion (arriba, opciones A/B/C) — ofrecer el companion visual de nuevo, esta vez con el
    usuario en un ordenador. Toda la investigacion del codigo Android ya esta hecha y documentada
