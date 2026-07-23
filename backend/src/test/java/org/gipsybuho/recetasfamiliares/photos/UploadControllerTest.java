@@ -41,8 +41,8 @@ class UploadControllerTest {
 
     @Test
     void recipePhotoOnlyAccessibleForFamilyMembers() throws Exception {
-        RegisteredUser owner = register("uploads-owner@example.com", "Familia Uploads");
-        RegisteredUser outsider = register("uploads-outsider@example.com", "Familia Ajena");
+        RegisteredUser owner = register(uniqueEmail("uploads-owner"), "Familia Uploads");
+        RegisteredUser outsider = register(uniqueEmail("uploads-outsider"), "Familia Ajena");
 
         String recipeId = createRecipe(owner);
         String photoPath = uploadRecipePhoto(owner, recipeId);
@@ -60,8 +60,8 @@ class UploadControllerTest {
 
     @Test
     void avatarOnlyAccessibleForOwnerAndFamilyMembers() throws Exception {
-        RegisteredUser owner = register("avatar-owner@example.com", "Familia Avatar");
-        RegisteredUser outsider = register("avatar-outsider@example.com", "Familia Avatar Ajena");
+        RegisteredUser owner = register(uniqueEmail("avatar-owner"), "Familia Avatar");
+        RegisteredUser outsider = register(uniqueEmail("avatar-outsider"), "Familia Avatar Ajena");
 
         String avatarPath = uploadAvatar(owner);
 
@@ -75,7 +75,7 @@ class UploadControllerTest {
 
     @Test
     void rejectsNonUuidUploadFilenames() throws Exception {
-        RegisteredUser user = register("uploads-names@example.com", "Familia Nombres");
+        RegisteredUser user = register(uniqueEmail("uploads-names"), "Familia Nombres");
 
         mockMvc.perform(get("/uploads/application.yml")
                         .header("Authorization", "Bearer " + user.accessToken()))
@@ -84,7 +84,7 @@ class UploadControllerTest {
 
     @Test
     void orphanFilesWithoutDatabaseRecordAreNotServed() throws Exception {
-        RegisteredUser user = register("uploads-orphan@example.com", "Familia Huerfana");
+        RegisteredUser user = register(uniqueEmail("uploads-orphan"), "Familia Huerfana");
         java.nio.file.Path orphan = java.nio.file.Path.of("target/test-uploads",
                 "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg");
         java.nio.file.Files.createDirectories(orphan.getParent());
@@ -97,8 +97,8 @@ class UploadControllerTest {
 
     @Test
     void externalPhotoUrlWithExactLocalUrlDoesNotGrantFileAccess() throws Exception {
-        RegisteredUser owner = register("uploads-real-owner@example.com", "Familia Real");
-        RegisteredUser attacker = register("uploads-suffix-attacker@example.com", "Familia Sufijo");
+        RegisteredUser owner = register(uniqueEmail("uploads-real-owner"), "Familia Real");
+        RegisteredUser attacker = register(uniqueEmail("uploads-suffix-attacker"), "Familia Sufijo");
 
         String ownerRecipeId = createRecipe(owner);
         String photoPath = uploadRecipePhoto(owner, ownerRecipeId);
