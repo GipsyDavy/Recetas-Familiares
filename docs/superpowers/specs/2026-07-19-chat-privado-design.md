@@ -1,8 +1,9 @@
 # Spec: Chat privado 1:1 entre miembros de una familia (Backend + Desktop + Android)
 
-Fecha: 2026-07-19 (addendum de navegación Desktop: 2026-07-22)
-Estado: aprobado en diseño y confirmado por escrito el 2026-07-22 (navegación Desktop, vía
-companion visual de `superpowers:brainstorming`) — listo para `writing-plans`.
+Fecha: 2026-07-19 (addendum de navegación Desktop: 2026-07-22; addendum de navegación Android: 2026-07-23)
+Estado: aprobado en diseño y confirmado por escrito el 2026-07-22 (navegación Desktop) y el
+2026-07-23 (navegación Android), ambos vía companion visual de `superpowers:brainstorming` —
+Android listo para `writing-plans`.
 
 ## Contexto
 
@@ -135,12 +136,23 @@ conversación a terceros).
 
 ### Android
 
-- `ConversationsScreen.kt` (nueva, bandeja de entrada).
-- `ProfileScreen.kt`: nuevo botón "Mensaje" en cada fila de miembro (misma zona que el punto
-  de presencia) → `POST /with/{userId}` → abre `PrivateChatScreen.kt`.
-- `PrivateChatScreen.kt` (nueva): mismo patrón que `ChatScreen.kt`.
+*(estructura de navegación detallada en el addendum 2026-07-23 más abajo)*
+
+- `ConversationsScreen.kt` (nueva): bandeja de entrada a pantalla completa, mismo patrón que
+  `ChatScreen.kt` (icono propio en la `TopAppBar`, no un tab del bottom nav). Tocar una
+  conversación empuja `PrivateChatScreen` en la pila de navegación (stack push, no split-view
+  — a diferencia de Desktop, aquí no hace falta preseleccionar nada en un panel).
+- `PrivateChatScreen.kt` (nueva): mismo patrón que `ChatScreen.kt` — historial, enviar
+  texto/imagen, editar/borrar propio, exportar, borrar-para-mí. Destino de navegación
+  independiente, alcanzable tanto desde `ConversationsScreen` como directamente desde el botón
+  "Mensaje" en `ProfileScreen`.
+- `ProfileScreen.kt` (`FamilyMembersSection`, ya visible a todos los roles — sin fix previo
+  necesario, a diferencia de Desktop): nuevo botón "Mensaje" en cada fila de miembro (misma
+  zona que el punto de presencia) → `POST /with/{userId}` → empuja `PrivateChatScreen`
+  directamente (no pasa por `ConversationsScreen`).
 - `ChatSocket.kt`: mismo tratamiento que Desktop — suscripción al inbox propio al iniciar
-  sesión, suscripción a la conversación específica mientras esa pantalla está abierta.
+  sesión, suscripción a la conversación específica mientras esa pantalla está abierta. Misma
+  conexión ya usada por `startChatBadge()`/`ChatScreen`, no una nueva.
 - Badge global: mismo mecanismo que `RecetasViewModel._chatUnread` (`RecetasViewModel.kt:897-940`),
   ahora indexado por `conversationId` en vez de un único contador global.
 
@@ -206,6 +218,39 @@ sidebar) conteniendo un `SplitPane` — lista de conversaciones a la izquierda,
 El botón "Mensaje" en `FamilyMembersView` (ya spec'd en el punto 3 original) sigue existiendo
 como atajo: crea/recupera la conversación (`POST /with/{otherUserId}`) y navega directamente a
 `ConversationsView` con esa conversación ya seleccionada en el panel derecho.
+
+## Addendum 2026-07-23: navegación Android confirmada
+
+Brainstorming visual (companion en navegador) con 3 opciones de navegación para el cliente
+Android, comparadas como mockups de pantalla móvil (bottom nav con 6 tabs ya existente +
+`TopAppBar` con icono de chat familiar):
+
+- **A. Icono propio en la `TopAppBar`** (🔒, junto al de chat familiar 💬), con su propio badge
+  de no-leídos. Abre `ConversationsScreen` a pantalla completa (bandeja); tocar una conversación
+  empuja `PrivateChatScreen` en la pila de navegación.
+- B. Sin icono propio: el botón "Mensaje" en `FamilyMembersSection` abre `PrivateChatScreen`
+  directamente, sin bandeja central — para ver otra conversación hay que volver a Perfil.
+- C. Bandeja embebida como segunda sección dentro de `ProfileScreen` (sin icono propio en la
+  `TopAppBar`).
+
+**Decisión del usuario: opción A.** Da paridad real con el patrón ya establecido del chat
+familiar (icono + badge + pantalla completa) y una bandeja de conversaciones accesible en un
+toque, sin depender de pasar primero por Perfil.
+
+Confirma y concreta el punto 3 de "Decisiones tomadas en brainstorming (2026-07-19)" para
+Android: la "pantalla nueva Conversaciones" es `ConversationsScreen.kt`, alcanzable desde un
+icono nuevo en la `TopAppBar` (mismo patrón que el icono de chat familiar existente, incluido su
+propio `BadgedBox`). A diferencia de Desktop (donde `PrivateChatView` es un sub-panel embebido
+sin navegación propia, por el modelo de `SplitPane`), en Android `PrivateChatScreen` es un
+**destino de navegación independiente**: se alcanza tanto empujándolo desde una fila de
+`ConversationsScreen` como directamente desde el botón "Mensaje" en `FamilyMembersSection` — no
+hace falta forzar el paso por la bandeja primero, ya que no existe la restricción de "panel
+derecho que necesita una conversación preseleccionada" que sí tiene el `SplitPane` de Desktop.
+
+Reuso de código: mismo criterio que Desktop — `ConversationsScreen`/`PrivateChatScreen` se
+escriben mirror-eando la estructura de `ChatScreen.kt` en vez de extraer composables
+compartidos. Evita tocar código estable ya probado del chat familiar; la duplicación es pequeña
+y acotada (mismo criterio ya aceptado en backend y Desktop para esta misma feature).
 
 ## Fuera de alcance
 
