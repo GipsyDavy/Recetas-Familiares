@@ -33,17 +33,18 @@ class UserControllerTest {
     /** Regresion: el principal JWT es el userId, no el email (fallaba con 404). */
     @Test
     void returnsAuthenticatedUserProfile() throws Exception {
-        String token = register("me-profile@example.com", "Familia Perfil");
+        String email = uniqueEmail("me-profile");
+        String token = register(email, "Familia Perfil");
 
         mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("me-profile@example.com"))
+                .andExpect(jsonPath("$.email").value(email))
                 .andExpect(jsonPath("$.displayName").value("Profile User"));
     }
 
     @Test
     void updatesDisplayName() throws Exception {
-        String token = register("me-update@example.com", "Familia Update");
+        String token = register(uniqueEmail("me-update"), "Familia Update");
 
         mockMvc.perform(put("/api/v1/users/me")
                         .header("Authorization", "Bearer " + token)
@@ -70,5 +71,9 @@ class UserControllerTest {
                 .andReturn();
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         return response.get("accessToken").asText();
+    }
+
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
     }
 }

@@ -33,7 +33,7 @@ class FavoriteRecipeControllerTest {
 
     @Test
     void createsListsRestoresAndSoftDeletesFavoriteRecipe() throws Exception {
-        RegisteredUser user = register("favorite-owner@example.com", "Familia Favoritos");
+        RegisteredUser user = register(uniqueEmail("favorite-owner"), "Familia Favoritos");
         String recipeId = read(createRecipe(user, "Arroz favorito").andReturn(), "id");
         MvcResult created = createFavorite(user, recipeId).andReturn();
         String favoriteId = read(created, "id");
@@ -61,8 +61,8 @@ class FavoriteRecipeControllerTest {
 
     @Test
     void blocksFavoriteAccessToAnotherFamilyAndRejectsForeignRecipe() throws Exception {
-        RegisteredUser first = register("favorite-one@example.com", "Familia Favoritos Uno");
-        RegisteredUser second = register("favorite-two@example.com", "Familia Favoritos Dos");
+        RegisteredUser first = register(uniqueEmail("favorite-one"), "Familia Favoritos Uno");
+        RegisteredUser second = register(uniqueEmail("favorite-two"), "Familia Favoritos Dos");
         String secondRecipeId = read(createRecipe(second, "Receta privada").andReturn(), "id");
         String favoriteId = read(createFavorite(second, secondRecipeId).andReturn(), "id");
 
@@ -87,7 +87,7 @@ class FavoriteRecipeControllerTest {
 
     @Test
     void validatesFavoriteInput() throws Exception {
-        RegisteredUser user = register("favorite-validation@example.com", "Familia Favoritos Validacion");
+        RegisteredUser user = register(uniqueEmail("favorite-validation"), "Familia Favoritos Validacion");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/favorite-recipes", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -164,4 +164,8 @@ class FavoriteRecipeControllerTest {
 
     private record RegisteredUser(String accessToken, String familyId) {
     }
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }

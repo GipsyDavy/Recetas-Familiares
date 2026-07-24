@@ -32,7 +32,7 @@ class RecipeRatingControllerTest {
 
     @Test
     void createsListsUpdatesAndSoftDeletesRating() throws Exception {
-        RegisteredUser user = register("rating-owner@example.com", "Familia Ratings");
+        RegisteredUser user = register(uniqueEmail("rating-owner"), "Familia Ratings");
         String recipeId = createRecipe(user, "Tortilla española");
 
         MvcResult created = mockMvc.perform(post(ratingsUrl(user, recipeId))
@@ -81,7 +81,7 @@ class RecipeRatingControllerTest {
 
     @Test
     void rejectsDuplicateRatingBySameUser() throws Exception {
-        RegisteredUser user = register("rating-dup@example.com", "Familia Dup Rating");
+        RegisteredUser user = register(uniqueEmail("rating-dup"), "Familia Dup Rating");
         String recipeId = createRecipe(user, "Gazpacho");
 
         mockMvc.perform(post(ratingsUrl(user, recipeId))
@@ -105,7 +105,7 @@ class RecipeRatingControllerTest {
 
     @Test
     void rejectsStarsOutOfRange() throws Exception {
-        RegisteredUser user = register("rating-val@example.com", "Familia Val Rating");
+        RegisteredUser user = register(uniqueEmail("rating-val"), "Familia Val Rating");
         String recipeId = createRecipe(user, "Paella");
 
         mockMvc.perform(post(ratingsUrl(user, recipeId))
@@ -129,8 +129,8 @@ class RecipeRatingControllerTest {
 
     @Test
     void blocksRatingAccessAcrossFamilies() throws Exception {
-        RegisteredUser owner = register("rating-priv@example.com", "Familia Privada Rating");
-        RegisteredUser other = register("rating-other@example.com", "Familia Otra Rating");
+        RegisteredUser owner = register(uniqueEmail("rating-priv"), "Familia Privada Rating");
+        RegisteredUser other = register(uniqueEmail("rating-other"), "Familia Otra Rating");
         String recipeId = createRecipe(owner, "Receta privada");
 
         mockMvc.perform(post(ratingsUrl(owner, recipeId))
@@ -150,8 +150,8 @@ class RecipeRatingControllerTest {
 
     @Test
     void aggregatesRatingsFromMultipleUsers() throws Exception {
-        RegisteredUser owner  = register("rating-multi-owner@example.com", "Familia Multi Rating");
-        RegisteredUser member = register("rating-multi-member@example.com", "Familia Multi Rating Member");
+        RegisteredUser owner  = register(uniqueEmail("rating-multi-owner"), "Familia Multi Rating");
+        RegisteredUser member = register(uniqueEmail("rating-multi-member"), "Familia Multi Rating Member");
         String recipeId = createRecipe(owner, "Croquetas");
 
         // Add member to same family (not possible via API in current design — each register creates own family)
@@ -217,4 +217,8 @@ class RecipeRatingControllerTest {
     }
 
     private record RegisteredUser(String accessToken, String familyId, String userId) {}
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }

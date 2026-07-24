@@ -40,11 +40,11 @@ class FamilyControllerTest {
     @Test
     void listsOnlyFamiliesOwnedByAuthenticatedUser() throws Exception {
         String firstAccessToken = registerAndReadAccessToken(
-                "familia-uno@example.com",
+                uniqueEmail("familia-uno"),
                 "Familia Uno"
         );
         String secondAccessToken = registerAndReadAccessToken(
-                "familia-dos@example.com",
+                uniqueEmail("familia-dos"),
                 "Familia Dos"
         );
 
@@ -65,7 +65,7 @@ class FamilyControllerTest {
 
     @Test
     void createsAdditionalFamilyForOwnerAndListsBothMemberships() throws Exception {
-        RegisteredUser user = register("familia-create-owner@example.com", "Familia Principal");
+        RegisteredUser user = register(uniqueEmail("familia-create-owner"), "Familia Principal");
 
         mockMvc.perform(post("/api/v1/families")
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -88,8 +88,8 @@ class FamilyControllerTest {
 
     @Test
     void blocksMemberOnlyUserFromCreatingAdditionalFamily() throws Exception {
-        RegisteredUser owner = register("familia-create-admin@example.com", "Familia Admin");
-        RegisteredUser member = register("familia-create-member@example.com", "Familia Temporal");
+        RegisteredUser owner = register(uniqueEmail("familia-create-admin"), "Familia Admin");
+        RegisteredUser member = register(uniqueEmail("familia-create-member"), "Familia Temporal");
         Instant now = Instant.now();
         jdbcTemplate.update(
                 """
@@ -127,7 +127,7 @@ class FamilyControllerTest {
     /** COD-4: lastActivityAt debe reflejar actividad de cualquier entidad, no solo recetas. */
     @Test
     void statsLastActivityCoversNonRecipeEntities() throws Exception {
-        RegisteredUser user = register("familia-stats@example.com", "Familia Stats");
+        RegisteredUser user = register(uniqueEmail("familia-stats"), "Familia Stats");
 
         // Sin actividad: lastActivityAt null
         mockMvc.perform(get("/api/v1/families/{familyId}/stats", user.familyId())
@@ -153,7 +153,7 @@ class FamilyControllerTest {
 
     @Test
     void statsLastActivityCoversStockMenuAndShoppingWithoutRecipes() throws Exception {
-        RegisteredUser stockUser = register("familia-stats-stock@example.com", "Familia Stats Stock");
+        RegisteredUser stockUser = register(uniqueEmail("familia-stats-stock"), "Familia Stats Stock");
         mockMvc.perform(post("/api/v1/families/{familyId}/stock-items", stockUser.familyId())
                         .header("Authorization", "Bearer " + stockUser.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -163,7 +163,7 @@ class FamilyControllerTest {
                 .andExpect(status().isCreated());
         assertStatsHasActivity(stockUser);
 
-        RegisteredUser menuUser = register("familia-stats-menu@example.com", "Familia Stats Menu");
+        RegisteredUser menuUser = register(uniqueEmail("familia-stats-menu"), "Familia Stats Menu");
         mockMvc.perform(post("/api/v1/families/{familyId}/menu-items", menuUser.familyId())
                         .header("Authorization", "Bearer " + menuUser.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -173,7 +173,7 @@ class FamilyControllerTest {
                 .andExpect(status().isCreated());
         assertStatsHasActivity(menuUser);
 
-        RegisteredUser shoppingUser = register("familia-stats-shopping@example.com", "Familia Stats Shopping");
+        RegisteredUser shoppingUser = register(uniqueEmail("familia-stats-shopping"), "Familia Stats Shopping");
         mockMvc.perform(post("/api/v1/families/{familyId}/shopping-lists", shoppingUser.familyId())
                         .header("Authorization", "Bearer " + shoppingUser.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -186,7 +186,7 @@ class FamilyControllerTest {
 
     @Test
     void statsLastActivityCoversFavoritesIndependentlyFromRecipeTimestamp() throws Exception {
-        RegisteredUser user = register("familia-stats-favorite@example.com", "Familia Stats Favorite");
+        RegisteredUser user = register(uniqueEmail("familia-stats-favorite"), "Familia Stats Favorite");
         String recipeId = read(createRecipe(user, "Receta favorita").andReturn(), "id");
         jdbcTemplate.update(
                 "UPDATE recipes SET updated_at = ? WHERE id = ?",
@@ -262,4 +262,8 @@ class FamilyControllerTest {
 
     private record RegisteredUser(String accessToken, String familyId, String userId) {
     }
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }

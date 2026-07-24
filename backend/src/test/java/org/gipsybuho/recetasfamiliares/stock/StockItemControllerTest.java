@@ -35,7 +35,7 @@ class StockItemControllerTest {
 
     @Test
     void createsListsUpdatesAndSoftDeletesStockItem() throws Exception {
-        RegisteredUser user = register("stock-owner@example.com", "Familia Stock");
+        RegisteredUser user = register(uniqueEmail("stock-owner"), "Familia Stock");
         MvcResult created = createStockItem(user, "Arroz").andReturn();
         String stockItemId = read(created, "id");
 
@@ -76,8 +76,8 @@ class StockItemControllerTest {
 
     @Test
     void blocksStockAccessToAnotherFamily() throws Exception {
-        RegisteredUser first = register("stock-one@example.com", "Familia Stock Uno");
-        RegisteredUser second = register("stock-two@example.com", "Familia Stock Dos");
+        RegisteredUser first = register(uniqueEmail("stock-one"), "Familia Stock Uno");
+        RegisteredUser second = register(uniqueEmail("stock-two"), "Familia Stock Dos");
         MvcResult created = createStockItem(second, "Aceite").andReturn();
         String stockItemId = read(created, "id");
 
@@ -92,7 +92,7 @@ class StockItemControllerTest {
 
     @Test
     void validatesStockInput() throws Exception {
-        RegisteredUser user = register("stock-validation@example.com", "Familia Stock Validacion");
+        RegisteredUser user = register(uniqueEmail("stock-validation"), "Familia Stock Validacion");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/stock-items", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -156,4 +156,8 @@ class StockItemControllerTest {
 
     private record RegisteredUser(String accessToken, String familyId) {
     }
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }

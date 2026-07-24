@@ -34,21 +34,22 @@ class AuthControllerTest {
 
     @Test
     void registerCreatesFamilyAndIssuesTokens() throws Exception {
+        String email = uniqueEmail("maria");
         MvcResult registered = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "maria@example.com",
+                                  "email": "%s",
                                   "displayName": "Maria",
                                   "password": "very-secure-password",
                                   "familyName": "Familia Cocina"
                                 }
-                                """))
+                                """.formatted(email)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.accessToken", not(isEmptyOrNullString())))
                 .andExpect(jsonPath("$.refreshToken", not(isEmptyOrNullString())))
-                .andExpect(jsonPath("$.user.email").value("maria@example.com"))
+                .andExpect(jsonPath("$.user.email").value(email))
                 .andExpect(jsonPath("$.family.name").value("Familia Cocina"))
                 .andReturn();
 
@@ -62,16 +63,17 @@ class AuthControllerTest {
 
     @Test
     void loginRefreshAndLogoutFollowTokenContract() throws Exception {
-        register("ana@example.com");
+        String email = uniqueEmail("ana");
+        register(email);
 
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "ana@example.com",
+                                  "email": "%s",
                                   "password": "very-secure-password"
                                 }
-                                """))
+                                """.formatted(email)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken", notNullValue()))
                 .andExpect(jsonPath("$.refreshToken", notNullValue()))
@@ -134,5 +136,9 @@ class AuthControllerTest {
     private String read(MvcResult result, String field) throws Exception {
         JsonNode node = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         return node.get(field).asText();
+    }
+
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
     }
 }

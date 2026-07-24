@@ -35,7 +35,7 @@ class FamilyNoteControllerTest {
 
     @Test
     void createsListsUpdatesAndSoftDeletesFamilyNote() throws Exception {
-        RegisteredUser user = register("note-owner@example.com", "Familia Notas");
+        RegisteredUser user = register(uniqueEmail("note-owner"), "Familia Notas");
         String recipeId = read(createRecipe(user, "Croquetas de la abuela").andReturn(), "id");
         MvcResult created = createNote(user, recipeId, "Recuerdo familiar").andReturn();
         String noteId = read(created, "id");
@@ -76,8 +76,8 @@ class FamilyNoteControllerTest {
 
     @Test
     void blocksNoteAccessToAnotherFamilyAndRejectsForeignRecipe() throws Exception {
-        RegisteredUser first = register("note-one@example.com", "Familia Notas Uno");
-        RegisteredUser second = register("note-two@example.com", "Familia Notas Dos");
+        RegisteredUser first = register(uniqueEmail("note-one"), "Familia Notas Uno");
+        RegisteredUser second = register(uniqueEmail("note-two"), "Familia Notas Dos");
         String secondRecipeId = read(createRecipe(second, "Receta privada").andReturn(), "id");
         String noteId = read(createNote(second, secondRecipeId, "Nota privada").andReturn(), "id");
 
@@ -105,7 +105,7 @@ class FamilyNoteControllerTest {
 
     @Test
     void validatesNoteInput() throws Exception {
-        RegisteredUser user = register("note-validation@example.com", "Familia Notas Validacion");
+        RegisteredUser user = register(uniqueEmail("note-validation"), "Familia Notas Validacion");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/notes", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -186,4 +186,8 @@ class FamilyNoteControllerTest {
 
     private record RegisteredUser(String accessToken, String familyId) {
     }
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }

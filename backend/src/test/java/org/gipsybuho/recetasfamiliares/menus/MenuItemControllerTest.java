@@ -35,7 +35,7 @@ class MenuItemControllerTest {
 
     @Test
     void createsListsUpdatesAndSoftDeletesMenuItem() throws Exception {
-        RegisteredUser user = register("menu-owner@example.com", "Familia Menu");
+        RegisteredUser user = register(uniqueEmail("menu-owner"), "Familia Menu");
         String recipeId = read(createRecipe(user, "Lentejas del lunes").andReturn(), "id");
         MvcResult created = createMenuItem(user, recipeId, "2026-06-01", "LUNCH").andReturn();
         String menuItemId = read(created, "id");
@@ -77,8 +77,8 @@ class MenuItemControllerTest {
 
     @Test
     void blocksMenuAccessToAnotherFamilyAndRejectsForeignRecipe() throws Exception {
-        RegisteredUser first = register("menu-one@example.com", "Familia Menu Uno");
-        RegisteredUser second = register("menu-two@example.com", "Familia Menu Dos");
+        RegisteredUser first = register(uniqueEmail("menu-one"), "Familia Menu Uno");
+        RegisteredUser second = register(uniqueEmail("menu-two"), "Familia Menu Dos");
         String secondRecipeId = read(createRecipe(second, "Tortilla privada").andReturn(), "id");
         String menuItemId = read(createMenuItem(second, secondRecipeId, "2026-06-01", "DINNER").andReturn(), "id");
 
@@ -105,7 +105,7 @@ class MenuItemControllerTest {
 
     @Test
     void validatesMenuInput() throws Exception {
-        RegisteredUser user = register("menu-validation@example.com", "Familia Menu Validacion");
+        RegisteredUser user = register(uniqueEmail("menu-validation"), "Familia Menu Validacion");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/menu-items", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -190,4 +190,8 @@ class MenuItemControllerTest {
 
     private record RegisteredUser(String accessToken, String familyId) {
     }
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }

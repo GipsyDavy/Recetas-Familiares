@@ -58,7 +58,7 @@ class RecipeControllerTest {
 
     @Test
     void createsAndListsRecipesForAuthenticatedFamilyMember() throws Exception {
-        RegisteredUser user = register("recipes-owner@example.com", "Familia Recetas");
+        RegisteredUser user = register(uniqueEmail("recipes-owner"), "Familia Recetas");
 
         createRecipe(user, "Tortilla familiar")
                 .andExpect(jsonPath("$.id", notNullValue()))
@@ -79,7 +79,7 @@ class RecipeControllerTest {
 
     @Test
     void getsUpdatesAndSoftDeletesRecipe() throws Exception {
-        RegisteredUser user = register("recipes-crud@example.com", "Familia CRUD");
+        RegisteredUser user = register(uniqueEmail("recipes-crud"), "Familia CRUD");
         MvcResult created = createRecipe(user, "Gazpacho familiar").andReturn();
         String recipeId = read(created, "id");
 
@@ -124,8 +124,8 @@ class RecipeControllerTest {
 
     @Test
     void blocksRecipeAccessToAnotherFamily() throws Exception {
-        RegisteredUser first = register("recipes-one@example.com", "Familia Uno");
-        RegisteredUser second = register("recipes-two@example.com", "Familia Dos");
+        RegisteredUser first = register(uniqueEmail("recipes-one"), "Familia Uno");
+        RegisteredUser second = register(uniqueEmail("recipes-two"), "Familia Dos");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/recipes", second.familyId())
                         .header("Authorization", "Bearer " + first.accessToken())
@@ -167,9 +167,10 @@ class RecipeControllerTest {
 
     @Test
     void allowsFamilyMembersToReadButOnlyOwnersAndAdminsCanWrite() throws Exception {
-        RegisteredUser owner = register("recipes-role-owner@example.com", "Familia Roles");
-        RegisteredUser member = register("recipes-role-member@example.com", "Familia Invitada");
-        addFamilyMember(owner.familyId(), "recipes-role-member@example.com", FamilyRole.MEMBER);
+        RegisteredUser owner = register(uniqueEmail("recipes-role-owner"), "Familia Roles");
+        String memberEmail = uniqueEmail("recipes-role-member");
+        RegisteredUser member = register(memberEmail, "Familia Invitada");
+        addFamilyMember(owner.familyId(), memberEmail, FamilyRole.MEMBER);
         createRecipe(owner, "Receta visible para miembro");
 
         mockMvc.perform(get("/api/v1/families/{familyId}/recipes", owner.familyId())
@@ -203,7 +204,7 @@ class RecipeControllerTest {
 
     @Test
     void validatesRecipeInput() throws Exception {
-        RegisteredUser user = register("recipes-validation@example.com", "Familia Validacion");
+        RegisteredUser user = register(uniqueEmail("recipes-validation"), "Familia Validacion");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/recipes", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -220,7 +221,7 @@ class RecipeControllerTest {
 
     @Test
     void copiesRecipeContentToAnotherOwnedFamily() throws Exception {
-        RegisteredUser user = register("recipes-copy-owner@example.com", "Familia Origen");
+        RegisteredUser user = register(uniqueEmail("recipes-copy-owner"), "Familia Origen");
         MvcResult source = createRecipe(user, "Paella familiar").andReturn();
         String recipeId = read(source, "id");
         mockMvc.perform(put("/api/v1/families/{familyId}/recipes/{recipeId}/ingredients", user.familyId(), recipeId)
@@ -281,11 +282,12 @@ class RecipeControllerTest {
 
     @Test
     void copyRecipeRequiresSourceMembershipAndTargetWriteAccess() throws Exception {
-        RegisteredUser sourceOwner = register("recipes-copy-source@example.com", "Familia Fuente");
-        RegisteredUser targetOwner = register("recipes-copy-target@example.com", "Familia Destino Protegida");
+        String sourceOwnerEmail = uniqueEmail("recipes-copy-source");
+        RegisteredUser sourceOwner = register(sourceOwnerEmail, "Familia Fuente");
+        RegisteredUser targetOwner = register(uniqueEmail("recipes-copy-target"), "Familia Destino Protegida");
         MvcResult source = createRecipe(sourceOwner, "Receta Fuente").andReturn();
         String recipeId = read(source, "id");
-        addFamilyMember(targetOwner.familyId(), "recipes-copy-source@example.com", FamilyRole.MEMBER);
+        addFamilyMember(targetOwner.familyId(), sourceOwnerEmail, FamilyRole.MEMBER);
 
         mockMvc.perform(post("/api/v1/families/{familyId}/recipes/{recipeId}/copy",
                         sourceOwner.familyId(),
@@ -311,7 +313,7 @@ class RecipeControllerTest {
 
     @Test
     void replacesAndListsRecipeIngredientsInOrder() throws Exception {
-        RegisteredUser user = register("recipe-ingredients@example.com", "Familia Ingredientes");
+        RegisteredUser user = register(uniqueEmail("recipe-ingredients"), "Familia Ingredientes");
         MvcResult created = createRecipe(user, "Croquetas familiares").andReturn();
         String recipeId = read(created, "id");
 
@@ -380,7 +382,7 @@ class RecipeControllerTest {
 
     @Test
     void replacesAndListsRecipeStepsInOrder() throws Exception {
-        RegisteredUser user = register("recipe-steps@example.com", "Familia Pasos");
+        RegisteredUser user = register(uniqueEmail("recipe-steps"), "Familia Pasos");
         MvcResult created = createRecipe(user, "Bizcocho familiar").andReturn();
         String recipeId = read(created, "id");
 
@@ -417,7 +419,7 @@ class RecipeControllerTest {
 
     @Test
     void softDeletesRecipeContentWhenDeletingRecipe() throws Exception {
-        RegisteredUser user = register("recipe-delete-content@example.com", "Familia Borrado Contenido");
+        RegisteredUser user = register(uniqueEmail("recipe-delete-content"), "Familia Borrado Contenido");
         MvcResult created = createRecipe(user, "Sopa familiar").andReturn();
         String recipeId = read(created, "id");
 
@@ -469,8 +471,8 @@ class RecipeControllerTest {
 
     @Test
     void blocksRecipeContentAccessToAnotherFamily() throws Exception {
-        RegisteredUser first = register("recipe-content-one@example.com", "Familia Contenido Uno");
-        RegisteredUser second = register("recipe-content-two@example.com", "Familia Contenido Dos");
+        RegisteredUser first = register(uniqueEmail("recipe-content-one"), "Familia Contenido Uno");
+        RegisteredUser second = register(uniqueEmail("recipe-content-two"), "Familia Contenido Dos");
         MvcResult secondRecipe = createRecipe(second, "Receta familiar privada").andReturn();
         String secondRecipeId = read(secondRecipe, "id");
 
@@ -497,7 +499,7 @@ class RecipeControllerTest {
 
     @Test
     void validatesRecipeContentInput() throws Exception {
-        RegisteredUser user = register("recipe-content-validation@example.com", "Familia Contenido Validacion");
+        RegisteredUser user = register(uniqueEmail("recipe-content-validation"), "Familia Contenido Validacion");
         MvcResult created = createRecipe(user, "Arroz familiar").andReturn();
         String recipeId = read(created, "id");
 
@@ -578,5 +580,9 @@ class RecipeControllerTest {
     }
 
     private record RegisteredUser(String accessToken, String familyId) {
+    }
+
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
     }
 }

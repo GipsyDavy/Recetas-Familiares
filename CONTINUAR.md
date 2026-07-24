@@ -4061,3 +4061,78 @@ skill formal. `/security-review` no invocado (no se toco backend ni Spring Secur
 sprint — solo cliente Android consumiendo contratos ya auditados). Riesgo residual explicito:
 el hallazgo de deuda tecnica del ping de inbox (arriba, `paraImplementar.txt` item 25) y la
 prueba manual con dos dispositivos, ambos sin resolver por decision consciente de alcance.
+
+---
+
+### Cierre de sprint 2026-07-24 — deuda tecnica de tests backend resuelta: 96 fallos -> 0
+
+Usuario delego la eleccion del siguiente sprint ("continua con que consideres necesario").
+Elegido: la deuda tecnica de tests backend ya diagnosticada (colision de emails fijos contra
+datos acumulados en la BD de test **persistente** de Hetzner), documentada desde sesiones
+anteriores y explicitamente pendiente de autorizacion. Motivo de la eleccion: mecanica, ya
+diagnosticada y con patron de fix ya probado (`uniqueEmail()`), sin tocar comportamiento de
+produccion, y restaura la señal real de CI para todo trabajo backend futuro — la opcion mas
+segura y fundamentada de las presentadas, frente a tocar el backend ya en produccion (item 25)
+o pulido visual (item 23).
+
+**Verificacion de estado real antes de empezar (no se asumio el diagnostico de sesiones
+anteriores sin comprobar):** WireGuard (`WireGuardTunnel$RecetasHetzner`) ya activo. Suite
+completa ejecutada contra la BD real: **195 tests, 96 fallos, 0 errores** — coincide exactamente
+con lo documentado. Confirmado con un `grep` que **el 100% de los 96 fallos** comparte el mismo
+patron (`register:XXX Status expected:<201> but was:<409>`), sin ninguna causa distinta mezclada.
+14 clases exactas, mismo recuento que lo ya documentado (`SyncControllerTest` 19,
+`FamilyMemberControllerTest` 17, `ChatControllerTest` 14, `RecipeControllerTest` 12,
+`FamilyControllerTest` 6, `RecipeRatingControllerTest` 5, `ShoppingListControllerTest` 4,
+`StockItemControllerTest`/`RecipePhotoControllerTest`/`MenuItemControllerTest`/`FavoriteRecipeControllerTest`/`FamilyNoteControllerTest`
+3 cada una, `UserControllerTest`/`AuthControllerTest` 2 cada una).
+
+**Decision de ejecucion:** dado el patron de subagentes devolviendo informes-stub muy agravado
+en el sprint anterior (Android), y que esta tarea es mecanica pero con riesgo real de correctud
+(varios tests reusan el mismo email deliberadamente para probar deteccion de duplicados —
+romperlo silenciosamente habria sido peor que el bug original), se hizo **directamente, sin
+subagentes**: 10 de los 14 archivos son un patron simple (`register(email, familia)`, cada email
+usado una sola vez, mismo helper `uniqueEmail(prefix)` ya probado en 4 clases previas
+(`UploadControllerTest`, `PrivateChatControllerTest`, `PresenceControllerTest`,
+`RecipeRankingControllerTest`)) y se arreglaron con un script `sed` verificado antes/despues por
+archivo. Los otros 4 (`AuthControllerTest`, `UserControllerTest`, `RecipeControllerTest`,
+`FamilyMemberControllerTest`) reusan el mismo email en varios sitios dentro de un mismo test
+(JSON embebido, aserciones `jsonPath`, helpers de busqueda por email) — se leyeron en su
+totalidad antes de tocarlos y se arreglaron a mano introduciendo variables locales para preservar
+la reutilizacion deliberada. Un primer intento de `sed` masivo sobre `FamilyMemberControllerTest.java`
+genero codigo Java invalido (sustituyo literales **dentro de text blocks JSON** por llamadas a
+metodo, que un text block trata como texto plano, no codigo) — revertido con `git checkout --`
+antes de cualquier commit y rehecho a mano, archivo completo, 17 tests, uno a uno.
+
+**Hallazgo nuevo durante la verificacion, no en el diagnostico original:** al arreglar el email
+de `ChatControllerTest`, 2 tests que antes fallaban en el `register()` (enmascarando el problema
+real) pasaron a fallar **mas adelante**, en un `clientId` de mensaje **fijo** (UUID literal
+hardcodeado, ej. `"11111111-1111-4111-8111-111111111111"`) que tambien colisionaba con datos
+acumulados — mismo patron de fondo, campo distinto. Encontrado y corregido: reemplazados por
+`UUID.randomUUID().toString()`, preservando la variable compartida donde el test exige
+deliberadamente el mismo id dos veces (prueba de idempotencia). Se investigo si el mismo patron
+existia en otras clases: `SyncControllerTest` tenia **26 literales UUID fijos** mas (ids de
+receta/ingrediente/paso/stock/menu/lista-compra/favorito/nota/foto sincronizados), causando fallos
+500 en 9 de sus 19 tests una vez que el registro ya no bloqueaba antes — corregidos igual, los 26
+reemplazados por `UUID.randomUUID().toString()` (se dejo sin tocar el unico literal embebido en
+un cuerpo JSON de test de validacion, ya que ese request se rechaza por validacion antes de tocar
+la BD, sin riesgo de colision).
+
+**Validacion final (ejecutada esta sesion, contra la BD real, no simulada):**
+`mvn test` completo -> **195 tests, 0 fallos, 0 errores, BUILD SUCCESS**. De 96 fallos a 0.
+Verificado tambien por lotes intermedios (10 clases simples: 63/63; 4 clases complejas: 34/34;
+`ChatControllerTest`+`SyncControllerTest` tras el fix de UUID: 33/33) antes de la corrida completa
+final, para aislar cualquier regresion por archivo antes de darlo por bueno.
+
+**Archivos modificados:** los 14 archivos de test de las clases listadas arriba (cada uno con su
+propio `uniqueEmail(prefix)` privado, mismo patron que las 4 clases que ya lo tenian) +
+`ChatControllerTest.java`/`SyncControllerTest.java` con el fix adicional de UUID.
+Ningun archivo de produccion tocado — cambio 100% en tests.
+
+**Trazabilidad:** agente lider Claude Code (Sonnet 5), sin subagentes en este sprint (decision
+explicita, ver arriba). Sin skills de proceso `superpowers` invocadas formalmente — tarea de
+naturaleza mecanica con causa raiz ya diagnosticada y verificada en sesiones previas (no aplica
+`systematic-debugging` desde cero); se aplico el mismo criterio pragmatico que ya se uso para el
+resto de deuda tecnica de este proyecto. `/VibeSec`/`security-review` no aplican: cambio
+exclusivamente en codigo de test, sin tocar autenticacion, autorizacion, imagenes ni datos de
+produccion. Riesgo residual: ninguno identificado — los 14 archivos quedan verificados 1:1 contra
+la BD de test real, no solo compilados.

@@ -35,7 +35,7 @@ class RecipePhotoControllerTest {
 
     @Test
     void createsListsUpdatesAndSoftDeletesRecipePhotoMetadata() throws Exception {
-        RegisteredUser user = register("photo-owner@example.com", "Familia Fotos");
+        RegisteredUser user = register(uniqueEmail("photo-owner"), "Familia Fotos");
         String recipeId = read(createRecipe(user, "Tarta con foto").andReturn(), "id");
         MvcResult created = createPhoto(user, recipeId, "https://cdn.example.com/tarta.jpg").andReturn();
         String photoId = read(created, "id");
@@ -85,8 +85,8 @@ class RecipePhotoControllerTest {
 
     @Test
     void blocksPhotoAccessToAnotherFamily() throws Exception {
-        RegisteredUser first = register("photo-one@example.com", "Familia Fotos Uno");
-        RegisteredUser second = register("photo-two@example.com", "Familia Fotos Dos");
+        RegisteredUser first = register(uniqueEmail("photo-one"), "Familia Fotos Uno");
+        RegisteredUser second = register(uniqueEmail("photo-two"), "Familia Fotos Dos");
         String secondRecipeId = read(createRecipe(second, "Foto privada").andReturn(), "id");
         String photoId = read(createPhoto(second, secondRecipeId, "https://cdn.example.com/private.jpg").andReturn(), "id");
 
@@ -101,7 +101,7 @@ class RecipePhotoControllerTest {
 
     @Test
     void validatesPhotoMetadata() throws Exception {
-        RegisteredUser user = register("photo-validation@example.com", "Familia Fotos Validacion");
+        RegisteredUser user = register(uniqueEmail("photo-validation"), "Familia Fotos Validacion");
         String recipeId = read(createRecipe(user, "Foto invalida").andReturn(), "id");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/recipes/{recipeId}/photos", user.familyId(), recipeId)
@@ -186,4 +186,8 @@ class RecipePhotoControllerTest {
 
     private record RegisteredUser(String accessToken, String familyId) {
     }
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }

@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import javax.imageio.ImageIO;
 
@@ -49,8 +50,8 @@ class ChatControllerTest {
 
     @Test
     void sendsListsWithEmojiAndIsIdempotentByClientId() throws Exception {
-        RegisteredUser user = register("chat-basic@example.com", "Familia Chat");
-        String clientId = "11111111-1111-4111-8111-111111111111";
+        RegisteredUser user = register(uniqueEmail("chat-basic"), "Familia Chat");
+        String clientId = UUID.randomUUID().toString();
         String emojiBody = "Hola familia 👩‍🍳 🍲";
 
         send(user, clientId, emojiBody)
@@ -76,8 +77,8 @@ class ChatControllerTest {
 
     @Test
     void blocksChatAccessAcrossFamilies() throws Exception {
-        RegisteredUser first = register("chat-fam-one@example.com", "Familia Uno");
-        RegisteredUser second = register("chat-fam-two@example.com", "Familia Dos");
+        RegisteredUser first = register(uniqueEmail("chat-fam-one"), "Familia Uno");
+        RegisteredUser second = register(uniqueEmail("chat-fam-two"), "Familia Dos");
         send(second, null, "Mensaje privado").andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/v1/families/{familyId}/chat/messages", second.familyId())
@@ -95,8 +96,8 @@ class ChatControllerTest {
 
     @Test
     void clearHidesHistoryOnlyForClearingUser() throws Exception {
-        RegisteredUser owner = register("chat-clear-owner@example.com", "Familia Clear");
-        RegisteredUser guest = registerAndJoin("chat-clear-guest@example.com", owner);
+        RegisteredUser owner = register(uniqueEmail("chat-clear-owner"), "Familia Clear");
+        RegisteredUser guest = registerAndJoin(uniqueEmail("chat-clear-guest"), owner);
 
         send(owner, null, "Primer recuerdo").andExpect(status().isCreated());
         send(owner, null, "Segundo recuerdo").andExpect(status().isCreated());
@@ -134,7 +135,7 @@ class ChatControllerTest {
 
     @Test
     void exportReflectsUserViewAscending() throws Exception {
-        RegisteredUser user = register("chat-export@example.com", "Familia Export");
+        RegisteredUser user = register(uniqueEmail("chat-export"), "Familia Export");
         send(user, null, "Uno").andExpect(status().isCreated());
         send(user, null, "Dos").andExpect(status().isCreated());
 
@@ -159,7 +160,7 @@ class ChatControllerTest {
 
     @Test
     void paginatesHistoryByCursorWithoutLosingMessages() throws Exception {
-        RegisteredUser user = register("chat-page@example.com", "Familia Page");
+        RegisteredUser user = register(uniqueEmail("chat-page"), "Familia Page");
         Set<String> sent = new HashSet<>();
         sent.add(read(send(user, null, "m1").andReturn(), "id"));
         sent.add(read(send(user, null, "m2").andReturn(), "id"));
@@ -191,7 +192,7 @@ class ChatControllerTest {
 
     @Test
     void editsOwnRecentMessageAndHistoryReflectsUpdate() throws Exception {
-        RegisteredUser user = register("chat-edit-owner@example.com", "Familia Edit");
+        RegisteredUser user = register(uniqueEmail("chat-edit-owner"), "Familia Edit");
         String messageId = read(send(user, null, "Antes").andReturn(), "id");
 
         mockMvc.perform(put("/api/v1/families/{familyId}/chat/messages/{messageId}",
@@ -217,8 +218,8 @@ class ChatControllerTest {
 
     @Test
     void blocksEditingOrDeletingAnotherMembersMessage() throws Exception {
-        RegisteredUser owner = register("chat-edit-owner-block@example.com", "Familia Edit Block");
-        RegisteredUser guest = registerAndJoin("chat-edit-guest-block@example.com", owner);
+        RegisteredUser owner = register(uniqueEmail("chat-edit-owner-block"), "Familia Edit Block");
+        RegisteredUser guest = registerAndJoin(uniqueEmail("chat-edit-guest-block"), owner);
         String messageId = read(send(owner, null, "Mensaje del owner").andReturn(), "id");
 
         mockMvc.perform(put("/api/v1/families/{familyId}/chat/messages/{messageId}",
@@ -244,7 +245,7 @@ class ChatControllerTest {
 
     @Test
     void rejectsEditAfterFifteenMinuteWindow() throws Exception {
-        RegisteredUser user = register("chat-edit-expired@example.com", "Familia Edit Expired");
+        RegisteredUser user = register(uniqueEmail("chat-edit-expired"), "Familia Edit Expired");
         String messageId = read(send(user, null, "Mensaje antiguo").andReturn(), "id");
         ChatMessageEntity message = messageRepository.findById(messageId).orElseThrow();
         ReflectionTestUtils.setField(message, "createdAt", Instant.now().minus(Duration.ofMinutes(16)));
@@ -262,7 +263,7 @@ class ChatControllerTest {
 
     @Test
     void softDeletesOwnMessageAndKeepsTombstoneInHistoryAndExport() throws Exception {
-        RegisteredUser user = register("chat-delete-owner@example.com", "Familia Delete");
+        RegisteredUser user = register(uniqueEmail("chat-delete-owner"), "Familia Delete");
         String messageId = read(send(user, null, "Quitar").andReturn(), "id");
 
         mockMvc.perform(delete("/api/v1/families/{familyId}/chat/messages/{messageId}",
@@ -291,7 +292,7 @@ class ChatControllerTest {
 
     @Test
     void rejectsEmptyBody() throws Exception {
-        RegisteredUser user = register("chat-empty@example.com", "Familia Empty");
+        RegisteredUser user = register(uniqueEmail("chat-empty"), "Familia Empty");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/chat/messages", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -305,7 +306,7 @@ class ChatControllerTest {
 
     @Test
     void rateLimitsBurstSends() throws Exception {
-        RegisteredUser user = register("chat-rate@example.com", "Familia Rate");
+        RegisteredUser user = register(uniqueEmail("chat-rate"), "Familia Rate");
         for (int i = 0; i < 10; i++) {
             send(user, null, "msg " + i).andExpect(status().isCreated());
         }
@@ -314,14 +315,14 @@ class ChatControllerTest {
 
     @Test
     void sendsImageMessageAndServesAttachmentsOnlyToFamilyMembers() throws Exception {
-        RegisteredUser owner = register("chat-image-owner@example.com", "Familia Imagen");
-        RegisteredUser guest = registerAndJoin("chat-image-guest@example.com", owner);
-        RegisteredUser outsider = register("chat-image-outsider@example.com", "Familia Ajena Imagen");
+        RegisteredUser owner = register(uniqueEmail("chat-image-owner"), "Familia Imagen");
+        RegisteredUser guest = registerAndJoin(uniqueEmail("chat-image-guest"), owner);
+        RegisteredUser outsider = register(uniqueEmail("chat-image-outsider"), "Familia Ajena Imagen");
 
         MvcResult sent = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
                                 "/api/v1/families/{familyId}/chat/messages/images", owner.familyId())
                         .file(new MockMultipartFile("id", "", "text/plain",
-                                "22222222-2222-4222-8222-222222222222".getBytes(StandardCharsets.UTF_8)))
+                                UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8)))
                         .file(new MockMultipartFile("body", "", "text/plain",
                                 "Mira como quedo la tarta".getBytes(StandardCharsets.UTF_8)))
                         .file(new MockMultipartFile("files", "tarta.jpg", "image/jpeg", validJpeg()))
@@ -354,7 +355,7 @@ class ChatControllerTest {
 
     @Test
     void rejectsFakeImageAttachmentEvenWithAllowedContentType() throws Exception {
-        RegisteredUser user = register("chat-image-fake@example.com", "Familia Fake Imagen");
+        RegisteredUser user = register(uniqueEmail("chat-image-fake"), "Familia Fake Imagen");
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
                                 "/api/v1/families/{familyId}/chat/messages/images", user.familyId())
@@ -366,7 +367,7 @@ class ChatControllerTest {
 
     @Test
     void rejectsMoreThanFiveImageAttachments() throws Exception {
-        RegisteredUser user = register("chat-image-many@example.com", "Familia Muchas Imagenes");
+        RegisteredUser user = register(uniqueEmail("chat-image-many"), "Familia Muchas Imagenes");
         var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
                 "/api/v1/families/{familyId}/chat/messages/images", user.familyId());
         request.header("Authorization", "Bearer " + user.accessToken());
@@ -446,6 +447,10 @@ class ChatControllerTest {
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         JsonNode value = response.get(field);
         return value == null || value.isNull() ? null : value.asText();
+    }
+
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
     }
 
     private void collectIds(MvcResult result, Set<String> target) throws Exception {

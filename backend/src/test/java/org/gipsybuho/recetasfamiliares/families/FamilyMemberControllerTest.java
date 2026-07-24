@@ -33,20 +33,21 @@ class FamilyMemberControllerTest {
 
     @Test
     void listMembersReturnsSelfAsOwner() throws Exception {
-        RegisteredUser user = register("members-self@example.com", "Familia Miembros");
+        String email = uniqueEmail("members-self");
+        RegisteredUser user = register(email, "Familia Miembros");
 
         mockMvc.perform(get("/api/v1/families/{familyId}/members", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].email").value("members-self@example.com"))
+                .andExpect(jsonPath("$[0].email").value(email))
                 .andExpect(jsonPath("$[0].role").value("OWNER"));
     }
 
     @Test
     void listMembersReturnsForbiddenForNonMember() throws Exception {
-        RegisteredUser ownerA = register("members-owner-a@example.com", "Familia A");
-        RegisteredUser userB  = register("members-user-b@example.com", "Familia B");
+        RegisteredUser ownerA = register(uniqueEmail("members-owner-a"), "Familia A");
+        RegisteredUser userB  = register(uniqueEmail("members-user-b"), "Familia B");
 
         mockMvc.perform(get("/api/v1/families/{familyId}/members", ownerA.familyId())
                         .header("Authorization", "Bearer " + userB.accessToken()))
@@ -55,7 +56,7 @@ class FamilyMemberControllerTest {
 
     @Test
     void listMembersRequiresAuthentication() throws Exception {
-        RegisteredUser user = register("members-noauth@example.com", "Familia NoAuth");
+        RegisteredUser user = register(uniqueEmail("members-noauth"), "Familia NoAuth");
 
         mockMvc.perform(get("/api/v1/families/{familyId}/members", user.familyId()))
                 .andExpect(status().isUnauthorized());
@@ -63,7 +64,7 @@ class FamilyMemberControllerTest {
 
     @Test
     void updateOwnerRoleReturnsBadRequest() throws Exception {
-        RegisteredUser user = register("members-role-owner@example.com", "Familia RoleOwner");
+        RegisteredUser user = register(uniqueEmail("members-role-owner"), "Familia RoleOwner");
 
         mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}/role",
                         user.familyId(), user.userId())
@@ -77,7 +78,7 @@ class FamilyMemberControllerTest {
 
     @Test
     void removeSelfReturnsBadRequest() throws Exception {
-        RegisteredUser user = register("members-remove-self@example.com", "Familia RemoveSelf");
+        RegisteredUser user = register(uniqueEmail("members-remove-self"), "Familia RemoveSelf");
 
         mockMvc.perform(delete("/api/v1/families/{familyId}/members/{userId}",
                         user.familyId(), user.userId())
@@ -87,15 +88,16 @@ class FamilyMemberControllerTest {
 
     @Test
     void inviteMemberAddsUserToFamily() throws Exception {
-        RegisteredUser owner  = register("invite-owner@example.com", "Familia Invite");
-        RegisteredUser guest  = register("invite-guest@example.com", "Familia Guest");
+        RegisteredUser owner  = register(uniqueEmail("invite-owner"), "Familia Invite");
+        String guestEmail = uniqueEmail("invite-guest");
+        RegisteredUser guest  = register(guestEmail, "Familia Guest");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "invite-guest@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
                 .andExpect(status().isCreated());
 
         // guest now in the owner's family — members list must have 2 entries
@@ -107,15 +109,16 @@ class FamilyMemberControllerTest {
 
     @Test
     void removeMemberHappyPath() throws Exception {
-        RegisteredUser owner = register("remove-happy-owner@example.com", "Familia RemoveHappy");
-        RegisteredUser guest = register("remove-happy-guest@example.com", "Familia RemoveHappyGuest");
+        RegisteredUser owner = register(uniqueEmail("remove-happy-owner"), "Familia RemoveHappy");
+        String guestEmail = uniqueEmail("remove-happy-guest");
+        RegisteredUser guest = register(guestEmail, "Familia RemoveHappyGuest");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "remove-happy-guest@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(delete("/api/v1/families/{familyId}/members/{userId}",
@@ -132,15 +135,16 @@ class FamilyMemberControllerTest {
 
     @Test
     void updateMemberRoleHappyPath() throws Exception {
-        RegisteredUser owner = register("role-happy-owner@example.com", "Familia RoleHappy");
-        RegisteredUser guest = register("role-happy-guest@example.com", "Familia RoleHappyGuest");
+        RegisteredUser owner = register(uniqueEmail("role-happy-owner"), "Familia RoleHappy");
+        String guestEmail = uniqueEmail("role-happy-guest");
+        RegisteredUser guest = register(guestEmail, "Familia RoleHappyGuest");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "role-happy-guest@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}/role",
@@ -156,40 +160,43 @@ class FamilyMemberControllerTest {
 
     @Test
     void firstOwnerCanCreateAdminMemberChangeRoleAndRemoveMembers() throws Exception {
-        RegisteredUser owner = register("first-owner@example.com", "Familia FirstOwner");
+        String ownerEmail = uniqueEmail("first-owner");
+        RegisteredUser owner = register(ownerEmail, "Familia FirstOwner");
+        String createdAdminEmail = uniqueEmail("created-admin");
+        String createdMemberEmail = uniqueEmail("created-member");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "created-admin@example.com",
+                                  "email": "%s",
                                   "displayName": "Created Admin",
                                   "password": "created-admin-password",
                                   "role": "ADMIN"
                                 }
-                                """))
+                                """.formatted(createdAdminEmail)))
                 .andExpect(status().isCreated());
 
         MvcResult members = mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].email").value("first-owner@example.com"))
+                .andExpect(jsonPath("$[0].email").value(ownerEmail))
                 .andExpect(jsonPath("$[0].role").value("OWNER"))
-                .andExpect(jsonPath("$[1].email").value("created-admin@example.com"))
+                .andExpect(jsonPath("$[1].email").value(createdAdminEmail))
                 .andExpect(jsonPath("$[1].role").value("ADMIN"))
                 .andReturn();
-        String createdAdminId = readUserIdByEmail(members, "created-admin@example.com");
+        String createdAdminId = readUserIdByEmail(members, createdAdminEmail);
 
         MvcResult adminLogin = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "created-admin@example.com",
+                                  "email": "%s",
                                   "password": "created-admin-password"
                                 }
-                                """))
+                                """.formatted(createdAdminEmail)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.family.id").value(owner.familyId()))
                 .andReturn();
@@ -200,22 +207,22 @@ class FamilyMemberControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "created-member@example.com",
+                                  "email": "%s",
                                   "displayName": "Created Member",
                                   "password": "created-member-password",
                                   "role": "MEMBER"
                                 }
-                                """))
+                                """.formatted(createdMemberEmail)))
                 .andExpect(status().isCreated());
 
         MvcResult afterAdminCreate = mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
-                .andExpect(jsonPath("$[2].email").value("created-member@example.com"))
+                .andExpect(jsonPath("$[2].email").value(createdMemberEmail))
                 .andExpect(jsonPath("$[2].role").value("MEMBER"))
                 .andReturn();
-        String createdMemberId = readUserIdByEmail(afterAdminCreate, "created-member@example.com");
+        String createdMemberId = readUserIdByEmail(afterAdminCreate, createdMemberEmail);
 
         mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}/role",
                         owner.familyId(), createdAdminId)
@@ -240,16 +247,17 @@ class FamilyMemberControllerTest {
 
     @Test
     void removeMemberRevokesRefreshToken() throws Exception {
-        RegisteredUser owner = register("revoke-owner@example.com", "Familia Revoke");
-        RegisteredUser guest = register("revoke-guest@example.com", "Familia RevokeGuest");
+        RegisteredUser owner = register(uniqueEmail("revoke-owner"), "Familia Revoke");
+        String guestEmail = uniqueEmail("revoke-guest");
+        RegisteredUser guest = register(guestEmail, "Familia RevokeGuest");
 
         // invite guest to owner's family
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "revoke-guest@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
                 .andExpect(status().isCreated());
 
         // expel guest — triggers bulk token revocation
@@ -269,7 +277,9 @@ class FamilyMemberControllerTest {
 
     @Test
     void updateMemberDetailsWithTemporaryPasswordChangesLoginAndRevokesRefreshToken() throws Exception {
-        RegisteredUser owner = register("edit-temp-owner@example.com", "Familia EditTemp");
+        RegisteredUser owner = register(uniqueEmail("edit-temp-owner"), "Familia EditTemp");
+        String guestEmail = uniqueEmail("edit-temp-guest");
+        String updatedEmail = uniqueEmail("edit-temp-updated");
 
         // Invita creando la cuenta directamente (sin familia propia previa) para que el
         // objetivo pertenezca a una sola familia: set-temporary-password esta bloqueado
@@ -279,28 +289,28 @@ class FamilyMemberControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "edit-temp-guest@example.com",
+                                  "email": "%s",
                                   "displayName": "Invitada Original",
                                   "password": "very-secure-password",
                                   "role": "MEMBER"
                                 }
-                                """))
+                                """.formatted(guestEmail)))
                 .andExpect(status().isCreated());
 
         MvcResult members = mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk())
                 .andReturn();
-        String guestId = readUserIdByEmail(members, "edit-temp-guest@example.com");
+        String guestId = readUserIdByEmail(members, guestEmail);
 
         MvcResult guestLogin = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "edit-temp-guest@example.com",
+                                  "email": "%s",
                                   "password": "very-secure-password"
                                 }
-                                """))
+                                """.formatted(guestEmail)))
                 .andExpect(status().isOk())
                 .andReturn();
         String guestRefreshToken = read(guestLogin, "refreshToken");
@@ -312,38 +322,38 @@ class FamilyMemberControllerTest {
                         .content("""
                                 {
                                   "displayName": "Invitada Actualizada",
-                                  "email": "edit-temp-updated@example.com",
+                                  "email": "%s",
                                   "passwordAction": "SET_TEMPORARY",
                                   "temporaryPassword": "temporary-password-123"
                                 }
-                                """))
+                                """.formatted(updatedEmail)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.displayName").value("Invitada Actualizada"))
-                .andExpect(jsonPath("$.email").value("edit-temp-updated@example.com"))
+                .andExpect(jsonPath("$.email").value(updatedEmail))
                 .andExpect(jsonPath("$.role").value("MEMBER"));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "edit-temp-guest@example.com",
+                                  "email": "%s",
                                   "password": "very-secure-password"
                                 }
-                                """))
+                                """.formatted(guestEmail)))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "edit-temp-updated@example.com",
+                                  "email": "%s",
                                   "password": "temporary-password-123"
                                 }
-                                """))
+                                """.formatted(updatedEmail)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.id").value(guestId))
                 .andExpect(jsonPath("$.user.displayName").value("Invitada Actualizada"))
-                .andExpect(jsonPath("$.user.email").value("edit-temp-updated@example.com"));
+                .andExpect(jsonPath("$.user.email").value(updatedEmail));
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -355,8 +365,9 @@ class FamilyMemberControllerTest {
 
     @Test
     void updateMemberDetailsBlocksTemporaryPasswordWhenTargetBelongsToMultipleFamilies() throws Exception {
-        RegisteredUser owner = register("edit-multi-owner@example.com", "Familia EditMulti");
-        RegisteredUser guest = register("edit-multi-guest@example.com", "Familia EditMultiGuest");
+        RegisteredUser owner = register(uniqueEmail("edit-multi-owner"), "Familia EditMulti");
+        String guestEmail = uniqueEmail("edit-multi-guest");
+        RegisteredUser guest = register(guestEmail, "Familia EditMultiGuest");
 
         // El guest ya tiene su propia familia (arriba); al invitarlo a otra familia mas
         // queda con 2 membresias activas, exactamente el escenario que debe bloquearse.
@@ -364,8 +375,8 @@ class FamilyMemberControllerTest {
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "edit-multi-guest@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
@@ -375,11 +386,11 @@ class FamilyMemberControllerTest {
                         .content("""
                                 {
                                   "displayName": "Invitada Actualizada",
-                                  "email": "edit-multi-guest@example.com",
+                                  "email": "%s",
                                   "passwordAction": "SET_TEMPORARY",
                                   "temporaryPassword": "temporary-password-123"
                                 }
-                                """))
+                                """.formatted(guestEmail)))
                 .andExpect(status().isBadRequest());
 
         // login con la password original sigue funcionando: nada cambio
@@ -387,25 +398,29 @@ class FamilyMemberControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "edit-multi-guest@example.com",
+                                  "email": "%s",
                                   "password": "very-secure-password"
                                 }
-                                """))
+                                """.formatted(guestEmail)))
                 .andExpect(status().isOk());
     }
 
     @Test
     void updateMemberDetailsRejectsMemberSelfOwnerAndDuplicateEmail() throws Exception {
-        RegisteredUser owner = register("edit-rules-owner@example.com", "Familia EditRules");
-        RegisteredUser admin = register("edit-rules-admin@example.com", "Familia EditRulesAdmin");
-        register("edit-rules-used@example.com", "Familia EditRulesUsed");
+        String ownerEmail = uniqueEmail("edit-rules-owner");
+        RegisteredUser owner = register(ownerEmail, "Familia EditRules");
+        String adminEmail = uniqueEmail("edit-rules-admin");
+        RegisteredUser admin = register(adminEmail, "Familia EditRulesAdmin");
+        String usedEmail = uniqueEmail("edit-rules-used");
+        register(usedEmail, "Familia EditRulesUsed");
+        String memberEmail = uniqueEmail("edit-rules-member");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "edit-rules-admin@example.com", "role": "ADMIN"}
-                                """))
+                                {"email": "%s", "role": "ADMIN"}
+                                """.formatted(adminEmail)))
                 .andExpect(status().isCreated());
 
         // Miembro invitado creando la cuenta directamente (sin familia propia previa),
@@ -416,28 +431,28 @@ class FamilyMemberControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "edit-rules-member@example.com",
+                                  "email": "%s",
                                   "displayName": "Test User",
                                   "password": "very-secure-password",
                                   "role": "MEMBER"
                                 }
-                                """))
+                                """.formatted(memberEmail)))
                 .andExpect(status().isCreated());
 
         MvcResult members = mockMvc.perform(get("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk())
                 .andReturn();
-        String memberId = readUserIdByEmail(members, "edit-rules-member@example.com");
+        String memberId = readUserIdByEmail(members, memberEmail);
 
         MvcResult memberLogin = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "email": "edit-rules-member@example.com",
+                                  "email": "%s",
                                   "password": "very-secure-password"
                                 }
-                                """))
+                                """.formatted(memberEmail)))
                 .andExpect(status().isOk())
                 .andReturn();
         String memberAccessToken = read(memberLogin, "accessToken");
@@ -445,10 +460,10 @@ class FamilyMemberControllerTest {
         String body = """
                 {
                   "displayName": "Nombre Editado",
-                  "email": "edit-rules-member@example.com",
+                  "email": "%s",
                   "passwordAction": "NONE"
                 }
-                """;
+                """.formatted(memberEmail);
 
         mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
                         owner.familyId(), memberId)
@@ -464,10 +479,10 @@ class FamilyMemberControllerTest {
                         .content("""
                                 {
                                   "displayName": "Owner Editado",
-                                  "email": "edit-rules-owner@example.com",
+                                  "email": "%s",
                                   "passwordAction": "NONE"
                                 }
-                                """))
+                                """.formatted(ownerEmail)))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
@@ -477,10 +492,10 @@ class FamilyMemberControllerTest {
                         .content("""
                                 {
                                   "displayName": "Owner Editado",
-                                  "email": "edit-rules-owner@example.com",
+                                  "email": "%s",
                                   "passwordAction": "NONE"
                                 }
-                                """))
+                                """.formatted(ownerEmail)))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
@@ -490,24 +505,25 @@ class FamilyMemberControllerTest {
                         .content("""
                                 {
                                   "displayName": "Nombre Editado",
-                                  "email": "edit-rules-used@example.com",
+                                  "email": "%s",
                                   "passwordAction": "NONE"
                                 }
-                                """))
+                                """.formatted(usedEmail)))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void updateMemberDetailsResetEmailFailsClosedWhenMailIsDisabled() throws Exception {
-        RegisteredUser owner = register("edit-reset-owner@example.com", "Familia EditReset");
-        RegisteredUser member = register("edit-reset-member@example.com", "Familia EditResetMember");
+        RegisteredUser owner = register(uniqueEmail("edit-reset-owner"), "Familia EditReset");
+        String memberEmail = uniqueEmail("edit-reset-member");
+        RegisteredUser member = register(memberEmail, "Familia EditResetMember");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "edit-reset-member@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(memberEmail)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(put("/api/v1/families/{familyId}/members/{userId}",
@@ -517,25 +533,26 @@ class FamilyMemberControllerTest {
                         .content("""
                                 {
                                   "displayName": "Test User",
-                                  "email": "edit-reset-member@example.com",
+                                  "email": "%s",
                                   "passwordAction": "SEND_RESET"
                                 }
-                                """))
+                                """.formatted(memberEmail)))
                 .andExpect(status().isServiceUnavailable());
     }
 
     @Test
     void inviteDuplicateMemberReturns201Silently() throws Exception {
-        RegisteredUser owner = register("invite-dup-owner@example.com", "Familia InviteDup");
-        register("invite-dup-guest@example.com", "Familia Guest2");
+        RegisteredUser owner = register(uniqueEmail("invite-dup-owner"), "Familia InviteDup");
+        String guestEmail = uniqueEmail("invite-dup-guest");
+        register(guestEmail, "Familia Guest2");
 
         // first invite — adds guest to family
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "invite-dup-guest@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
                 .andExpect(status().isCreated());
 
         // second invite — same user, same family: anti-enumeration, must be 201 silent no-op
@@ -543,8 +560,8 @@ class FamilyMemberControllerTest {
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "invite-dup-guest@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(guestEmail)))
                 .andExpect(status().isCreated());
 
         // member list must still be exactly 2 (no duplicate row created)
@@ -556,15 +573,15 @@ class FamilyMemberControllerTest {
 
     @Test
     void inviteNonExistentUserReturns201Silently() throws Exception {
-        RegisteredUser owner = register("invite-notfound-owner@example.com", "Familia NotFound");
+        RegisteredUser owner = register(uniqueEmail("invite-notfound-owner"), "Familia NotFound");
 
         // Anti-enumeration: unregistered email must not reveal itself via 404
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "nobody@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(uniqueEmail("nobody"))))
                 .andExpect(status().isCreated());
 
         // family membership must remain unchanged (only owner)
@@ -576,17 +593,19 @@ class FamilyMemberControllerTest {
 
     @Test
     void inviteRequiresAdminRole() throws Exception {
-        RegisteredUser owner  = register("invite-perm-owner@example.com", "Familia InvPerm");
-        RegisteredUser member = register("invite-perm-member@example.com", "Familia InvPerm2");
-        register("invite-perm-target@example.com", "Familia InvPerm3");
+        RegisteredUser owner  = register(uniqueEmail("invite-perm-owner"), "Familia InvPerm");
+        String memberEmail = uniqueEmail("invite-perm-member");
+        RegisteredUser member = register(memberEmail, "Familia InvPerm2");
+        String targetEmail = uniqueEmail("invite-perm-target");
+        register(targetEmail, "Familia InvPerm3");
 
         // owner invites member as MEMBER
         mockMvc.perform(post("/api/v1/families/{familyId}/members", owner.familyId())
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "invite-perm-member@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(memberEmail)))
                 .andExpect(status().isCreated());
 
         // member (not admin) tries to invite — must be forbidden
@@ -594,8 +613,8 @@ class FamilyMemberControllerTest {
                         .header("Authorization", "Bearer " + member.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "invite-perm-target@example.com", "role": "MEMBER"}
-                                """))
+                                {"email": "%s", "role": "MEMBER"}
+                                """.formatted(targetEmail)))
                 .andExpect(status().isForbidden());
     }
 
@@ -629,6 +648,10 @@ class FamilyMemberControllerTest {
     private String read(MvcResult result, String field) throws Exception {
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         return response.get(field).asText();
+    }
+
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
     }
 
     private String readUserIdByEmail(MvcResult result, String email) throws Exception {

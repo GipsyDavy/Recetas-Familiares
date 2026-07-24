@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.sql.Timestamp;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.UUID;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,7 +41,7 @@ class SyncControllerTest {
 
     @Test
     void pullsFamilyRecipeChangesWithDeletedContent() throws Exception {
-        RegisteredUser user = register("sync-owner@example.com", "Familia Sync");
+        RegisteredUser user = register(uniqueEmail("sync-owner"), "Familia Sync");
         MvcResult created = createRecipe(user, "Potaje familiar").andReturn();
         String recipeId = read(created, "id");
 
@@ -68,8 +69,8 @@ class SyncControllerTest {
 
     @Test
     void blocksSyncPullForAnotherFamily() throws Exception {
-        RegisteredUser first = register("sync-one@example.com", "Familia Sync Uno");
-        RegisteredUser second = register("sync-two@example.com", "Familia Sync Dos");
+        RegisteredUser first = register(uniqueEmail("sync-one"), "Familia Sync Uno");
+        RegisteredUser second = register(uniqueEmail("sync-two"), "Familia Sync Dos");
 
         mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", second.familyId())
                         .header("Authorization", "Bearer " + first.accessToken()))
@@ -79,10 +80,10 @@ class SyncControllerTest {
 
     @Test
     void pushesOfflineRecipeContentAndReturnsServerState() throws Exception {
-        RegisteredUser user = register("sync-push@example.com", "Familia Push");
-        String recipeId = "11111111-1111-4111-8111-111111111111";
-        String ingredientId = "22222222-2222-4222-8222-222222222222";
-        String stepId = "33333333-3333-4333-8333-333333333333";
+        RegisteredUser user = register(uniqueEmail("sync-push"), "Familia Push");
+        String recipeId = UUID.randomUUID().toString();
+        String ingredientId = UUID.randomUUID().toString();
+        String stepId = UUID.randomUUID().toString();
 
         mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -144,10 +145,10 @@ class SyncControllerTest {
 
     @Test
     void pushesRecipeDeleteAndReturnsContentTombstones() throws Exception {
-        RegisteredUser user = register("sync-push-delete@example.com", "Familia Push Delete");
-        String recipeId = "44444444-4444-4444-8444-444444444444";
-        String ingredientId = "55555555-5555-4555-8555-555555555555";
-        String stepId = "66666666-6666-4666-8666-666666666666";
+        RegisteredUser user = register(uniqueEmail("sync-push-delete"), "Familia Push Delete");
+        String recipeId = UUID.randomUUID().toString();
+        String ingredientId = UUID.randomUUID().toString();
+        String stepId = UUID.randomUUID().toString();
 
         pushRecipeGraph(user, recipeId, ingredientId, stepId);
 
@@ -182,8 +183,8 @@ class SyncControllerTest {
 
     @Test
     void pushesAndPullsStockItems() throws Exception {
-        RegisteredUser user = register("sync-stock@example.com", "Familia Sync Stock");
-        String stockItemId = "88888888-8888-4888-8888-888888888888";
+        RegisteredUser user = register(uniqueEmail("sync-stock"), "Familia Sync Stock");
+        String stockItemId = UUID.randomUUID().toString();
 
         mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -243,11 +244,11 @@ class SyncControllerTest {
 
     @Test
     void pushesAndPullsMenuItems() throws Exception {
-        RegisteredUser user = register("sync-menu@example.com", "Familia Sync Menu");
-        String recipeId = "99999999-9999-4999-8999-999999999999";
-        String menuItemId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-        String ingredientId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-        String stepId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+        RegisteredUser user = register(uniqueEmail("sync-menu"), "Familia Sync Menu");
+        String recipeId = UUID.randomUUID().toString();
+        String menuItemId = UUID.randomUUID().toString();
+        String ingredientId = UUID.randomUUID().toString();
+        String stepId = UUID.randomUUID().toString();
 
         pushRecipeGraph(user, recipeId, ingredientId, stepId);
 
@@ -309,9 +310,9 @@ class SyncControllerTest {
 
     @Test
     void pushesAndPullsShoppingListsAndItems() throws Exception {
-        RegisteredUser user = register("sync-shopping@example.com", "Familia Sync Compra");
-        String shoppingListId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
-        String itemId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+        RegisteredUser user = register(uniqueEmail("sync-shopping"), "Familia Sync Compra");
+        String shoppingListId = UUID.randomUUID().toString();
+        String itemId = UUID.randomUUID().toString();
 
         mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -388,11 +389,11 @@ class SyncControllerTest {
 
     @Test
     void pushesAndPullsFavoriteRecipes() throws Exception {
-        RegisteredUser user = register("sync-favorite@example.com", "Familia Sync Favoritos");
-        String recipeId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
-        String ingredientId = "12121212-1212-4212-8212-121212121212";
-        String stepId = "34343434-3434-4434-8434-343434343434";
-        String favoriteId = "56565656-5656-4656-8656-565656565656";
+        RegisteredUser user = register(uniqueEmail("sync-favorite"), "Familia Sync Favoritos");
+        String recipeId = UUID.randomUUID().toString();
+        String ingredientId = UUID.randomUUID().toString();
+        String stepId = UUID.randomUUID().toString();
+        String favoriteId = UUID.randomUUID().toString();
 
         pushRecipeGraph(user, recipeId, ingredientId, stepId);
 
@@ -450,11 +451,11 @@ class SyncControllerTest {
 
     @Test
     void pushesAndPullsFamilyNotes() throws Exception {
-        RegisteredUser user = register("sync-note@example.com", "Familia Sync Notas");
-        String recipeId = "78787878-7878-4878-8878-787878787878";
-        String ingredientId = "90909090-9090-4090-8090-909090909090";
-        String stepId = "abababab-abab-4bab-8bab-abababababab";
-        String noteId = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
+        RegisteredUser user = register(uniqueEmail("sync-note"), "Familia Sync Notas");
+        String recipeId = UUID.randomUUID().toString();
+        String ingredientId = UUID.randomUUID().toString();
+        String stepId = UUID.randomUUID().toString();
+        String noteId = UUID.randomUUID().toString();
 
         pushRecipeGraph(user, recipeId, ingredientId, stepId);
 
@@ -517,11 +518,11 @@ class SyncControllerTest {
 
     @Test
     void pushesAndPullsRecipePhotos() throws Exception {
-        RegisteredUser user = register("sync-photo@example.com", "Familia Sync Fotos");
-        String recipeId = "edededed-eded-4ded-8ded-edededededed";
-        String ingredientId = "fafafafa-fafa-4afa-8afa-fafafafafafa";
-        String stepId = "10101010-1010-4010-8010-101010101010";
-        String photoId = "23232323-2323-4323-8323-232323232323";
+        RegisteredUser user = register(uniqueEmail("sync-photo"), "Familia Sync Fotos");
+        String recipeId = UUID.randomUUID().toString();
+        String ingredientId = UUID.randomUUID().toString();
+        String stepId = UUID.randomUUID().toString();
+        String photoId = UUID.randomUUID().toString();
 
         pushRecipeGraph(user, recipeId, ingredientId, stepId);
 
@@ -586,8 +587,8 @@ class SyncControllerTest {
 
     @Test
     void rejectsPushWhenBaseSyncVersionIsStale() throws Exception {
-        RegisteredUser user = register("sync-conflict@example.com", "Familia Sync Conflict");
-        String recipeId = "45454545-4545-4545-8545-454545454545";
+        RegisteredUser user = register(uniqueEmail("sync-conflict"), "Familia Sync Conflict");
+        String recipeId = UUID.randomUUID().toString();
 
         mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -652,8 +653,8 @@ class SyncControllerTest {
 
     @Test
     void blocksSyncPushForAnotherFamily() throws Exception {
-        RegisteredUser first = register("sync-push-one@example.com", "Familia Push Uno");
-        RegisteredUser second = register("sync-push-two@example.com", "Familia Push Dos");
+        RegisteredUser first = register(uniqueEmail("sync-push-one"), "Familia Push Uno");
+        RegisteredUser second = register(uniqueEmail("sync-push-two"), "Familia Push Dos");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", second.familyId())
                         .header("Authorization", "Bearer " + first.accessToken())
@@ -671,7 +672,7 @@ class SyncControllerTest {
 
     @Test
     void validatesSyncPushPayload() throws Exception {
-        RegisteredUser user = register("sync-push-validation@example.com", "Familia Push Validacion");
+        RegisteredUser user = register(uniqueEmail("sync-push-validation"), "Familia Push Validacion");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -695,7 +696,7 @@ class SyncControllerTest {
 
     @Test
     void rejectsNonUuidV4SyncIds() throws Exception {
-        RegisteredUser user = register("sync-push-uuid-validation@example.com", "Familia Push Uuid");
+        RegisteredUser user = register(uniqueEmail("sync-push-uuid-validation"), "Familia Push Uuid");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/sync/push", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -719,7 +720,7 @@ class SyncControllerTest {
 
     @Test
     void pullWithLimitPaginatesWithoutLosingRows() throws Exception {
-        RegisteredUser user = register("sync-paged@example.com", "Familia Paged");
+        RegisteredUser user = register(uniqueEmail("sync-paged"), "Familia Paged");
         java.util.Set<String> expectedIds = new java.util.HashSet<>();
         for (int i = 1; i <= 3; i++) {
             MvcResult created = createRecipe(user, "Receta paginada " + i).andReturn();
@@ -753,7 +754,7 @@ class SyncControllerTest {
 
     @Test
     void pullWithLimitKeepsWholeUpdatedAtGroupWhenAllRowsShareTimestamp() throws Exception {
-        RegisteredUser user = register("sync-paged-same-time@example.com", "Familia Paged Same Time");
+        RegisteredUser user = register(uniqueEmail("sync-paged-same-time"), "Familia Paged Same Time");
         java.util.Set<String> expectedIds = new java.util.HashSet<>();
         for (int i = 1; i <= 3; i++) {
             MvcResult created = createRecipe(user, "Receta mismo timestamp " + i).andReturn();
@@ -783,7 +784,7 @@ class SyncControllerTest {
 
     @Test
     void pullWithoutLimitKeepsFullResponseContract() throws Exception {
-        RegisteredUser user = register("sync-nolimit@example.com", "Familia NoLimit");
+        RegisteredUser user = register(uniqueEmail("sync-nolimit"), "Familia NoLimit");
         createRecipe(user, "Receta completa");
 
         mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z", user.familyId())
@@ -796,7 +797,7 @@ class SyncControllerTest {
 
     @Test
     void pullWithoutLimitUsesServerDefaultPageSize() throws Exception {
-        RegisteredUser user = register("sync-default-limit@example.com", "Familia Default Limit");
+        RegisteredUser user = register(uniqueEmail("sync-default-limit"), "Familia Default Limit");
         Instant base = Instant.parse("2026-07-11T10:00:00Z");
         for (int i = 0; i <= SyncService.DEFAULT_PULL_LIMIT; i++) {
             MvcResult created = createRecipe(user, "Receta default limit " + i).andReturn();
@@ -818,7 +819,7 @@ class SyncControllerTest {
 
     @Test
     void rejectsNonPositivePullLimit() throws Exception {
-        RegisteredUser user = register("sync-badlimit@example.com", "Familia BadLimit");
+        RegisteredUser user = register(uniqueEmail("sync-badlimit"), "Familia BadLimit");
 
         mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull?since=1970-01-01T00:00:00Z&limit=0", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken()))
@@ -946,4 +947,8 @@ class SyncControllerTest {
 
     private record RegisteredUser(String accessToken, String familyId) {
     }
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }

@@ -35,7 +35,7 @@ class ShoppingListControllerTest {
 
     @Test
     void createsUpdatesItemsAndSoftDeletesShoppingList() throws Exception {
-        RegisteredUser user = register("shopping-owner@example.com", "Familia Compra");
+        RegisteredUser user = register(uniqueEmail("shopping-owner"), "Familia Compra");
         MvcResult created = createShoppingList(user, "Compra semanal").andReturn();
         String shoppingListId = read(created, "id");
         MvcResult itemCreated = createItem(user, shoppingListId, "Tomate").andReturn();
@@ -105,8 +105,8 @@ class ShoppingListControllerTest {
 
     @Test
     void blocksShoppingAccessToAnotherFamily() throws Exception {
-        RegisteredUser first = register("shopping-one@example.com", "Familia Compra Uno");
-        RegisteredUser second = register("shopping-two@example.com", "Familia Compra Dos");
+        RegisteredUser first = register(uniqueEmail("shopping-one"), "Familia Compra Uno");
+        RegisteredUser second = register(uniqueEmail("shopping-two"), "Familia Compra Dos");
         String shoppingListId = read(createShoppingList(second, "Compra privada").andReturn(), "id");
 
         mockMvc.perform(get("/api/v1/families/{familyId}/shopping-lists", second.familyId())
@@ -120,7 +120,7 @@ class ShoppingListControllerTest {
 
     @Test
     void validatesShoppingInput() throws Exception {
-        RegisteredUser user = register("shopping-validation@example.com", "Familia Compra Validacion");
+        RegisteredUser user = register(uniqueEmail("shopping-validation"), "Familia Compra Validacion");
 
         mockMvc.perform(post("/api/v1/families/{familyId}/shopping-lists", user.familyId())
                         .header("Authorization", "Bearer " + user.accessToken())
@@ -136,7 +136,7 @@ class ShoppingListControllerTest {
 
     @Test
     void generatesShoppingListFromPlannedMenuRecipes() throws Exception {
-        RegisteredUser user = register("shopping-generate@example.com", "Familia Compra Generada");
+        RegisteredUser user = register(uniqueEmail("shopping-generate"), "Familia Compra Generada");
         String firstRecipeId = read(createRecipe(user, "Pasta familiar").andReturn(), "id");
         String secondRecipeId = read(createRecipe(user, "Ensalada familiar").andReturn(), "id");
         replaceIngredients(user, firstRecipeId, """
@@ -320,4 +320,8 @@ class ShoppingListControllerTest {
 
     private record RegisteredUser(String accessToken, String familyId) {
     }
+    private static String uniqueEmail(String prefix) {
+        return prefix + "-" + System.nanoTime() + "@example.com";
+    }
+
 }
