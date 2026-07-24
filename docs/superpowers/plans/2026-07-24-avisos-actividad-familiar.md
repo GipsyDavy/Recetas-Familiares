@@ -14,7 +14,7 @@
 
 | File | Change |
 |---|---|
-| `backend/src/main/resources/db/migration/V10__create_family_activity_schema.sql` | Create |
+| `backend/src/main/resources/db/migration/V20__create_family_activity_schema.sql` | Create |
 | `backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySection.java` | Create |
 | `backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySectionActivityEntity.java` | Create |
 | `backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySectionActivityRepository.java` | Create |
@@ -52,14 +52,14 @@
 ### Task 1: Migracion Flyway + entidades JPA
 
 **Files:**
-- Create: `backend/src/main/resources/db/migration/V10__create_family_activity_schema.sql`
+- Create: `backend/src/main/resources/db/migration/V20__create_family_activity_schema.sql`
 - Create: `backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySection.java`
 - Create: `backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySectionActivityEntity.java`
 - Create: `backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySectionActivityRepository.java`
 - Create: `backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/UserSectionLastSeenEntity.java`
 - Create: `backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/UserSectionLastSeenRepository.java`
 
-Ultima migracion existente es `V9__create_recipe_photos_schema.sql` — esta es `V10`. Sigue el mismo estilo SQL (VARCHAR(36) para ids, timestamptz, indices explicitos).
+Ultima migracion real (verificado con `sort -V`, no alfabetico) es `V19__create_private_chat_schema.sql` — esta es `V20`. (Nota: la version original de este plan decia V10 por un error de ordenamiento alfabetico vs numerico al listar migraciones; corregido tras ejecutar Task 1.) Sigue el mismo estilo SQL (VARCHAR(36) para ids, timestamptz, indices explicitos).
 
 - [ ] **Step 1: Escribir la migracion**
 
@@ -315,7 +315,7 @@ Expected: `BUILD SUCCESS`, sin errores.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add backend/src/main/resources/db/migration/V10__create_family_activity_schema.sql backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySection.java backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySectionActivityEntity.java backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySectionActivityRepository.java backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/UserSectionLastSeenEntity.java backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/UserSectionLastSeenRepository.java
+git add backend/src/main/resources/db/migration/V20__create_family_activity_schema.sql backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySection.java backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySectionActivityEntity.java backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/FamilySectionActivityRepository.java backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/UserSectionLastSeenEntity.java backend/src/main/java/org/gipsybuho/recetasfamiliares/activity/UserSectionLastSeenRepository.java
 git commit -m "feat(backend): esquema de avisos de actividad familiar (migracion + entidades)"
 ```
 
