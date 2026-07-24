@@ -24,8 +24,9 @@ import org.springframework.stereotype.Component;
  *   <li>CONNECT: exige JWT valido en la cabecera Authorization (nunca en la URL,
  *       que se loggea). Resuelve el userId y lo fija como Principal de la sesion.</li>
  *   <li>SUBSCRIBE: valida membership de familia contra el destino
- *       {@code /topic/families/{familyId}/chat} o
- *       {@code /topic/families/{familyId}/presence}. Se re-valida en cada nueva
+ *       {@code /topic/families/{familyId}/chat},
+ *       {@code /topic/families/{familyId}/presence} o
+ *       {@code /topic/families/{familyId}/activity}. Se re-valida en cada nueva
  *       suscripcion, de modo que un usuario expulsado no puede resuscribirse.
  *       Una suscripcion de presencia autorizada, ademas, registra la conexion
  *       en {@link PresenceRegistry} y difunde el snapshot actualizado.</li>
@@ -43,6 +44,7 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
     private static final String TOPIC_PREFIX = "/topic/families/";
     private static final String CHAT_SUFFIX = "/chat";
     private static final String PRESENCE_SUFFIX = "/presence";
+    private static final String ACTIVITY_SUFFIX = "/activity";
     private static final String CONVERSATION_TOPIC_PREFIX = "/topic/conversations/";
     private static final String INBOX_TOPIC_PREFIX = "/topic/users/";
     private static final String INBOX_TOPIC_SUFFIX = "/inbox";
@@ -172,6 +174,8 @@ public class ChatStompAuthChannelInterceptor implements ChannelInterceptor {
             suffix = CHAT_SUFFIX;
         } else if (destination.endsWith(PRESENCE_SUFFIX)) {
             suffix = PRESENCE_SUFFIX;
+        } else if (destination.endsWith(ACTIVITY_SUFFIX)) {
+            suffix = ACTIVITY_SUFFIX;
         } else {
             return null;
         }

@@ -30,6 +30,7 @@ class ChatStompAuthChannelInterceptorTest {
     private static final String FAMILY_ID = "fam-abc";
     private static final String TOPIC = "/topic/families/" + FAMILY_ID + "/chat";
     private static final String PRESENCE_TOPIC = "/topic/families/" + FAMILY_ID + "/presence";
+    private static final String ACTIVITY_TOPIC = "/topic/families/" + FAMILY_ID + "/activity";
     private static final String CONVERSATION_ID = "conv-xyz";
     private static final String OTHER_USER_ID = "user-456";
     private static final String CONVERSATION_TOPIC = "/topic/conversations/" + CONVERSATION_ID;
@@ -210,6 +211,38 @@ class ChatStompAuthChannelInterceptorTest {
 
         assertThrows(MessagingException.class, () -> interceptor.preSend(subscribe, channel));
         Mockito.verifyNoInteractions(privateConversationRepository);
+    }
+
+    @Test
+    void allowsSubscribeToActivityTopicForFamilyMember() {
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(eq(FAMILY_ID), eq(USER_ID)))
+                .thenReturn(true);
+        Message<byte[]> subscribe = subscribe(ACTIVITY_TOPIC, new StompPrincipal(USER_ID));
+
+        assertDoesNotThrow(() -> interceptor.preSend(subscribe, channel));
+    }
+
+    @Test
+    void rejectsSubscribeToActivityTopicForNonMember() {
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(eq(FAMILY_ID), eq(USER_ID)))
+                .thenReturn(false);
+        Message<byte[]> subscribe = subscribe(ACTIVITY_TOPIC, new StompPrincipal(USER_ID));
+
+        assertThrows(MessagingException.class, () -> interceptor.preSend(subscribe, channel));
+    }
+
+    @Test
+    void activitySubscribeDoesNotTouchPresenceRegistry() {
+        // Regresion: el sufijo /activity comparte authorizeFamilyTopic con /presence;
+        // no debe disparar el registro/broadcast de presencia, que es especifico
+        // de PRESENCE_SUFFIX.
+        when(familyMemberRepository.existsByFamily_IdAndUser_IdAndDeletedFalse(eq(FAMILY_ID), eq(USER_ID)))
+                .thenReturn(true);
+        Message<byte[]> subscribe = subscribe(ACTIVITY_TOPIC, new StompPrincipal(USER_ID));
+
+        interceptor.preSend(subscribe, channel);
+
+        Mockito.verifyNoInteractions(presenceRegistry, presencePublisher);
     }
 
     private Message<byte[]> send(String destination, StompPrincipal principal) {
