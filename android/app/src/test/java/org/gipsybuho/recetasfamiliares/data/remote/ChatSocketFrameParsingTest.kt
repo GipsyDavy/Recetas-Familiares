@@ -36,4 +36,26 @@ class ChatSocketFrameParsingTest {
 
         assertNull(extractStompHeader(frame, "destination"))
     }
+
+    @Test
+    fun extractsDestinationFromInboxFrame() {
+        val frame = "MESSAGE\n" +
+            "destination:/topic/users/u1/inbox\n" +
+            "subscription:sub-inbox\n" +
+            "\n" +
+            "{\"conversationId\":\"c1\",\"senderUserId\":\"u2\",\"sentAt\":\"2026-07-23T10:00:00Z\"}"
+
+        assertEquals("/topic/users/u1/inbox", extractStompHeader(frame, "destination"))
+    }
+
+    @Test
+    fun extractsDestinationFromConversationFrame() {
+        val frame = "MESSAGE\n" +
+            "destination:/topic/conversations/c1\n" +
+            "subscription:sub-conversation\n" +
+            "\n" +
+            "{\"id\":\"m1\"}"
+
+        assertEquals("/topic/conversations/c1", extractStompHeader(frame, "destination"))
+    }
 }

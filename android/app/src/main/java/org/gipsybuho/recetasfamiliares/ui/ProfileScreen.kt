@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -76,7 +77,11 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Modifier) {
+internal fun ProfileScreen(
+    viewModel: RecetasViewModel,
+    modifier: Modifier = Modifier,
+    onMessageMember: (FamilyMemberDto) -> Unit = {}
+) {
     val displayName by viewModel.displayName.collectAsState()
     val email       by viewModel.email.collectAsState()
     val avatarUrl   by viewModel.avatarUrl.collectAsState()
@@ -436,7 +441,8 @@ internal fun ProfileScreen(viewModel: RecetasViewModel, modifier: Modifier = Mod
                 },
                 onRemoveMember = { member ->
                     memberToRemove = member
-                }
+                },
+                onMessageMember = onMessageMember
             )
         }
 
@@ -760,7 +766,8 @@ private fun FamilyMembersSection(
     myUserId: String?,
     onChangeRole: (FamilyMemberDto, String) -> Unit,
     onEditMember: (FamilyMemberDto) -> Unit,
-    onRemoveMember: (FamilyMemberDto) -> Unit
+    onRemoveMember: (FamilyMemberDto) -> Unit,
+    onMessageMember: (FamilyMemberDto) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -832,6 +839,15 @@ private fun FamilyMembersSection(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    if (member.userId != myUserId) {
+                        IconButton(onClick = { onMessageMember(member) }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Message,
+                                contentDescription = "Enviar mensaje privado a ${member.displayName}",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     if (canManage) {
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {

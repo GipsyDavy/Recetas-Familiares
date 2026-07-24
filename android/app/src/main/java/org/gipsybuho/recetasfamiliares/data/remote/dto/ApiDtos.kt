@@ -554,3 +554,65 @@ data class ChatExportDto(
 data class PresenceResponseDto(
     val onlineUserIds: List<String>
 )
+
+// ── Chat privado 1:1 ─────────────────────────────────────────────────────────
+
+data class PrivateAttachmentDto(
+    val id: String,
+    val url: String,
+    val thumbnailUrl: String?,
+    val contentType: String,
+    val sizeBytes: Long,
+    val width: Int? = null,
+    val height: Int? = null
+)
+
+data class PrivateMessageDto(
+    val id: String,
+    val conversationId: String,
+    val authorUserId: String,
+    val authorDisplayName: String,
+    val body: String?,
+    val attachments: List<PrivateAttachmentDto>? = emptyList(),
+    val createdAt: String,
+    val updatedAt: String,
+    val syncVersion: Long,
+    val deleted: Boolean = false
+)
+
+data class PrivateConversationDto(
+    val conversationId: String,
+    val otherUserId: String,
+    val otherUserDisplayName: String,
+    val otherUserAvatarUrl: String?,
+    val lastMessagePreview: String?,
+    val lastMessageAt: String?
+)
+
+data class PrivateMessageHistoryDto(
+    val items: List<PrivateMessageDto>,
+    val hasMore: Boolean,
+    val nextBefore: String? = null
+)
+
+data class PrivateMessageExportDto(
+    val conversationId: String,
+    val exportedAt: String,
+    val totalMessages: Int,
+    val messages: List<PrivateMessageDto>
+)
+
+data class SendPrivateMessageRequestDto(
+    val id: String,
+    val body: String
+)
+
+data class EditPrivateMessageRequestDto(
+    val body: String
+)
+
+data class PrivateInboxPingDto(
+    val conversationId: String,
+    val senderUserId: String,
+    val sentAt: String
+)

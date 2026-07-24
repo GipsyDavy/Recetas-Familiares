@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -87,6 +88,7 @@ import androidx.work.WorkManager
 import org.gipsybuho.recetasfamiliares.R
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateConversationDto
 
 internal enum class MainTab { RECIPES, STOCK, SHOPPING, NOTES, MENU, PROFILE }
 
@@ -337,6 +339,9 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     var searchQuery by remember { mutableStateOf("") }
     var showThemePicker by remember { mutableStateOf(false) }
     var chatOpen by remember { mutableStateOf(false) }
+    var conversationsOpen by remember { mutableStateOf(false) }
+    var initialConversation by remember { mutableStateOf<PrivateConversationDto?>(null) }
+    val privateChatUnread by viewModel.privateChatUnread.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
     val filteredRecipes by viewModel.filteredRecipes.collectAsState()
     val filterByStock by viewModel.filterByStock.collectAsState()
@@ -352,13 +357,13 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     var navigateToRecipeId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Con el chat abierto, RecetasApp hace return antes de componer su SnackbarHost;
-    // en ese caso el propio ChatScreen muestra los avisos. Se descartan aqui para no
-    // encolar un snackbar rezagado que reaparezca al cerrar el chat.
-    val chatOpenState = rememberUpdatedState(chatOpen)
+    // Con el chat (familiar o privado) abierto, RecetasApp hace return antes de
+    // componer su SnackbarHost; en ese caso la propia pantalla muestra los avisos.
+    // Se descartan aqui para no encolar un snackbar rezagado que reaparezca al cerrar.
+    val overlayOpenState = rememberUpdatedState(chatOpen || conversationsOpen)
     LaunchedEffect(Unit) {
         viewModel.userMessage.collect { message ->
-            if (!chatOpenState.value) snackbarHostState.showSnackbar(message)
+            if (!overlayOpenState.value) snackbarHostState.showSnackbar(message)
         }
     }
 
@@ -371,6 +376,15 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
 
     if (chatOpen) {
         ChatScreen(viewModel, onClose = { chatOpen = false })
+        return
+    }
+
+    if (conversationsOpen) {
+        ConversationsScreen(
+            viewModel = viewModel,
+            initialConversation = initialConversation,
+            onClose = { conversationsOpen = false; initialConversation = null }
+        )
         return
     }
 
@@ -445,6 +459,33 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                                             "Chat familiar, $chatUnread mensajes nuevos"
                                         } else {
                                             "Chat familiar"
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = { PlainTooltip { Text("Chat privado") } },
+                            state = rememberTooltipState()
+                        ) {
+                            val privateUnreadTotal = privateChatUnread.values.sum()
+                            IconButton(onClick = { conversationsOpen = true }) {
+                                BadgedBox(
+                                    badge = {
+                                        if (privateUnreadTotal > 0) {
+                                            Badge {
+                                                Text(if (privateUnreadTotal > 9) "9+" else "$privateUnreadTotal")
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Lock,
+                                        contentDescription = if (privateUnreadTotal > 0) {
+                                            "Chat privado, $privateUnreadTotal mensajes nuevos"
+                                        } else {
+                                            "Chat privado"
                                         }
                                     )
                                 }
@@ -540,7 +581,16 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                             tab = MainTab.RECIPES
                         }
                     )
-                    MainTab.PROFILE  -> ProfileScreen(viewModel, Modifier.padding(padding))
+                    MainTab.PROFILE  -> ProfileScreen(
+                        viewModel,
+                        Modifier.padding(padding),
+                        onMessageMember = { member ->
+                            viewModel.createOrGetConversation(member.userId) { conversation ->
+                                initialConversation = conversation
+                                conversationsOpen = true
+                            }
+                        }
+                    )
                 }
             }
         }

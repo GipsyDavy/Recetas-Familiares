@@ -34,6 +34,10 @@ import org.gipsybuho.recetasfamiliares.core.AppContainer
 import org.gipsybuho.recetasfamiliares.data.remote.ChatSocket
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateConversationDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateInboxPingDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
+import org.gipsybuho.recetasfamiliares.data.repository.PRIVATE_CHAT_MAX_BODY_LENGTH
 import org.gipsybuho.recetasfamiliares.ui.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.ui.theme.ThemeMode
 import android.content.ContentValues
@@ -373,9 +377,14 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                     if (active.id != currentFamilyId || active.role != container.sessionStore.familyRole) {
                         container.familyMemberRepository.setActiveFamily(active)
                     }
-                    if (familyChanged) clearFamilyScopedState()
+                    if (familyChanged) {
+                        stopChatBadge()
+                        clearFamilyScopedState()
+                        startChatBadge()
+                    }
                     _familyInfo.value = active
                 } else {
+                    stopChatBadge()
                     clearFamilyScopedState()
                     _familyInfo.value = null
                 }
@@ -911,6 +920,34 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    // ── Chat privado 1:1 ─────────────────────────────────────────────────────
+
+    private val _conversations = MutableStateFlow<List<PrivateConversationDto>>(emptyList())
+    val conversations: StateFlow<List<PrivateConversationDto>> = _conversations.asStateFlow()
+
+    private val _privateChatUnread = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val privateChatUnread: StateFlow<Map<String, Int>> = _privateChatUnread.asStateFlow()
+
+    private val _privateMessages = MutableStateFlow<List<PrivateMessageDto>>(emptyList())
+    val privateMessages: StateFlow<List<PrivateMessageDto>> = _privateMessages.asStateFlow()
+
+    private val _privateChatConnected = MutableStateFlow(false)
+    val privateChatConnected: StateFlow<Boolean> = _privateChatConnected.asStateFlow()
+
+    private val _privateChatLoading = MutableStateFlow(false)
+    val privateChatLoading: StateFlow<Boolean> = _privateChatLoading.asStateFlow()
+
+    private val _privateChatHasMoreOlder = MutableStateFlow(false)
+    val privateChatHasMoreOlder: StateFlow<Boolean> = _privateChatHasMoreOlder.asStateFlow()
+
+    private var privateChatOldestCursor: String? = null
+    private var privateChatSocket: ChatSocket? = null
+
+    /** Escrito en el hilo principal (efectos de Compose), leido tambien desde el hilo
+     * lector de OkHttp (ChatSocket.onMessage) al procesar un ping de inbox. */
+    @Volatile
+    private var activePrivateConversationId: String? = null
+
     /**
      * Conexion en tiempo real ligera, viva mientras hay sesion, solo para
      * contar mensajes nuevos de otros miembros con el chat cerrado.
@@ -928,8 +965,16 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 }
             },
             onConnectionChange = {},
-            onPresenceUpdate = { online -> _onlineUserIds.value = online }
+            onPresenceUpdate = { online -> _onlineUserIds.value = online },
+            onInboxPing = { ping -> handlePrivateInboxPing(ping) }
         )
+    }
+
+    private fun handlePrivateInboxPing(ping: PrivateInboxPingDto) {
+        if (ping.conversationId == activePrivateConversationId) return
+        _privateChatUnread.update { current ->
+            current + (ping.conversationId to ((current[ping.conversationId] ?: 0) + 1))
+        }
     }
 
     fun stopChatBadge() {
@@ -937,6 +982,216 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         chatBadgeSocket = null
         chatBadgeSeenIds.clear()
         _chatUnread.value = 0
+        _privateChatUnread.value = emptyMap()
+        _conversations.value = emptyList()
+    }
+
+    /** Bandeja de conversaciones privadas del usuario en la familia activa. */
+    fun loadConversations() {
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.listConversations() }
+                .onSuccess { _conversations.value = it }
+                .onFailure { _userMessage.emit("No se pudieron cargar las conversaciones") }
+        }
+    }
+
+    /** Crea o recupera la conversacion con otro miembro. Llamado desde el boton Mensaje en Miembros. */
+    fun createOrGetConversation(otherUserId: String, onResult: (PrivateConversationDto) -> Unit) {
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.createOrGetConversation(otherUserId) }
+                .onSuccess { conversation ->
+                    loadConversations()
+                    onResult(conversation)
+                }
+                .onFailure { _userMessage.emit("No se pudo abrir la conversacion") }
+        }
+    }
+
+    /** Marca una conversacion como leida (limpia su contador) al abrirla, sin conectar el socket todavia. */
+    fun markConversationRead(conversationId: String) {
+        _privateChatUnread.update { it - conversationId }
+    }
+
+    /** Abre una conversacion: conexion propia y efimera (a diferencia del chat familiar, sin polling de respaldo). */
+    fun openPrivateChat(conversationId: String) {
+        activePrivateConversationId = conversationId
+        markConversationRead(conversationId)
+        _privateMessages.value = emptyList()
+        _privateChatLoading.value = true
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.loadHistory(conversationId) }
+                .onSuccess { history ->
+                    _privateMessages.value = history.items.sortedBy { it.createdAt }
+                    _privateChatHasMoreOlder.value = history.hasMore
+                    privateChatOldestCursor = history.nextBefore
+                }
+                .onFailure { _userMessage.emit("No se pudo cargar la conversacion") }
+            _privateChatLoading.value = false
+        }
+        privateChatSocket = container.chatRepository.openRealtime(
+            onMessage = {},
+            onConnectionChange = { connected -> _privateChatConnected.value = connected },
+            onPresenceUpdate = {},
+            conversationId = conversationId,
+            onPrivateMessage = { msg -> _privateMessages.update { mergePrivateMessages(it, listOf(msg)) } }
+        )
+    }
+
+    fun closePrivateChat() {
+        activePrivateConversationId = null
+        privateChatSocket?.disconnect()
+        privateChatSocket = null
+        _privateChatConnected.value = false
+    }
+
+    fun loadOlderPrivateChat() {
+        val conversationId = activePrivateConversationId ?: return
+        if (_privateChatLoading.value) return
+        if (!_privateChatHasMoreOlder.value) return
+        val before = privateChatOldestCursor ?: return
+        _privateChatLoading.value = true
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.loadHistory(conversationId, before) }
+                .onSuccess { history ->
+                    _privateMessages.update { mergePrivateMessages(it, history.items) }
+                    _privateChatHasMoreOlder.value = history.hasMore
+                    privateChatOldestCursor = history.nextBefore
+                }
+                .onFailure { _userMessage.emit("No se pudieron cargar mensajes anteriores") }
+            _privateChatLoading.value = false
+        }
+    }
+
+    fun sendPrivateMessage(body: String, onSent: () -> Unit = {}) {
+        val conversationId = activePrivateConversationId ?: return
+        val text = body.trim()
+        if (text.isEmpty()) return
+        if (!_privateChatConnected.value) {
+            viewModelScope.launch { _userMessage.emit("Sin conexión en tiempo real") }
+            return
+        }
+        if (text.length > PRIVATE_CHAT_MAX_BODY_LENGTH) {
+            viewModelScope.launch { _userMessage.emit("El mensaje no puede superar $PRIVATE_CHAT_MAX_BODY_LENGTH caracteres") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.send(conversationId, text) }
+                .onSuccess { msg ->
+                    _privateMessages.update { mergePrivateMessages(it, listOf(msg)) }
+                    onSent()
+                }
+                .onFailure { _userMessage.emit("No se pudo enviar el mensaje") }
+        }
+    }
+
+    fun sendPrivateImage(context: Context, uri: Uri, caption: String, onSent: () -> Unit = {}) {
+        val conversationId = activePrivateConversationId ?: return
+        val text = caption.trim()
+        if (!_privateChatConnected.value) {
+            viewModelScope.launch { _userMessage.emit("Sin conexión en tiempo real") }
+            return
+        }
+        if (text.length > PRIVATE_CHAT_MAX_BODY_LENGTH) {
+            viewModelScope.launch { _userMessage.emit("El mensaje no puede superar $PRIVATE_CHAT_MAX_BODY_LENGTH caracteres") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val image = compressImage(context, uri)
+                    container.privateChatRepository.sendImages(conversationId, text, listOf(image))
+                }
+            }.onSuccess { msg ->
+                _privateMessages.update { mergePrivateMessages(it, listOf(msg)) }
+                onSent()
+            }.onFailure {
+                _userMessage.emit("No se pudo enviar la imagen")
+            }
+        }
+    }
+
+    fun editPrivateMessage(message: PrivateMessageDto, body: String, onDone: () -> Unit = {}) {
+        val conversationId = activePrivateConversationId ?: return
+        val text = body.trim()
+        if (message.deleted || message.authorUserId != myUserId) return
+        if (text.isEmpty()) return
+        if (text.length > PRIVATE_CHAT_MAX_BODY_LENGTH) {
+            viewModelScope.launch { _userMessage.emit("El mensaje no puede superar $PRIVATE_CHAT_MAX_BODY_LENGTH caracteres") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.edit(conversationId, message.id, text) }
+                .onSuccess { updated ->
+                    _privateMessages.update { mergePrivateMessages(it, listOf(updated)) }
+                    _userMessage.emit("Mensaje editado")
+                    onDone()
+                }
+                .onFailure { _userMessage.emit("No se pudo editar el mensaje") }
+        }
+    }
+
+    fun deletePrivateMessage(message: PrivateMessageDto) {
+        val conversationId = activePrivateConversationId ?: return
+        if (message.authorUserId != myUserId || message.deleted) return
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.delete(conversationId, message.id) }
+                .onSuccess { updated ->
+                    _privateMessages.update { mergePrivateMessages(it, listOf(updated)) }
+                    _userMessage.emit("Mensaje eliminado")
+                }
+                .onFailure { _userMessage.emit("No se pudo eliminar el mensaje") }
+        }
+    }
+
+    fun clearPrivateChat() {
+        val conversationId = activePrivateConversationId ?: return
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.clear(conversationId) }
+                .onSuccess {
+                    _privateMessages.value = emptyList()
+                    _privateChatHasMoreOlder.value = false
+                    privateChatOldestCursor = null
+                    _userMessage.emit("Conversación borrada para ti")
+                }
+                .onFailure { _userMessage.emit("No se pudo borrar la conversacion") }
+        }
+    }
+
+    fun exportPrivateChat(onExported: (String) -> Unit) {
+        val conversationId = activePrivateConversationId ?: return
+        viewModelScope.launch {
+            runCatching { container.privateChatRepository.export(conversationId) }
+                .onSuccess { export -> onExported(buildPrivateChatExportText(export)) }
+                .onFailure { _userMessage.emit("No se pudo exportar la conversacion") }
+        }
+    }
+
+    /** Mismo criterio que mergeChat, para mensajes de una conversacion privada. */
+    private fun mergePrivateMessages(
+        existing: List<PrivateMessageDto>,
+        incoming: List<PrivateMessageDto>
+    ): List<PrivateMessageDto> {
+        val byId = LinkedHashMap<String, PrivateMessageDto>(existing.size + incoming.size)
+        existing.forEach { byId[it.id] = it }
+        incoming.forEach { byId[it.id] = it }
+        return byId.values.sortedBy { it.createdAt }
+    }
+
+    private fun buildPrivateChatExportText(export: org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageExportDto): String {
+        val builder = StringBuilder("Conversacion privada - export\n\n")
+        export.messages.forEach { message ->
+            val attachments = message.attachments.orEmpty()
+            val body = message.body ?: if (attachments.isEmpty()) "(mensaje eliminado)" else ""
+            builder.append("[").append(message.createdAt).append("] ")
+                .append(message.authorDisplayName).append(": ").append(body)
+            if (attachments.isNotEmpty()) {
+                if (body.isNotBlank()) builder.append(' ')
+                builder.append('[').append(attachments.size)
+                    .append(if (attachments.size == 1) " imagen]" else " imagenes]")
+            }
+            builder.append('\n')
+        }
+        return builder.toString()
     }
 
     /** Abre el chat: carga la pagina reciente, conecta en tiempo real y arranca el polling de respaldo. */
@@ -1189,6 +1444,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     override fun onCleared() {
         closeChat()
+        closePrivateChat()
         super.onCleared()
     }
 

@@ -52,6 +52,12 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.UserResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UserRecipeRankingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.EditPrivateMessageRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateConversationDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageExportDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageHistoryDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.SendPrivateMessageRequestDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -392,4 +398,69 @@ interface RecetasApi {
     suspend fun presence(
         @Path("familyId") familyId: String
     ): PresenceResponseDto
+
+    // ── Chat privado 1:1 ─────────────────────────────────────────────────────
+
+    @POST("api/v1/families/{familyId}/conversations/with/{otherUserId}")
+    suspend fun createOrGetConversation(
+        @Path("familyId") familyId: String,
+        @Path("otherUserId") otherUserId: String
+    ): PrivateConversationDto
+
+    @GET("api/v1/families/{familyId}/conversations")
+    suspend fun conversations(
+        @Path("familyId") familyId: String
+    ): List<PrivateConversationDto>
+
+    @GET("api/v1/families/{familyId}/conversations/{conversationId}/messages")
+    suspend fun privateMessages(
+        @Path("familyId") familyId: String,
+        @Path("conversationId") conversationId: String,
+        @Query("before") before: String? = null,
+        @Query("limit") limit: Int? = null
+    ): PrivateMessageHistoryDto
+
+    @POST("api/v1/families/{familyId}/conversations/{conversationId}/messages")
+    suspend fun sendPrivateMessage(
+        @Path("familyId") familyId: String,
+        @Path("conversationId") conversationId: String,
+        @Body request: SendPrivateMessageRequestDto
+    ): PrivateMessageDto
+
+    @Multipart
+    @POST("api/v1/families/{familyId}/conversations/{conversationId}/messages/images")
+    suspend fun sendPrivateImageMessage(
+        @Path("familyId") familyId: String,
+        @Path("conversationId") conversationId: String,
+        @Part("id") id: RequestBody,
+        @Part("body") body: RequestBody? = null,
+        @Part files: List<MultipartBody.Part>
+    ): PrivateMessageDto
+
+    @PUT("api/v1/families/{familyId}/conversations/{conversationId}/messages/{messageId}")
+    suspend fun editPrivateMessage(
+        @Path("familyId") familyId: String,
+        @Path("conversationId") conversationId: String,
+        @Path("messageId") messageId: String,
+        @Body request: EditPrivateMessageRequestDto
+    ): PrivateMessageDto
+
+    @DELETE("api/v1/families/{familyId}/conversations/{conversationId}/messages/{messageId}")
+    suspend fun deletePrivateMessage(
+        @Path("familyId") familyId: String,
+        @Path("conversationId") conversationId: String,
+        @Path("messageId") messageId: String
+    ): PrivateMessageDto
+
+    @POST("api/v1/families/{familyId}/conversations/{conversationId}/clear")
+    suspend fun clearPrivateConversation(
+        @Path("familyId") familyId: String,
+        @Path("conversationId") conversationId: String
+    ): Unit
+
+    @GET("api/v1/families/{familyId}/conversations/{conversationId}/export")
+    suspend fun exportPrivateConversation(
+        @Path("familyId") familyId: String,
+        @Path("conversationId") conversationId: String
+    ): PrivateMessageExportDto
 }
