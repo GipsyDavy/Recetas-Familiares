@@ -2,7 +2,6 @@ package org.gipsybuho.recetasfamiliares.ui
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,7 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -77,43 +76,45 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import coil3.compose.SubcomposeAsyncImage
-import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatAttachmentDto
-import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
-import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateAttachmentDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateConversationDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
+import org.gipsybuho.recetasfamiliares.data.repository.PRIVATE_CHAT_MAX_BODY_LENGTH
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
-    val messages by viewModel.chatMessages.collectAsState()
-    val connected by viewModel.chatConnected.collectAsState()
-    val loading by viewModel.chatLoading.collectAsState()
-    val hasMoreOlder by viewModel.chatHasMoreOlder.collectAsState()
+fun PrivateChatScreen(
+    viewModel: RecetasViewModel,
+    conversation: PrivateConversationDto,
+    onClose: () -> Unit
+) {
+    val messages by viewModel.privateMessages.collectAsState()
+    val connected by viewModel.privateChatConnected.collectAsState()
+    val loading by viewModel.privateChatLoading.collectAsState()
+    val hasMoreOlder by viewModel.privateChatHasMoreOlder.collectAsState()
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val myUserId = viewModel.myUserId
 
     var menuOpen by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
-    var editingMessage by remember { mutableStateOf<ChatMessageDto?>(null) }
+    var editingMessage by remember { mutableStateOf<PrivateMessageDto?>(null) }
     var editDraft by remember { mutableStateOf("") }
-    var deletingMessage by remember { mutableStateOf<ChatMessageDto?>(null) }
-    var viewingAttachment by remember { mutableStateOf<ChatAttachmentDto?>(null) }
+    var deletingMessage by remember { mutableStateOf<PrivateMessageDto?>(null) }
+    var viewingAttachment by remember { mutableStateOf<PrivateAttachmentDto?>(null) }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
-    // El chat se muestra con return propio antes del Scaffold global de RecetasApp,
-    // asi que necesita su propio host para que los avisos (guardar imagen, borrar,
-    // errores de export) sean visibles mientras el chat esta abierto.
+    // Esta pantalla se muestra con return propio antes del Scaffold de RecetasApp/
+    // ConversationsScreen, asi que necesita su propio host para que los avisos
+    // (guardar imagen, borrar, errores de export) sean visibles mientras esta abierta.
     LaunchedEffect(Unit) {
         viewModel.userMessage.collect { message -> snackbarHostState.showSnackbar(message) }
     }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             val caption = draft.trim()
-            viewModel.sendChatImage(context, uri, caption) {
+            viewModel.sendPrivateImage(context, uri, caption) {
                 if (draft.trim() == caption) {
                     draft = ""
                 }
@@ -121,10 +122,11 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
         }
     }
 
-    // Ciclo de vida de la conexion en tiempo real ligado a la pantalla.
-    DisposableEffect(Unit) {
-        viewModel.openChat()
-        onDispose { viewModel.closeChat() }
+    // Ciclo de vida de la conexion en tiempo real ligado a esta conversacion:
+    // se abre al entrar y se cierra siempre al salir (cambio de conversacion o cierre).
+    DisposableEffect(conversation.conversationId) {
+        viewModel.openPrivateChat(conversation.conversationId)
+        onDispose { viewModel.closePrivateChat() }
     }
 
     // Autoscroll al fondo solo si no interrumpe lectura de historial antiguo.
@@ -147,7 +149,7 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
     // Cargar mas antiguos al llegar arriba del todo.
     LaunchedEffect(listState.firstVisibleItemIndex, hasMoreOlder) {
         if (hasMoreOlder && listState.firstVisibleItemIndex == 0) {
-            viewModel.loadOlderChat()
+            viewModel.loadOlderPrivateChat()
         }
     }
 
@@ -157,12 +159,12 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cerrar chat")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cerrar conversacion")
                     }
                 },
                 title = {
                     Column {
-                        Text("Chat familiar", style = MaterialTheme.typography.titleMedium)
+                        Text(conversation.otherUserDisplayName, style = MaterialTheme.typography.titleMedium)
                         Text(
                             if (connected) "En línea" else "Sin conexión en tiempo real",
                             style = MaterialTheme.typography.labelSmall,
@@ -177,10 +179,10 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text("Exportar chat") },
+                            text = { Text("Exportar conversación") },
                             onClick = {
                                 menuOpen = false
-                                viewModel.exportChat { text -> shareChatText(context, text) }
+                                viewModel.exportPrivateChat { text -> shareChatText(context, text) }
                             }
                         )
                         DropdownMenuItem(
@@ -210,9 +212,9 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
                     }
                     messages.isEmpty() -> {
                         EmptyStateView(
-                            icon = Icons.Outlined.ChatBubbleOutline,
+                            icon = Icons.Outlined.Lock,
                             title = "Aún no hay mensajes",
-                            subtitle = "Este es el chat privado de tu familia. Escribe el primer mensaje para empezar a coordinar la cocina."
+                            subtitle = "Esta es tu conversación privada con ${conversation.otherUserDisplayName}. Escribe el primer mensaje para empezar."
                         )
                     }
                     else -> {
@@ -223,7 +225,7 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = Spacing.md)
                         ) {
                             items(messages, key = { it.id }) { message ->
-                                MessageBubble(
+                                PrivateMessageBubble(
                                     message = message,
                                     isMine = message.authorUserId == myUserId,
                                     onEdit = { selected ->
@@ -239,15 +241,15 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
                 }
             }
 
-            ChatInputBar(
+            PrivateChatInputBar(
                 draft = draft,
                 connected = connected,
-                onDraftChange = { draft = it.take(CHAT_MAX_BODY_LENGTH) },
+                onDraftChange = { draft = it.take(PRIVATE_CHAT_MAX_BODY_LENGTH) },
                 onPickImage = { imagePicker.launch("image/*") },
                 onSend = {
                     val text = draft.trim()
                     if (text.isNotEmpty()) {
-                        viewModel.sendChat(text) {
+                        viewModel.sendPrivateMessage(text) {
                             if (draft.trim() == text) {
                                 draft = ""
                             }
@@ -262,11 +264,11 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("Borrar chat para ti") },
-            text = { Text("Se ocultará tu historial en este chat. Los demás miembros conservarán el suyo. Esta acción no se puede deshacer.") },
+            text = { Text("Se ocultará tu historial en esta conversación. La otra persona conservará el suyo. Esta acción no se puede deshacer.") },
             confirmButton = {
                 TextButton(onClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.clearChat()
+                    viewModel.clearPrivateChat()
                     confirmClear = false
                 }) { Text("Borrar") }
             },
@@ -284,8 +286,8 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
             text = {
                 OutlinedTextField(
                     value = editDraft,
-                    onValueChange = { editDraft = it.take(CHAT_MAX_BODY_LENGTH) },
-                    supportingText = { Text("${editDraft.length}/$CHAT_MAX_BODY_LENGTH") },
+                    onValueChange = { editDraft = it.take(PRIVATE_CHAT_MAX_BODY_LENGTH) },
+                    supportingText = { Text("${editDraft.length}/$PRIVATE_CHAT_MAX_BODY_LENGTH") },
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 5
                 )
@@ -294,7 +296,7 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
                 TextButton(
                     enabled = text.isNotEmpty() && text != message.body.orEmpty(),
                     onClick = {
-                        viewModel.editChatMessage(message, text) {
+                        viewModel.editPrivateMessage(message, text) {
                             editingMessage = null
                         }
                     }
@@ -310,11 +312,11 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
         AlertDialog(
             onDismissRequest = { deletingMessage = null },
             title = { Text("Eliminar mensaje") },
-            text = { Text("Se mostrará como mensaje eliminado para todos los miembros.") },
+            text = { Text("Se mostrará como mensaje eliminado para ambos.") },
             confirmButton = {
                 TextButton(onClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.deleteChatMessage(message)
+                    viewModel.deletePrivateMessage(message)
                     deletingMessage = null
                 }) { Text("Eliminar") }
             },
@@ -325,7 +327,7 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
     }
 
     viewingAttachment?.let { attachment ->
-        ChatImageViewer(
+        PrivateChatImageViewer(
             attachment = attachment,
             onDismiss = { viewingAttachment = null },
             onSave = { viewModel.saveChatImageToGallery(context, attachment.url) }
@@ -334,12 +336,12 @@ fun ChatScreen(viewModel: RecetasViewModel, onClose: () -> Unit) {
 }
 
 @Composable
-private fun MessageBubble(
-    message: ChatMessageDto,
+private fun PrivateMessageBubble(
+    message: PrivateMessageDto,
     isMine: Boolean,
-    onEdit: (ChatMessageDto) -> Unit,
-    onDelete: (ChatMessageDto) -> Unit,
-    onImageClick: (ChatAttachmentDto) -> Unit
+    onEdit: (PrivateMessageDto) -> Unit,
+    onDelete: (PrivateMessageDto) -> Unit,
+    onImageClick: (PrivateAttachmentDto) -> Unit
 ) {
     var actionsOpen by remember(message.id) { mutableStateOf(false) }
     val time = formatTime(message.createdAt)
@@ -417,7 +419,7 @@ private fun MessageBubble(
                 }
                 attachments.forEachIndexed { index, attachment ->
                     if (index > 0) Spacer(Modifier.height(Spacing.sm))
-                    ChatAttachmentImage(attachment, speaker, bodyText, onClick = { onImageClick(attachment) })
+                    PrivateAttachmentImage(attachment, speaker, bodyText, onClick = { onImageClick(attachment) })
                 }
                 val visibleText = deletedText ?: bodyText
                 if (visibleText != null) {
@@ -443,8 +445,8 @@ private fun MessageBubble(
 }
 
 @Composable
-private fun ChatAttachmentImage(
-    attachment: ChatAttachmentDto,
+private fun PrivateAttachmentImage(
+    attachment: PrivateAttachmentDto,
     speaker: String,
     caption: String?,
     onClick: () -> Unit
@@ -491,8 +493,8 @@ private fun ChatAttachmentImage(
  * la galería. En API < 29 solicita WRITE_EXTERNAL_STORAGE antes de descargar.
  */
 @Composable
-private fun ChatImageViewer(
-    attachment: ChatAttachmentDto,
+private fun PrivateChatImageViewer(
+    attachment: PrivateAttachmentDto,
     onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
@@ -556,7 +558,7 @@ private fun ChatImageViewer(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatInputBar(
+private fun PrivateChatInputBar(
     draft: String,
     connected: Boolean,
     onDraftChange: (String) -> Unit,
@@ -564,8 +566,8 @@ private fun ChatInputBar(
     onSend: () -> Unit
 ) {
     Surface(tonalElevation = 3.dp) {
-        val nearLimit = draft.length >= CHAT_MAX_BODY_LENGTH - 160
-        val canSend = connected && draft.isNotBlank() && draft.trim().length <= CHAT_MAX_BODY_LENGTH
+        val nearLimit = draft.length >= PRIVATE_CHAT_MAX_BODY_LENGTH - 160
+        val canSend = connected && draft.isNotBlank() && draft.trim().length <= PRIVATE_CHAT_MAX_BODY_LENGTH
         Row(
             Modifier
                 .fillMaxWidth()
@@ -597,7 +599,7 @@ private fun ChatInputBar(
                 onValueChange = onDraftChange,
                 placeholder = { Text("Mensaje…") },
                 supportingText = if (nearLimit) {
-                    { Text("${draft.length}/$CHAT_MAX_BODY_LENGTH") }
+                    { Text("${draft.length}/$PRIVATE_CHAT_MAX_BODY_LENGTH") }
                 } else {
                     null
                 },
@@ -627,23 +629,4 @@ private fun ChatInputBar(
             }
         }
     }
-}
-
-private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-
-/** Formatea una fecha ISO-8601 a hora local HH:mm. Compartida con PrivateChatScreen. */
-internal fun formatTime(iso: String): String =
-    runCatching {
-        OffsetDateTime.parse(iso)
-            .atZoneSameInstant(ZoneId.systemDefault())
-            .format(timeFormatter)
-    }.getOrElse { iso }
-
-/** Comparte texto plano via Intent.ACTION_SEND. Compartida con PrivateChatScreen. */
-internal fun shareChatText(context: Context, text: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, "Exportar chat"))
 }
