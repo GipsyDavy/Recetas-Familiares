@@ -377,9 +377,14 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                     if (active.id != currentFamilyId || active.role != container.sessionStore.familyRole) {
                         container.familyMemberRepository.setActiveFamily(active)
                     }
-                    if (familyChanged) clearFamilyScopedState()
+                    if (familyChanged) {
+                        stopChatBadge()
+                        clearFamilyScopedState()
+                        startChatBadge()
+                    }
                     _familyInfo.value = active
                 } else {
+                    stopChatBadge()
                     clearFamilyScopedState()
                     _familyInfo.value = null
                 }
@@ -937,6 +942,10 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     private var privateChatOldestCursor: String? = null
     private var privateChatSocket: ChatSocket? = null
+
+    /** Escrito en el hilo principal (efectos de Compose), leido tambien desde el hilo
+     * lector de OkHttp (ChatSocket.onMessage) al procesar un ping de inbox. */
+    @Volatile
     private var activePrivateConversationId: String? = null
 
     /**
