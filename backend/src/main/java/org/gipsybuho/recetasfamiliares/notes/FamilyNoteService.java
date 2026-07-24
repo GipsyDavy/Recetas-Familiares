@@ -25,17 +25,20 @@ public class FamilyNoteService {
     private final FamilyRepository familyRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final RecipeRepository recipeRepository;
+    private final org.gipsybuho.recetasfamiliares.activity.FamilyActivityService familyActivityService;
 
     public FamilyNoteService(
             FamilyNoteRepository noteRepository,
             FamilyRepository familyRepository,
             FamilyMemberRepository familyMemberRepository,
-            RecipeRepository recipeRepository
+            RecipeRepository recipeRepository,
+            org.gipsybuho.recetasfamiliares.activity.FamilyActivityService familyActivityService
     ) {
         this.noteRepository = noteRepository;
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.recipeRepository = recipeRepository;
+        this.familyActivityService = familyActivityService;
     }
 
     @Transactional(readOnly = true)
@@ -69,7 +72,9 @@ public class FamilyNoteService {
                 request.body().trim(),
                 request.pinned()
         );
-        return toResponse(noteRepository.save(note));
+        FamilyNoteResponse response = toResponse(noteRepository.save(note));
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.NOTE, userId);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -84,7 +89,9 @@ public class FamilyNoteService {
         FamilyNoteEntity note = requireActiveNote(familyId, noteId);
         RecipeEntity recipe = resolveActiveRecipe(familyId, request.recipeId());
         note.update(recipe, request.title().trim(), request.body().trim(), request.pinned());
-        return toResponse(noteRepository.save(note));
+        FamilyNoteResponse response = toResponse(noteRepository.save(note));
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.NOTE, userId);
+        return response;
     }
 
     @Transactional
@@ -93,6 +100,7 @@ public class FamilyNoteService {
         FamilyNoteEntity note = requireActiveNote(familyId, noteId);
         note.softDelete();
         noteRepository.save(note);
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.NOTE, userId);
     }
 
     private void requireMembership(String familyId, String userId) {
