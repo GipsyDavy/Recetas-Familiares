@@ -30,6 +30,7 @@ public class RecipeService {
     private final FamilyRepository familyRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final UserRepository userRepository;
+    private final org.gipsybuho.recetasfamiliares.activity.FamilyActivityService familyActivityService;
 
     public RecipeService(
             RecipeRepository recipeRepository,
@@ -38,7 +39,8 @@ public class RecipeService {
             RecipePhotoRepository photoRepository,
             FamilyRepository familyRepository,
             FamilyMemberRepository familyMemberRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            org.gipsybuho.recetasfamiliares.activity.FamilyActivityService familyActivityService
     ) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
@@ -47,6 +49,7 @@ public class RecipeService {
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.userRepository = userRepository;
+        this.familyActivityService = familyActivityService;
     }
 
     @Transactional(readOnly = true)
@@ -79,7 +82,9 @@ public class RecipeService {
                 request.cookMinutes(),
                 request.difficulty()
         );
-        return toResponse(recipeRepository.save(recipe));
+        RecipeResponse response = toResponse(recipeRepository.save(recipe));
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.RECIPE, userId);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -100,7 +105,9 @@ public class RecipeService {
                 request.cookMinutes(),
                 request.difficulty()
         );
-        return toResponse(recipeRepository.save(recipe));
+        RecipeResponse response = toResponse(recipeRepository.save(recipe));
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.RECIPE, userId);
+        return response;
     }
 
     @Transactional
@@ -115,6 +122,7 @@ public class RecipeService {
                 .forEach(RecipePhotoEntity::softDelete);
         recipe.softDelete();
         recipeRepository.save(recipe);
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.RECIPE, userId);
     }
 
     @Transactional

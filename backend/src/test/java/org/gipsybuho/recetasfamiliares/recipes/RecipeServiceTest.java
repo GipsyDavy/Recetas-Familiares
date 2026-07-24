@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import org.gipsybuho.recetasfamiliares.activity.FamilyActivityService;
 import org.gipsybuho.recetasfamiliares.families.FamilyEntity;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
@@ -47,6 +48,8 @@ class RecipeServiceTest {
     private FamilyMemberRepository familyMemberRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private FamilyActivityService familyActivityService;
 
     private RecipeService service;
 
@@ -59,7 +62,8 @@ class RecipeServiceTest {
                 photoRepository,
                 familyRepository,
                 familyMemberRepository,
-                userRepository
+                userRepository,
+                familyActivityService
         );
     }
 
