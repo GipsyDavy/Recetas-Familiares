@@ -238,7 +238,7 @@ public class PrivateChatService {
         message.editBody(normalizeRequiredBody(request.body()));
         PrivateMessageEntity saved = messageRepository.save(message);
         PrivateMessageResponse response = PrivateMessageResponse.from(saved);
-        publishAfterCommit(response, conversation.otherParticipant(userId), null);
+        publishUpdateAfterCommit(response);
         return response;
     }
 
@@ -249,7 +249,7 @@ public class PrivateChatService {
         message.softDelete();
         PrivateMessageEntity saved = messageRepository.save(message);
         PrivateMessageResponse response = PrivateMessageResponse.from(saved);
-        publishAfterCommit(response, conversation.otherParticipant(userId), null);
+        publishUpdateAfterCommit(response);
         return response;
     }
 
@@ -308,13 +308,13 @@ public class PrivateChatService {
             List<FileStorageService.StoredFile> storedFiles
     ) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            realtimePublisher.publish(response, recipientUserId);
+            realtimePublisher.publishNewMessage(response, recipientUserId);
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                realtimePublisher.publish(response, recipientUserId);
+                realtimePublisher.publishNewMessage(response, recipientUserId);
             }
 
             @Override
@@ -322,6 +322,19 @@ public class PrivateChatService {
                 if (status == STATUS_ROLLED_BACK && storedFiles != null) {
                     cleanupStoredFiles(storedFiles);
                 }
+            }
+        });
+    }
+
+    private void publishUpdateAfterCommit(PrivateMessageResponse response) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            realtimePublisher.publishUpdate(response);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                realtimePublisher.publishUpdate(response);
             }
         });
     }

@@ -31,10 +31,21 @@ public class PrivateConversationRealtimePublisher {
         return INBOX_TOPIC_PREFIX + userId + INBOX_TOPIC_SUFFIX;
     }
 
-    void publish(PrivateMessageResponse message, String recipientUserId) {
+    /** Mensaje nuevo (envio de texto o imagen): notifica la conversacion y hace sonar la bandeja del destinatario. */
+    void publishNewMessage(PrivateMessageResponse message, String recipientUserId) {
         messagingTemplate.convertAndSend(conversationTopicFor(message.conversationId()), message);
         messagingTemplate.convertAndSend(
                 inboxTopicFor(recipientUserId),
                 new PrivateInboxPing(message.conversationId(), message.authorUserId(), message.updatedAt()));
+    }
+
+    /**
+     * Edicion o borrado de un mensaje ya existente: solo actualiza el topic de la
+     * conversacion (para quien la tenga abierta en tiempo real). No genera ping de
+     * bandeja — el mensaje ya conto como no-leido cuando se envio la primera vez, y
+     * el ping no lleva messageId para poder deduplicar en el cliente.
+     */
+    void publishUpdate(PrivateMessageResponse message) {
+        messagingTemplate.convertAndSend(conversationTopicFor(message.conversationId()), message);
     }
 }

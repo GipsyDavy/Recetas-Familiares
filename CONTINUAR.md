@@ -4136,3 +4136,53 @@ resto de deuda tecnica de este proyecto. `/VibeSec`/`security-review` no aplican
 exclusivamente en codigo de test, sin tocar autenticacion, autorizacion, imagenes ni datos de
 produccion. Riesgo residual: ninguno identificado — los 14 archivos quedan verificados 1:1 contra
 la BD de test real, no solo compilados.
+
+---
+
+### Cierre de sprint 2026-07-24 — item 25 resuelto: badge de chat privado ya no sobre-cuenta en edicion/borrado
+
+Usuario delego de nuevo la eleccion ("continua"). Elegido: cerrar el item 25 (hallazgo de la
+revision final del sprint de chat privado Android, arriba), ya que la causa raiz estaba
+identificada con evidencia concreta y el fix resulto mas simple de lo previsto una vez leido
+el codigo real.
+
+**Diseño evaluado (2 opciones, decidido por criterio propio dado YAGNI/minima complejidad):**
+- Opcion A (anadir `messageId` a `PrivateInboxPing` + dedupe cliente tipo `chatBadgeSeenIds`):
+  descartada. Requiere tocar el DTO compartido, el publisher, y AMBOS clientes (Desktop
+  `ChatRepository.java` + Android `RecetasViewModel.kt`), triplicando la superficie de cambio
+  para el mismo resultado.
+- Opcion B (elegida): separar el metodo unico `PrivateConversationRealtimePublisher.publish()`
+  en dos — `publishNewMessage()` (mensaje nuevo: topic de conversacion + ping de bandeja, usado
+  por `sendMessage`/`sendImageMessage`) y `publishUpdate()` (edicion/borrado: solo topic de
+  conversacion, sin ping, usado por `editMessage`/`deleteMessage`). Cambio 100% backend, en 2
+  archivos (`PrivateConversationRealtimePublisher.java`, `PrivateChatService.java`), sin tocar
+  el DTO `PrivateInboxPing`, sin tocar ningun cliente. Correcto porque editar/borrar un mensaje
+  ya enviado no es "actividad nueva" para el contador de no-leidos — ese mensaje ya genero su
+  propio ping cuando se envio la primera vez.
+
+**TDD aplicado:** test nuevo en `PrivateConversationRealtimePublisherTest.java`
+(`publishUpdateOnlyNotifiesConversationTopicNotInbox`) escrito primero, RED confirmado
+(`cannot find symbol: publishNewMessage/publishUpdate`, compilacion fallida), implementado el
+split, GREEN confirmado. Los 2 tests existentes del publisher renombrados a `publishNewMessage`
+sin cambiar su logica (mismo comportamiento que antes para mensajes nuevos).
+
+**Validacion:** `PrivateConversationRealtimePublisherTest` 3/3, `PrivateChatControllerTest`
+16/16 (integracion REST completa, sin regresion en envio/edicion/borrado/export/clear). Suite
+completa del backend contra la BD real de Hetzner: **196 tests (195+1 nuevo), 0 fallos, 0
+errores, BUILD SUCCESS**.
+
+**Seguridad (criterio propio, sin invocar skill formal):** el cambio reduce la superficie de
+notificacion (se envia MENOS informacion, no mas) — no toca autenticacion, autorizacion,
+ownership ni expone ningun dato nuevo. No hay input de usuario nuevo que validar. Sin hallazgos.
+
+**Archivos modificados:** `backend/src/main/java/.../dm/PrivateConversationRealtimePublisher.java`,
+`backend/src/main/java/.../dm/PrivateChatService.java`,
+`backend/src/test/java/.../dm/PrivateConversationRealtimePublisherTest.java`.
+Ningun DTO ni cliente (Desktop/Android) tocado — exactamente el alcance minimo previsto.
+
+**Trazabilidad:** agente lider Claude Code (Sonnet 5), sin subagentes (cambio pequeño y bien
+acotado, 2 archivos main + 1 test, no ameritaba dispatch). Sin skill de proceso formal invocada
+(`systematic-debugging` no aplica: causa raiz ya diagnosticada con evidencia en la revision
+anterior; el diseño de la solucion se evaluo con criterio propio, documentado arriba, no requirio
+brainstorming con el usuario dado que ambas opciones eran tecnicas y una era claramente mas
+simple bajo YAGNI). Riesgo residual: ninguno identificado.
