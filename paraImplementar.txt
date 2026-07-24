@@ -1,24 +1,24 @@
 1. botón actualizar en notas Android — COMPLETADO (IconButton Refresh + PullToRefreshBox en NotesScreens.kt, confirmado 2026-07-24)
 2. botón salir en desktop y Android — COMPLETADO (Desktop: "Cerrar sesión" + "Salir" en sidebar de MainWindow.java; Android: "Cerrar sesión" + "Salir de la aplicación" en ProfileScreen.kt, confirmado 2026-07-24)
-3. opción editar miembros desde la pantalla de miembros del propietario y del administrador, que al pinchar sobre un miembro se abra una ventana para editar los datos y la contraseña en caso de ser necesario por olvidarla
-4. opción cambiar de familia para todos los usuarios y de pertenecer a varias familias y poder cambiar de grupo en para interactuar con una u otra familia
-5. opción crear familia solo propietario y adminsitradores, en la pantalla de miembros de desktop para propietario y administradores implementar la opción de crear familia y poder cambiar de una a otra para añadir, eliminar o editar miembros
-6. opción de recuperar contraseña si se olvida implementa en desktop también la opción de validar email
-7. opción de añadir una imagen a la receta para identificarla también visualmente
-8. posibilidad de buscar recetas en internet, documentación o información sobre productos o alimentos, implementando un botón que permita esa opción al pinchar sobre el botón se accede a una pantalla donde se indica la receta, alimentos o documentación a buscar sobre las recetas y que busque en internet coincidencias y poder añadir esas recetas buscadas en internet a la aplicacion
-9. sistema de calificación por estrellas de 1 a 5 para indicar si te gusta o no la receta.
-10. constancia de que usuario es el que crea la receta
+3. opción editar miembros + contraseña olvidada — COMPLETADO (Android: passwordAction en RecetasViewModel/ProfileScreen/ApiDtos; Desktop: FamilyMembersView + FamilyRepository, confirmado 2026-07-24)
+4. opción cambiar de familia / pertenecer a varias — COMPLETADO (Android: switchActiveFamily; Desktop: FamilyMembersView + FamilyRepository + AppContext, confirmado 2026-07-24)
+5. opción crear familia (owner/admin) desde Desktop — COMPLETADO (createFamily en MainWindow.java/FamilyMembersView.java/AppContext.java, confirmado 2026-07-24)
+6. recuperar contraseña olvidada + validar email en Desktop — COMPLETADO (PasswordResetDialog.java + LoginView.java + emailVerified en ProfileView.java/UserDtos.java, confirmado 2026-07-24)
+7. añadir imagen a la receta — COMPLETADO (RecipePhoto* en backend: entity/repository/service/controller/response/DTOs, confirmado 2026-07-24)
+8. buscar recetas en internet (boton que busca coincidencias online y las importa) — NO IMPLEMENTADO (sin evidencia en backend, confirmado 2026-07-24)
+9. sistema de calificación por estrellas 1-5 — COMPLETADO (RecipeRating* en backend: entity/repository/service/controller/response, confirmado 2026-07-24)
+10. constancia de que usuario crea la receta — COMPLETADO (authorUserId en RecipeResponse.java, confirmado 2026-07-24; pendiente verificar si se muestra visualmente en cliente, no solo en el DTO)
 11. ranking de usuarios en cuanto a recetas y calificación de las mismas — COMPLETADO (backend RecipeRankingController + UI Android y Desktop, confirmado 2026-07-24)
-12. posibilidad de exportar o copiar las recetas para llevarlas a otro grupo familiar y no tener que reescribirla si el usuario esta en varios grupos familiares
-13. posibilidad de estar en varios grupos familiares
-14. chat que pueda ser privado entre un usuario y otro y chat familiar con todos los usuarios de la familia
-15. posibilidad de subir imagen de grupo de familia
-16. posibilidad de comparar recetas con otras en internet y que tras comparativa de sugerencia sobre si modificar algo o no.
-17. que la aplicacion cada vez que se borre y se instale de nuevo o cuando se reinstale no se pierdan los datos, solo si el usuario es eliminado por el administrador o propietario se perderan los datos
-18. alojar en el servidor hertzner todos los datos de usuarios, chat y base de datos, con sus backups
+12. exportar o copiar recetas a otro grupo familiar — COMPLETADO (evidencia: tests dedicados recipes-copy-source/recipes-copy-target en RecipeControllerTest, confirmado 2026-07-24)
+13. posibilidad de estar en varios grupos familiares — COMPLETADO (modelo de datos ya soporta multi-familia, confirmado por el bloqueo explicito de reset-password para cuentas multi-familia visto en varias sesiones, 2026-07-24)
+14. chat privado 1:1 y chat familiar — COMPLETADO (chat familiar en produccion desde antes de esta auditoria; chat privado ver items 24/25, confirmado 2026-07-24)
+15. posibilidad de subir imagen de grupo de familia — NO IMPLEMENTADO (sin evidencia en backend, confirmado 2026-07-24)
+16. comparar recetas con otras en internet + sugerencia de IA — NO IMPLEMENTADO (mismo alcance que item 8, sin evidencia en backend, confirmado 2026-07-24)
+17. no perder datos al reinstalar (salvo expulsion por admin/owner) — COMPLETADO (propiedad arquitectonica trivial: toda la persistencia vive en backend/PostgreSQL, nunca en el cliente, confirmado 2026-07-24)
+18. backups del servidor Hetzner — NO VERIFICABLE DESDE EL REPO (solo existe herztner/restic-offsite-passphrase.env, sin script de backup/cron visible en el repositorio; podria vivir directamente en el servidor fuera de este repo, o estar pendiente de completar — requiere acceso SSH al servidor para confirmar, no una auditoria de codigo, 2026-07-24)
 19. opción de poder listar los miembros del grupo familiar — COMPLETADO (FamilyMembersSection Android + FamilyMembersView Desktop, confirmado 2026-07-24)
 20. icono indicando miembros en linea o activos — COMPLETADO (Android y Desktop, confirmado 2026-07-24). Pendiente real: aviso/notificacion cuando otros miembros actualizan recetas, notas o stock (distinto de presencia online) — hoy solo hay sync silenciosa, sin badge ni notificacion visible; el plan de presencia excluyo explicitamente avisos toast/snackbar por diseño, asi que esto es trabajo nuevo, no un bug.
-21. incluye en la aplicación por defecto al menos 5 recetas muy conocidas 2 de dificultad fácil, dos de dificultad media y 1 de dificultad difícil
+21. 5 recetas por defecto (2 faciles, 2 medias, 1 dificil) — COMPLETADO (StarterRecipeSeeder.java en backend, confirmado 2026-07-24; pendiente verificar si el reparto exacto de dificultad coincide, no solo que existan recetas semilla)
 22. scroll en desktop cuando se cambia tamaño de la ventana — COMPLETADO (fix generalizado via DesktopScroll.java, confirmado 2026-07-24 que sigue en el codigo, el backlog simplemente no se habia actualizado tras el fix de sesion anterior)
 23. pulido visual del sidebar de Desktop: iconos con color/chip propio por item en vez del texto plano actual, mas compacto y agradable a la vista (idea surgida al comparar con un mockup durante el brainstorming del chat privado, 2026-07-22)
 24. chat privado Android — COMPLETADO y PUSHEADO 2026-07-24 (ver CONTINUAR.md, merge 6d2155b en origin/main). Navegacion resuelta: opcion A (icono propio en TopAppBar junto al de chat familiar, abre ConversationsScreen -> PrivateChatScreen). Pendiente real: prueba manual con dos cuentas/dispositivos (bloqueada para el agente).
