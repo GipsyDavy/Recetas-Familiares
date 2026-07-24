@@ -3952,3 +3952,112 @@ del usuario** (no se toco sin autorizacion, cambio de alcance mayor al ya cerrad
 
 `main` local y remoto sincronizados (confirmar en la proxima sesion), arbol de trabajo limpio salvo
 lo ya commiteado arriba, sin worktrees activos, sin ramas de feature pendientes.
+
+---
+
+### Cierre de sprint 2026-07-24 — chat privado Android completado (implementacion, sin push todavia)
+
+Retomada la sesion con el brainstorming de navegacion Android ya resuelto (companion visual,
+opcion A elegida: icono propio en `TopAppBar` junto al de chat familiar, abre `ConversationsScreen`
+a pantalla completa; una conversacion seleccionada reemplaza la bandeja por `PrivateChatScreen`
+via estado local, sin Navigation Compose). Spec (`docs/superpowers/specs/2026-07-19-chat-privado-design.md`,
+addendum Android 2026-07-23) autocorregida antes de escribir el plan: dos suposiciones falsas
+detectadas por mi mismo (no por el usuario) al leer el codigo real — no existe Navigation Compose
+en toda la app (navegacion por flags booleanos + early return, patron `chatOpen`/`initialRecipeId`),
+y Android **no** comparte el modelo de socket unico de Desktop: ya usa **dos conexiones
+independientes** en produccion para chat familiar (`chatBadgeSocket` siempre vivo vs `chatSocket`
+efimero por pantalla) — el plan siguio ese precedente propio de Android, no el de Desktop.
+
+**Plan escrito:** `docs/superpowers/plans/2026-07-23-chat-privado-android.md`, 13 tareas TDD.
+Autorevision encontro y corrigio 2 fallos reales antes de ejecutar: `Icons.Outlined.Lock` referenciado
+sin import (no habria compilado) y `sendPrivateImage` sin guard de conexion (paridad con
+`sendChatImage` real).
+
+**Ejecucion:** `superpowers:subagent-driven-development`, worktree nativo `.claude/worktrees/chat-privado-android`
+(rama `worktree-chat-privado-android`, creado con `EnterWorktree`, baseline verificado con
+`local.properties` copiado manualmente — no versionado, git-ignorado, sdk.dir del entorno).
+**10 tareas completadas, 10 commits:**
+`4094094` (DTOs) · `175073e` (endpoints `RecetasApi`) · `a8644fa`+`c959461`+`cdb5deb` (`PrivateChatRepository`,
+15 tests tras 2 rondas de hallazgos reales de un revisor independiente — ver abajo) ·
+`55526bf` (`ChatSocket`/`ChatRepository` extendidos, topics de inbox y conversacion) ·
+`a12794c` (wiring en `AppContainer`) · `40e3fa1`+`2ea8d8c` (estado en `RecetasViewModel`, con un
+fix real de `loadOlderPrivateChat` sin loading-flag/guard/onFailure encontrado por mi mismo
+leyendo el diff) · `695c9bb` (`ConversationsScreen`, `PrivateChatScreen`, boton "Mensaje" en
+`FamilyMembersSection`, icono `TopAppBar`) · `b8aeba0` (2 fixes de la revision final, ver abajo).
+
+**Patron recurrente y muy agravado esta sesion — subagentes devolviendo un stub generico** (tipo
+"Approve — esto no es un agente fp-check...") en vez del informe real solicitado, incluso tras
+pedirlo explicitamente sin referencias a "arriba". Ocurrio en la mayoria de las tareas (Tarea 1
+code-quality, Tarea 2 code-quality, Tarea 3 implementador x2 + spec-review x2 + code-quality,
+Tarea 4 implementador, Tarea 5 implementador, Tarea 6, Tarea 8, y la revision final de rama
+completa) — recuperado casi siempre via `SendMessage` insistiendo en el informe completo (a veces
+2 intentos), y en 2 casos (Tarea 4, spec-review de Tarea 3 con un agente distinto) abandonando el
+agente atascado y verificando **yo mismo directamente** (`git show`, `git diff`, recompilar, correr
+tests) en vez de seguir reintentando — mas rapido y fiable que un tercer/cuarto intento. Ya estaba
+en memoria (`feedback_subagent_truncation.md`); reforzado: cuando un agente stub-loopea 2 veces
+seguidas, verificar directo en vez de insistir con el mismo agente.
+
+**Hallazgos reales de revisores independientes durante la ejecucion (todos verificados por mi
+mismo leyendo codigo/diffs, no solo aceptados de oidas):**
+- Tarea 3 (`PrivateChatRepository`): el implementador encontro y arreglo un bug real en los tests
+  que yo mismo escribi en el plan (`runTest` anidado dentro de `assertThrows` — invalido en
+  `kotlinx-coroutines-test`, arreglado con `runBlocking`), y añadio (autorizado por mi despues del
+  hecho, con test TDD retroactivo exigido y verificado con mutacion real) un guard de maximo 5
+  imagenes por mensaje que faltaba respecto al `ChatRepository` hermano. Un revisor independiente
+  encontro ademas 3 huecos reales de cobertura (`clear()`, camino feliz de `sendImages()`, y el
+  lado negativo del allowlist de URLs) — los 3 cerrados con tests verificados por mutacion real
+  (rotura de produccion -> confirmar RED -> revertir -> confirmar GREEN), no solo inspeccion.
+- Revision final de rama completa (agente independiente, 46 llamadas de herramienta, compilo y
+  corrio la suite el mismo): confirmo seguras 3 de 5 areas de riesgo pedidas explicitamente
+  (orden de disposal de sockets entre `ConversationsScreen`/`PrivateChatScreen`, el cambio de
+  `else` a `else if` en el ruteo de frames `MESSAGE` de `ChatSocket` — verificado necesario y
+  seguro contra el backend real, no una regresion — y la supresion de snackbar). Encontro 3
+  problemas reales Important, todos en el mecanismo de badge de chat privado:
+  1. **Corregido en `b8aeba0`:** `activePrivateConversationId` era un `var` normal escrito desde
+     Compose (hilo principal) y leido desde el hilo lector de OkHttp al procesar un ping de
+     inbox — hueco de visibilidad JMM real. Ahora `@Volatile`.
+  2. **Corregido en `b8aeba0`:** `refreshFamiliesFromServer()` (unico de 5 puntos de cruce de
+     frontera de familia) no llamaba `stopChatBadge()`/`startChatBadge()` al detectar cambio de
+     familia activa desde el servidor — dejaba badge/bandeja de chat privado con datos de la
+     familia anterior hasta que el usuario abriera `ConversationsScreen` manualmente.
+  3. **NO corregido, documentado como deuda tecnica (`paraImplementar.txt` item 25):** el backend
+     ya en produccion emite el ping de inbox (`PrivateInboxPing`) tambien en `editMessage()` y
+     `deleteMessage()`, sin `messageId` en el DTO — el cliente no puede deduplicar (a diferencia
+     del chat familiar, cuyo `chatBadgeSeenIds` deduplica por id de mensaje). Efecto: el contador
+     de no-leidos puede subir sin que exista un mensaje nuevo real, si se edita o borra un mensaje
+     con la conversacion cerrada. Arreglo real exige tocar el backend (anadir `messageId` al DTO +
+     dedupe cliente, o dejar de emitir el ping en edicion/borrado) — fuera de alcance de un cambio
+     solo-cliente, no corregido en este sprint.
+
+**Validacion ejecutada esta sesion (verificada por mi mismo, no solo reportada por subagentes):**
+`./gradlew :app:compileDebugKotlin` -> `BUILD SUCCESSFUL`. `./gradlew :app:testDebugUnitTest` ->
+`BUILD SUCCESSFUL`, 0 fallos (verificado tambien via XML crudo de resultados, no solo el resumen
+de consola). `./gradlew :app:assembleDebug` -> `BUILD SUCCESSFUL`, APK debug generado.
+
+**Seguridad (VibeSec, ejecutado por mi mismo en esta sesion, no via skill `/VibeSec` formal
+invocada — mismo criterio de fondo aplicado):** boton "Mensaje" nunca aparece en la fila propia
+(`member.userId != myUserId`); imagenes de chat privado se descargan autenticadas igual que el
+chat familiar (`AuthInterceptor` adjunta el Bearer por origen de host, no por ruta — cubre
+`/uploads/dm/**` automaticamente sin caso especial); sin logica de autorizacion propia en el
+cliente (todo delegado al backend, ya auditado en el sprint del backend); allowlist de reescritura
+de URLs restrictivo (`/uploads/dm/`, `/uploads/dm_thumbnails/` unicamente, bloquea `..`) — mismo
+patron que Desktop, ya revisado en ese sprint.
+
+**Pendiente real, no simulable por el agente:** prueba manual con dos cuentas/dos
+dispositivos-emuladores (abrir el icono de chat privado, badge, bandeja, boton "Mensaje" desde un
+miembro, mensaje en vivo sin recargar, y que un tercer miembro no participante no vea la
+conversacion en su propia bandeja) — bloqueada para el agente en este entorno, requiere
+interaccion humana. Documentado tambien en el plan (Tarea 13, paso 4).
+
+**Estado de git:** 10 commits del plan + 1 commit de fixes de la revision final (`b8aeba0`), todos
+en la rama `worktree-chat-privado-android` dentro del worktree `.claude/worktrees/chat-privado-android`.
+**Sin pushear, sin mergear a `main` todavia** — pendiente de decision explicita del usuario
+(merge local / PR / dejar como esta / descartar), siguiendo `superpowers:finishing-a-development-branch`.
+
+**Trazabilidad:** agente lider Claude Code (Sonnet 5) en todo el sprint. Skills usadas:
+`superpowers:writing-plans`, `superpowers:subagent-driven-development` (con recuperacion manual
+frecuente por el patron de stub descrito arriba). VibeSec aplicado por criterio propio, no via
+skill formal. `/security-review` no invocado (no se toco backend ni Spring Security en este
+sprint — solo cliente Android consumiendo contratos ya auditados). Riesgo residual explicito:
+el hallazgo de deuda tecnica del ping de inbox (arriba, `paraImplementar.txt` item 25) y la
+prueba manual con dos dispositivos, ambos sin resolver por decision consciente de alcance.
