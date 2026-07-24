@@ -22,15 +22,18 @@ public class StockItemService {
     private final StockItemRepository stockItemRepository;
     private final FamilyRepository familyRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final org.gipsybuho.recetasfamiliares.activity.FamilyActivityService familyActivityService;
 
     public StockItemService(
             StockItemRepository stockItemRepository,
             FamilyRepository familyRepository,
-            FamilyMemberRepository familyMemberRepository
+            FamilyMemberRepository familyMemberRepository,
+            org.gipsybuho.recetasfamiliares.activity.FamilyActivityService familyActivityService
     ) {
         this.stockItemRepository = stockItemRepository;
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
+        this.familyActivityService = familyActivityService;
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +64,9 @@ public class StockItemService {
                 request.expiresAt(),
                 trimToNull(request.note())
         );
-        return toResponse(stockItemRepository.save(stockItem));
+        StockItemResponse response = toResponse(stockItemRepository.save(stockItem));
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.STOCK, userId);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -87,7 +92,9 @@ public class StockItemService {
                 request.expiresAt(),
                 trimToNull(request.note())
         );
-        return toResponse(stockItemRepository.save(stockItem));
+        StockItemResponse response = toResponse(stockItemRepository.save(stockItem));
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.STOCK, userId);
+        return response;
     }
 
     @Transactional
@@ -96,6 +103,7 @@ public class StockItemService {
         StockItemEntity stockItem = requireActiveStockItem(familyId, stockItemId);
         stockItem.softDelete();
         stockItemRepository.save(stockItem);
+        familyActivityService.recordActivity(familyId, org.gipsybuho.recetasfamiliares.activity.FamilySection.STOCK, userId);
     }
 
     private void requireMembership(String familyId, String userId) {
