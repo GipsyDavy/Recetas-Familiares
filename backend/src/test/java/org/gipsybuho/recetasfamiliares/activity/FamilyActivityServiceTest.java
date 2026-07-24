@@ -26,13 +26,15 @@ class FamilyActivityServiceTest {
 
     private FamilySectionActivityRepository activityRepository;
     private UserSectionLastSeenRepository lastSeenRepository;
+    private FamilyActivityRealtimePublisher realtimePublisher;
     private FamilyActivityService service;
 
     @BeforeEach
     void setUp() {
         activityRepository = Mockito.mock(FamilySectionActivityRepository.class);
         lastSeenRepository = Mockito.mock(UserSectionLastSeenRepository.class);
-        service = new FamilyActivityService(activityRepository, lastSeenRepository);
+        realtimePublisher = Mockito.mock(FamilyActivityRealtimePublisher.class);
+        service = new FamilyActivityService(activityRepository, lastSeenRepository, realtimePublisher);
     }
 
     @Test

@@ -18,13 +18,16 @@ public class FamilyActivityService {
 
     private final FamilySectionActivityRepository activityRepository;
     private final UserSectionLastSeenRepository lastSeenRepository;
+    private final FamilyActivityRealtimePublisher realtimePublisher;
 
     public FamilyActivityService(
             FamilySectionActivityRepository activityRepository,
-            UserSectionLastSeenRepository lastSeenRepository
+            UserSectionLastSeenRepository lastSeenRepository,
+            FamilyActivityRealtimePublisher realtimePublisher
     ) {
         this.activityRepository = activityRepository;
         this.lastSeenRepository = lastSeenRepository;
+        this.realtimePublisher = realtimePublisher;
     }
 
     @Transactional
@@ -36,6 +39,7 @@ public class FamilyActivityService {
         activity.touch(now);
         activityRepository.save(activity);
         markSeenAt(familyId, section, actorUserId, now);
+        realtimePublisher.publish(familyId, section);
     }
 
     @Transactional
