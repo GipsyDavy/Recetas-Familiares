@@ -6,6 +6,8 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Unico punto de escritura de actividad de familia (avisos de recetas/notas/
@@ -39,7 +41,27 @@ public class FamilyActivityService {
         activity.touch(now);
         activityRepository.save(activity);
         markSeenAt(familyId, section, actorUserId, now);
-        realtimePublisher.publish(familyId, section);
+        publishAfterCommit(familyId, section);
+    }
+
+    /**
+     * Envia el ping solo tras confirmar el commit real de la transaccion (misma
+     * razon que PrivateChatService.publishAfterCommit): publicar dentro de la
+     * transaccion notificaria a un suscriptor antes de que la fila sea visible
+     * para otras conexiones, o incluso si la transaccion externa que invoco
+     * recordActivity (p.ej. RecipeService.createRecipe) hiciera rollback despues.
+     */
+    private void publishAfterCommit(String familyId, FamilySection section) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            realtimePublisher.publish(familyId, section);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                realtimePublisher.publish(familyId, section);
+            }
+        });
     }
 
     @Transactional
