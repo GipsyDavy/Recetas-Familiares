@@ -10,6 +10,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.gipsybuho.recetasfamiliares.core.SessionStore
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyActivityPingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PresenceResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateInboxPingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
@@ -37,13 +38,15 @@ class ChatSocket(
     private val onPresenceUpdate: (Set<String>) -> Unit,
     private val conversationId: String? = null,
     private val onInboxPing: (PrivateInboxPingDto) -> Unit = {},
-    private val onPrivateMessage: (PrivateMessageDto) -> Unit = {}
+    private val onPrivateMessage: (PrivateMessageDto) -> Unit = {},
+    private val onActivityPing: (FamilyActivityPingDto) -> Unit = {}
 ) {
 
     private val wsUrl: String = toWebSocketUrl(baseUrl)
     private val topic: String = "/topic/families/$familyId/chat"
     private val presenceTopic: String = "/topic/families/$familyId/presence"
     private val inboxTopic: String = "/topic/users/$myUserId/inbox"
+    private val activityTopic: String = "/topic/families/$familyId/activity"
     private val conversationTopic: String? = conversationId?.let { "/topic/conversations/$it" }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val reconnectRunnable = Runnable {
@@ -152,6 +155,12 @@ class ChatSocket(
                     "\n" +
                     NUL
                 webSocket.send(subscribeInbox)
+                val subscribeActivity = "SUBSCRIBE\n" +
+                    "id:sub-activity\n" +
+                    "destination:$activityTopic\n" +
+                    "\n" +
+                    NUL
+                webSocket.send(subscribeActivity)
                 conversationTopic?.let { convTopic ->
                     val subscribeConversation = "SUBSCRIBE\n" +
                         "id:sub-conversation\n" +
@@ -174,6 +183,8 @@ class ChatSocket(
                     handleInboxPing(body)
                 } else if (destination != null && destination == conversationTopic) {
                     handlePrivateMessage(body)
+                } else if (destination == activityTopic) {
+                    handleActivityPing(body)
                 } else if (destination == topic) {
                     handleChatMessage(body)
                 }
@@ -203,6 +214,12 @@ class ChatSocket(
         runCatching { gson.fromJson(body, PrivateInboxPingDto::class.java) }
             .getOrNull()
             ?.let(onInboxPing)
+    }
+
+    private fun handleActivityPing(body: String) {
+        runCatching { gson.fromJson(body, FamilyActivityPingDto::class.java) }
+            .getOrNull()
+            ?.let(onActivityPing)
     }
 
     private fun handlePrivateMessage(body: String) {

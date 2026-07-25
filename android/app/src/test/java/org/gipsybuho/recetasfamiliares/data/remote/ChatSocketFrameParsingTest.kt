@@ -58,4 +58,15 @@ class ChatSocketFrameParsingTest {
 
         assertEquals("/topic/conversations/c1", extractStompHeader(frame, "destination"))
     }
+
+    @Test
+    fun extractsDestinationFromActivityFrame() {
+        val frame = "MESSAGE\n" +
+            "destination:/topic/families/fam-1/activity\n" +
+            "subscription:sub-activity\n" +
+            "\n" +
+            "{\"section\":\"RECIPE\"}"
+
+        assertEquals("/topic/families/fam-1/activity", extractStompHeader(frame, "destination"))
+    }
 }
