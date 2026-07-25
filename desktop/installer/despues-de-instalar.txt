@@ -1,0 +1,12 @@
+Recetas Familiares se ha instalado correctamente.
+
+Primeros pasos:
+
+  - Abre la aplicacion desde el acceso directo del menu Inicio (o del
+    escritorio, si marcaste esa opcion durante la instalacion).
+  - Inicia sesion con tu cuenta familiar, o crea una cuenta nueva desde la
+    propia pantalla de inicio de sesion.
+  - Si formabas parte de una familia antes de reinstalar, veras tus recetas,
+    stock, menus y notas tal como los dejaste: todo se guarda en el servidor.
+
+Soporte y actualizaciones: https://github.com/gipsybuho

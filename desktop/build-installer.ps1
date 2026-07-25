@@ -37,8 +37,22 @@ $PngPath        = "$ProjectDir\src\main\resources\brand\gipsy-buho-logo.png"
 $ShadedJar      = "$TargetDir\recetas-familiares-desktop-1.1.jar"
 
 # ── Rutas de herramientas ─────────────────────────────────────────────────────
-$NSIS      = "C:\Program Files (x86)\NSIS\makensis.exe"
-$InnoSetup = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+$NSIS = "C:\Program Files (x86)\NSIS\makensis.exe"
+
+$InnoSetupCandidates = @(
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+    "C:\Program Files\Inno Setup 6\ISCC.exe",
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+)
+function Find-InnoSetup {
+    foreach ($candidate in $InnoSetupCandidates) {
+        if (Test-Path $candidate) { return $candidate }
+    }
+    $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+    if ($iscc) { return $iscc.Source }
+    return $null
+}
+$InnoSetup = Find-InnoSetup
 
 $MvnCandidates = @(
     "C:\Program Files\Apache NetBeans\java\maven\bin\mvn.cmd",
@@ -222,6 +236,34 @@ function New-NsisBitmaps {
     $hdr.Dispose()
 }
 
+# Genera el BMP pequeno 55x58 requerido por Inno Setup (WizardSmallImageFile)
+function New-InnoSmallImage {
+    param([string]$InstallerDir)
+    Add-Type -AssemblyName System.Drawing
+    $brown = [System.Drawing.Color]::FromArgb(61, 43, 31)   # #3D2B1F
+    $terra = [System.Drawing.Color]::FromArgb(193, 125, 82) # #C17D52
+    $white = [System.Drawing.Brushes]::White
+
+    $bmp = New-Object System.Drawing.Bitmap 55, 58
+    $g   = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $rect = New-Object System.Drawing.Rectangle 0, 0, 55, 58
+    $gradient = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+        $rect, $terra, $brown, [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal)
+    $g.FillRectangle($gradient, $rect)
+    $gradient.Dispose()
+
+    $f  = New-Object System.Drawing.Font "Segoe UI", 16, ([System.Drawing.FontStyle]::Bold)
+    $sf = New-Object System.Drawing.StringFormat
+    $sf.Alignment     = [System.Drawing.StringAlignment]::Center
+    $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
+    $g.DrawString("RF", $f, $white, (New-Object System.Drawing.RectangleF 0, 0, 55, 58), $sf)
+
+    foreach ($obj in @($f,$sf,$g)) { $obj.Dispose() }
+    $bmp.Save("$InstallerDir\recetas-small.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $bmp.Dispose()
+}
+
 # ── INICIO ─────────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "  +--------------------------------------------------+" -ForegroundColor Magenta
@@ -268,15 +310,15 @@ if (-not $MVN) {
 Write-OK "Maven: $MVN"
 
 $hasNsis = Test-Path $NSIS
-$hasInno = Test-Path $InnoSetup
-if ($hasNsis) {
-    Write-OK "NSIS: $NSIS"
-} elseif ($hasInno) {
+$hasInno = [bool]$InnoSetup -and (Test-Path $InnoSetup)
+if ($hasInno) {
     Write-OK "Inno Setup 6: $InnoSetup"
+} elseif ($hasNsis) {
+    Write-OK "NSIS: $NSIS"
 } else {
-    Write-Warn "Ni NSIS ni Inno Setup encontrados."
+    Write-Warn "Ni Inno Setup ni NSIS encontrados."
     Write-Warn "Se creara solo el app-image (sin .exe instalador)."
-    Write-Warn "NSIS: https://nsis.sourceforge.io/Download"
+    Write-Warn "Inno Setup: https://jrsoftware.org/isdl.php"
 }
 
 # ── PASO 2: Preparar directorios (solo los que Maven no borrará) ───────────────
@@ -398,12 +440,27 @@ if (-not (Test-Path "$AppImageDir\$AppName.exe")) {
 $imageMB = '{0:N0}' -f ((Get-ChildItem $AppImageDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB)
 Write-OK "App-image creado: $AppImageDir ($imageMB MB)"
 
-# ── PASO 7: Crear instalador .exe (NSIS → Inno Setup → aviso) ────────────────
+# ── PASO 7: Crear instalador .exe (Inno Setup → NSIS → aviso) ────────────────
 Write-Step "7/7  Creando instalador .exe..."
 
 $exePath = "$OutputDir\RecetasFamiliares-Instalador-v$AppVersion.exe"
 
-if ($hasNsis) {
+if ($hasInno) {
+    # Generar graficas BMP del wizard (reutiliza el welcome de NSIS + una pequena dedicada)
+    Write-OK "Generando graficas del instalador..."
+    New-NsisBitmaps -InstallerDir "$ProjectDir\installer"
+    New-InnoSmallImage -InstallerDir "$ProjectDir\installer"
+
+    & $InnoSetup "/DMyAppVersion=$AppVersion" "$ProjectDir\installer.iss"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Inno Setup fallo con codigo $LASTEXITCODE"
+        exit 1
+    }
+    if (Test-Path $exePath) {
+        $exeMB = '{0:N1}' -f ((Get-Item $exePath).Length / 1MB)
+        Write-OK "Instalador .exe: $exePath ($exeMB MB)"
+    }
+} elseif ($hasNsis) {
     # Generar graficas BMP para NSIS MUI2
     Write-OK "Generando graficas del instalador..."
     New-NsisBitmaps -InstallerDir "$ProjectDir\installer"
@@ -424,18 +481,8 @@ if ($hasNsis) {
         $exeMB = '{0:N1}' -f ((Get-Item $exePath).Length / 1MB)
         Write-OK "Instalador .exe: $exePath ($exeMB MB)"
     }
-} elseif ($hasInno) {
-    & $InnoSetup "$ProjectDir\installer.iss"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Fail "Inno Setup fallo con codigo $LASTEXITCODE"
-        exit 1
-    }
-    if (Test-Path $exePath) {
-        $exeMB = '{0:N1}' -f ((Get-Item $exePath).Length / 1MB)
-        Write-OK "Instalador .exe: $exePath ($exeMB MB)"
-    }
 } else {
-    Write-Warn "Sin herramienta de instalador. Instala NSIS desde https://nsis.sourceforge.io"
+    Write-Warn "Sin herramienta de instalador. Instala Inno Setup desde https://jrsoftware.org/isdl.php"
     Write-Warn "App-image portable disponible en: $AppImageDir"
 }
 

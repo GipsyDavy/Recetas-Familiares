@@ -1,0 +1,18 @@
+Recetas Familiares — antes de instalar
+
+Recetas Familiares es una aplicacion de escritorio para gestionar recetas,
+ingredientes, stock, menus semanales, listas de la compra, notas y chat
+familiar, sincronizada con el resto de dispositivos de tu familia.
+
+Antes de continuar, ten en cuenta:
+
+  - Requiere Windows 10 o superior, de 64 bits.
+  - Necesita conexion a internet: los datos se guardan y sincronizan en el
+    servidor de Recetas Familiares, no solo en este equipo.
+  - No requiere instalar Java ni JavaFX por separado: el instalador incluye
+    todo lo necesario para ejecutar la aplicacion.
+  - Si ya tienes una version instalada, este instalador la actualizara
+    automaticamente conservando tu sesion y tus datos (que viven en el
+    servidor, no en este equipo).
+
+Pulsa "Siguiente" para continuar con la instalacion.
