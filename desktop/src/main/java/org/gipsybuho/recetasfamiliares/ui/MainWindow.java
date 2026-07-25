@@ -25,6 +25,7 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 import org.gipsybuho.recetasfamiliares.core.FamilyRole;
 import org.gipsybuho.recetasfamiliares.core.ServerConfig;
@@ -158,6 +159,10 @@ public class MainWindow {
         // hilo de JavaFX antes de tocar la sidebar, igual que chatView.setUnreadListener.
         context.getChatRepository().setInboxListener(
                 unread -> Platform.runLater(() -> updatePrivateChatBadge(unread)));
+        // El ping de actividad llega en hilo de OkHttp (ver ChatSocket): marshalizar al
+        // hilo de JavaFX antes de tocar la sidebar, igual que los listeners anteriores.
+        context.getChatRepository().setActivityListener(
+                sections -> Platform.runLater(() -> updateActivityBadges(sections)));
         profileView = new ProfileView(context, stage, this::refreshUserCard, this::setStatus,
                 this::showLogin);
         profileSettingsTab = null;
@@ -169,6 +174,48 @@ public class MainWindow {
         root.setLeft(sidebar);
         navigateTo("dashboard");
         OnboardingDialog.showIfFirstRun(stage);
+        loadInitialActivity();
+    }
+
+    /**
+     * Snapshot inicial de secciones con actividad no vista (Recetas/Stock/Notas), en hilo de
+     * fondo para no bloquear el arranque de la ventana principal (mismo patron que
+     * refreshPersistedRole/triggerInitialSync).
+     */
+    private void loadInitialActivity() {
+        String familyId = context.getSession().getFamilyId();
+        if (familyId == null) {
+            return;
+        }
+        Thread.ofVirtual().start(() -> {
+            try {
+                var activity = context.getFamilyRepository().loadActivity(familyId);
+                java.util.Set<String> unseen = new java.util.HashSet<>();
+                if (activity.recipe()) unseen.add("RECIPE");
+                if (activity.note()) unseen.add("NOTE");
+                if (activity.stock()) unseen.add("STOCK");
+                Platform.runLater(() -> updateActivityBadges(unseen));
+            } catch (ApiException ignored) {
+                // Sin bloquear el arranque de la ventana si esta llamada falla; el
+                // WebSocket de actividad (setActivityListener) sigue activo igualmente.
+            }
+        });
+    }
+
+    /** Marca una seccion de actividad como vista: local al instante, REST en segundo plano. */
+    private void markSectionSeen(String section) {
+        context.getChatRepository().markSectionSeenLocally(section);
+        String familyId = context.getSession().getFamilyId();
+        if (familyId == null) {
+            return;
+        }
+        Thread.ofVirtual().start(() -> {
+            try {
+                context.getFamilyRepository().markSectionSeen(familyId, section);
+            } catch (ApiException ignored) {
+                // Best-effort: si falla, el proximo fetch de loadActivity() lo corrige.
+            }
+        });
     }
 
     private void refreshPersistedRole() {
@@ -534,6 +581,13 @@ public class MainWindow {
             conversationsView.onHidden();
         }
         updateActiveSidebarButton(view);
+        if ("recipes".equals(view)) {
+            markSectionSeen("RECIPE");
+        } else if ("stock".equals(view)) {
+            markSectionSeen("STOCK");
+        } else if ("notes".equals(view)) {
+            markSectionSeen("NOTE");
+        }
         switch (view) {
             case "dashboard" -> {
                 setCenterWithFade(dashboardView);
@@ -684,6 +738,20 @@ public class MainWindow {
         int total = unreadByConversation.values().stream().mapToInt(Integer::intValue).sum();
         String base = "🔒  Chat privado";
         btnConversations.setText(total > 0 ? base + "  (" + (total > 9 ? "9+" : total) + ")" : base);
+    }
+
+    /** Marca sin numero (punto) en Recetas/Stock/Notas cuando hay actividad familiar sin ver. */
+    private void updateActivityBadges(java.util.Set<String> sectionsWithUnseenActivity) {
+        applyActivityMark(btnRecipes, "📖  Recetas", sectionsWithUnseenActivity.contains("RECIPE"));
+        applyActivityMark(btnStock, "🧂  Stock", sectionsWithUnseenActivity.contains("STOCK"));
+        applyActivityMark(btnNotes, "📝  Notas familiares", sectionsWithUnseenActivity.contains("NOTE"));
+    }
+
+    private void applyActivityMark(Button button, String baseText, boolean hasUnseenActivity) {
+        if (button == null) {
+            return;
+        }
+        button.setText(hasUnseenActivity ? baseText + "  •" : baseText);
     }
 
     private void doLogout() {
