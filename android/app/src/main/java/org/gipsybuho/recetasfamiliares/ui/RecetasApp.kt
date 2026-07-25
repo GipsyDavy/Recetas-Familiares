@@ -506,15 +506,40 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
+            val sectionsWithUnseenActivity by viewModel.sectionsWithUnseenActivity.collectAsState()
             NavigationBar {
-                NavigationBarItem(selected = tab == MainTab.RECIPES, onClick = { tab = MainTab.RECIPES },
-                    icon = { Icon(if (tab == MainTab.RECIPES) Icons.Filled.Restaurant else Icons.Outlined.Restaurant, contentDescription = null) }, label = { Text("Recetas") })
-                NavigationBarItem(selected = tab == MainTab.STOCK, onClick = { tab = MainTab.STOCK },
-                    icon = { Icon(if (tab == MainTab.STOCK) Icons.Filled.Inventory2 else Icons.Outlined.Inventory2, contentDescription = null) }, label = { Text("Stock") })
+                NavigationBarItem(
+                    selected = tab == MainTab.RECIPES,
+                    onClick = { tab = MainTab.RECIPES; viewModel.markSectionSeen("RECIPE") },
+                    icon = {
+                        BadgedBox(badge = { if (sectionsWithUnseenActivity.contains("RECIPE")) Badge() }) {
+                            Icon(if (tab == MainTab.RECIPES) Icons.Filled.Restaurant else Icons.Outlined.Restaurant, contentDescription = null)
+                        }
+                    },
+                    label = { Text("Recetas") }
+                )
+                NavigationBarItem(
+                    selected = tab == MainTab.STOCK,
+                    onClick = { tab = MainTab.STOCK; viewModel.markSectionSeen("STOCK") },
+                    icon = {
+                        BadgedBox(badge = { if (sectionsWithUnseenActivity.contains("STOCK")) Badge() }) {
+                            Icon(if (tab == MainTab.STOCK) Icons.Filled.Inventory2 else Icons.Outlined.Inventory2, contentDescription = null)
+                        }
+                    },
+                    label = { Text("Stock") }
+                )
                 NavigationBarItem(selected = tab == MainTab.SHOPPING, onClick = { tab = MainTab.SHOPPING },
                     icon = { Icon(if (tab == MainTab.SHOPPING) Icons.Filled.ShoppingCart else Icons.Outlined.ShoppingCart, contentDescription = null) }, label = { Text("Lista") })
-                NavigationBarItem(selected = tab == MainTab.NOTES, onClick = { tab = MainTab.NOTES },
-                    icon = { Icon(if (tab == MainTab.NOTES) Icons.Filled.Description else Icons.Outlined.Description, contentDescription = null) }, label = { Text("Notas") })
+                NavigationBarItem(
+                    selected = tab == MainTab.NOTES,
+                    onClick = { tab = MainTab.NOTES; viewModel.markSectionSeen("NOTE") },
+                    icon = {
+                        BadgedBox(badge = { if (sectionsWithUnseenActivity.contains("NOTE")) Badge() }) {
+                            Icon(if (tab == MainTab.NOTES) Icons.Filled.Description else Icons.Outlined.Description, contentDescription = null)
+                        }
+                    },
+                    label = { Text("Notas") }
+                )
                 NavigationBarItem(selected = tab == MainTab.MENU, onClick = { tab = MainTab.MENU },
                     icon = { Icon(if (tab == MainTab.MENU) Icons.Filled.CalendarMonth else Icons.Outlined.CalendarMonth, contentDescription = null) }, label = { Text("Menú") })
                 NavigationBarItem(selected = tab == MainTab.PROFILE, onClick = { tab = MainTab.PROFILE },
