@@ -47,12 +47,14 @@ public class ChatSocket {
     private final String topic;
     private final String presenceTopic;
     private final String inboxTopic;
+    private final String activityTopic;
     private final Gson gson;
     private final Consumer<ChatDtos.ChatMessage> onMessage;
     private final Consumer<Boolean> onConnectionChange;
     private final Consumer<Set<String>> onPresenceUpdate;
     private final Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateInboxPing> onInboxPing;
     private final Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> onPrivateMessage;
+    private final Consumer<org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos.FamilyActivityPing> onActivityPing;
 
     // Conversacion privada actualmente seleccionada (o null); mutable porque el
     // usuario cambia de conversacion sin reabrir el WebSocket.
@@ -81,7 +83,8 @@ public class ChatSocket {
             Consumer<Boolean> onConnectionChange,
             Consumer<Set<String>> onPresenceUpdate,
             Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateInboxPing> onInboxPing,
-            Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> onPrivateMessage
+            Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> onPrivateMessage,
+            Consumer<org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos.FamilyActivityPing> onActivityPing
     ) {
         this.apiClient = apiClient;
         this.tokenSupplier = tokenSupplier;
@@ -90,12 +93,14 @@ public class ChatSocket {
         this.topic = "/topic/families/" + familyId + "/chat";
         this.presenceTopic = "/topic/families/" + familyId + "/presence";
         this.inboxTopic = "/topic/users/" + myUserId + "/inbox";
+        this.activityTopic = "/topic/families/" + familyId + "/activity";
         this.gson = gson;
         this.onMessage = onMessage;
         this.onConnectionChange = onConnectionChange;
         this.onPresenceUpdate = onPresenceUpdate;
         this.onInboxPing = onInboxPing;
         this.onPrivateMessage = onPrivateMessage;
+        this.onActivityPing = onActivityPing;
     }
 
     public synchronized void connect() {
@@ -240,6 +245,12 @@ public class ChatSocket {
                         + "\n"
                         + NUL;
                 socket.send(subscribeInbox);
+                String subscribeActivity = "SUBSCRIBE\n"
+                        + "id:sub-activity\n"
+                        + "destination:" + activityTopic + "\n"
+                        + "\n"
+                        + NUL;
+                socket.send(subscribeActivity);
                 if (currentConversationTopic != null) {
                     sendConversationSubscribe();
                 }
@@ -258,6 +269,8 @@ public class ChatSocket {
                     handleInboxPing(body);
                 } else if (destination != null && destination.equals(currentConversationTopic)) {
                     handlePrivateMessage(body);
+                } else if (activityTopic.equals(destination)) {
+                    handleActivityPing(body);
                 } else if (topic.equals(destination)) {
                     handleChatMessage(body);
                 }
@@ -312,6 +325,18 @@ public class ChatSocket {
                     org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage.class);
             if (message != null && message.isUsable()) {
                 onPrivateMessage.accept(message);
+            }
+        } catch (RuntimeException ignored) {
+            // Frame no parseable: se descarta sin romper la conexion.
+        }
+    }
+
+    private void handleActivityPing(String body) {
+        try {
+            var ping = gson.fromJson(body,
+                    org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos.FamilyActivityPing.class);
+            if (ping != null && ping.section() != null) {
+                onActivityPing.accept(ping);
             }
         } catch (RuntimeException ignored) {
             // Frame no parseable: se descarta sin romper la conexion.

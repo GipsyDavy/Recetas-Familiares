@@ -47,6 +47,16 @@ public class FamilyRepository {
         return api.get("api/v1/families/" + familyId + "/presence", FamilyDtos.PresenceResponse.class);
     }
 
+    /** Snapshot inicial de secciones con actividad no vista (recipe/note/stock). */
+    public FamilyDtos.FamilyActivityResponse loadActivity(String familyId) throws ApiException {
+        return api.get("api/v1/families/" + familyId + "/activity", FamilyDtos.FamilyActivityResponse.class);
+    }
+
+    /** Marca una seccion de actividad como vista para el usuario actual. */
+    public void markSectionSeen(String familyId, String section) throws ApiException {
+        api.post("api/v1/families/" + familyId + "/activity/" + section + "/seen", "{}", Void.class);
+    }
+
     /** Returns recipe contribution ranking for active family members. */
     public FamilyDtos.UserRecipeRankingResponse[] loadRecipeRanking(String familyId) throws ApiException {
         FamilyDtos.UserRecipeRankingResponse[] result = api.get(

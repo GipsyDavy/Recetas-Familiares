@@ -41,6 +41,9 @@ public class ChatRepository {
     private volatile java.util.function.Consumer<org.gipsybuho.recetasfamiliares.api.dto.PrivateChatDtos.PrivateMessage> conversationMessageListener;
     private volatile ChatSocket activeSocket;
 
+    private final java.util.Set<String> sectionsWithUnseenActivity = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private volatile Consumer<java.util.Set<String>> activityListener;
+
     public ChatRepository(ApiClient api, AppSession session) {
         this.api = api;
         this.session = session;
@@ -76,6 +79,7 @@ public class ChatRepository {
     public void resetPrivateChatState() {
         unreadByConversation.clear();
         activeConversationId = null;
+        sectionsWithUnseenActivity.clear();
     }
 
     /** Snapshot inmutable de no-leidos por conversacion, para pintar la bandeja/badge. */
@@ -125,6 +129,33 @@ public class ChatRepository {
         Consumer<Map<String, Integer>> listener = inboxListener;
         if (listener != null) {
             listener.accept(unreadByConversation());
+        }
+    }
+
+    public void setActivityListener(Consumer<java.util.Set<String>> listener) {
+        this.activityListener = listener;
+    }
+
+    public java.util.Set<String> sectionsWithUnseenActivity() {
+        return java.util.Set.copyOf(sectionsWithUnseenActivity);
+    }
+
+    /** Limpia una seccion localmente al navegar a ella (el POST "seen" real lo hace el llamador). */
+    public void markSectionSeenLocally(String section) {
+        if (sectionsWithUnseenActivity.remove(section)) {
+            notifyActivityListener();
+        }
+    }
+
+    private void handleActivityPing(org.gipsybuho.recetasfamiliares.api.dto.FamilyDtos.FamilyActivityPing ping) {
+        sectionsWithUnseenActivity.add(ping.section());
+        notifyActivityListener();
+    }
+
+    private void notifyActivityListener() {
+        Consumer<java.util.Set<String>> listener = activityListener;
+        if (listener != null) {
+            listener.accept(sectionsWithUnseenActivity());
         }
     }
 
@@ -239,7 +270,8 @@ public class ChatRepository {
                 onConnectionChange,
                 this::handlePresenceUpdate,
                 this::handleInboxPing,
-                this::handlePrivateMessage);
+                this::handlePrivateMessage,
+                this::handleActivityPing);
         socket.connect();
         this.activeSocket = socket;
         return socket;
