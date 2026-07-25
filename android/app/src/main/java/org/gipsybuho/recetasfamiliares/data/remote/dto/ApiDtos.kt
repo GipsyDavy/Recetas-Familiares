@@ -616,3 +616,15 @@ data class PrivateInboxPingDto(
     val senderUserId: String,
     val sentAt: String
 )
+
+// ── Avisos de actividad familiar ──────────────────────────────────────────
+
+data class FamilyActivityDto(
+    val recipe: Boolean,
+    val note: Boolean,
+    val stock: Boolean
+)
+
+data class FamilyActivityPingDto(
+    val section: String
+)

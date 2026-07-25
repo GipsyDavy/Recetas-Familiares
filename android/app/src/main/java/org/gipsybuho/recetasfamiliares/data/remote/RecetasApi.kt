@@ -53,6 +53,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.UserRecipeRankingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateShoppingListItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.UpdateStockItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.EditPrivateMessageRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyActivityDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateConversationDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageExportDto
@@ -60,6 +61,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageHistoryDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SendPrivateMessageRequestDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -463,4 +465,15 @@ interface RecetasApi {
         @Path("familyId") familyId: String,
         @Path("conversationId") conversationId: String
     ): PrivateMessageExportDto
+
+    // ── Avisos de actividad familiar ──────────────────────────────────────────
+
+    @GET("api/v1/families/{familyId}/activity")
+    suspend fun familyActivity(@Path("familyId") familyId: String): FamilyActivityDto
+
+    @POST("api/v1/families/{familyId}/activity/{section}/seen")
+    suspend fun markSectionSeen(
+        @Path("familyId") familyId: String,
+        @Path("section") section: String
+    ): Response<Unit>
 }
