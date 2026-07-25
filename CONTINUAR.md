@@ -4186,3 +4186,88 @@ acotado, 2 archivos main + 1 test, no ameritaba dispatch). Sin skill de proceso 
 anterior; el diseño de la solucion se evaluo con criterio propio, documentado arriba, no requirio
 brainstorming con el usuario dado que ambas opciones eran tecnicas y una era claramente mas
 simple bajo YAGNI). Riesgo residual: ninguno identificado.
+
+---
+
+### Cierre de sprint 2026-07-25 — avisos de actividad familiar (item 20, segunda mitad): completado
+
+Usuario eligio explicitamente este item de una lista de 4 pendientes reales tras la auditoria
+completa del backlog (arriba). Brainstorming completo (`superpowers:brainstorming`, con
+companion visual ofrecido y declinado por consumo de tokens) → spec escrita y aprobada
+(`docs/superpowers/specs/2026-07-24-avisos-actividad-familiar-design.md`) → plan de 20 tareas
+(`docs/superpowers/plans/2026-07-24-avisos-actividad-familiar.md`) → ejecucion
+`superpowers:subagent-driven-development` en worktree nativo (`.claude/worktrees/avisos-actividad-familiar`,
+rama `worktree-avisos-actividad-familiar`).
+
+**Diseño (decisiones confirmadas con el usuario, ver spec):** indicador simple sin numero (no
+contador de eventos — deliberadamente inmune al bug de sobre-conteo corregido hoy mismo en el
+ping de chat privado), granularidad por seccion completa (no por item), persistente entre
+sesiones via comparacion de timestamps (`family_section_activity.last_activity_at` vs
+`user_section_last_seen.last_seen_at`, sin tabla de eventos), solo con la app abierta (sin push
+real/FCM), badge sobre los tabs/items ya existentes de Recetas/Stock/Notas (sin icono nuevo en
+la barra superior).
+
+**Ejecucion:** 18 tareas de implementacion + 20 commits totales (incluye 1 fix encontrado durante
+la propia ejecucion, ver abajo). Backend (Tasks 1-9): migracion V20 (numeracion corregida en el
+propio Task 1 — el borrador del plan asumia V10 por un error mio de `ls | tail -5` alfabetico en
+vez de numerico; V10-V19 ya existian tras sprints anteriores), `FamilyActivityService` (unico
+punto de escritura, TDD, 5 tests), instrumentacion de `RecipeService`/`FamilyNoteService`/
+`StockItemService`, endpoints REST (`GET .../activity`, `POST .../activity/{section}/seen`,
+404 no 403 anti-enumeracion), extension del interceptor STOMP (mismo patron que chat/presence,
+sin logica nueva), publisher de tiempo real. Android (Tasks 10-14): DTOs, extension de
+`ChatSocket.kt` con topic fijo de actividad (mismo socket-siempre-vivo del badge de chat, no una
+conexion nueva), estado en `RecetasViewModel.kt`, badge sin numero en `NavigationBarItem`.
+Desktop (Tasks 15-18): mismo patron, `Thread.ofVirtual()` para las llamadas REST en segundo
+plano (patron real ya usado en `doLogout()`, mejor que el `new Thread(...)` asumido en el
+borrador del plan), indicador de texto "•" en el sidebar (`updateActivityBadges`).
+
+**Hallazgo real durante la ejecucion, no en el diseño original:** el implementador de Task 8
+(publisher de tiempo real) encontro, en su propia autorevision, que `recordActivity()` publicaba
+el ping de WebSocket DENTRO de su propia transaccion `@Transactional`, antes del commit real
+(Spring comitea al salir del proxy mas externo de la cadena de propagacion, no al final de ese
+metodo especifico) — mismo patron de riesgo que `PrivateChatService.publishAfterCommit` ya existe
+para resolver: un suscriptor podia recibir el aviso antes de que la fila fuera visible para otras
+conexiones, o recibir un aviso de un cambio que despues hiciera rollback en la transaccion externa
+(p.ej. `RecipeService.createRecipe` invocando `recordActivity` como ultimo paso). Verificado por
+mi mismo leyendo `PrivateChatService.java` como referencia, corregido con el mismo patron
+`TransactionSynchronizationManager.registerSynchronization(afterCommit)`, validado sin
+regresiones (10/10 tests del paquete `activity`).
+
+**Patron de subagentes esta sesion:** igual de agravado que en sprints anteriores del mismo dia
+— la mayoria de subagentes (implementadores y revisores) devolvieron un stub generico tipo
+"Approve — no es un agente fp-check" en la primera respuesta. Recuperado via `SendMessage`
+insistiendo en el informe completo en la mayoria de casos; en varios casos (Tasks 1, 5, 7, 15-18)
+verificado directamente por mi mismo (`git show`, leer el codigo real, recompilar, correr tests)
+en vez de seguir insistiendo con el mismo agente atascado — mas rapido y fiable, mismo criterio ya
+aplicado en sprints anteriores del dia. Un subagente (Task 18) se corto por limite de sesion de la
+API justo antes de confirmar el commit — verificado directamente que el commit SI se habia
+completado antes del corte, sin perdida de trabajo.
+
+**Validacion:** backend completo contra la BD real de Hetzner (WireGuard activo toda la sesion):
+**209/209 tests, 0 fallos**. Android: `./gradlew :app:testDebugUnitTest` (76/76) +
+`./gradlew :app:assembleDebug` verde. Desktop: `mvn test` + `mvn compile` verde (48 tests). Los
+3 modulos re-verificados en `main` tras el merge, no solo en el worktree.
+
+**Seguridad (VibeSec, criterio propio, sin invocar skill formal):** ambos endpoints REST 404 no
+403 para no-miembros (verificado por test dedicado); topic STOMP reutiliza autorizacion de
+membership ya existente, sin logica nueva (verificado por 2 tests dedicados); el ping de tiempo
+real no lleva contenido del cambio, solo el enum de seccion (`FamilyActivityPing(FamilySection)`,
+confirmado leyendo el record real); sin filtracion cross-familia (`recordActivity`/
+`unseenSections`/`markSeen` siempre reciben un `familyId` ya autorizado por el llamador). Sin
+hallazgos Critical/Important.
+
+**Estado de git:** merge fast-forward a `main` (commit `3d07fa5`), worktree y rama limpiados.
+**Sin pushear a origin todavia** — pendiente de autorizacion explicita del usuario.
+
+**Pendiente real, no simulable por el agente:** prueba manual con dos cuentas/dispositivos
+(confirmar que el badge se enciende/apaga correctamente en Android y Desktop, que persiste tras
+reiniciar la app, y que quien hizo el cambio nunca ve su propio badge encendido) — bloqueada para
+el agente en este entorno, documentada en el plan (Tarea 20, paso 4).
+
+**Trazabilidad:** agente lider Claude Code (Sonnet 5) en todo el sprint. Skills usadas:
+`superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:subagent-driven-development`
+(con recuperacion manual muy frecuente, ver arriba). VibeSec aplicado por criterio propio, no via
+skill formal invocada. `/security-review` no invocado formalmente, pero se cubrieron sus mismos
+criterios (autorizacion en endpoints, JWT/STOMP, sin exposicion de datos entre familias) de forma
+manual dado que el cambio toca backend con datos de familia. Riesgo residual explicito: la prueba
+manual con dos dispositivos, sin resolver por bloqueo tecnico del entorno del agente.
