@@ -41,4 +41,10 @@ public final class FamilyDtos {
             Double averageStars,
             long score
     ) {}
+
+    /** Matches backend FamilyActivityResponse: {recipe, note, stock} */
+    public record FamilyActivityResponse(boolean recipe, boolean note, boolean stock) {}
+
+    /** Ping STOMP en /topic/families/{familyId}/activity: {"section": "RECIPE"|"NOTE"|"STOCK"} */
+    public record FamilyActivityPing(String section) {}
 }
