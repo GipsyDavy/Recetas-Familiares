@@ -4257,7 +4257,11 @@ confirmado leyendo el record real); sin filtracion cross-familia (`recordActivit
 hallazgos Critical/Important.
 
 **Estado de git:** merge fast-forward a `main` (commit `3d07fa5`), worktree y rama limpiados.
-**Sin pushear a origin todavia** — pendiente de autorizacion explicita del usuario.
+**Pusheado a origin/main 2026-07-25** (24 commits, `6be110e..96a6fe4`, incluye tambien los
+sprints de test-debt e item-25 del mismo dia que quedaron pendientes de push). CI/CD
+`Backend CI/CD` run `30155786153`: `success`. Health prod verificado tras el deploy:
+`GET https://recetas.167.233.213.242.sslip.io/api/v1/health` → `{"status":"UP"}` a las
+2026-07-25T11:18:05Z (Flyway aplico V20 sin error).
 
 **Pendiente real, no simulable por el agente:** prueba manual con dos cuentas/dispositivos
 (confirmar que el badge se enciende/apaga correctamente en Android y Desktop, que persiste tras
@@ -4271,3 +4275,45 @@ skill formal invocada. `/security-review` no invocado formalmente, pero se cubri
 criterios (autorizacion en endpoints, JWT/STOMP, sin exposicion de datos entre familias) de forma
 manual dado que el cambio toca backend con datos de familia. Riesgo residual explicito: la prueba
 manual con dos dispositivos, sin resolver por bloqueo tecnico del entorno del agente.
+
+---
+
+## Cierre de sesion 2026-07-25 — push a produccion verificado, backlog al dia
+
+Sesion cerrada a peticion del usuario ("cerramos sesion, documenta todo perfectamente"). Estado
+final verificado en esta sesion, no de memoria:
+
+- **Push realizado y verificado:** `git push origin main` → `6be110e..96a6fe4` (24 commits).
+  Incluye 3 sprints del mismo dia que se habian quedado sin pushear: fix de deuda de tests
+  backend, fix del sobre-conteo del badge de chat privado (item 25), y el sprint completo de
+  avisos de actividad familiar (item 20, segunda mitad, detalle arriba).
+- **CI/CD verificado, no asumido:** run `Backend CI/CD` #`30155786153` vía API publica de GitHub
+  (PowerShell `Invoke-RestMethod`, `curl` de git-bash sigue roto por el MITM TLS de Avast en esta
+  maquina) → `status=completed conclusion=success`.
+- **Health de produccion verificado tras el deploy:**
+  `GET https://recetas.167.233.213.242.sslip.io/api/v1/health` → `{"status":"UP"}`
+  (`2026-07-25T11:18:05Z`). Flyway aplico la migracion V20 sin error.
+- `paraImplementar.txt` actualizado: item 20 completo (ambas mitades), sin cambios de codigo, ya
+  commiteado aparte si aplica.
+- Arbol de trabajo limpio, `main` local = `origin/main`, sin worktrees activos.
+
+**Pendiente real para la siguiente sesion (no bloqueante, no requiere codigo nuevo):**
+- Prueba manual con dos cuentas/dispositivos del badge de avisos de actividad familiar (Android +
+  Desktop): encendido/apagado correcto, persistencia tras reiniciar la app, y que el autor del
+  cambio nunca ve su propio badge encendido. Bloqueada para el agente en este entorno
+  (automatizacion de clics de UI no disponible).
+- Sin sprint funcional siguiente fijado por el usuario. Candidatos reales que quedan abiertos en
+  `paraImplementar.txt` tras la auditoria completa del 2026-07-24/25: (8)/(16) buscar/comparar
+  recetas en internet con IA — declarados NO IMPLEMENTADO, sin decision de si se hacen; (18)
+  backups del servidor — no verificable desde el repo, requeriria sesion con acceso SSH al VPS
+  para confirmar que el cron/script sigue vivo; (23) pulido visual del sidebar Desktop — idea
+  suelta del brainstorming del chat privado, sin spec; iOS sigue con deuda de compilacion/paridad
+  general (fuera de alcance mientras no haya macOS).
+- Deuda ya conocida de sesiones previas, sigue sin resolver: 5 tests `UploadControllerTest` en
+  rojo por contaminacion de la BD de test LOCAL compartida (no aplica a CI, que usa Postgres
+  efimero).
+
+**Trazabilidad de este cierre:** agente lider Claude Code (Sonnet 5). Sin skill de proceso nueva
+invocada (cierre puramente documental/operativo: commit+push+verificacion, ya cubierto por
+`finishing-a-development-branch` en el sprint anterior). Sin hallazgos de seguridad nuevos en este
+cierre (sin cambios de codigo, solo push de lo ya revisado y documentacion).
