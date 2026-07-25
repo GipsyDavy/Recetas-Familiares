@@ -335,6 +335,7 @@ internal fun ProfileScreen(
 
         LaunchedEffect(Unit) {
             viewModel.loadFamilyStats()
+            viewModel.loadFamilyActivity()
             viewModel.loadAccountStatus()
             viewModel.loadFamilyMembers()
             viewModel.loadPresence()

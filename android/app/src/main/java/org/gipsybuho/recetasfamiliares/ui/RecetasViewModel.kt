@@ -37,6 +37,8 @@ import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateConversationDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateInboxPingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyActivityDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyActivityPingDto
 import org.gipsybuho.recetasfamiliares.data.repository.PRIVATE_CHAT_MAX_BODY_LENGTH
 import org.gipsybuho.recetasfamiliares.ui.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.ui.theme.ThemeMode
@@ -408,6 +410,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             _familyInfo.value = target
             refresh()
             loadFamilyStats()
+            loadFamilyActivity()
             loadFamilyMembers()
             loadUserRecipeRankings()
             startChatBadge()
@@ -535,6 +538,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 .onSuccess {
                     _familyMembers.update { members -> members.filterNot { it.userId == userId } }
                     loadFamilyStats()
+                    loadFamilyActivity()
                     _userMessage.emit("Miembro expulsado")
                 }
                 .onFailure { _userMessage.emit("No se pudo expulsar al miembro") }
@@ -948,6 +952,44 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     @Volatile
     private var activePrivateConversationId: String? = null
 
+    // ── Avisos de actividad familiar ─────────────────────────────────────────
+
+    private val _sectionsWithUnseenActivity = MutableStateFlow<Set<String>>(emptySet())
+    val sectionsWithUnseenActivity: StateFlow<Set<String>> = _sectionsWithUnseenActivity.asStateFlow()
+
+    /** Fetch inicial del estado de avisos; se llama junto a loadFamilyStats(). */
+    fun loadFamilyActivity() {
+        viewModelScope.launch {
+            val familyId = container.sessionStore.familyId ?: return@launch
+            runCatching { container.familyMemberRepository.familyActivity() }
+                .onSuccess {
+                    if (familyId == container.sessionStore.familyId) applyActivitySnapshot(it)
+                }
+        }
+    }
+
+    private fun applyActivitySnapshot(activity: FamilyActivityDto) {
+        val unseen = buildSet {
+            if (activity.recipe) add("RECIPE")
+            if (activity.note) add("NOTE")
+            if (activity.stock) add("STOCK")
+        }
+        _sectionsWithUnseenActivity.value = unseen
+    }
+
+    private fun handleActivityPing(ping: FamilyActivityPingDto) {
+        _sectionsWithUnseenActivity.update { it + ping.section }
+    }
+
+    /** Marca una seccion como vista al navegar a su tab: limpia el aviso local y avisa al servidor. */
+    fun markSectionSeen(section: String) {
+        if (!_sectionsWithUnseenActivity.value.contains(section)) return
+        _sectionsWithUnseenActivity.update { it - section }
+        viewModelScope.launch {
+            runCatching { container.familyMemberRepository.markSectionSeen(section) }
+        }
+    }
+
     /**
      * Conexion en tiempo real ligera, viva mientras hay sesion, solo para
      * contar mensajes nuevos de otros miembros con el chat cerrado.
@@ -966,7 +1008,8 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             },
             onConnectionChange = {},
             onPresenceUpdate = { online -> _onlineUserIds.value = online },
-            onInboxPing = { ping -> handlePrivateInboxPing(ping) }
+            onInboxPing = { ping -> handlePrivateInboxPing(ping) },
+            onActivityPing = { ping -> handleActivityPing(ping) }
         )
     }
 
@@ -984,6 +1027,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         _chatUnread.value = 0
         _privateChatUnread.value = emptyMap()
         _conversations.value = emptyList()
+        _sectionsWithUnseenActivity.value = emptySet()
     }
 
     /** Bandeja de conversaciones privadas del usuario en la familia activa. */

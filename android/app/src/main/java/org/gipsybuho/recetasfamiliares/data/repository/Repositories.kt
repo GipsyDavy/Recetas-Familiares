@@ -21,6 +21,7 @@ import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockDao
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 import org.gipsybuho.recetasfamiliares.data.remote.RecetasApi
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyActivityDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyNoteDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.CreateNoteRequestDto
@@ -209,6 +210,18 @@ class FamilyMemberRepository(
     suspend fun presence(): PresenceResponseDto {
         val familyId = sessionStore.familyId ?: return PresenceResponseDto(emptyList())
         return api.presence(familyId)
+    }
+
+    // ── Avisos de actividad familiar ─────────────────────────────────────────
+
+    suspend fun familyActivity(): FamilyActivityDto {
+        val familyId = sessionStore.familyId ?: error("No family session")
+        return api.familyActivity(familyId)
+    }
+
+    suspend fun markSectionSeen(section: String) {
+        val familyId = sessionStore.familyId ?: error("No family session")
+        api.markSectionSeen(familyId, section)
     }
 
     suspend fun updateRole(userId: String, role: String): FamilyMemberDto {
