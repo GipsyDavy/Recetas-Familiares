@@ -12,6 +12,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatExportDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatHistoryDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.EditChatMessageRequestDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.FamilyActivityPingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateInboxPingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.SendChatMessageRequestDto
@@ -108,7 +109,8 @@ class ChatRepository(
         onPresenceUpdate: (Set<String>) -> Unit,
         conversationId: String? = null,
         onInboxPing: (PrivateInboxPingDto) -> Unit = {},
-        onPrivateMessage: (PrivateMessageDto) -> Unit = {}
+        onPrivateMessage: (PrivateMessageDto) -> Unit = {},
+        onActivityPing: (FamilyActivityPingDto) -> Unit = {}
     ): ChatSocket? {
         val family = familyId ?: return null
         val user = myUserId ?: return null
@@ -124,7 +126,8 @@ class ChatRepository(
             onPresenceUpdate = onPresenceUpdate,
             conversationId = conversationId,
             onInboxPing = onInboxPing,
-            onPrivateMessage = { msg -> onPrivateMessage(normalizePrivateMessage(msg)) }
+            onPrivateMessage = { msg -> onPrivateMessage(normalizePrivateMessage(msg)) },
+            onActivityPing = onActivityPing
         )
         socket.connect()
         return socket
