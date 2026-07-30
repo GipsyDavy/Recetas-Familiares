@@ -4327,3 +4327,97 @@ final verificado en esta sesion, no de memoria:
 invocada (cierre puramente documental/operativo: commit+push+verificacion, ya cubierto por
 `finishing-a-development-branch` en el sprint anterior). Sin hallazgos de seguridad nuevos en este
 cierre (sin cambios de codigo, solo push de lo ya revisado y documentacion).
+
+---
+
+### Sprint Semgrep + TruffleHog en el protocolo de sprint (2026-07-30, Claude Code)
+
+- **Objetivo (peticion literal del usuario):** dejar Semgrep y TruffleHog activos en cada sprint y
+  usarlos cuando corresponda. Derivo despues en: corregir los 12 warnings encontrados y añadir
+  `dependabot.yml` para GitHub Actions.
+- **Agente lider:** Claude Code (Opus 5), en solitario. Sin Codex ni Gemini: el usuario no los pidio
+  y no habia incertidumbre tecnica ni cambio multiplataforma que justificara segunda opinion.
+- **Skills de proceso:** ninguna de `superpowers` invocada. Justificacion: tooling de seguridad y
+  ediciones de configuracion (workflows, manifest, dependabot); no hay feature nueva que brainstormear
+  ni bug que depurar, y los cambios no son testeables por TDD. Se documenta como no aplicable, no como
+  omision.
+- **`/VibeSec` y `/security-review`: NO invocados.** Motivo: no se toco codigo de aplicacion, auth,
+  endpoints, ownership ni manejo de imagenes. La superficie tocada (CI con secrets, manifest Android)
+  se analizo con Semgrep y revision manual. Si el siguiente sprint toca backend o auth, siguen siendo
+  obligatorios.
+
+**Herramientas verificadas en la sesion:** `semgrep 1.168.0` (en PATH), `trufflehog 3.95.6`
+(`MAVEN\tools\security\trufflehog\v3.95.6\`). Ambas ya estaban instaladas de una sesion previa, junto
+con `codeql v2.25.6` sin integrar.
+
+**Limitacion de entorno diagnosticada (relevante para el futuro):** el CLI de Semgrep no puede
+resolver `--config p/<pack>`. Avast intercepta TLS y presenta `CN=Avast Web/Mail Shield Root`, que
+OpenSSL rechaza con `Basic Constraints of CA cert not marked critical`. Añadir el almacen de Windows
+al bundle de certifi no lo arregla: el certificado de Avast es el malformado. PowerShell y git
+(schannel) si validan, asi que los packs se descargan por PowerShell y Semgrep los consume como
+archivos locales. Esto extiende el problema ya conocido de `curl` en git-bash de esta maquina.
+
+**Archivos nuevos:**
+- `scripts/security/run-security-scan.ps1` — orquestador Semgrep + TruffleHog. Modos `quick`
+  (archivos modificados), `sprint` (repo completo + historial desde `origin/main`) y `full`
+  (+ historial git completo). Exit 0 limpio / 1 bloqueante / 2 herramienta ausente.
+- `scripts/security/update-semgrep-rules.ps1` — refresca los packs `java`, `kotlin`, `secrets`,
+  `security-audit`, `owasp-top-ten` desde `https://semgrep.dev/c/p/<pack>`.
+- `scripts/security/trufflehog-exclude.txt` — exclusiones de artefactos generados y binarios.
+- `.github/dependabot.yml` — actualizacion semanal agrupada de GitHub Actions con `cooldown` de
+  7 dias (14 en major).
+
+**Archivos modificados:** `CLAUDE.md` (seccion nueva de invocacion obligatoria + 2 items en el
+checklist de cierre), `CONTINUAR.md` (§9 y esta entrada), `.gitignore` (`.security-reports/`),
+`.github/workflows/backend-ci-cd.yml` y `dependency-audit.yml` (pinning por SHA),
+`android/app/src/main/AndroidManifest.xml` (`nosemgrep` justificado),
+`android/build.gradle.kts` (AGP 9.2.1 → 9.3.0, cambio previo del usuario que estaba sin commitear).
+`.claude/settings.local.json` tambien se amplio con permisos, pero no se versiona.
+
+**Hallazgos corregidos (12 → 0):**
+- 11 x `github-actions-mutable-action-tag`: acciones fijadas al SHA del commit de su release —
+  `checkout` v4.4.0 `11d5960a`, `setup-java` v4.8.0 `c1e32368`, `upload-artifact` v4.6.2 `ea165f8d`,
+  `download-artifact` v4.3.0 `d3f86a10`. El riesgo era concreto: un tag `v4` reasignado ejecutaria
+  codigo ajeno con acceso a `BACKEND_DEPLOY_KEY`.
+- 1 x `exported_activity`: falso positivo. La activity de entrada declara LAUNCHER y
+  `android:exported="true"` es obligatorio desde API 31. Marcado con `nosemgrep` y motivo escrito en
+  el propio manifest.
+- 1 x `dependabot-missing-cooldown` (aparecio al escanear el `dependabot.yml` recien creado):
+  corregido añadiendo el bloque `cooldown`.
+
+**Bug encontrado y corregido en el propio script de escaneo:** Semgrep emite dos escalas de severidad
+segun la regla (`ERROR/WARNING/INFO` y `CRITICAL/HIGH/MEDIUM/LOW`) y el script solo contaba la primera.
+Un hallazgo `CRITICAL` o `HIGH` se habria reportado como cero y no habria bloqueado el cierre. Ahora
+cuenta todas las severidades y bloquea `ERROR`, `CRITICAL` y `HIGH`.
+
+**Validacion ejecutada en esta sesion:**
+- Semgrep + TruffleHog `-Mode sprint` final: **0 hallazgos Semgrep, 0 secretos verificados, exit 0**.
+- TruffleHog `-Mode full` sobre los 375 commits del historial: 0 secretos verificados.
+- Android: `gradle projects` OK y `gradle assembleDebug` **BUILD SUCCESSFUL** (Gradle 9.5.1), antes y
+  despues de tocar el manifest; manifest fusionado conserva `android:exported="true"`.
+- YAML de los dos workflows y del `dependabot.yml`: parsean correctamente.
+- CI/CD real: run `Backend CI/CD` #`30569174939` → **success** (build 2m19s, deploy 33s), release
+  `20260730T181211Z-7fd97a2852bc`. El health check de `deploy-backend-ci.sh:67` (`curl -fsS`, 3
+  reintentos) corre antes del `echo release_id` y el log lo imprime → backend de produccion
+  respondiendo tras el despliegue.
+
+**Commits publicados:** `7c653a7` (tooling + protocolo), `e232988` (AGP 9.3.0), `7fd97a2` (pinning SHA
++ nosemgrep), `437942e` (dependabot + fix de severidades). Ademas se empujo `f41c2a2` (instalador Inno
+Setup), que llevaba desde el 25/07 commiteado sin publicar. `main` = `origin/main`, arbol limpio.
+
+**Riesgos residuales:**
+- Las reglas de Semgrep son snapshots locales: se desactualizan en silencio. Refrescar con
+  `update-semgrep-rules.ps1` al menos cada pocos sprints. Ademas los packs community traen un contador
+  `missed` (p.ej. `kotlin.yaml`: 63 reglas no incluidas) que exige cuenta Semgrep.
+- No se ha verificado que GitHub acepte el `dependabot.yml`: no hay endpoint en `gh` para validar la
+  config. Comprobar en Insights → Dependency graph → Dependabot. Aun no hay PRs, esperable porque las
+  cuatro acciones ya estan en su ultima v4.x.
+- Fijar por SHA congela las acciones si Dependabot no funciona; conviene confirmar el primer PR.
+- TruffleHog verifica los candidatos contra el proveedor emisor (egreso de red). Usar `-NoVerify` si
+  se quiere cero egreso, a cambio de mas falsos positivos.
+- `herztner/` queda excluido del escaneo de secretos por ser directorio local no versionado.
+- Dos falsos positivos permanentes en cada escaneo: la URL de ejemplo con credenciales embebidas de
+  `ServerUrlConfigTest.kt:42` y `ServerConfigTest.java:75`. Son fixtures de test. No reproducir esa
+  URL literal en documentacion: el detector `URI` de TruffleHog tambien la marca aqui.
+- Ajeno a este sprint pero visto de paso: el `Dependency Audit` programado del 27/07 (run
+  `30255543538`) termino **cancelled tras 6h 0m 22s**, con pinta de job colgado. Sin revisar.
