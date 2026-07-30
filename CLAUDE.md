@@ -242,9 +242,10 @@ Cuando ejecutarlo:
 
 Interpretacion de resultados:
 - Salida `0`: sin hallazgos bloqueantes.
-- Salida `1`: bloqueante. Hay hallazgos Semgrep de severidad `ERROR` o secretos verificados. No cerrar el sprint sin corregir o justificar por escrito.
+- Salida `1`: bloqueante. Hay hallazgos Semgrep de severidad `ERROR`, `CRITICAL` o `HIGH`, o secretos verificados. No cerrar el sprint sin corregir o justificar por escrito.
 - Salida `2`: herramienta no disponible. Documentar motivo, riesgo residual y validacion alternativa.
-- Los `WARNING` de Semgrep y los secretos `no verificado` requieren revision manual: se corrigen o se justifican, no se ignoran en silencio.
+- Semgrep usa dos escalas segun la regla (`ERROR/WARNING/INFO` y `CRITICAL/HIGH/MEDIUM/LOW`). El resto de severidades y los secretos `no verificado` requieren revision manual: se corrigen o se justifican, no se ignoran en silencio.
+- Los falsos positivos se marcan en el codigo con `nosemgrep` y un comentario que explique el motivo. No se silencian sin justificacion escrita.
 - Los informes quedan en `.security-reports/<timestamp>/` (ignorado por git). Nunca versionar ni pegar secretos en bruto: usar siempre el valor `Redacted`.
 
 Detalles operativos:

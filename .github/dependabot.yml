@@ -1,0 +1,32 @@
+# Actualizacion de las GitHub Actions usadas por los workflows.
+#
+# Las acciones estan fijadas por SHA de commit (mitigacion de tag mutable,
+# detectada por Semgrep). Dependabot actualiza el SHA y el comentario de
+# version, asi que el pinning se mantiene sin quedarse sin parches.
+#
+# Solo cubre github-actions. Las dependencias Maven y Gradle siguen
+# auditandose con el workflow dependency-audit.yml.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(ci)
+    # Espera antes de proponer una version recien publicada: si una release de
+    # una accion sale comprometida, la ventana de exposicion se cierra antes de
+    # que llegue el PR.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    # Un unico PR por semana con todas las actualizaciones de acciones.
+    groups:
+      github-actions:
+        patterns:
+          - "*"

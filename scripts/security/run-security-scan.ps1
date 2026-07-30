@@ -149,13 +149,26 @@ else {
             else {
                 $sg = Get-Content $jsonPath -Raw | ConvertFrom-Json
                 $results = @($sg.results)
-                $bySeverity = @{ ERROR = 0; WARNING = 0; INFO = 0 }
+
+                # Semgrep usa dos escalas segun la regla: ERROR/WARNING/INFO y
+                # CRITICAL/HIGH/MEDIUM/LOW. Se cuentan todas y bloquean las altas.
+                $blockingSeverities = @('ERROR', 'CRITICAL', 'HIGH')
+                $bySeverity = [ordered]@{}
                 foreach ($r in $results) {
-                    $sev = "$($r.extra.severity)"
-                    if ($bySeverity.ContainsKey($sev)) { $bySeverity[$sev]++ } else { $bySeverity[$sev] = 1 }
+                    $sev = "$($r.extra.severity)".ToUpperInvariant()
+                    if ($bySeverity.Contains($sev)) { $bySeverity[$sev]++ } else { $bySeverity[$sev] = 1 }
                 }
+                $counts = if ($bySeverity.Count -gt 0) {
+                    ($bySeverity.Keys | Sort-Object | ForEach-Object { "$_=$($bySeverity[$_])" }) -join ' '
+                }
+                else { 'sin hallazgos' }
+                $blockingCount = 0
+                foreach ($sev in $blockingSeverities) {
+                    if ($bySeverity.Contains($sev)) { $blockingCount += $bySeverity[$sev] }
+                }
+
                 Add-Summary "## Semgrep: $($results.Count) hallazgos (reglas: $($ruleFiles.Count) packs locales)"
-                Add-Summary "   ERROR=$($bySeverity['ERROR']) WARNING=$($bySeverity['WARNING']) INFO=$($bySeverity['INFO'])"
+                Add-Summary "   $counts | bloqueantes ($($blockingSeverities -join '/')): $blockingCount"
 
                 foreach ($r in ($results | Sort-Object { $_.extra.severity } | Select-Object -First 40)) {
                     $rel = "$($r.path)".Replace("$repoRoot\", '')
@@ -166,7 +179,7 @@ else {
                 if ($results.Count -gt 40) {
                     Add-Summary "   ... $($results.Count - 40) hallazgos mas en semgrep.json"
                 }
-                if ($bySeverity['ERROR'] -gt 0) { $blocking++ }
+                if ($blockingCount -gt 0) { $blocking++ }
             }
         }
     }
