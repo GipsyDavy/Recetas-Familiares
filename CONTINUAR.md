@@ -4419,5 +4419,60 @@ Setup), que llevaba desde el 25/07 commiteado sin publicar. `main` = `origin/mai
 - Dos falsos positivos permanentes en cada escaneo: la URL de ejemplo con credenciales embebidas de
   `ServerUrlConfigTest.kt:42` y `ServerConfigTest.java:75`. Son fixtures de test. No reproducir esa
   URL literal en documentacion: el detector `URI` de TruffleHog tambien la marca aqui.
+
+---
+
+### Dependency Audit cancelado a las 6h — diagnostico y fix (2026-07-30, Claude Code)
+
+- **Sintoma:** el `Dependency Audit` programado terminaba `cancelled` a las 6h 0m 22s exactas. Paso
+  el 13/07 (run `29238931456`) y el 27/07 (run `30255543538`). En medio, el 20/07 acabo `success`
+  pero tardando 3h 13m; los runs manuales del 11/07 tardaban 4-5 minutos.
+- **Metodo:** `superpowers:systematic-debugging`, fase 1 completa antes de tocar nada.
+
+**Causa raiz (evidencia directa del log, no inferencia):**
+
+- El job no se colgaba: se pasaba las 6h descargando la base del NVD y GitHub lo mataba en su limite
+  duro de 6h. Ultimo progreso del job Desktop: `Downloaded 210,000/370,569 (57%)`.
+- El reparto real del job que si termino (Backend, 1h 33m) lo deja claro:
+  `09:49:52 Checking for updates` → `11:22:06 Downloaded 370,472/370,472 (100%)` →
+  `11:22:12 Analysis Started` → `11:22:23 Analysis Complete (11 seconds)`.
+  **El analisis dura 11 segundos; el resto es descargar ~370.000 CVEs.**
+- Se redescargaba entera cada semana porque la cache de `setup-java` se llavea con el hash de los
+  `pom.xml`. Al no cambiar los poms, la clave se repite y el post-job registra literalmente
+  `Cache hit occurred on the primary key ..., not saving cache`: la base recien descargada se
+  descarta. La cache restaurada pesaba 84 MB, sin rastro del NVD.
+- **Descartado con evidencia:** la `NVD_API_KEY` no tenia nada que ver. El secret existe en el repo y
+  llega al plugin via `<nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>` en
+  ambos poms; el log del job muestra `NVD_API_KEY: ***` en el entorno.
+- Factor agravante: los dos jobs corren en paralelo compartiendo la misma API key, y el limite de NVD
+  es por clave. Ademas ningun job declaraba `timeout-minutes`, asi que se aplicaba el maximo de 6h.
+
+**Fix aplicado (commit `c1bdec1`), opcion elegida por el usuario:**
+
+- `actions/cache` (fijada por SHA, v4.3.0) sobre `~/.m2/dependency-check-data`, con clave rotatoria
+  `dependency-check-data-<job>-${{ github.run_id }}` y `restore-keys` por prefijo, distinta por job.
+- `-DdataDirectory="$HOME/.m2/dependency-check-data"` en ambos `mvn`.
+- `timeout-minutes: 180` en los dos jobs, para que un run degradado falle en 3h en vez de quemar 6h.
+
+**Trampa evitada, anotada para la proxima vez:** la propiedad correcta del plugin es `dataDirectory`,
+NO `data.directory`. Verificado abriendo `META-INF/maven/plugin.xml` dentro de
+`dependency-check-maven-12.2.2.jar` del repositorio local: la expresion es `${dataDirectory}`. El
+flag equivocado se habria ignorado en silencio, la cache habria quedado vacia y el problema seguiria
+igual aparentando estar resuelto.
+
+**Estado de verificacion — NO cerrado:**
+
+- Run manual `30570916754` lanzado para poblar la cache. Ese run es lento por definicion (arranca en
+  frio) y no prueba nada por si mismo.
+- La prueba real es el run siguiente: deberia bajar de horas a minutos. Comprobar en el schedule del
+  lunes 06:00 UTC o con `gh workflow run dependency-audit.yml --ref main`.
+- Riesgo conocido: si el NVD va tan lento como el 27/07, el run de poblado puede agotar los 180
+  minutos nuevos. `actions/cache` no guarda en el post-job de un job fallido, asi que la cache
+  seguiria vacia y habria que relanzarlo hasta que uno complete. Es limitacion del arranque en frio,
+  no del fix.
+- Alternativa si el arranque en frio resulta imposible de completar: serializar los jobs
+  (`needs: backend` en desktop con cache compartida) para que solo se descargue el NVD una vez por
+  semana en lugar de dos en paralelo compitiendo por la misma clave.
 - Ajeno a este sprint pero visto de paso: el `Dependency Audit` programado del 27/07 (run
-  `30255543538`) termino **cancelled tras 6h 0m 22s**, con pinta de job colgado. Sin revisar.
+  `30255543538`) termino **cancelled tras 6h 0m 22s**. Revisado y corregido despues, en la misma
+  sesion: ver la seccion siguiente.
