@@ -5,6 +5,13 @@ name: Dependency Audit
 # independiente del pipeline CI/CD. Requiere el secret NVD_API_KEY.
 # OSS Index corre anonimo en CI (las credenciales Sonatype solo existen
 # en el settings.xml local); la cobertura NVD/CISA no depende de ello.
+#
+# La base de datos del NVD (~370k CVEs) se cachea entre runs con clave
+# rotatoria por run_id + restore-keys por prefijo. Sin esa cache el job
+# redescargaba el NVD entero cada semana: el analisis real tarda 11 segundos,
+# la descarga tardaba horas y agoto el limite de 6h de GitHub (runs 29238931456
+# y 30255543538, cancelados). `dataDirectory` es la propiedad real del plugin
+# (no `data.directory`); si se cambia, verificarla contra su plugin.xml.
 
 on:
   schedule:
@@ -18,6 +25,7 @@ jobs:
   backend:
     name: Backend dependency audit
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -29,10 +37,20 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Cache base de datos NVD
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/dependency-check-data
+          key: dependency-check-data-backend-${{ github.run_id }}
+          restore-keys: |
+            dependency-check-data-backend-
+
       - name: Dependency-Check backend
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: mvn -B -f backend/pom.xml -P security-audit -DskipTests verify
+        run: >-
+          mvn -B -f backend/pom.xml -P security-audit -DskipTests
+          -DdataDirectory="$HOME/.m2/dependency-check-data" verify
 
       - name: Upload backend report
         if: always()
@@ -46,6 +64,7 @@ jobs:
   desktop:
     name: Desktop dependency audit
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -57,10 +76,20 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Cache base de datos NVD
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/dependency-check-data
+          key: dependency-check-data-desktop-${{ github.run_id }}
+          restore-keys: |
+            dependency-check-data-desktop-
+
       - name: Dependency-Check desktop
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: mvn -B -f desktop/pom.xml -P security-audit -DskipTests verify
+        run: >-
+          mvn -B -f desktop/pom.xml -P security-audit -DskipTests
+          -DdataDirectory="$HOME/.m2/dependency-check-data" verify
 
       - name: Upload desktop report
         if: always()
