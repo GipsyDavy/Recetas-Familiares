@@ -13,6 +13,10 @@
         android:label="Recetas Familiares"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.RecetasFamiliares">
+        <!-- La activity de entrada declara LAUNCHER, asi que android:exported="true"
+             es obligatorio desde API 31: sin el, la app no arranca. No acepta datos
+             de terceros mas alla del intent MAIN. -->
+        <!-- nosemgrep -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
