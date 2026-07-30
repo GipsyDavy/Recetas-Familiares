@@ -4460,19 +4460,29 @@ NO `data.directory`. Verificado abriendo `META-INF/maven/plugin.xml` dentro de
 flag equivocado se habria ignorado en silencio, la cache habria quedado vacia y el problema seguiria
 igual aparentando estar resuelto.
 
-**Estado de verificacion — NO cerrado:**
+**Estado de verificacion — CERRADO (2026-07-30, Codex):**
 
-- Run manual `30570916754` lanzado para poblar la cache. Ese run es lento por definicion (arranca en
-  frio) y no prueba nada por si mismo.
-- La prueba real es el run siguiente: deberia bajar de horas a minutos. Comprobar en el schedule del
-  lunes 06:00 UTC o con `gh workflow run dependency-audit.yml --ref main`.
-- Riesgo conocido: si el NVD va tan lento como el 27/07, el run de poblado puede agotar los 180
-  minutos nuevos. `actions/cache` no guarda en el post-job de un job fallido, asi que la cache
-  seguiria vacia y habria que relanzarlo hasta que uno complete. Es limitacion del arranque en frio,
-  no del fix.
-- Alternativa si el arranque en frio resulta imposible de completar: serializar los jobs
-  (`needs: backend` en desktop con cache compartida) para que solo se descargue el NVD una vez por
-  semana en lugar de dos en paralelo compitiendo por la misma clave.
+- Primer poblado, run manual `30570916754`: Backend termino `success` en 25m06s, con descarga fria,
+  `Analysis Complete (11 seconds)`, `BUILD SUCCESS` y cache
+  `dependency-check-data-backend-30570916754` guardada (117.751.221 bytes). Desktop fallo tras
+  2h49m08s: arranco con `Cache not found`, alcanzo 270.000/372.035 CVEs (73%) y el NVD devolvio HTTP
+  408. Maven termino `BUILD FAILURE`; el post-job no guardo cache y `gh cache list` confirmo que no
+  existia ninguna clave Desktop.
+- Segundo poblado, run manual `30583229931`: termino `success`. Backend restauro la cache del primer
+  run y bajo a 47s totales (`Analysis Complete (12 seconds)`, `BUILD SUCCESS`). Desktop todavia
+  arranco en frio, pero completo 372.061/372.061 CVEs, `Analysis Complete (8 seconds)` y
+  `BUILD SUCCESS` en 10m46s; guardo
+  `dependency-check-data-desktop-30583229931` (118.231.644 bytes).
+- Prueba final en caliente, run manual `30584022302`: `success` en ambos jobs. Desktop restauro
+  `dependency-check-data-desktop-30583229931`, completo el analisis en 9s y el job entero en 47s.
+  Backend restauro `dependency-check-data-backend-30583229931`, completo el analisis en 10s y el job
+  entero en 51s. Ambos registraron `BUILD SUCCESS` y rotaron nuevas caches con la clave del run
+  `30584022302`.
+- Resultado: verificado en un run posterior que las dos caches se restauran y que el workflow baja
+  de horas a menos de un minuto por job. No fue necesario aplicar el plan B de serializar los jobs.
+- Riesgo residual: una reconstruccion totalmente en frio sigue dependiendo de la disponibilidad y
+  velocidad del NVD, como demuestra el HTTP 408 del primer intento; la ruta normal con cache queda
+  verificada.
 - Ajeno a este sprint pero visto de paso: el `Dependency Audit` programado del 27/07 (run
   `30255543538`) termino **cancelled tras 6h 0m 22s**. Revisado y corregido despues, en la misma
   sesion: ver la seccion siguiente.
