@@ -1,0 +1,16 @@
+# Rutas excluidas del escaneo de secretos (regex Go, una por linea).
+# Solo artefactos generados, binarios y directorios no versionados.
+(^|[\\/])build[\\/]
+(^|[\\/])target[\\/]
+(^|[\\/])out[\\/]
+(^|[\\/])\.gradle[\\/]
+(^|[\\/])\.git[\\/]
+(^|[\\/])\.idea[\\/]
+(^|[\\/])\.kotlin[\\/]
+(^|[\\/])\.superpowers[\\/]
+(^|[\\/])node_modules[\\/]
+(^|[\\/])uploads[\\/]
+(^|[\\/])\.security-reports[\\/]
+(^|[\\/])herztner[\\/]
+\.(apk|aab|jar|war|dex|so|class|zip|7z|gz|tgz|pdf)$
+\.(png|jpg|jpeg|webp|gif|ico|svg)$

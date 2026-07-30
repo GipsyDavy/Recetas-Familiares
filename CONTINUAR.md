@@ -446,6 +446,16 @@ iOS:
 - Build final requiere macOS + Xcode.
 - En Windows, verificar edicion Kotlin, estructura y compilacion parcial si el tooling lo permite.
 
+Seguridad (obligatorio en todo sprint, ver `CLAUDE.md`):
+
+```powershell
+pwsh -NoProfile -File scripts/security/run-security-scan.ps1 -Mode quick   # durante el sprint
+pwsh -NoProfile -File scripts/security/run-security-scan.ps1               # antes del commit de cierre
+```
+
+Exit 0 = limpio, 1 = bloqueante (Semgrep ERROR o secreto verificado), 2 = herramienta no disponible.
+Informes en `.security-reports/<timestamp>/` (ignorado por git).
+
 No marcar `PASS`, `validado` o `cerrado` si no se ejecuto realmente en la sesion.
 
 ---

@@ -68,6 +68,9 @@ herztner/
 # Superpowers (brainstorming mockups, sesiones de desarrollo)
 .superpowers/
 
+# Informes de escaneo de seguridad (Semgrep / TruffleHog)
+.security-reports/
+
 # OS files
 .DS_Store
 Thumbs.db

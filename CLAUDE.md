@@ -132,6 +132,8 @@ Antes de declarar un sprint cerrado, hacer commit o marcar una funcionalidad com
 ### Seguridad
 - [ ] `/VibeSec` invocado en esta sesion si se tocaron auth, ownership, datos familiares, imagenes, almacenamiento, red, tokens, permisos o funcionalidad sensible.
 - [ ] `/security-review` invocado en esta sesion si se tocaron endpoints backend, Spring Security, JWT, CORS, subida de imagenes, datos familiares o funcionalidad critica.
+- [ ] `scripts/security/run-security-scan.ps1` (Semgrep + TruffleHog) ejecutado en esta sesion con resultado documentado: modo usado, hallazgos por severidad, secretos verificados y codigo de salida.
+- [ ] Hallazgos Semgrep `ERROR` y secretos verificados: cero, o corregidos, o justificados explicitamente.
 - [ ] Si una herramienta no esta disponible, documentar herramienta, motivo exacto, riesgo residual y validacion alternativa aplicada.
 - [ ] Vulnerabilidades nuevas revisadas: secretos, tokens, ownership, path traversal, XSS/injection, SSRF, CORS, logs sensibles, almacenamiento inseguro y permisos.
 - [ ] Si se tocaron archivos o imagenes, se revisaron formato, tamano, rutas, metadata, extension/tipo real y limites.
@@ -220,6 +222,38 @@ Claude Code debe invocar `/security-review` de forma proactiva en:
 - Tareas que modifiquen endpoints backend con datos de usuario o familia.
 - Implementaciones que toquen Spring Security, JWT filters, CORS, almacenamiento temporal, subida de archivos o autorizacion.
 - Cambios en modelos sincronizados que puedan exponer datos entre familias o dispositivos.
+
+## Semgrep + TruffleHog - EJECUTAR EN TODO SPRINT
+
+Escaneo estatico (Semgrep) y de secretos (TruffleHog) instalados localmente y obligatorios en cada sprint.
+
+Comando unico:
+
+```powershell
+pwsh -NoProfile -File scripts/security/run-security-scan.ps1            # modo sprint (por defecto)
+pwsh -NoProfile -File scripts/security/run-security-scan.ps1 -Mode quick # solo archivos modificados
+pwsh -NoProfile -File scripts/security/run-security-scan.ps1 -Mode full  # + historial git completo
+```
+
+Cuando ejecutarlo:
+- `-Mode quick` durante el sprint, tras cada bloque de cambios relevante.
+- `-Mode sprint` obligatorio antes del commit de cierre de sprint.
+- `-Mode full` cuando se toquen credenciales, despliegue, CI/CD, `.env`, configuracion de servidor o si se sospecha de un secreto historico.
+
+Interpretacion de resultados:
+- Salida `0`: sin hallazgos bloqueantes.
+- Salida `1`: bloqueante. Hay hallazgos Semgrep de severidad `ERROR` o secretos verificados. No cerrar el sprint sin corregir o justificar por escrito.
+- Salida `2`: herramienta no disponible. Documentar motivo, riesgo residual y validacion alternativa.
+- Los `WARNING` de Semgrep y los secretos `no verificado` requieren revision manual: se corrigen o se justifican, no se ignoran en silencio.
+- Los informes quedan en `.security-reports/<timestamp>/` (ignorado por git). Nunca versionar ni pegar secretos en bruto: usar siempre el valor `Redacted`.
+
+Detalles operativos:
+- Binarios y reglas viven fuera del repositorio, en `../tools/security/` (`semgrep-rules/`, `trufflehog/`). Se pueden sobrescribir con `SEMGREP_BIN`, `TRUFFLEHOG_BIN`, `SEMGREP_RULES_DIR`.
+- Limitacion conocida: el CLI de Semgrep no puede descargar `p/<pack>` porque Avast intercepta TLS y su raiz es rechazada por OpenSSL. Por eso se usan snapshots locales de los packs oficiales (`java`, `kotlin`, `secrets`, `security-audit`, `owasp-top-ten`). Actualizarlos con `scripts/security/update-semgrep-rules.ps1`.
+- TruffleHog verifica los candidatos contra el proveedor emisor. Para no generar egreso de red, usar `-NoVerify` (mas falsos positivos).
+- Exclusiones de ruido en `scripts/security/trufflehog-exclude.txt`. No añadir ahi codigo fuente ni configuracion: solo artefactos generados y binarios.
+
+Estas herramientas no sustituyen a `/VibeSec` ni a `/security-review`: son analisis automatico complementario.
 
 Regla general:
 - Si existe duda razonable sobre si aplica o no, invocar. Es mejor un analisis de mas que una vulnerabilidad sin detectar.
