@@ -36,8 +36,61 @@ Politica actual:
 
 - Backup logico diario a las 03:15 UTC con `pg_dump --format=custom`, retencion 14 dias.
 - Base backup fisico semanal los domingos a las 04:15 UTC con `pg_basebackup`, retencion 21 dias.
-- Archivado WAL activo con `archive_mode=on`, `archive_timeout=15min`, retencion local 35 dias.
+- Archivado WAL activo con `archive_mode=on`, `archive_timeout=15min`. **La purga de WAL vive
+  en el script diario** y conserva solo los segmentos posteriores a la copia base mas antigua en
+  disco (ver abajo).
 - Permisos de backups restringidos a `postgres:postgres`.
+
+**Los scripts estan versionados en `infra/postgres/` desde el 2026-07-31.** Antes vivian solo en
+`/usr/local/sbin/` del VPS, invisibles para cualquier auditoria del repositorio. Editar alli
+primero y desplegar despues; el README de ese directorio tiene el procedimiento y, sobre todo,
+**los permisos correctos por script**: `0750 root:postgres` para los dos que corren con
+`User=postgres`, `0700 root:root` solo para el offsite. Ponerles `0700` a los primeros los rompe
+con `status=203/EXEC` y el backup deja de ejecutarse.
+
+### Purga de WAL (cambiada el 2026-07-31)
+
+Antes: `find "$WAL_DIR" -mtime +35 -delete` **dentro del script de basebackup**, que solo corre los
+domingos. Si el basebackup fallaba varias semanas seguidas, el WAL dejaba de purgarse en silencio.
+
+Ahora, en `recetas-postgres-logical-backup` (diario):
+
+```bash
+OLDEST_BASE="$(ls -1d "$BASE_DIR"/base_* 2>/dev/null | sort | head -1)"
+if [ -n "$OLDEST_BASE" ]; then
+  find "$WAL_DIR" -type f ! -newer "$OLDEST_BASE" -delete
+fi
+```
+
+Conserva exactamente lo que el PITR necesita: los segmentos posteriores a la copia base mas antigua
+que sigue en disco. Es fail-closed — sin ninguna copia base, no borra nada.
+
+Antes de tocar esta regla, probarla siempre en seco cambiando `-delete` por `-print`.
+
+### Durabilidad del archivado
+
+`archive_command` incluye `sync` sobre el fichero destino desde el 2026-07-31. Sin el, `cp`
+devuelve exito con los datos aun en cache de pagina: PostgreSQL da el segmento por archivado y lo
+recicla, y un corte abrupto podria perderlo.
+
+La configuracion vive en `/etc/postgresql/18/main/conf.d/recetas-archive.conf`, **no** en
+`postgresql.conf` (que solo tiene la linea de ejemplo comentada). Es `sighup`: aplicar con
+`select pg_reload_conf()`, sin reiniciar.
+
+**Trampa al verificarlo:** `pg_switch_wal()` no rota nada si no hubo escrituras desde el ultimo
+cambio de segmento, asi que la prueba sale en falso. Hay que generar WAL primero, en una base
+desechable, nunca en produccion:
+
+```bash
+sudo -u postgres psql -tAc "create database wal_probe"
+sudo -u postgres psql -d wal_probe -tAc "create table t as select g, repeat('x',200) from generate_series(1,80000) g"
+sudo -u postgres psql -tAc "select pg_switch_wal()"
+sleep 8
+sudo -u postgres psql -tAc "select archived_count, failed_count from pg_stat_archiver"
+sudo -u postgres psql -tAc "drop database wal_probe"
+```
+
+`archived_count` debe subir y `failed_count` seguir en 0.
 
 Comprobaciones:
 
@@ -196,9 +249,37 @@ PGPASSWORD='<nueva-clave>' psql -h 10.10.0.1 -U recetas_app -d recetas_familiare
 PGPASSWORD='<nueva-clave>' psql -h 10.10.0.1 -U recetas_app -d recetas_familiares_test -At -c "SELECT current_user, current_database();"
 ```
 
+## Verificacion operativa 2026-07-31
+
+Auditoria completa por SSH y sprint de correcciones. Detalle en `CONTINUAR.md`.
+
+- Los tres backups verificados vivos, con `Result=success` y exit 0, y **restaurabilidad probada**:
+  `pg_restore --list` sobre el dump del dia devuelve 184 entradas de TOC y 26 tablas con datos.
+- **Restauracion desde el repositorio offsite ensayada por primera vez** (cerraba un riesgo
+  residual abierto desde el 11/07): `restic restore latest` -> `pg_restore` en base desechable ->
+  recuentos comparados con produccion. Identicos:
+  `users=14 families=10 recipes=58 notes=2 stock=0 dm=1`, 26 tablas en ambas.
+- Repositorio restic: 16 snapshots, **55 MiB reales** pese a 5.5 GiB logicos por snapshot
+  (deduplicacion + compresion 5.53x sobre los segmentos WAL). Storage Box de 1 TB al 0%.
+- `restic check` pasa a verificar tambien los blobs cifrados con `--read-data-subset=1/7`,
+  rotando por dia del año: cobertura completa del repositorio cada semana. Antes solo validaba
+  estructura e indices, asi que un blob corrupto habria pasado desapercibido.
+- VPS actualizado y reiniciado: kernel `7.0.0-27` -> `7.0.0-28`, `libc6` y parche de seguridad de
+  OpenSSL. Corte de produccion ~12 s. Todos los servicios volvieron solos.
+- `unattended-upgrades` reinicia ahora automaticamente a las **05:45 UTC**, despues de los tres
+  backups. Antes instalaba parches pero nunca reiniciaba, y por eso se acumularon 22 dias de
+  kernel sin aplicar.
+
+**Falsa alarma descartada, anotada para no repetirla:** el WAL local parece crecer sin control
+(5.6 GB para una base de datos de 10 MB, sin `crontab` de root y sin scripts en `/usr/local/bin`).
+No es cierto. La purga existe, vive en `/usr/local/sbin` y estaba embebida en el script de
+basebackup. El estado estacionario es de ~6-7 GB sobre 38 GB de disco.
+
 ## Riesgos Residuales
 
-- El ensayo PITR se hizo restaurando desde los backups locales del VPS; un PITR usando exclusivamente el repositorio offsite (restic restore + mismo procedimiento) no se ha ensayado por separado, aunque el restore offsite ya esta validado.
+- Lo ensayado el 2026-07-31 desde el repositorio offsite fue una **restauracion logica**
+  (`restic restore` de un dump + `pg_restore`), no un PITR completo. Un PITR partiendo solo del
+  offsite —copia base + reproduccion de WAL hasta un instante concreto— sigue sin ensayarse.
 - La copia offsite depende de una unica Storage Box; si Hetzner pierde VPS y Storage Box a la vez (misma cuenta/proveedor), no hay tercera copia.
 - La passphrase restic tiene una unica copia fuera del VPS (carpeta local del usuario); si se pierden ambas, el repositorio offsite es irrecuperable.
 - El backend ya esta desplegado en VPS/API publica HTTPS temporal; falta dominio propio estable y estrategia de rollback/CI-CD.

@@ -1,5 +1,21 @@
 # Correcciones operativas del VPS — Plan de implementacion
 
+> **EJECUTADO Y CERRADO el 2026-07-31.** Las 9 tareas se completaron en linea con
+> `superpowers:executing-plans`. Las casillas se dejan sin marcar a proposito: este fichero queda
+> como el plan tal cual se aprobo, y el resultado real —incluidas las desviaciones respecto a el—
+> esta en `CONTINUAR.md`, seccion "Sprint de correcciones operativas del VPS".
+>
+> Desviaciones que conviene conocer si alguien reutiliza este plan:
+> - **Task 4/5, permisos:** el plan dice `chmod 0700`. Es **incorrecto** para
+>   `recetas-postgres-logical-backup` y `recetas-postgres-basebackup`, que corren con
+>   `User=postgres` y necesitan `0750`. Con `0700` fallan con `status=203/EXEC`.
+> - **Task 6, ruta:** el `archive_command` no esta en `postgresql.conf` sino en
+>   `conf.d/recetas-archive.conf`.
+> - **Task 6, verificacion:** `pg_switch_wal()` no rota nada sin escrituras previas; hay que
+>   generar WAL en una base desechable o la prueba sale en falso.
+> - **Task 8:** el tunel no estaba roto. El peer obsoleto es `10.10.0.2`, no `10.10.0.3`.
+> - Se añadio `.gitattributes`, no previsto: sin el, un clon nuevo sacaba los scripts con CRLF.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** cerrar los siete hallazgos de la auditoria operativa del 2026-07-31 dejando el VPS parcheado, la purga de WAL desacoplada del basebackup semanal, la integridad del repo offsite verificada de verdad y los scripts de backup versionados en el repositorio.

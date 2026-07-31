@@ -4568,3 +4568,105 @@ lectura sobre infraestructura propia, sin incertidumbre tecnica ni cambio multip
 justificara segunda opinion. Sin cambios en el VPS ni en el codigo. Secretos nunca impresos: los
 ficheros de entorno se consultaron solo por nombre de clave y restic se invoco con las variables
 cargadas en subshell.
+
+---
+
+### Sprint de correcciones operativas del VPS — CERRADO 2026-07-31 (Claude Code)
+
+Continuacion directa de la auditoria del item 18 de la misma sesion. Cierra sus siete hallazgos
+mas la causa raiz que ninguno de ellos nombraba.
+
+**Skills de proceso:** `superpowers:writing-plans` (plan de 9 tareas en
+`docs/superpowers/plans/2026-07-31-correcciones-operativas-vps.md`) y
+`superpowers:executing-plans` (ejecucion en linea, con checkpoint del usuario antes del reinicio y
+antes de desplegar la purga de WAL). Sin worktree: los cambios reales viven en el servidor, aislar
+el repositorio no aisla nada.
+
+**Agente lider:** Claude Code (Opus 5), en solitario. Sin Codex ni Gemini: infraestructura propia,
+sin incertidumbre tecnica ni cambio multiplataforma.
+
+**`/VibeSec` y `/security-review`: no aplican.** Cero codigo de aplicacion tocado. La superficie de
+seguridad de este sprint (parches del sistema, permisos de scripts, cifrado offsite, peers VPN) se
+reviso manualmente y con Semgrep + TruffleHog.
+
+#### Hallazgos cerrados
+
+| Hallazgo | Estado | Evidencia |
+|---|---|---|
+| Reinicio pendiente + 12 paquetes | CERRADO | kernel `7.0.0-28`, 0 pendientes, corte de ~12 s |
+| Purga de WAL acoplada al basebackup | CERRADO | movida al script diario, 3 de 362 segmentos purgados |
+| `restic check` sin `--read-data` | CERRADO | `read group #3 of 4 data packs`, `no errors were found` |
+| Ensayo de restore sin repetir | CERRADO | restaurado desde offsite, recuentos identicos a produccion |
+| `archive_command` con `cp` plano | CERRADO | `sync` añadido, `archived_count` 363 -> 365, 0 fallos |
+| Peer WireGuard `10.10.0.3` sin documentar | CERRADO | es el propio PC del usuario (ver correccion abajo) |
+| Tunel WireGuard del PC caido | CERRADO | diagnostico erroneo, ver correccion abajo |
+| **Causa raiz:** scripts sin versionar | CERRADO | `infra/postgres/` + `.gitattributes` |
+
+#### Causa raiz del item 18
+
+Los scripts de backup vivian solo en `/usr/local/sbin/` del VPS. Por eso ninguna auditoria del
+repositorio podia verlos y el item estuvo meses como "no verificable desde el repo". Se replica el
+patron que ya existia en `infra/backend/`: ahora estan en `infra/postgres/` junto con
+`recetas-archive.conf` y un README con el procedimiento de despliegue.
+
+Al añadirlos aparecio un problema latente que afectaba **tambien a los scripts de despliegue del
+backend que ya estaban versionados**: el repo usa `core.autocrlf=true` y no tenia `.gitattributes`,
+asi que un clon nuevo sacaba todos los scripts de `infra/` con finales de linea CRLF. `bash` falla
+al ejecutarlos porque el retorno de carro se cuela en el shebang. Corregido con `.gitattributes`
+(`infra/** text eol=lf`), verificado con `git ls-files --eol`.
+
+#### Dos correcciones a la auditoria de la manana
+
+**1. El peer `10.10.0.3` es el propio PC del usuario.** No un segundo dispositivo.
+`Get-NetIPAddress` muestra que la interfaz `RecetasHetzner` tiene esa IP.
+
+**2. El peer obsoleto es `10.10.0.2`, no al reves.** Es el que consta en la documentacion como
+"peer PC" y el que lleva 11 dias o mas sin conectar (`latest-handshake = 0`, sin endpoint). En
+algun momento el tunel del PC se recreo con otra IP y la documentacion se quedo atras.
+
+**Por que fallo el diagnostico inicial:** en Windows, desactivar un tunel *borra* su servicio y
+activarlo lo recrea. Al muestrear el estado por la mañana el tunel estaba desactivado, no aparecia
+ningun servicio WireGuard, y se concluyo "el servicio ya no existe" cuando lo correcto era "esta
+desactivado ahora mismo". Ademas se cruzo la identidad de los peers por fiarse de la documentacion
+en vez de comprobarla. El tunel esta operativo: `ping 10.10.0.1` y puerto 5432 alcanzables.
+
+#### Fallo propio durante la ejecucion
+
+El primer despliegue de la purga de WAL murio con `status=203/EXEC` y `Permission denied`. El plan
+decia `chmod 0700`, copiado del script offsite — pero ese corre como root, mientras que los dos de
+PostgreSQL corren con `User=postgres` y necesitan `0750` para que el grupo pueda ejecutarlos. El
+backup diario habria quedado roto en silencio hasta las 03:20 del dia siguiente. Lo detecto la
+verificacion de `Result` y `ExecMainStatus`, que el plan exigia en vez de dar por bueno el
+`systemctl start`. No se destruyo nada: fallo antes de tocar ficheros. Permisos documentados por
+script en `infra/postgres/README.md`.
+
+#### Trampas nuevas anotadas
+
+- `pg_switch_wal()` **no rota nada** si no hubo escrituras desde el ultimo cambio de segmento. La
+  primera verificacion del `archive_command` salio en falso por esto. Hay que generar WAL antes, en
+  una base desechable.
+- El `archive_command` vive en `/etc/postgresql/18/main/conf.d/recetas-archive.conf`, **no** en
+  `postgresql.conf`.
+- `date +%j` da el dia del año con ceros a la izquierda; en aritmetica de bash eso es octal y `089`
+  ni siquiera es octal valido. Usar `+%-j`.
+- `file` no esta instalado en el VPS; para detectar CRLF, `grep -qU $'\r'`.
+
+#### Pendiente de accion del usuario
+
+**Retirar el peer WireGuard `10.10.0.2`.** Autorizado por el usuario, pero el clasificador de
+permisos del agente bloqueo la modificacion de la configuracion de acceso VPN, dos veces, y no se
+intento sortear. La copia de seguridad `/etc/wireguard/wg0.conf.bak-20260731` ya esta creada y la
+configuracion quedo intacta. Comando:
+
+```bash
+ssh root@167.233.213.242 'wg set wg0 peer "/PBRk+zF/9uJHVabGkEH38KjzCeEfI5f5TJccU8/WXE=" remove && sed -i "6,9d" /etc/wireguard/wg0.conf'
+```
+
+#### Riesgo residual
+
+- El PITR partiendo **solo** del repositorio offsite sigue sin ensayarse. Lo probado el 31/07 fue
+  restauracion logica desde offsite, no reproduccion de WAL hasta un instante concreto.
+- El auto-reinicio de `unattended-upgrades` a las 05:45 UTC no se ha visto disparar todavia; se
+  vera en el proximo parche de kernel.
+- La regla nueva de purga de WAL solo se ha ejecutado una vez en real. Su comportamiento en estado
+  estacionario, cuando la retencion de 21 dias empiece a eliminar copias base, no se ha observado.
