@@ -18,6 +18,11 @@ desde el repo". Mismo patron que `infra/backend/`.
 Destino de los backups locales: `/var/backups/recetas-postgres/{logical,base,wal}`.
 Destino offsite: repositorio restic cifrado en un Hetzner Storage Box por SFTP.
 
+`recetas-archive.conf` es la configuracion de archivado de WAL de PostgreSQL.
+Vive en el servidor en `/etc/postgresql/18/main/conf.d/` — **no** en
+`postgresql.conf`, que solo tiene la linea de ejemplo comentada. `archive_command`
+es un parametro `sighup`: basta `select pg_reload_conf()`, no hace falta reiniciar.
+
 ## Secretos
 
 **No estan aqui y no deben estarlo.** Viven en el VPS, modo 0600 root:root:
