@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 027
+DB_NAME="${DB_NAME:-recetas_familiares}"
+BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/recetas-postgres}"
+LOGICAL_DIR="$BACKUP_ROOT/logical"
+RETENTION_DAYS="${RETENTION_DAYS:-14}"
+TS="$(date -u +%Y%m%dT%H%M%SZ)"
+TMP="$LOGICAL_DIR/${DB_NAME}_${TS}.dump.tmp"
+OUT="$LOGICAL_DIR/${DB_NAME}_${TS}.dump"
+mkdir -p "$LOGICAL_DIR"
+rm -f "$TMP"
+pg_dump --format=custom --compress=9 --no-owner --no-acl --file="$TMP" "$DB_NAME"
+mv "$TMP" "$OUT"
+chmod 0640 "$OUT"
+find "$LOGICAL_DIR" -type f -name "${DB_NAME}_*.dump" -mtime +"$RETENTION_DAYS" -delete
+printf '%s\n' "$OUT"

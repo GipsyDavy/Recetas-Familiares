@@ -1,0 +1,10 @@
+#!/bin/bash
+# Copia offsite cifrada (restic -> Hetzner Storage Box) de los backups locales de PostgreSQL.
+# Falla cerrado: si el destino no responde, los backups locales siguen intactos.
+set -euo pipefail
+set -a
+source /etc/recetas-familiares/offsite-backup.env
+set +a
+restic backup /var/backups/recetas-postgres --tag scheduled --quiet
+restic forget --tag scheduled --keep-daily 14 --keep-weekly 5 --prune --quiet
+restic check --quiet
