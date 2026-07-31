@@ -1,0 +1,10 @@
+# Este repositorio se desarrolla en Windows con core.autocrlf=true, pero varios
+# ficheros se ejecutan en el VPS Linux. Sin esta regla, un clon nuevo los sacaria
+# con finales de linea CRLF y bash fallaria al ejecutarlos: el \r se cuela en el
+# shebang y en cada comando.
+#
+# Afecta a los scripts de despliegue del backend (infra/backend/) y a los de
+# backup de PostgreSQL (infra/postgres/), que se copian al servidor por scp.
+
+infra/** text eol=lf
+*.sh text eol=lf
