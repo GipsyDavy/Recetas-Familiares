@@ -4486,3 +4486,85 @@ igual aparentando estar resuelto.
 - Ajeno a este sprint pero visto de paso: el `Dependency Audit` programado del 27/07 (run
   `30255543538`) termino **cancelled tras 6h 0m 22s**. Revisado y corregido despues, en la misma
   sesion: ver la seccion siguiente.
+
+---
+
+### Verificacion operativa del VPS (item 18) — CERRADO 2026-07-31 (Claude Code)
+
+- **Objetivo:** cerrar el unico item del backlog marcado "no verificable desde el repo". Sprint de
+  solo lectura contra el VPS por SSH. Sin cambios en produccion.
+- **Skill de proceso:** `superpowers:verification-before-completion` (evidencia antes de afirmar).
+  Ninguna otra aplica: no hay feature nueva, ni bug, ni codigo que escribir.
+- **`/VibeSec` y `/security-review`: no aplican.** No se toco codigo de aplicacion, auth, endpoints,
+  ownership ni imagenes. La revision de seguridad de este sprint fue de configuracion operativa
+  (ufw, WireGuard, permisos de backups, cifrado offsite).
+
+**Resultado: los tres backups estan vivos, se ejecutan y son restaurables.** Item 18 pasa de
+"no verificable" a **verificado operativo**.
+
+| Backup | Cadencia | Ultima ejecucion | Resultado | Retencion |
+|---|---|---|---|---|
+| Logico (`pg_dump -Fc -Z9`) | diaria ~03:20 UTC | 2026-07-31 03:16:19 | `Result=success`, exit 0 | 14 dias (16 ficheros, 111-116 KB) |
+| Base fisico (`pg_basebackup -Ft -z -X stream`) | semanal domingo | 2026-07-26 04:24:19 | `Result=success`, exit 0 | 21 dias (4 copias, 7.5 MB c/u) |
+| Offsite cifrado (restic -> Storage Box) | diaria ~05:20 UTC | 2026-07-31 05:15:53 | `Result=success`, exit 0 | keep-daily 14 + keep-weekly 5 |
+
+**Evidencia recogida (no inferida):**
+
+- **Restaurabilidad probada, no supuesta:** `pg_restore --list` sobre el dump del 31/07 devuelve
+  184 entradas de TOC y 26 tablas con datos, incluidas `users`, `families`, `recipes`,
+  `family_notes`, `stock_items`, `private_messages`. Produccion tiene 14 usuarios, 10 familias y
+  58 recetas — coherente con un dump de 111 KB comprimido sobre una BD de 10 MB.
+- **restic:** 16 snapshots (2026-07-11 → 2026-07-31), la retencion `forget --prune` funciona. El
+  repo ocupa **55.17 MiB reales** (ratio de compresion 5.53x) pese a que el ultimo snapshot mide
+  5.541 GiB logicos: la deduplicacion absorbe los segmentos WAL. `restic check` corre dentro del
+  propio script en cada ejecucion; 0 errores en los ultimos 7 dias.
+- **Storage Box:** 1.0 TB de cuota, 59.5 MB usados (0%). Sin riesgo de cuota.
+- **Disco VPS:** 11 GB usados de 38 GB (30%), 26 GB libres. Memoria: 2.8 GB disponibles de 3.7 GB.
+- **Backend:** `recetas-backend.service` active running desde el deploy del 2026-07-30 18:12 UTC,
+  `NRestarts=0`. Health publico `{"status":"UP"}` verificado desde Windows con
+  `Invoke-RestMethod`. VPS con 22 dias de uptime.
+- **Firewall:** ufw activo y correcto — 5432/tcp expuesto **solo en `wg0`**, nunca publico; ademas
+  SSH, 80, 443 y 51820/udp.
+- **Archivado WAL:** `archive_mode=on`, `wal_level=replica`, `archive_timeout=900`. 359 segmentos,
+  5.6 GB, el mas antiguo del 09/07.
+
+**Falsa alarma descartada durante el sprint (anotada para no repetirla):** el WAL local parecia
+crecer sin purga — 5.6 GB para una BD de 10 MB, sin `crontab` de root y sin scripts en
+`/usr/local/bin`. **Es correcto.** La purga existe, vive en `/usr/local/sbin` (no `bin`) y esta
+embebida en el script de basebackup: `find "$WAL_DIR" -type f -mtime +35 -delete`. Los segmentos
+mas antiguos tienen 22 dias, todavia dentro de la ventana de 35. El estado estacionario esperado es
+~6-7 GB (35 dias x ~177 MB/dia, medido por dos vias independientes: 77 ficheros nuevos en 7 dias, y
+el crecimiento de los snapshots restic de 4.299 a 5.541 GiB en la misma semana). **No hay riesgo de
+llenado de disco.** La retencion es coherente: WAL 35 dias > basebackups 21 dias, que es el orden
+correcto para que el PITR siempre tenga WAL desde la copia base mas antigua.
+
+**Hallazgos abiertos (ninguno critico, ninguno afecta a produccion ahora mismo):**
+
+- **MEDIA — reinicio pendiente en el VPS.** `/var/run/reboot-required` presente y 12 paquetes
+  actualizables, con 22 dias de uptime. Probable kernel/libs de seguridad sin aplicar.
+- **MEDIA — tunel WireGuard del PC caido.** El peer `10.10.0.2` (este PC) tiene el ultimo handshake
+  hace 11 dias, y el servicio Windows `WireGuardTunnel$RecetasHetzner` **ya no existe** (solo
+  aparece "ProtonVPN WireGuard", parado). Consecuencia: no hay acceso directo a PostgreSQL desde el
+  PC y el backend dev local contra `recetas_familiares_test` no funciona hasta restaurarlo. No
+  afecta a produccion, que no usa el tunel.
+- **MEDIA — peer WireGuard no documentado.** `10.10.0.3` (clave `i6Y0xNui...`), ultimo handshake
+  hace 5 dias, desde el mismo endpoint publico que el PC (`79.145.220.21`). Presumiblemente un
+  segundo dispositivo del usuario, pero no consta en la documentacion. Confirmar o retirar.
+- **BAJA — acoplamiento purga WAL / basebackup.** La purga de WAL solo se ejecuta dentro del script
+  semanal de basebackup. Si el basebackup falla varias semanas seguidas, el WAL deja de purgarse en
+  silencio. Hoy es inofensivo por el margen de disco; conviene desacoplarlo o alertar.
+- **BAJA — `restic check` sin `--read-data`.** Verifica estructura e indices, no los blobs cifrados.
+  La integridad real del contenido offsite no se comprueba desde el ensayo de restore del 11/07.
+- **BAJA — ensayo de restore no repetido desde 2026-07-11.** Los backups son validos e integros hoy,
+  pero la restauracion completa solo se ha ensayado una vez, hace 20 dias.
+- **INFO — `archive_command` usa `cp` plano** sin fsync. La documentacion de PostgreSQL advierte que
+  puede perderse el ultimo segmento ante un corte abrupto. Riesgo bajo en un VPS.
+- **INFO — avisos post-quantum de OpenSSH** en cada backup offsite ("connection is not using a
+  post-quantum key exchange algorithm"). Es ruido del journal, no un fallo: el Storage Box de
+  Hetzner todavia no soporta ese intercambio de claves.
+
+**Trazabilidad:** agente lider Claude Code (Opus 5), en solitario. Sin Codex ni Gemini: auditoria de
+lectura sobre infraestructura propia, sin incertidumbre tecnica ni cambio multiplataforma que
+justificara segunda opinion. Sin cambios en el VPS ni en el codigo. Secretos nunca impresos: los
+ficheros de entorno se consultaron solo por nombre de clave y restic se invoco con las variables
+cargadas en subshell.
