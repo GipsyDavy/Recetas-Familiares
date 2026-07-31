@@ -1,0 +1,8 @@
+kernel=7.0.0-27-generic
+uptime=up 3 weeks, 1 day, 23 hours, 20 minutes
+users=14 families=10 recipes=58
+wal_segments=360
+disco=/dev/sda1        38G   11G   26G  30% /
+active
+active
+active
