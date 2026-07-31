@@ -14,4 +14,19 @@ pg_dump --format=custom --compress=9 --no-owner --no-acl --file="$TMP" "$DB_NAME
 mv "$TMP" "$OUT"
 chmod 0640 "$OUT"
 find "$LOGICAL_DIR" -type f -name "${DB_NAME}_*.dump" -mtime +"$RETENTION_DAYS" -delete
+
+# Purga de WAL. Se conservan solo los segmentos necesarios para restaurar desde
+# la copia base mas antigua que sigue en disco; los anteriores ya no sirven para
+# nada. Fail-closed: sin ninguna copia base, no se borra nada.
+#
+# Vivia en el script de basebackup, que solo corre los domingos. Si aquel
+# fallaba varias semanas seguidas, el WAL dejaba de purgarse sin que nadie se
+# enterara. Aqui corre a diario.
+BASE_DIR="$BACKUP_ROOT/base"
+WAL_DIR="$BACKUP_ROOT/wal"
+OLDEST_BASE="$(ls -1d "$BASE_DIR"/base_* 2>/dev/null | sort | head -1)"
+if [ -n "$OLDEST_BASE" ]; then
+  find "$WAL_DIR" -type f ! -newer "$OLDEST_BASE" -delete
+fi
+
 printf '%s\n' "$OUT"

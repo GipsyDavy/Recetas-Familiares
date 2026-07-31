@@ -3,9 +3,7 @@ set -euo pipefail
 umask 027
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/recetas-postgres}"
 BASE_DIR="$BACKUP_ROOT/base"
-WAL_DIR="$BACKUP_ROOT/wal"
 RETENTION_DAYS="${RETENTION_DAYS:-21}"
-WAL_RETENTION_DAYS="${WAL_RETENTION_DAYS:-35}"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 TMP="$BASE_DIR/base_${TS}.tmp"
 OUT="$BASE_DIR/base_${TS}"
@@ -15,5 +13,8 @@ pg_basebackup -D "$TMP" -Ft -z -X stream -c fast
 mv "$TMP" "$OUT"
 chmod -R go-rwx "$OUT"
 find "$BASE_DIR" -mindepth 1 -maxdepth 1 -type d -name 'base_*' -mtime +"$RETENTION_DAYS" -exec rm -rf {} +
-find "$WAL_DIR" -type f -mtime +"$WAL_RETENTION_DAYS" -delete
+# La purga de WAL ya no vive aqui: se movio al script diario
+# (recetas-postgres-logical-backup) el 2026-07-31. Estando en este script, que
+# solo corre los domingos, un fallo repetido del basebackup dejaba de purgar el
+# WAL en silencio.
 printf '%s\n' "$OUT"

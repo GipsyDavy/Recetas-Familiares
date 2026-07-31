@@ -41,10 +41,23 @@ purgarse en silencio.
 
 ## Desplegar un cambio
 
+**Ojo con los permisos: no son iguales para los tres scripts.** Los dos de
+PostgreSQL corren con `User=postgres` en su unit, asi que necesitan bit de
+ejecucion para el grupo. El offsite corre como root y no lo necesita.
+
+| Script | Modo | Propietario |
+|---|---|---|
+| `recetas-postgres-logical-backup` | `0750` | `root:postgres` |
+| `recetas-postgres-basebackup` | `0750` | `root:postgres` |
+| `recetas-postgres-offsite-backup` | `0700` | `root:root` |
+
+Poner `0700` en los dos primeros los rompe con `status=203/EXEC` y
+`Permission denied`, y el backup no se ejecuta. Paso el 2026-07-31.
+
 ```bash
 ssh root@167.233.213.242 'cp /usr/local/sbin/<script> /usr/local/sbin/<script>.bak-$(date +%Y%m%d)'
 scp infra/postgres/<script> root@167.233.213.242:/usr/local/sbin/<script>
-ssh root@167.233.213.242 'chmod 0700 /usr/local/sbin/<script>'
+ssh root@167.233.213.242 'chmod 0750 /usr/local/sbin/<script>'   # 0700 para el offsite
 ```
 
 ## Verificar
