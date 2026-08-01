@@ -711,6 +711,15 @@ git commit -m "feat(android): muestra la portada de receta en las cards del list
   - `byte[] fetch(String url)` — bytes de la imagen, o `null` si falla. Cachea aciertos y también los fallos, para no martillear el servidor con URLs rotas.
   - `void shutdown()`.
 
+> **EJECUTADO CON DESVIACIÓN (2026-08-01).** No se creó `AuthenticatedImageLoader`. El
+> plan no vio que `ApiClient.fetchImage(String)` ya existía (`api/ApiClient.java:189`) y ya
+> resuelve el problema del JWT, **restringiendo el token al origen del backend**. El loader
+> propuesto aquí montaba un `OkHttpClient` paralelo que añadía `Authorization` a *cualquier*
+> host: como `coverThumbnailUrl` sale de la base de datos, eso filtraría el JWT a un host
+> arbitrario. Lo implementado es `core/ImageCache.java`: solo la caché (LRU de 200 entradas y
+> 32 MB), delegando la descarga en `ApiClient.fetchImage`. Tests en
+> `core/ImageCacheTest.java` (7 casos). No reimplementar el loader.
+
 **Por qué existe:** `/uploads/**` exige JWT y `javafx.scene.image.Image(url)` no admite cabeceras.
 
 Se separa la descarga (esta tarea, testeable sin JavaFX) del pintado (Task 4, no testeable aquí). `fetch` devuelve bytes precisamente para poder testearlo sin arrancar el toolkit de JavaFX.

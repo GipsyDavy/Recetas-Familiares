@@ -411,7 +411,7 @@ Estado verificado de los 22 puntos (2026-07-12 mediodia, Claude Code, contra cod
   - (21) verificado en codigo y produccion: StarterRecipeSeeder crea 2 EASY + 2 MEDIUM + 1 HARD.
 - PARCIALES:
   - (3) rol/expulsion OK (Sprint C); NO existe endpoint para que OWNER/ADMIN edite datos/password de otro miembro (verificado: FamilyController solo tiene invite/list/role/remove/avatar/stats). El "password olvidada" queda cubierto por self-reset CRIT-2 via email. Si se quiere el literal del punto 3, falta sprint backend+clientes con decision de seguridad (admin-reset de password ajena es delicado).
-  - (7) foto y portada en DETALLE OK (verificado Android hoy); las cards de LISTADO no muestran portada ni en Android ni en Desktop (`RecipeListView` sin imagenes). Mejora UX pendiente.
+  - (7) COMPLETO en Android y Desktop desde 2026-08-01 (sprint "portada de receta en los listados"): detalle y cards de listado muestran portada. iOS queda fuera de alcance mientras siga bloqueado. Historico: hasta esa fecha la portada solo se veia en el detalle.
   - (14) chat familiar OK; chat privado 1:1 pendiente (tras chat fase 4 push).
 - PENDIENTES: (10) creador de receta (sprint propio, contrato sync + Room), (11) ranking (depende de 9+10), (20) presencia online/avisos (sin push, solo app abierta), (22) scroll Desktop al redimensionar.
   - (22) NO estaba en el roadmap anterior. Verificado hoy: 7 vistas Desktop sin ScrollPane envolvente (WeeklyMenuView, CookingView, FamilyMembersView, LoginView, RecipeListView, StockView, NotesView; las de tabla tienen scroll interno pero cabeceras/formularios pueden quedar fuera al reducir ventana). Sprint UX Desktop propio.
@@ -5017,10 +5017,11 @@ como una mejora de durabilidad real. Corregido.
 Ningun riesgo de perdida de datos abierto. El backlog restante es funcional o de deuda, sin
 prioridad fijada por el usuario:
 
-- **Deuda:** 5 tests `UploadControllerTest` en rojo en local por contaminacion de la BD de test
-  compartida. CI no afectado (Postgres efimero).
-- **UX (7):** las cards de listado no muestran portada de receta ni en Android ni en Desktop; el
-  detalle si. Alcance acotado.
+- ~~**Deuda:** 5 tests `UploadControllerTest` en rojo en local~~ — NO EXISTE. Verificado el
+  2026-08-01 contra `recetas_familiares_test`: aislada 7/7 y tambien dentro de la suite completa.
+  La afirmacion venia arrastrada de julio sin volver a comprobarse.
+- ~~**UX (7):** las cards de listado no muestran portada de receta~~ — HECHO el 2026-08-01 en
+  Android y Desktop. Ver "Sprint: portada de receta en los listados" al final de este documento.
 - **UX-14:** ayuda contextual completa en Desktop y Android. Sprint grande, multi-fase, sin spec.
 - **(23):** pulido visual del sidebar Desktop. Idea suelta, sin spec.
 - **Prueba manual pendiente:** badge de avisos de actividad con dos cuentas/dispositivos. Bloqueada
@@ -5057,3 +5058,82 @@ Dos hallazgos de Codex que se habian rebajado con argumentos propios resultaron 
 verificarlos: el `source` del fichero de estado (bastaba un valor con un espacio, no hacia falta
 contenido hostil) y el contrato del `archive_command` (el ejemplo canonico de la documentacion es
 incompleto respecto a lo que ella misma exige).
+
+---
+
+## Sprint: portada de receta en los listados (2026-08-01)
+
+Cierra el punto (7) del roadmap en Android y Desktop: las cards de listado ya muestran la foto
+de portada, no solo el detalle. Plan ejecutado:
+`docs/superpowers/plans/2026-08-01-portada-recetas-listado.md`.
+
+### Qué se hizo
+
+- **Backend** (`c0d249e`, `8f53736`): `RecipeResponse` gana `coverThumbnailUrl` como último
+  componente (cambio aditivo). La portada se resuelve con **una** consulta por página
+  (`RecipePhotoRepository.findCoverCandidates`), que filtra por `familyId` además de por los ids
+  de receta y va sobre el índice existente `ix_recipe_photos_recipe_active`. Sin migración de BD.
+- **Determinismo**: `position` no es único en `recipe_photos`, así que dos fotos empatadas dejaban
+  el orden al planner y listado y detalle podían discrepar. Se añadió desempate por `id` y se
+  unificó la resolución: detalle, sync y push pasan por `coverUrlsByRecipeId` con un lote de un
+  elemento, de modo que existe **un solo** criterio en todo el servicio.
+- **Android** (`f2464c0`, `3554f98`): no consume el campo nuevo — deriva la portada de las fotos
+  que Room ya sincroniza, así que funciona offline y **sin subir versión de esquema**. La regla de
+  selección vive en `ui/RecipeCovers.kt` con el mismo desempate que el backend. `Crossfade` en la
+  card y `derivedStateOf` por item para que un cambio de portada no recomponga el resto.
+- **Desktop** (`c1f681f`, `576a792`, `866a078`): `RecipeCell` pinta una miniatura de 56×56 con
+  `FadeTransition` de 150 ms (respeta `MotionPreferences`); descarga en hilo virtual, pintado en el
+  JavaFX Application Thread, y la celda descarta el resultado si se recicló mientras bajaba la
+  imagen. Placeholder con variables de la paleta, así que sigue el tema claro/oscuro.
+
+### Desviación deliberada del plan (Task 3)
+
+El plan mandaba crear `AuthenticatedImageLoader` con su propio `OkHttpClient`. **No se hizo**: ese
+loader añadía `Authorization: Bearer` a cualquier URL y, como `coverThumbnailUrl` sale de la base
+de datos, habría filtrado el JWT a un host arbitrario. Además duplicaba
+`ApiClient.fetchImage(String)` (`api/ApiClient.java:189`), que ya existía y ya restringe el token
+al origen del backend (SEC-3). Lo implementado es solo la caché: `core/ImageCache.java`, LRU de
+200 entradas **y 32 MB** — el presupuesto de memoria se añadió porque una portada sin thumbnail
+cae a la imagen original y 200 originales grandes podían tumbar el cliente.
+
+### Validación ejecutada en esta sesión (2026-08-01, Claude Code)
+
+| Comando | Resultado |
+|---|---|
+| `mvn -f backend/pom.xml test` | **215 tests, 0 fallos, 0 errores, BUILD SUCCESS** (10:15 min) |
+| `mvn test` en `desktop/` | **55 tests, 0 fallos, BUILD SUCCESS** |
+| `gradle test --rerun-tasks` en `android/` | **82 tests, 0 fallos, BUILD SUCCESSFUL** (13 clases) |
+| `gradle assembleDebug` en `android/` | BUILD SUCCESSFUL |
+| `run-security-scan.ps1 -Mode quick` ×2 y `-Mode sprint` | Semgrep 0 hallazgos; TruffleHog 2 no verificados; **exit 0** |
+| `/VibeSec` y `/security-review` | Sin hallazgos de alta confianza en el diff de la rama |
+
+Los 2 hallazgos de TruffleHog son los `https://user:***@example.test` de `ServerUrlConfigTest.kt` y
+`ServerConfigTest.java`: credenciales inventadas en tests de parsing de URL, falsos positivos ya
+conocidos.
+
+Lo verificado en la revisión de seguridad: la consulta de portadas filtra por familia (con test que
+la llama directamente con el `familyId` del extraño), el `familyId` siempre sale de la entidad y
+nunca del request, Android y Desktop solo adjuntan el JWT si la URL es del origen del backend, y
+`clearFamilyScopedCaches()` — que `showLogin()` ya invoca — vacía la caché de imágenes, así que ni
+el cambio de familia ni el logout dejan fotos ajenas en memoria.
+
+### Corrección de una deuda que no existía
+
+`CONTINUAR.md` arrastraba desde julio "5 tests `UploadControllerTest` en rojo en local". Es falso:
+en la suite completa de hoy `UploadControllerTest` dio **7 tests, 0 fallos** (surefire, 23:01).
+La entrada del backlog queda corregida.
+
+### Riesgo residual
+
+- **Sin validación manual de la GUI Desktop.** Falta comprobar con la aplicación real: miniatura
+  presente, placeholder en recetas sin foto, **ninguna fila con la foto de otra receta al hacer
+  scroll rápido**, ventana que no se congela y ausencia de miniaturas al cambiar de familia. El
+  reciclado de `ListCell` está resuelto en código (`pendingUrl`) pero no verificado a ojo.
+- **Desktop no tiene tests de UI automatizados** (`COD-8` sigue parcial): `RecipeCell` se valida
+  por compilación y por los tests de `ImageCache`.
+- **Android no tiene tests de UI Compose ni Robolectric**: `RecipeCard` se validó por compilación;
+  la lógica de selección de portada sí está cubierta como función pura.
+- **Sync**: si solo cambia una *foto*, la fila de receta no cambia y el `coverThumbnailUrl` del
+  pull no se refresca hasta que se toque la receta. Aceptado: Android usa sus propias fotos y
+  Desktop reconstruye su caché desde el listado REST.
+- **iOS fuera de alcance**, sigue bloqueado.
