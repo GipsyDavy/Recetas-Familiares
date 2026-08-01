@@ -1,12 +1,16 @@
 package org.gipsybuho.recetasfamiliares.recipes;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.gipsybuho.recetasfamiliares.common.api.PageResponse;
 import org.gipsybuho.recetasfamiliares.families.FamilyEntity;
 import org.gipsybuho.recetasfamiliares.families.FamilyMemberRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRepository;
 import org.gipsybuho.recetasfamiliares.families.FamilyRole;
+import org.gipsybuho.recetasfamiliares.photos.RecipeCoverProjection;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoEntity;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoRepository;
 import org.gipsybuho.recetasfamiliares.users.UserEntity;
@@ -57,8 +61,14 @@ public class RecipeService {
         requireMembership(familyId, userId);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
         Page<RecipeEntity> recipes = recipeRepository.findByFamily_IdAndDeletedFalse(familyId, pageable);
+        Map<String, String> covers = coverUrlsByRecipeId(
+                familyId,
+                recipes.getContent().stream().map(RecipeEntity::getId).toList()
+        );
         return new PageResponse<>(
-                recipes.getContent().stream().map(this::toResponse).toList(),
+                recipes.getContent().stream()
+                        .map(recipe -> toResponse(recipe, covers.get(recipe.getId())))
+                        .toList(),
                 recipes.getNumber(),
                 recipes.getSize(),
                 recipes.getTotalElements(),
@@ -222,6 +232,10 @@ public class RecipeService {
     }
 
     private RecipeResponse toResponse(RecipeEntity recipe) {
+        return toResponse(recipe, coverUrlOf(recipe));
+    }
+
+    private RecipeResponse toResponse(RecipeEntity recipe, String coverThumbnailUrl) {
         return new RecipeResponse(
                 recipe.getId(),
                 recipe.getFamilyId(),
@@ -236,7 +250,41 @@ public class RecipeService {
                 recipe.getSyncVersion(),
                 recipe.isDeleted(),
                 recipe.getCreatedByUserId(),
-                recipe.getCreatedByDisplayName()
+                recipe.getCreatedByDisplayName(),
+                coverThumbnailUrl
         );
+    }
+
+    /** Portada de una sola receta. Para listas usar coverUrlsByRecipeId: esto seria N+1. */
+    private String coverUrlOf(RecipeEntity recipe) {
+        return photoRepository.findByRecipe_IdAndDeletedFalseOrderByPositionAsc(recipe.getId()).stream()
+                .findFirst()
+                .map(RecipeService::preferredCoverUrl)
+                .orElse(null);
+    }
+
+    private Map<String, String> coverUrlsByRecipeId(String familyId, Collection<String> recipeIds) {
+        if (recipeIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> covers = new LinkedHashMap<>();
+        for (RecipeCoverProjection candidate : photoRepository.findCoverCandidates(familyId, recipeIds)) {
+            // La consulta llega ordenada por position ascendente, asi que la primera fila
+            // de cada receta es su portada. putIfAbsent conserva esa y descarta el resto.
+            covers.putIfAbsent(candidate.getRecipeId(), preferredCoverUrl(candidate));
+        }
+        return covers;
+    }
+
+    private static String preferredCoverUrl(RecipeCoverProjection photo) {
+        return photo.getThumbnailUrl() != null && !photo.getThumbnailUrl().isBlank()
+                ? photo.getThumbnailUrl()
+                : photo.getUrl();
+    }
+
+    private static String preferredCoverUrl(RecipePhotoEntity photo) {
+        return photo.getThumbnailUrl() != null && !photo.getThumbnailUrl().isBlank()
+                ? photo.getThumbnailUrl()
+                : photo.getUrl();
     }
 }

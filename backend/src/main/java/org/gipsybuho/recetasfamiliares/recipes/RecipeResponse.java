@@ -16,6 +16,7 @@ public record RecipeResponse(
         long syncVersion,
         boolean deleted,
         String createdByUserId,
-        String createdByDisplayName
+        String createdByDisplayName,
+        String coverThumbnailUrl
 ) {
 }
