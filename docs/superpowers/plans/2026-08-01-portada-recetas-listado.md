@@ -31,14 +31,20 @@ set -a && . <(tr -d '\r' < herztner/recetas_app.env) && set +a
 
 ---
 
-### Task 1: Backend — `coverThumbnailUrl` en los endpoints REST de recetas
+### Task 1: Backend — `coverThumbnailUrl` en REST y en sync
+
+**Por qué es una sola tarea:** `RecipeResponse` se construye posicionalmente también en `SyncService`, así que añadir el componente número 15 rompe la compilación de sync en el acto. Separar REST de sync produciría un commit intermedio que no compila.
 
 **Files:**
 - Modify: `backend/src/main/java/org/gipsybuho/recetasfamiliares/recipes/RecipeResponse.java`
 - Create: `backend/src/main/java/org/gipsybuho/recetasfamiliares/photos/RecipeCoverProjection.java`
 - Modify: `backend/src/main/java/org/gipsybuho/recetasfamiliares/photos/RecipePhotoRepository.java`
 - Modify: `backend/src/main/java/org/gipsybuho/recetasfamiliares/recipes/RecipeService.java:56-67` (listRecipes) y `:224-241` (toResponse)
+- Modify: `backend/src/main/java/org/gipsybuho/recetasfamiliares/sync/SyncService.java:121-124` (pagedPull) y `:465` (toRecipeResponse)
 - Test: `backend/src/test/java/org/gipsybuho/recetasfamiliares/recipes/RecipeControllerTest.java`
+- Test: `backend/src/test/java/org/gipsybuho/recetasfamiliares/sync/SyncControllerTest.java`
+
+**Baseline verificado antes de empezar (2026-08-01):** `mvn -f backend/pom.xml test` → 209 tests, 0 fallos, 0 errores, `BUILD SUCCESS`. Cualquier test en rojo al terminar esta tarea lo has introducido tú.
 
 **Interfaces:**
 - Consumes: nada de tareas anteriores.
@@ -297,40 +303,9 @@ Sustituir `toResponse` (líneas 224-241) por estos cuatro métodos:
     }
 ```
 
-- [ ] **Step 7: Ejecutar los tests y verificar que pasan**
+**No ejecutes los tests todavía:** `SyncService` no compila hasta el Step 9. Sigue adelante.
 
-```bash
-mvn -f backend/pom.xml test -Dtest=RecipeControllerTest
-```
-
-Esperado: PASS. Si falla la compilación de `SyncService`, es lo esperado — lo arregla la Task 2. En ese caso, ejecutar antes la Task 2 y volver aquí.
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add backend/src/main/java/org/gipsybuho/recetasfamiliares/recipes/RecipeResponse.java \
-        backend/src/main/java/org/gipsybuho/recetasfamiliares/recipes/RecipeService.java \
-        backend/src/main/java/org/gipsybuho/recetasfamiliares/photos/RecipeCoverProjection.java \
-        backend/src/main/java/org/gipsybuho/recetasfamiliares/photos/RecipePhotoRepository.java \
-        backend/src/test/java/org/gipsybuho/recetasfamiliares/recipes/RecipeControllerTest.java
-git commit -m "feat(backend): expone la portada de receta en los endpoints de recetas"
-```
-
----
-
-### Task 2: Backend — portada también en `sync/pull` y `sync/push`
-
-**Files:**
-- Modify: `backend/src/main/java/org/gipsybuho/recetasfamiliares/sync/SyncService.java:121-124` (pagedPull), `:244` (push) y `:465` (toRecipeResponse)
-- Test: `backend/src/test/java/org/gipsybuho/recetasfamiliares/sync/SyncControllerTest.java`
-
-**Interfaces:**
-- Consumes: `RecipeResponse` con 15 componentes y `RecipePhotoRepository.findCoverCandidates(...)` de la Task 1.
-- Produces: nada nuevo hacia tareas posteriores.
-
-**Nota de diseño que debe quedar en el código:** el pull entrega recetas cuyo `updatedAt` cambió. Si solo cambia una *foto*, la fila de receta no cambia y su `coverThumbnailUrl` no se refresca hasta que la receta se toque. Es aceptable porque ningún cliente depende de esa vía: Android usa sus propias fotos y Desktop reconstruye su caché desde el listado REST.
-
-- [ ] **Step 1: Escribir el test que falla**
+- [ ] **Step 7: Escribir el test de sync que falla**
 
 Añadir a `SyncControllerTest`, adaptando los helpers de registro que ya use esa clase:
 
@@ -358,15 +333,9 @@ Añadir a `SyncControllerTest`, adaptando los helpers de registro que ya use esa
     }
 ```
 
-- [ ] **Step 2: Ejecutar el test y verificar que falla**
+- [ ] **Step 8: Batch de portadas en el pull**
 
-```bash
-mvn -f backend/pom.xml test -Dtest=SyncControllerTest
-```
-
-Esperado: FALLA con "No value at JSON path \"$.recipes[0].coverThumbnailUrl\"", o error de compilación si la Task 1 ya cambió el record.
-
-- [ ] **Step 3: Batch de portadas en el pull**
+**Nota de diseño que debe quedar como comentario en el código:** el pull entrega recetas cuyo `updatedAt` cambió. Si solo cambia una *foto*, la fila de receta no cambia y su `coverThumbnailUrl` no se refresca hasta que la receta se toque. Es aceptable porque ningún cliente depende de esa vía: Android usa sus propias fotos y Desktop reconstruye su caché desde el listado REST.
 
 En `SyncService.pagedPull`, sustituir las líneas 122-124 por:
 
@@ -388,7 +357,7 @@ En `SyncService.pagedPull`, sustituir las líneas 122-124 por:
 
 Añadir los imports que falten: `java.util.Map`, `java.util.LinkedHashMap`, `java.util.Collection`, `java.util.function.Function` y `org.gipsybuho.recetasfamiliares.photos.RecipeCoverProjection`.
 
-- [ ] **Step 4: Adaptar `toRecipeResponse` y el push**
+- [ ] **Step 9: Adaptar `toRecipeResponse` y el push**
 
 Sustituir `toRecipeResponse` (línea 465) por la pareja de métodos, más el helper de lotes:
 
@@ -440,33 +409,38 @@ Sustituir `toRecipeResponse` (línea 465) por la pareja de métodos, más el hel
 
 El bucle de push (línea 244) no cambia: sigue llamando a `toRecipeResponse(recipe)`, que ahora resuelve la portada con una consulta por receta. Es aceptable porque el push está acotado por el número de recetas que el cliente empuja, no por el catálogo entero.
 
-- [ ] **Step 5: Ejecutar la suite de sync y verificar que pasa**
+- [ ] **Step 10: Ejecutar los tests tocados y verificar que pasan**
 
 ```bash
-mvn -f backend/pom.xml test -Dtest='SyncControllerTest,SyncServiceTest'
+mvn -f backend/pom.xml test -Dtest='RecipeControllerTest,SyncControllerTest,SyncServiceTest,RecipeServiceTest'
 ```
 
-Esperado: PASS en ambas clases.
+Esperado: PASS en las cuatro clases.
 
-- [ ] **Step 6: Ejecutar la suite completa del backend**
+- [ ] **Step 11: Ejecutar la suite completa del backend**
 
 ```bash
 mvn -f backend/pom.xml test
 ```
 
-Esperado: `BUILD SUCCESS`. Cualquier clase que construya un `RecipeResponse` posicionalmente y no compile hay que arreglarla aquí.
+Esperado: `BUILD SUCCESS` con **209 tests o más**, 0 fallos y 0 errores. Cualquier otra clase que construya un `RecipeResponse` posicionalmente y no compile hay que arreglarla aquí.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
-git add backend/src/main/java/org/gipsybuho/recetasfamiliares/sync/SyncService.java \
+git add backend/src/main/java/org/gipsybuho/recetasfamiliares/recipes/RecipeResponse.java \
+        backend/src/main/java/org/gipsybuho/recetasfamiliares/recipes/RecipeService.java \
+        backend/src/main/java/org/gipsybuho/recetasfamiliares/sync/SyncService.java \
+        backend/src/main/java/org/gipsybuho/recetasfamiliares/photos/RecipeCoverProjection.java \
+        backend/src/main/java/org/gipsybuho/recetasfamiliares/photos/RecipePhotoRepository.java \
+        backend/src/test/java/org/gipsybuho/recetasfamiliares/recipes/RecipeControllerTest.java \
         backend/src/test/java/org/gipsybuho/recetasfamiliares/sync/SyncControllerTest.java
-git commit -m "feat(backend): la portada de receta viaja tambien por sync"
+git commit -m "feat(backend): expone la portada de receta en recetas y en sync"
 ```
 
 ---
 
-### Task 3: Android — portada en `RecipeCard`
+### Task 2: Android — portada en `RecipeCard`
 
 **Files:**
 - Modify: `android/app/src/main/java/org/gipsybuho/recetasfamiliares/data/local/Daos.kt:234-254` (RecipePhotoDao)
@@ -724,7 +698,7 @@ git commit -m "feat(android): muestra la portada de receta en las cards del list
 
 ---
 
-### Task 4: Desktop — cargador de imagen autenticado
+### Task 3: Desktop — cargador de imagen autenticado
 
 **Files:**
 - Create: `desktop/src/main/java/org/gipsybuho/recetasfamiliares/ui/AuthenticatedImageLoader.java`
@@ -739,7 +713,7 @@ git commit -m "feat(android): muestra la portada de receta en las cards del list
 
 **Por qué existe:** `/uploads/**` exige JWT y `javafx.scene.image.Image(url)` no admite cabeceras.
 
-Se separa la descarga (esta tarea, testeable sin JavaFX) del pintado (Task 5, no testeable aquí). `fetch` devuelve bytes precisamente para poder testearlo sin arrancar el toolkit de JavaFX.
+Se separa la descarga (esta tarea, testeable sin JavaFX) del pintado (Task 4, no testeable aquí). `fetch` devuelve bytes precisamente para poder testearlo sin arrancar el toolkit de JavaFX.
 
 - [ ] **Step 1: Escribir el test que falla**
 
@@ -953,7 +927,7 @@ git commit -m "feat(desktop): anade un cargador de imagenes con JWT y cache acot
 
 ---
 
-### Task 5: Desktop — miniatura 56×56 en `RecipeCell`
+### Task 4: Desktop — miniatura 56×56 en `RecipeCell`
 
 **Files:**
 - Modify: `desktop/src/main/java/org/gipsybuho/recetasfamiliares/api/dto/RecipeDtos.java:9-24`
@@ -962,10 +936,10 @@ git commit -m "feat(desktop): anade un cargador de imagenes con JWT y cache acot
 - Test: validación manual (ver Step 5)
 
 **Interfaces:**
-- Consumes: `AuthenticatedImageLoader.fetch(String)` de la Task 4, y el campo `coverThumbnailUrl` del JSON que produce la Task 1.
+- Consumes: `AuthenticatedImageLoader.fetch(String)` de la Task 3, y el campo `coverThumbnailUrl` del JSON que produce la Task 1.
 - Produces: `AppContext.getImageLoader()` → `AuthenticatedImageLoader`.
 
-**Limitación aceptada:** Desktop no tiene tests de UI automatizados (`COD-8` sigue parcial). Esta tarea se valida por compilación, por los tests de la Task 4 y por prueba manual con la GUI real.
+**Limitación aceptada:** Desktop no tiene tests de UI automatizados (`COD-8` sigue parcial). Esta tarea se valida por compilación, por los tests de la Task 3 y por prueba manual con la GUI real.
 
 - [ ] **Step 1: Añadir el campo al DTO**
 
@@ -1190,7 +1164,7 @@ git commit -m "feat(desktop): muestra la portada de receta en el listado"
 
 ---
 
-### Task 6: Cierre del sprint
+### Task 5: Cierre del sprint
 
 **Files:**
 - Modify: `CONTINUAR.md`
@@ -1241,5 +1215,5 @@ git commit -m "docs: cierra el sprint de portada de receta en los listados"
 
 ## Fuera de este plan
 
-- **Deuda de `UploadControllerTest`.** Aislada pasa entera (7/7, verificado el 2026-08-01), así que el fallo depende de la suite completa. Necesita su propio plan, guiado por `superpowers:systematic-debugging`, partiendo de la ejecución de `mvn -f backend/pom.xml test`.
+- **Deuda de `UploadControllerTest`: no existe.** Verificado el 2026-08-01 contra `recetas_familiares_test`: aislada pasa 7/7, y en la suite completa también — `mvn -f backend/pom.xml test` → **209 tests, 0 fallos, 0 errores, `BUILD SUCCESS`** en 9:29. Lo que hay que arreglar no es código sino `CONTINUAR.md`, que arrastra desde julio la afirmación de "5 tests en rojo". Se corrige en la Task 5.
 - **iOS**, otros listados (favoritos, menús, búsqueda global) y elegir manualmente qué foto es la portada.
