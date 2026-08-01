@@ -40,6 +40,10 @@ public interface RecipePhotoRepository extends JpaRepository<RecipePhotoEntity, 
      * Candidatas a portada de varias recetas en una sola consulta. El filtro por familia
      * no es redundante con el IN: impide que un id de receta ajena devuelva una URL de
      * otra familia. Va sobre ix_recipe_photos_recipe_active (recipe_id, deleted, position).
+     * El desempate final por p.id ASC es obligatorio: position no es unico (no hay
+     * constraint en el esquema) y sin un criterio total el orden entre fotos empatadas
+     * queda a merced del planner, que puede variar entre esta consulta batch y cualquier
+     * otra forma de leer las mismas filas.
      */
     @Query("""
             SELECT p.recipe.id AS recipeId,
@@ -49,7 +53,7 @@ public interface RecipePhotoRepository extends JpaRepository<RecipePhotoEntity, 
             WHERE p.recipe.family.id = :familyId
               AND p.recipe.id IN :recipeIds
               AND p.deleted = false
-            ORDER BY p.recipe.id ASC, p.position ASC
+            ORDER BY p.recipe.id ASC, p.position ASC, p.id ASC
             """)
     List<RecipeCoverProjection> findCoverCandidates(
             @Param("familyId") String familyId,

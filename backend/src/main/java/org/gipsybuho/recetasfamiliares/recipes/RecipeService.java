@@ -255,12 +255,13 @@ public class RecipeService {
         );
     }
 
-    /** Portada de una sola receta. Para listas usar coverUrlsByRecipeId: esto seria N+1. */
+    /**
+     * Portada de una sola receta. Pasa por coverUrlsByRecipeId con un lote de un elemento
+     * para que exista una unica resolucion de portada (mismo desempate, misma consulta):
+     * listado y detalle no pueden discrepar porque ya no son dos caminos distintos.
+     */
     private String coverUrlOf(RecipeEntity recipe) {
-        return photoRepository.findByRecipe_IdAndDeletedFalseOrderByPositionAsc(recipe.getId()).stream()
-                .findFirst()
-                .map(RecipeService::preferredCoverUrl)
-                .orElse(null);
+        return coverUrlsByRecipeId(recipe.getFamilyId(), List.of(recipe.getId())).get(recipe.getId());
     }
 
     private Map<String, String> coverUrlsByRecipeId(String familyId, Collection<String> recipeIds) {
@@ -269,20 +270,15 @@ public class RecipeService {
         }
         Map<String, String> covers = new LinkedHashMap<>();
         for (RecipeCoverProjection candidate : photoRepository.findCoverCandidates(familyId, recipeIds)) {
-            // La consulta llega ordenada por position ascendente, asi que la primera fila
-            // de cada receta es su portada. putIfAbsent conserva esa y descarta el resto.
+            // La consulta llega ordenada por position y luego por id ascendente, asi que la
+            // primera fila de cada receta es su portada de forma determinista. putIfAbsent
+            // conserva esa y descarta el resto.
             covers.putIfAbsent(candidate.getRecipeId(), preferredCoverUrl(candidate));
         }
         return covers;
     }
 
     private static String preferredCoverUrl(RecipeCoverProjection photo) {
-        return photo.getThumbnailUrl() != null && !photo.getThumbnailUrl().isBlank()
-                ? photo.getThumbnailUrl()
-                : photo.getUrl();
-    }
-
-    private static String preferredCoverUrl(RecipePhotoEntity photo) {
         return photo.getThumbnailUrl() != null && !photo.getThumbnailUrl().isBlank()
                 ? photo.getThumbnailUrl()
                 : photo.getUrl();

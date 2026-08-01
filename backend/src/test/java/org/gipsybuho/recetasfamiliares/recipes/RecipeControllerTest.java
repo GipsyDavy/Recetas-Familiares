@@ -56,6 +56,9 @@ class RecipeControllerTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private org.gipsybuho.recetasfamiliares.photos.RecipePhotoRepository photoRepository;
+
     @Test
     void createsAndListsRecipesForAuthenticatedFamilyMember() throws Exception {
         RegisteredUser user = register(uniqueEmail("recipes-owner"), "Familia Recetas");
@@ -564,7 +567,11 @@ class RecipeControllerTest {
     }
 
     @Test
-    void coverIsNotLeakedAcrossFamilies() throws Exception {
+    void outsiderCannotListAnotherFamilysRecipesRegardlessOfCover() throws Exception {
+        // Nombre corregido: esto solo prueba que el listado por familia ya excluye recetas
+        // ajenas (comportamiento preexistente de findByFamily_IdAndDeletedFalse), no que
+        // findCoverCandidates filtre por familia. Esa prueba de seguridad real esta en
+        // recipeCoverQueryDoesNotLeakAcrossFamilies, que llama al repositorio directamente.
         RegisteredUser owner = register(uniqueEmail("cover-owner"), "Familia Duena");
         RegisteredUser outsider = register(uniqueEmail("cover-outsider"), "Familia Ajena");
 
@@ -576,6 +583,49 @@ class RecipeControllerTest {
                         .header("Authorization", "Bearer " + outsider.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
+    void recipeCoverQueryDoesNotLeakAcrossFamilies() throws Exception {
+        // Prueba de seguridad real: llama a findCoverCandidates directamente con el
+        // familyId del extraño y el recipeId del dueno. Si alguien quitara el filtro
+        // "AND p.recipe.family.id = :familyId" de la consulta, este test se pone en rojo
+        // (a diferencia del test de listado de arriba, que seguiria en verde).
+        RegisteredUser owner = register(uniqueEmail("cover-query-owner"), "Familia Consulta Duena");
+        RegisteredUser outsider = register(uniqueEmail("cover-query-outsider"), "Familia Consulta Ajena");
+
+        MvcResult created = createRecipe(owner, "Receta con portada ajena").andReturn();
+        String recipeId = read(created, "id");
+        addPhotoMetadata(owner, recipeId, 1, "https://cdn.test/ajena.jpg", "https://cdn.test/ajena-thumb.jpg");
+
+        List<org.gipsybuho.recetasfamiliares.photos.RecipeCoverProjection> candidates =
+                photoRepository.findCoverCandidates(outsider.familyId(), List.of(recipeId));
+
+        org.assertj.core.api.Assertions.assertThat(candidates).isEmpty();
+    }
+
+    @Test
+    void coverIsDeterministicWhenPhotosSharePosition() throws Exception {
+        // Sin desempate por id, listado y detalle resuelven la portada con consultas SQL
+        // distintas y podrian discrepar cuando dos fotos activas comparten position.
+        RegisteredUser user = register(uniqueEmail("recipes-cover-tie"), "Familia Empate");
+        MvcResult created = createRecipe(user, "Receta con empate de posicion").andReturn();
+        String recipeId = read(created, "id");
+
+        addPhotoMetadata(user, recipeId, 1, "https://cdn.test/empate-a.jpg", "https://cdn.test/empate-a-thumb.jpg");
+        addPhotoMetadata(user, recipeId, 1, "https://cdn.test/empate-b.jpg", "https://cdn.test/empate-b-thumb.jpg");
+
+        MvcResult detail = mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}",
+                        user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        String detailCover = read(detail, "coverThumbnailUrl");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].coverThumbnailUrl").value(detailCover));
     }
 
     private void addPhotoMetadata(
