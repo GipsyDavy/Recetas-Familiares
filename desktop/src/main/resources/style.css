@@ -301,6 +301,15 @@
     -fx-text-fill: recetas-text-primary;
 }
 
+/* Hueco de la miniatura de portada: se ve tambien en recetas sin foto. Usa las
+   variables de la paleta, asi que sigue el tema claro/oscuro sin colores nuevos. */
+.recipe-cell-thumb-placeholder {
+    -fx-background-color: recetas-surface-var;
+    -fx-border-color: recetas-surface-border;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
 .recipe-cell-meta {
     -fx-font-size: 12px;
     -fx-text-fill: recetas-text-second;
