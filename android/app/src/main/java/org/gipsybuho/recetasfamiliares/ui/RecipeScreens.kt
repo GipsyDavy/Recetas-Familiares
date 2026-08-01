@@ -129,6 +129,7 @@ internal fun RecipeList(
 ) {
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val recipeHasMore by viewModel.recipeHasMore.collectAsState()
+    val recipeCovers by viewModel.recipeCovers.collectAsState()
     var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     var editingRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     var editingIngredients by remember { mutableStateOf<List<RecipeIngredientEntity>>(emptyList()) }
@@ -279,6 +280,7 @@ internal fun RecipeList(
                                                     val boundsState = this@SharedTransitionLayout.rememberSharedContentState("recipe_bounds_${recipe.id}")
                                                     RecipeCard(
                                                         recipe,
+                                                        coverUrl = recipeCovers[recipe.id],
                                                         modifier = Modifier.animateItem().let { m ->
                                                             with(this@SharedTransitionLayout) { m.sharedBounds(boundsState, this@AnimatedContent) }
                                                         }
@@ -336,7 +338,12 @@ internal fun RecipeList(
 }
 
 @Composable
-private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun RecipeCard(
+    recipe: RecipeEntity,
+    coverUrl: String?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -355,6 +362,16 @@ private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onCl
                 modifier = Modifier.size(56.dp).align(Alignment.Center),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.30f)
             )
+            Crossfade(targetState = coverUrl, label = "recipeCardCover") { url ->
+                if (url != null) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
