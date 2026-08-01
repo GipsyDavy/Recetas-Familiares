@@ -5123,12 +5123,35 @@ el cambio de familia ni el logout dejan fotos ajenas en memoria.
 en la suite completa de hoy `UploadControllerTest` dio **7 tests, 0 fallos** (surefire, 23:01).
 La entrada del backlog queda corregida.
 
-### Riesgo residual
+### Validación manual de la GUI Desktop — HECHA (2026-08-01 noche)
 
-- **Sin validación manual de la GUI Desktop.** Falta comprobar con la aplicación real: miniatura
-  presente, placeholder en recetas sin foto, **ninguna fila con la foto de otra receta al hacer
-  scroll rápido**, ventana que no se congela y ausencia de miniaturas al cambiar de familia. El
-  reciclado de `ListCell` está resuelto en código (`pendingUrl`) pero no verificado a ojo.
+Ejecutada contra un backend **local** apuntando a `recetas_familiares_test` (nunca producción),
+con datos sembrados por API: 24 recetas cuya portada es una imagen de color distinto con **su
+número en grande**, una de cada seis deliberadamente sin foto, más las 5 de inicio. Así una foto
+en la fila equivocada se ve al instante.
+
+| Punto | Resultado |
+|---|---|
+| Miniatura en recetas con foto | OK — cada número coincide con su fila |
+| Placeholder en recetas sin foto | OK — hueco con el color de la paleta, no vacío |
+| Scroll rápido sin fotos cruzadas | OK — más de 50 capturas, ninguna fila con foto ajena |
+| Ventana responde durante la carga | OK — skeleton de carga y luego contenido, sin congelarse |
+| Cambio de familia | OK — la familia B solo muestra sus fotos (B1–B6) |
+
+El caso exigente se probó con **caché de imágenes fría** (reiniciando la app, que es lo que la
+vacía) y haciendo scroll de inmediato, con las descargas en vuelo: las celdas recicladas muestran
+placeholder hasta que llega **su** imagen, que es exactamente lo que debe hacer la guardia de
+`pendingUrl`. Se capturó incluso el fotograma con el `FadeTransition` a medias.
+
+Método reutilizable: se pilota la GUI desde PowerShell con `user32.dll` (`SetCursorPos`,
+`mouse_event`, `MoveWindow`) y se capturan ventanas con `CopyFromScreen`. Dos trampas: el popup de
+un `ComboBox` de JavaFX es una ventana propia y hay que capturar la pantalla entera para verlo, y
+con la ventana estrecha el sidebar colapsa y desaparece la entrada "Recetas".
+
+Datos de prueba eliminados al terminar (cuenta borrada por API, `uploads-manual/` borrado) y la
+URL de producción restaurada en las preferencias de la app.
+
+### Riesgo residual
 - **Desktop no tiene tests de UI automatizados** (`COD-8` sigue parcial): `RecipeCell` se valida
   por compilación y por los tests de `ImageCache`.
 - **Android no tiene tests de UI Compose ni Robolectric**: `RecipeCard` se validó por compilación;
