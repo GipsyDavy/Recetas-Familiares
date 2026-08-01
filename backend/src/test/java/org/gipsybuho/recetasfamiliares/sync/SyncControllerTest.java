@@ -826,6 +826,28 @@ class SyncControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void pullExposesRecipeCoverThumbnail() throws Exception {
+        RegisteredUser user = register(uniqueEmail("sync-cover"), "Familia Sync Portada");
+        MvcResult created = createRecipe(user, "Receta sincronizada").andReturn();
+        String recipeId = read(created, "id");
+
+        mockMvc.perform(post("/api/v1/families/{familyId}/recipes/{recipeId}/photos",
+                        user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"position": 1, "url": "https://cdn.test/sync.jpg",
+                                 "thumbnailUrl": "https://cdn.test/sync-thumb.jpg"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/sync/pull", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipes[0].coverThumbnailUrl").value("https://cdn.test/sync-thumb.jpg"));
+    }
+
     private RegisteredUser register(String email, String familyName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

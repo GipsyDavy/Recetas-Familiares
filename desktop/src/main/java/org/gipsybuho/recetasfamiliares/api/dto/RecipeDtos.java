@@ -20,7 +20,10 @@ public final class RecipeDtos {
             long syncVersion,
             boolean deleted,
             String createdByUserId,
-            String createdByDisplayName
+            String createdByDisplayName,
+            // Portada calculada por el backend. Gson deja null si el servidor es
+            // anterior a este campo, asi que un backend viejo no rompe el cliente.
+            String coverThumbnailUrl
     ) {}
 
     public record RecipeIngredientDto(

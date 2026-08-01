@@ -56,6 +56,9 @@ class RecipeControllerTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private org.gipsybuho.recetasfamiliares.photos.RecipePhotoRepository photoRepository;
+
     @Test
     void createsAndListsRecipesForAuthenticatedFamilyMember() throws Exception {
         RegisteredUser user = register(uniqueEmail("recipes-owner"), "Familia Recetas");
@@ -518,6 +521,129 @@ class RecipeControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("validation_error"));
+    }
+
+    @Test
+    void listAndDetailExposeCoverFromLowestPositionPhoto() throws Exception {
+        RegisteredUser user = register(uniqueEmail("recipes-cover"), "Familia Portada");
+        MvcResult created = createRecipe(user, "Receta con portada").andReturn();
+        String recipeId = read(created, "id");
+
+        // Se crean en orden inverso a proposito: la portada es la de position menor,
+        // no la primera insertada.
+        addPhotoMetadata(user, recipeId, 2, "https://cdn.test/segunda.jpg", "https://cdn.test/segunda-thumb.jpg");
+        addPhotoMetadata(user, recipeId, 1, "https://cdn.test/primera.jpg", "https://cdn.test/primera-thumb.jpg");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].coverThumbnailUrl").value("https://cdn.test/primera-thumb.jpg"));
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverThumbnailUrl").value("https://cdn.test/primera-thumb.jpg"));
+    }
+
+    @Test
+    void coverFallsBackToFullUrlAndIsNullWithoutPhotos() throws Exception {
+        RegisteredUser user = register(uniqueEmail("recipes-cover-fallback"), "Familia Fallback");
+
+        MvcResult withoutPhotos = createRecipe(user, "Receta sin fotos").andReturn();
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}",
+                        user.familyId(), read(withoutPhotos, "id"))
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverThumbnailUrl").doesNotExist());
+
+        MvcResult withoutThumb = createRecipe(user, "Receta sin thumbnail").andReturn();
+        String recipeId = read(withoutThumb, "id");
+        addPhotoMetadata(user, recipeId, 1, "https://cdn.test/solo-original.jpg", null);
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}", user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverThumbnailUrl").value("https://cdn.test/solo-original.jpg"));
+    }
+
+    @Test
+    void outsiderCannotListAnotherFamilysRecipesRegardlessOfCover() throws Exception {
+        // Nombre corregido: esto solo prueba que el listado por familia ya excluye recetas
+        // ajenas (comportamiento preexistente de findByFamily_IdAndDeletedFalse), no que
+        // findCoverCandidates filtre por familia. Esa prueba de seguridad real esta en
+        // recipeCoverQueryDoesNotLeakAcrossFamilies, que llama al repositorio directamente.
+        RegisteredUser owner = register(uniqueEmail("cover-owner"), "Familia Duena");
+        RegisteredUser outsider = register(uniqueEmail("cover-outsider"), "Familia Ajena");
+
+        MvcResult created = createRecipe(owner, "Receta privada").andReturn();
+        String recipeId = read(created, "id");
+        addPhotoMetadata(owner, recipeId, 1, "https://cdn.test/privada.jpg", "https://cdn.test/privada-thumb.jpg");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes", outsider.familyId())
+                        .header("Authorization", "Bearer " + outsider.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
+    void recipeCoverQueryDoesNotLeakAcrossFamilies() throws Exception {
+        // Prueba de seguridad real: llama a findCoverCandidates directamente con el
+        // familyId del extraño y el recipeId del dueno. Si alguien quitara el filtro
+        // "AND p.recipe.family.id = :familyId" de la consulta, este test se pone en rojo
+        // (a diferencia del test de listado de arriba, que seguiria en verde).
+        RegisteredUser owner = register(uniqueEmail("cover-query-owner"), "Familia Consulta Duena");
+        RegisteredUser outsider = register(uniqueEmail("cover-query-outsider"), "Familia Consulta Ajena");
+
+        MvcResult created = createRecipe(owner, "Receta con portada ajena").andReturn();
+        String recipeId = read(created, "id");
+        addPhotoMetadata(owner, recipeId, 1, "https://cdn.test/ajena.jpg", "https://cdn.test/ajena-thumb.jpg");
+
+        List<org.gipsybuho.recetasfamiliares.photos.RecipeCoverProjection> candidates =
+                photoRepository.findCoverCandidates(outsider.familyId(), List.of(recipeId));
+
+        org.assertj.core.api.Assertions.assertThat(candidates).isEmpty();
+    }
+
+    @Test
+    void coverIsDeterministicWhenPhotosSharePosition() throws Exception {
+        // Sin desempate por id, listado y detalle resuelven la portada con consultas SQL
+        // distintas y podrian discrepar cuando dos fotos activas comparten position.
+        RegisteredUser user = register(uniqueEmail("recipes-cover-tie"), "Familia Empate");
+        MvcResult created = createRecipe(user, "Receta con empate de posicion").andReturn();
+        String recipeId = read(created, "id");
+
+        addPhotoMetadata(user, recipeId, 1, "https://cdn.test/empate-a.jpg", "https://cdn.test/empate-a-thumb.jpg");
+        addPhotoMetadata(user, recipeId, 1, "https://cdn.test/empate-b.jpg", "https://cdn.test/empate-b-thumb.jpg");
+
+        MvcResult detail = mockMvc.perform(get("/api/v1/families/{familyId}/recipes/{recipeId}",
+                        user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        String detailCover = read(detail, "coverThumbnailUrl");
+
+        mockMvc.perform(get("/api/v1/families/{familyId}/recipes", user.familyId())
+                        .header("Authorization", "Bearer " + user.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].coverThumbnailUrl").value(detailCover));
+    }
+
+    private void addPhotoMetadata(
+            RegisteredUser user,
+            String recipeId,
+            int position,
+            String url,
+            String thumbnailUrl
+    ) throws Exception {
+        String thumbnailJson = thumbnailUrl == null ? "null" : "\"" + thumbnailUrl + "\"";
+        mockMvc.perform(post("/api/v1/families/{familyId}/recipes/{recipeId}/photos",
+                        user.familyId(), recipeId)
+                        .header("Authorization", "Bearer " + user.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"position": %d, "url": "%s", "thumbnailUrl": %s}
+                                """.formatted(position, url, thumbnailJson)))
+                .andExpect(status().isCreated());
     }
 
     private RegisteredUser register(String email, String familyName) throws Exception {

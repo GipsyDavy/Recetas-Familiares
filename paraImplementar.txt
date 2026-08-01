@@ -4,7 +4,7 @@
 4. opción cambiar de familia / pertenecer a varias — COMPLETADO (Android: switchActiveFamily; Desktop: FamilyMembersView + FamilyRepository + AppContext, confirmado 2026-07-24)
 5. opción crear familia (owner/admin) desde Desktop — COMPLETADO (createFamily en MainWindow.java/FamilyMembersView.java/AppContext.java, confirmado 2026-07-24)
 6. recuperar contraseña olvidada + validar email en Desktop — COMPLETADO (PasswordResetDialog.java + LoginView.java + emailVerified en ProfileView.java/UserDtos.java, confirmado 2026-07-24)
-7. añadir imagen a la receta — COMPLETADO (RecipePhoto* en backend: entity/repository/service/controller/response/DTOs, confirmado 2026-07-24)
+7. añadir imagen a la receta — COMPLETADO (RecipePhoto* en backend: entity/repository/service/controller/response/DTOs, confirmado 2026-07-24). Portada en las cards de listado: COMPLETADO 2026-08-01 en Android (Room, sin subir esquema) y Desktop (campo coverThumbnailUrl + cache de imagenes). iOS fuera de alcance mientras siga bloqueado.
 8. buscar recetas en internet (boton que busca coincidencias online y las importa) — NO IMPLEMENTADO (sin evidencia en backend, confirmado 2026-07-24)
 9. sistema de calificación por estrellas 1-5 — COMPLETADO (RecipeRating* en backend: entity/repository/service/controller/response, confirmado 2026-07-24)
 10. constancia de que usuario crea la receta — COMPLETADO (authorUserId en RecipeResponse.java, confirmado 2026-07-24; pendiente verificar si se muestra visualmente en cliente, no solo en el DTO)

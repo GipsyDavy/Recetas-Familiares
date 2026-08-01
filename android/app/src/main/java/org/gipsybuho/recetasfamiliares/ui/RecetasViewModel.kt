@@ -81,6 +81,14 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     val recipes: StateFlow<List<RecipeEntity>> = container.recipeRepository.recipes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val recipeCovers: StateFlow<Map<String, String>> = container.sessionStore.familyIdFlow
+        .flatMapLatest { familyId ->
+            if (familyId == null) flowOf(emptyList())
+            else container.database.recipePhotoDao().observeCovers(familyId)
+        }
+        .map { photos -> coversByRecipeId(photos) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     val stockItems: StateFlow<List<StockItemEntity>> = container.stockRepository.stockItems
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

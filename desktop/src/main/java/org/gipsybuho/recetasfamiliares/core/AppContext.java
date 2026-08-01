@@ -21,6 +21,7 @@ public final class AppContext {
 
     private final AppSession session;
     private final ApiClient apiClient;
+    private final ImageCache imageCache;
     private final AuthRepository authRepository;
     private final RecipeRepository recipeRepository;
     private final StockRepository stockRepository;
@@ -37,6 +38,7 @@ public final class AppContext {
     private AppContext() {
         session = new AppSession();
         apiClient = new ApiClient(session);
+        imageCache = new ImageCache(apiClient, 200, 32L * 1024 * 1024);
         authRepository = new AuthRepository(apiClient, session);
         userRepository = new UserRepository(apiClient, session);
         familyRepository = new FamilyRepository(apiClient, session);
@@ -59,6 +61,7 @@ public final class AppContext {
 
     public AppSession getSession() { return session; }
     public ApiClient getApiClient() { return apiClient; }
+    public ImageCache getImageCache() { return imageCache; }
     public AuthRepository getAuthRepository() { return authRepository; }
     public RecipeRepository getRecipeRepository() { return recipeRepository; }
     public StockRepository getStockRepository() { return stockRepository; }
@@ -85,6 +88,7 @@ public final class AppContext {
         favoriteRepository.clearCache();
         noteRepository.clearCache();
         chatRepository.resetPrivateChatState();
+        imageCache.clearCache();
     }
 
     public void shutdown() {

@@ -76,7 +76,7 @@ class UpdateFromSyncTest {
     private static RecipeDtos.RecipeDto recipe(String id, boolean deleted) {
         return new RecipeDtos.RecipeDto(id, "fam-1", "t", null, null, null, null, null,
                 "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 1L, deleted,
-                "user-1", "Ana");
+                "user-1", "Ana", null);
     }
 
     private static RecipeDtos.RecipeIngredientDto ingredient(String id, String recipeId, boolean deleted) {

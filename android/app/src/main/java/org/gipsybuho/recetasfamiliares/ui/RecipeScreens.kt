@@ -90,6 +90,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -129,6 +130,7 @@ internal fun RecipeList(
 ) {
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val recipeHasMore by viewModel.recipeHasMore.collectAsState()
+    val recipeCovers by viewModel.recipeCovers.collectAsState()
     var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     var editingRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     var editingIngredients by remember { mutableStateOf<List<RecipeIngredientEntity>>(emptyList()) }
@@ -277,8 +279,12 @@ internal fun RecipeList(
                                             LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                                                 items(filtered, key = { it.id }) { recipe ->
                                                     val boundsState = this@SharedTransitionLayout.rememberSharedContentState("recipe_bounds_${recipe.id}")
+                                                    // derivedStateOf por item: un cambio de portada de UNA receta no debe
+                                                    // recomponer el resto de cards visibles (CLAUDE.md #11, recomposiciones costosas).
+                                                    val coverUrl by remember(recipe.id) { derivedStateOf { recipeCovers[recipe.id] } }
                                                     RecipeCard(
                                                         recipe,
+                                                        coverUrl = coverUrl,
                                                         modifier = Modifier.animateItem().let { m ->
                                                             with(this@SharedTransitionLayout) { m.sharedBounds(boundsState, this@AnimatedContent) }
                                                         }
@@ -336,7 +342,12 @@ internal fun RecipeList(
 }
 
 @Composable
-private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun RecipeCard(
+    recipe: RecipeEntity,
+    coverUrl: String?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -355,6 +366,16 @@ private fun RecipeCard(recipe: RecipeEntity, modifier: Modifier = Modifier, onCl
                 modifier = Modifier.size(56.dp).align(Alignment.Center),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.30f)
             )
+            Crossfade(targetState = coverUrl, label = "recipeCardCover") { url ->
+                if (url != null) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(

@@ -78,7 +78,13 @@ class RecipeServiceTest {
         )).thenReturn(true);
         when(familyRepository.findById("family-1")).thenReturn(Optional.of(family));
         when(userRepository.findById("user-1")).thenReturn(Optional.of(creator));
-        when(recipeRepository.save(any(RecipeEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // El mock no dispara @PrePersist: hay que simular la asignacion de id que Postgres
+        // hace en un save() real, igual que copyRecipeCopiesContentIntoTargetFamily.
+        when(recipeRepository.save(any(RecipeEntity.class))).thenAnswer(invocation -> {
+            RecipeEntity saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", "recipe-1");
+            return saved;
+        });
 
         RecipeResponse response = service.createRecipe(
                 "family-1",

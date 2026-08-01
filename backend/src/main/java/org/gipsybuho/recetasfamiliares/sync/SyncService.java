@@ -2,8 +2,11 @@ package org.gipsybuho.recetasfamiliares.sync;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -21,6 +24,7 @@ import org.gipsybuho.recetasfamiliares.menus.MenuItemResponse;
 import org.gipsybuho.recetasfamiliares.notes.FamilyNoteEntity;
 import org.gipsybuho.recetasfamiliares.notes.FamilyNoteRepository;
 import org.gipsybuho.recetasfamiliares.notes.FamilyNoteResponse;
+import org.gipsybuho.recetasfamiliares.photos.RecipeCoverProjection;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoEntity;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoRepository;
 import org.gipsybuho.recetasfamiliares.photos.RecipePhotoResponse;
@@ -119,9 +123,23 @@ public class SyncService {
     }
 
     private SyncPullResponse pagedPull(String familyId, Instant since, int limit, Instant serverTime) {
-        Slice<RecipeResponse> recipes = fetchSlice(
+        // Nota de diseno: el pull entrega recetas cuyo updatedAt cambio. Si solo cambia una
+        // foto, la fila de receta no cambia y su coverThumbnailUrl no se refresca hasta que
+        // la receta se toque. Es aceptable: ningun cliente depende de esa via, Android usa
+        // sus propias fotos y Desktop reconstruye su cache desde el listado REST.
+        Slice<RecipeEntity> recipeEntities = fetchSlice(
                 p -> recipeRepository.findByFamily_IdAndUpdatedAtAfter(familyId, since, p),
-                RecipeEntity::getUpdatedAt, this::toRecipeResponse, limit);
+                RecipeEntity::getUpdatedAt, Function.identity(), limit);
+        Map<String, String> recipeCovers = coverUrlsByRecipeId(
+                familyId,
+                recipeEntities.items().stream().map(RecipeEntity::getId).toList()
+        );
+        Slice<RecipeResponse> recipes = new Slice<>(
+                recipeEntities.items().stream()
+                        .map(recipe -> toRecipeResponse(recipe, recipeCovers.get(recipe.getId())))
+                        .toList(),
+                recipeEntities.nextSince()
+        );
         Slice<RecipeIngredientResponse> ingredients = fetchSlice(
                 p -> ingredientRepository.findByRecipe_Family_IdAndUpdatedAtAfter(familyId, since, p),
                 RecipeIngredientEntity::getUpdatedAt, this::toIngredientResponse, limit);
@@ -462,7 +480,16 @@ public class SyncService {
         }
     }
 
+    /**
+     * Pasa por coverUrlsByRecipeId con un lote de un elemento para que exista una unica
+     * resolucion de portada (misma consulta, mismo desempate) en todo el servicio.
+     */
     private RecipeResponse toRecipeResponse(RecipeEntity recipe) {
+        String cover = coverUrlsByRecipeId(recipe.getFamilyId(), List.of(recipe.getId())).get(recipe.getId());
+        return toRecipeResponse(recipe, cover);
+    }
+
+    private RecipeResponse toRecipeResponse(RecipeEntity recipe, String coverThumbnailUrl) {
         return new RecipeResponse(
                 recipe.getId(),
                 recipe.getFamilyId(),
@@ -477,8 +504,29 @@ public class SyncService {
                 recipe.getSyncVersion(),
                 recipe.isDeleted(),
                 recipe.getCreatedByUserId(),
-                recipe.getCreatedByDisplayName()
+                recipe.getCreatedByDisplayName(),
+                coverThumbnailUrl
         );
+    }
+
+    private Map<String, String> coverUrlsByRecipeId(String familyId, Collection<String> recipeIds) {
+        if (recipeIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> covers = new LinkedHashMap<>();
+        for (RecipeCoverProjection candidate : photoRepository.findCoverCandidates(familyId, recipeIds)) {
+            // La consulta llega ordenada por position y luego por id ascendente, asi que la
+            // primera fila de cada receta es su portada de forma determinista. putIfAbsent
+            // conserva esa y descarta el resto.
+            covers.putIfAbsent(candidate.getRecipeId(), preferredCoverUrl(candidate));
+        }
+        return covers;
+    }
+
+    private static String preferredCoverUrl(RecipeCoverProjection photo) {
+        return photo.getThumbnailUrl() != null && !photo.getThumbnailUrl().isBlank()
+                ? photo.getThumbnailUrl()
+                : photo.getUrl();
     }
 
     private RecipeIngredientResponse toIngredientResponse(RecipeIngredientEntity ingredient) {
