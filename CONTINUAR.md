@@ -4798,3 +4798,143 @@ Higiene de secretos durante el sprint: en ningun momento se imprimieron `Private
 - La copia offsite sigue dependiendo de una unica Storage Box en la misma cuenta que el VPS.
 - La passphrase de restic sigue con una unica copia fuera del VPS.
 - Sin revision de Gemini en este sprint.
+
+---
+
+### Sprint `archive_command` correcto ante rearchivado — CERRADO 2026-08-01 (Claude Code)
+
+Cierra el defecto latente anotado horas antes en el sprint del PITR. Nacio de un hallazgo de Codex
+que yo habia rebajado dos veces.
+
+**Agente lider:** Claude Code (Opus 5).
+**Skills de proceso:** `superpowers:writing-plans` (plan en
+`docs/superpowers/plans/2026-08-01-archive-command-rearchivado.md`) y
+`superpowers:executing-plans`. Sin subagentes.
+**Gemini:** no disponible (sin cuota) tambien en este sprint.
+
+#### Como empezo: una afirmacion que yo habia rechazado
+
+En el sprint anterior, Codex señalo que el `archive_command`
+(`test ! -f DEST && cp %p DEST && sync DEST`) incumplia el contrato de PostgreSQL ante un
+rearchivado. Lo deje fuera de alcance alegando, entre otras cosas, que "el matiz no estaba
+verificado" y que el patron era el ejemplo canonico de la documentacion.
+
+**Primer paso de este sprint: verificarlo.** PostgreSQL 18 §25.3.1, textual:
+
+> "When an archive command or library encounters a pre-existing file, it should return a zero
+> status [...] if the WAL file has identical contents to the pre-existing archive and the
+> pre-existing archive is fully persisted to storage. If a pre-existing file contains different
+> contents [...] the archive command or library _must_ return a nonzero status."
+
+Y el escenario, tambien textual: "if the system crashes before the server makes a durable record of
+archival success, the server will attempt to archive the file again after restarting".
+
+Codex tenia razon. Y el detalle que hacia enganoso mi razonamiento: el ejemplo canonico de la
+propia documentacion (`test ! -f ... && cp ...`) **es** el que teniamos, y es incompleto respecto a
+lo que el mismo apartado exige unas lineas mas abajo.
+
+#### El segundo defecto, que nadie habia previsto
+
+El preflight revelo que **este servidor no tiene GNU coreutils**. Ubuntu 26.04 usa
+`rust-coreutils 0.8.0` (uutils); el paquete `coreutils` es solo un meta-paquete. Comprobado con
+`strace`, su `sync FICHERO` **no hace `fsync(2)`**:
+
+```
+openat(AT_FDCWD, ".../f", O_RDONLY|O_NONBLOCK) = 3
+sync()                                          = 0
+```
+
+Llama a `sync()` global. Y devolvio **exit 0** sincronizando un fichero que el usuario `postgres` ni
+siquiera podia abrir, asi que su codigo de salida no sirve para afirmar durabilidad.
+
+Consecuencia: el `sync` que se añadio al comando el 2026-07-31 **no hacia lo que su propio
+comentario afirmaba**. El runbook decia que evitaba que `cp` devolviera exito con datos en cache de
+pagina; en realidad disparaba un sync global de codigo de salida no fiable.
+
+Tanto mi plan como la revision de Codex se apoyaban en documentacion de **GNU** para justificar el
+diseño de durabilidad. Regla que deja el hallazgo: **en este servidor no dar por hecho el
+comportamiento de GNU coreutils.** `cp` y `cmp` siguen siendo GNU; `sync`, `ln`, `cat`, `mktemp` y
+`stat` son uutils.
+
+#### La solucion
+
+Script en **Python 3** (`infra/postgres/recetas-postgres-archive-wal`, desplegado en
+`/usr/local/sbin/`, `0755 root:root`). Python expone `os.fsync(2)` real sobre fichero y sobre
+directorio y propaga los errores.
+
+- Un unico camino de salida exitosa: `fsync` del fichero **y** del directorio (el `fsync` de un
+  fichero no persiste la entrada de su directorio), sin fallbacks que enmascaren errores.
+- Publicacion con `os.link()`: falla con `FileExistsError` ante un destino existente de cualquier
+  tipo. `rename()` sobrescribiria en silencio. Y se comprobo en este VPS que `ln` de shell **sin
+  `-T`** sobre un destino que sea un directorio devuelve **exit 0** publicando dentro — el
+  bloqueante que Codex señalo, confirmado empiricamente.
+- Symlink en el destino rechazado explicitamente.
+- `ARCHIVE_DIR` constante, no leida del entorno: una variable heredada por PostgreSQL podria
+  redirigir el archivo en silencio.
+- Codigos de salida por causa: 0 ok, 1 uso, 2 conflicto, 3 copia, 4 durabilidad, 5 entorno.
+- Registro en syslog (`journalctl -t recetas-archive-wal`) en cada exito y cada error.
+
+#### Revision de Codex sobre el plan
+
+Una ronda, solo lectura, antes de tocar nada: **6 bloqueantes, 5 importantes, 2 menores.
+Incorporados todos, ninguno rechazado.** Los de mayor impacto:
+
+1. `ln` sin `-T` puede devolver 0 sin publicar el segmento si el destino es un directorio.
+2. **Toda la verificacion de la v1 pasaba igual con el comando antiguo**: archivar un destino nuevo
+   es algo que el comando viejo tambien hace, y el "rearchivado" se probaba invocando el script a
+   mano, no via archiver. No distinguia activado de no activado.
+3. La bateria de pruebas imprimia `[MAL]` y salia 0 — verde falso automatizable.
+4. `pg_reload_conf()` solo confirma el SIGHUP; una configuracion invalida se ignora en silencio.
+5. `CREATE TABLE IF NOT EXISTS` + `DROP TABLE` para generar WAL podia borrar una tabla homonima
+   preexistente. Sustituido por `pg_create_restore_point()`, sin DDL.
+6. **El rollback al comando antiguo puede atascar el archiver por el mismo defecto que el sprint
+   corrige**, si el script nuevo llego a publicar un destino y devolvio error despues. El plan
+   inspecciona los `.ready` antes de revertir.
+
+#### Validacion
+
+**Bateria de 11 casos, 18 aserciones, exit 0**, ejecutada en un directorio desechable dentro de
+`/var/backups/recetas-postgres` (mismo filesystem que el destino real) antes de tocar la
+configuracion: destino nuevo, rearchivado identico, conflicto, origen ausente, directorio ausente,
+nombre con barra, destino no escribible, destino symlink, **destino directorio**, escritura truncada
+via `RLIMIT_FSIZE`, y ausencia de temporales huerfanos.
+
+**Activacion verificada, no supuesta:** `pg_file_settings.applied = t`, `sourcefile` correcto,
+`archive_command` efectivo igual al esperado, `archive_mode = on`, `archive_library` vacio, y
+`pg_conf_load_time()` avanzando de `2026-07-31 18:05:56` a `2026-08-01 06:47:05`.
+
+**Archivado real a traves del script nuevo**, demostrado con la entrada de syslog del segmento
+exacto: `000000010000000100000076: archivado`. Ademas `.done` presente, `.ready` ausente,
+`archived_count` 375 -> 376, `failed_count` 0, sin errores del archiver en el log.
+
+**El contrato, comprobado en produccion:**
+
+| Caso | Comando antiguo | Comando nuevo |
+|---|---|---|
+| Rearchivado con contenido identico | exit 1 (atasca el archiver) | **exit 0** |
+| Destino con contenido distinto | exit 1 | exit 2, fichero intacto (sha e inodo sin cambios) |
+
+Backup logico completo ejecutado despues: `Result=success`. Servicios activos. Health de produccion
+`{"status":"UP"}`.
+
+#### Estado final
+
+- `archive_command = '/usr/local/sbin/recetas-postgres-archive-wal %p %f'`
+- Sin `.ready` pendientes, sin temporales huerfanos en el directorio de WAL.
+- Rollback disponible: `/etc/postgresql/18/main/conf.d/recetas-archive.conf.bak-20260801-064636`,
+  con su hash en `/root/archive-rollback.sha`. `archive_command` es `sighup`: revertir no reinicia
+  PostgreSQL.
+
+#### Riesgo residual
+
+- **`ENOSPC` y `EIO` reales no ensayados** sobre el filesystem de produccion. La bateria cubre
+  escritura truncada con `RLIMIT_FSIZE`; los fallos de dispositivo quedan sin ensayar. El script es
+  fail-closed ante ellos por diseño, pero no verificado.
+- Dependencia nueva de `python3` en el camino de archivado. Es parte de Ubuntu base y el fallo seria
+  fail-closed (PostgreSQL reintenta, no se pierde WAL).
+- Temporal huerfano si el proceso muere con `SIGKILL` entre `mkstemp` y `os.link`. No es corrupcion
+  —antes del link no hay nada publicado; despues son hard links al mismo inodo— pero `restic` puede
+  copiarlo antes de la purga diaria.
+- El codigo 2 (conflicto) no se distingue en `failed_count`: solo aparece en
+  `journalctl -t recetas-archive-wal`. Si algun dia se monta alerta de backups, ese es el sitio.
+- Sin revision de Gemini.

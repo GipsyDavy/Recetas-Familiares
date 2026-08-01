@@ -73,30 +73,88 @@ que sigue en disco. Es fail-closed — sin ninguna copia base, no borra nada.
 
 Antes de tocar esta regla, probarla siempre en seco cambiando `-delete` por `-print`.
 
-### Durabilidad del archivado
+### Durabilidad y contrato del archivado (reescrito el 2026-08-01)
 
-`archive_command` incluye `sync` sobre el fichero destino desde el 2026-07-31. Sin el, `cp`
-devuelve exito con los datos aun en cache de pagina: PostgreSQL da el segmento por archivado y lo
-recicla, y un corte abrupto podria perderlo.
+`archive_command` es ahora un script versionado:
 
-La configuracion vive en `/etc/postgresql/18/main/conf.d/recetas-archive.conf`, **no** en
-`postgresql.conf` (que solo tiene la linea de ejemplo comentada). Es `sighup`: aplicar con
-`select pg_reload_conf()`, sin reiniciar.
-
-**Trampa al verificarlo:** `pg_switch_wal()` no rota nada si no hubo escrituras desde el ultimo
-cambio de segmento, asi que la prueba sale en falso. Hay que generar WAL primero, en una base
-desechable, nunca en produccion:
-
-```bash
-sudo -u postgres psql -tAc "create database wal_probe"
-sudo -u postgres psql -d wal_probe -tAc "create table t as select g, repeat('x',200) from generate_series(1,80000) g"
-sudo -u postgres psql -tAc "select pg_switch_wal()"
-sleep 8
-sudo -u postgres psql -tAc "select archived_count, failed_count from pg_stat_archiver"
-sudo -u postgres psql -tAc "drop database wal_probe"
+```
+archive_command = '/usr/local/sbin/recetas-postgres-archive-wal %p %f'
 ```
 
-`archived_count` debe subir y `failed_count` seguir en 0.
+Sustituye a `test ! -f DEST && cp %p DEST && sync DEST`, que tenia **dos defectos**, ambos
+verificados el 2026-08-01. Detalle completo en `infra/postgres/README.md`.
+
+**1. Incumplia el contrato de rearchivado.** §25.3.1 dice literalmente:
+
+> "When an archive command or library encounters a pre-existing file, it should return a zero
+> status [...] if the WAL file has identical contents to the pre-existing archive and the
+> pre-existing archive is fully persisted to storage. If a pre-existing file contains different
+> contents [...] the archive command or library _must_ return a nonzero status."
+
+El comando anterior devolvia 1 **siempre** que el destino existiera. Tras una caida en la ventana
+entre la copia y el registro durable del exito, PostgreSQL reintenta el mismo segmento: el archiver
+quedaba atascado de forma permanente, `pg_wal` crecia y, si el disco se llenaba, PANIC.
+
+**Detalle que conviene recordar:** el ejemplo canonico de la propia documentacion
+(`test ! -f ... && cp ...`) era exactamente el que teniamos, y es **incompleto** respecto a lo que
+el mismo apartado exige unas lineas mas abajo. Que un comando aparezca como ejemplo oficial no
+significa que cumpla el contrato completo.
+
+**2. El `sync` no hacia lo que su propio comentario afirmaba.** Ubuntu 26.04 sustituyo GNU coreutils
+por **uutils** (`rust-coreutils 0.8.0`; el paquete `coreutils` es solo un meta-paquete). Su
+`sync FICHERO` **no hace `fsync(2)`**: abre el fichero y llama a `sync()` global. Comprobado con
+`strace`:
+
+```
+openat(AT_FDCWD, "...", O_RDONLY|O_NONBLOCK) = 3
+sync()                                       = 0
+```
+
+Ademas devolvio codigo 0 sincronizando un fichero que el usuario ni siquiera podia abrir, asi que
+su codigo de salida no sirve para afirmar durabilidad. Por eso el script esta en Python 3, que
+expone `os.fsync` real sobre el fichero **y sobre el directorio** — el `fsync` de un fichero no
+persiste la entrada de su directorio — y propaga los errores.
+
+**Regla general que deja este hallazgo:** en este servidor, **no dar por hecho el comportamiento de
+GNU coreutils**. `cp` y `cmp` siguen siendo GNU, pero `sync`, `ln`, `cat`, `mktemp` y `stat` son
+uutils. Verificar con `<comando> --version` antes de apoyarse en semantica fina.
+
+La configuracion vive en `/etc/postgresql/18/main/conf.d/recetas-archive.conf`, **no** en
+`postgresql.conf`. Es `sighup`: aplicar con `select pg_reload_conf()`, sin reiniciar.
+
+#### Verificar el archivado
+
+**Trampa 1:** `pg_switch_wal()` no rota nada si no hubo escrituras desde el ultimo cambio de
+segmento, asi que la prueba sale en falso. Usar `pg_create_restore_point()`, que escribe un marcador
+en el WAL **sin DDL** y sin tocar el esquema (crear y borrar una tabla de sondeo puede eliminar una
+homonima preexistente):
+
+```bash
+sudo -u postgres psql -tAc "select pg_create_restore_point('archive-check')"
+SEG=$(sudo -u postgres psql -tAc "select pg_walfile_name(pg_current_wal_insert_lsn())")
+sudo -u postgres psql -tAc "select pg_switch_wal()"
+sleep 10
+sudo -u postgres psql -tAc "select last_archived_wal, archived_count, failed_count from pg_stat_archiver"
+```
+
+**Trampa 2:** `pg_reload_conf()` solo confirma que se envio el SIGHUP; una configuracion invalida se
+ignora y solo deja rastro en el log. Para afirmar que se aplico de verdad:
+
+```bash
+sudo -u postgres psql -X -At -c "SELECT applied, sourcefile FROM pg_file_settings WHERE name='archive_command' ORDER BY seqno DESC LIMIT 1;"
+sudo -u postgres psql -X -At -c "SELECT pg_conf_load_time();"
+```
+
+**Trampa 3:** `failed_count` sin cambios no prueba ausencia de fallos — PostgreSQL no contabiliza
+ahi los fallos por señal ni ciertos errores de shell. La comprobacion concluyente exige a la vez:
+destino regular presente, `<segmento>.done` en `archive_status`, `.ready` ausente, contador
+incrementado y **entrada en el syslog del script**:
+
+```bash
+journalctl -t recetas-archive-wal --no-pager -n 20
+```
+
+Esa ultima es la unica forma de demostrar que el archiver ejecuta **este** script y no otro comando.
 
 Comprobaciones:
 
@@ -339,11 +397,19 @@ basebackup. El estado estacionario es de ~6-7 GB sobre 38 GB de disco.
   `max_logical_replication_workers=0`, `shared_preload_libraries=''`) y no en un namespace de red
   del sistema operativo. Suficiente mientras el preflight siga confirmando cero suscripciones
   logicas; si algun dia existieran, hay que aislar por SO antes de repetir el ensayo.
-- El `archive_command` actual (`test ! -f ... && cp ... && sync`) se niega a rearchivar un segmento
-  ya presente. Segun revision externa (Codex, 2026-08-01), ante un rearchivado tras una caida esto
-  podria atascar el archiver de forma permanente. **No verificado contra la documentacion en esta
-  sesion**; anotado como defecto latente candidato a sprint propio. Hoy funciona: `failed_count=0`,
-  367 segmentos archivados.
+- ~~El `archive_command` podria atascarse ante un rearchivado tras caida.~~ **CERRADO el
+  2026-08-01.** La afirmacion de Codex se verifico contra la documentacion de PostgreSQL 18 §25.3.1
+  y era correcta. Sustituido por `recetas-postgres-archive-wal`, validado con 11 casos y con el
+  contrato comprobado en produccion: rearchivado identico devuelve 0, contenido distinto devuelve 2
+  sin tocar el fichero. Al hacerlo aparecio un segundo defecto que nadie habia previsto: el `sync`
+  del comando anterior no hacia `fsync(2)` porque este servidor usa uutils, no GNU coreutils.
+- **`ENOSPC` y `EIO` reales no se han ensayado** sobre el filesystem de produccion. La bateria cubre
+  escritura truncada con `RLIMIT_FSIZE` aplicado solo al proceso de prueba; los fallos de
+  dispositivo quedan sin ensayar. El script es fail-closed ante ellos por diseño, pero no verificado.
+- Si el proceso muere con `SIGKILL` entre `mkstemp` y `os.link`, queda un temporal `.<segmento>.*`
+  en el directorio de WAL. No es corrupcion (antes del `link` no hay nada publicado; despues,
+  temporal y destino son hard links al mismo inodo, asi que borrar el temporal no elimina el
+  segmento), pero `restic` puede copiarlo en la ventana hasta la purga diaria.
 - La copia offsite depende de una unica Storage Box; si Hetzner pierde VPS y Storage Box a la vez (misma cuenta/proveedor), no hay tercera copia.
 - La passphrase restic tiene una unica copia fuera del VPS (carpeta local del usuario); si se pierden ambas, el repositorio offsite es irrecuperable.
 - El backend ya esta desplegado en VPS/API publica HTTPS temporal; falta dominio propio estable y estrategia de rollback/CI-CD.

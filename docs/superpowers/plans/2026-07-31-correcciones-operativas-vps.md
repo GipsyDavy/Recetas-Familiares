@@ -454,6 +454,15 @@ ssh -o BatchMode=yes root@167.233.213.242 'grep -rn "archive_command" /etc/postg
 
 - [ ] **Step 2: Cambiarlo, guardando copia**
 
+> **OBSOLETO — no copiar este comando (nota añadida el 2026-08-01).** El `archive_command` que
+> instala este paso fue sustituido por `/usr/local/sbin/recetas-postgres-archive-wal`. Tenia dos
+> defectos: (1) devolvia 1 **siempre** que el destino existiera, aunque el contenido fuese
+> identico, incumpliendo §25.3.1 y pudiendo atascar el archiver tras una caida; (2) el `sync` final
+> **no hacia `fsync(2)`** — este servidor usa uutils, no GNU coreutils — asi que la justificacion
+> de durabilidad que acompañaba a este cambio era incorrecta. Ver
+> `docs/superpowers/plans/2026-08-01-archive-command-rearchivado.md` y la seccion
+> `Durabilidad y contrato del archivado` del runbook.
+
 ```bash
 ssh -o BatchMode=yes root@167.233.213.242 'bash -s' <<'EOF'
 F=/etc/postgresql/18/main/postgresql.conf

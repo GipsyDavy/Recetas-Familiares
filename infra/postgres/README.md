@@ -28,6 +28,62 @@ Vive en el servidor en `/etc/postgresql/18/main/conf.d/` — **no** en
 `postgresql.conf`, que solo tiene la linea de ejemplo comentada. `archive_command`
 es un parametro `sighup`: basta `select pg_reload_conf()`, no hace falta reiniciar.
 
+## `recetas-postgres-archive-wal` (el `archive_command`)
+
+| Script | Ejecutado por | Modo | Propietario |
+|---|---|---|---|
+| `recetas-postgres-archive-wal` | el proceso archiver de PostgreSQL | `0755` | `root:root` |
+
+**Ojo: NO es `0750 root:postgres` como los tres de backup.** Aquellos los lanza systemd con
+`User=postgres`, asi que basta el bit de grupo. Este lo ejecuta el archiver directamente, que corre
+como `postgres`: necesita el bit de ejecucion de «otros», y no debe poder modificarlo.
+
+Esta escrito en **Python 3**, no en shell, por dos motivos verificados el 2026-08-01:
+
+1. El contrato de §25.3.1 exige que, ante un fichero de archivo preexistente, el comando devuelva
+   **0 si el contenido es identico y esta persistido** y distinto de 0 solo si difiere. El comando
+   anterior (`test ! -f DEST && cp %p DEST && sync DEST`) fallaba **siempre** que el destino
+   existiera. Tras una caida en la ventana entre la copia y el registro durable del exito,
+   PostgreSQL reintenta el mismo segmento: con el comando antiguo el archiver quedaba atascado de
+   forma permanente, `pg_wal` crecia y, si el disco se llenaba, PostgreSQL hacia PANIC.
+2. **Ubuntu 26.04 sustituyo GNU coreutils por uutils** (`rust-coreutils 0.8.0`; el paquete
+   `coreutils` es solo un meta-paquete). Su `sync FICHERO` **no hace `fsync(2)`**: abre el fichero y
+   llama a `sync()` global. Comprobado con `strace`. Ademas devolvio codigo 0 sincronizando un
+   fichero que el usuario ni siquiera podia abrir, asi que su codigo de salida no sirve para
+   afirmar durabilidad. Python expone `os.fsync` real sobre fichero y sobre directorio, y propaga
+   los errores.
+
+Publicacion con `os.link()`, no con `rename()`: `rename` **sobrescribe** en silencio si el destino
+aparece durante la carrera. Y `ln` de shell sin `-T` sobre un destino que fuese un directorio
+publicaria **dentro** devolviendo 0 — comprobado en este VPS.
+
+### Codigos de salida
+
+| Codigo | Significado |
+|---|---|
+| 0 | archivado (o rearchivado identico) y persistido |
+| 1 | uso incorrecto: argumentos o nombre de destino invalido |
+| 2 | **conflicto**: el destino existe con contenido distinto. Requiere intervencion humana |
+| 3 | error copiando el origen al temporal |
+| 4 | error de durabilidad: `fsync` de fichero o de directorio fallo |
+| 5 | error de entorno: directorio ausente, origen ausente, destino no regular |
+
+### Auditar el archivado
+
+El script registra cada exito en `daemon.info` y cada error en `daemon.err`:
+
+```bash
+journalctl -t recetas-archive-wal --no-pager -n 20
+```
+
+Es la via para **demostrar que el archiver ejecuta este script** y no otro comando, y el unico
+sitio donde aparece el codigo 2 (conflicto), que no incrementa `failed_count` de forma
+distinguible.
+
+`ARCHIVE_DIR` es una constante dentro del script, deliberadamente **no** configurable por entorno:
+una variable heredada por el proceso de PostgreSQL podria redirigir el archivo en silencio. Para
+probarlo en un directorio desechable, generar una copia del script sustituyendo esa linea.
+
 ## Secretos
 
 **No estan aqui y no deben estarlo.** Viven en el VPS, modo 0600 root:root:

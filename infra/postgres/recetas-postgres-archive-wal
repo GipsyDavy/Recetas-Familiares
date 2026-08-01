@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""archive_command de Recetas Familiares.
+
+Contrato de PostgreSQL (§25.3.1, verificado contra la doc de la 18 el 2026-08-01):
+
+  - No sobrescribir nunca un fichero de archivo preexistente.
+  - Si existe y el contenido es IDENTICO y esta persistido -> salir 0. El rearchivado tras
+    una caida es legitimo y debe poder avanzar.
+  - Si existe y el contenido DIFIERE -> salir distinto de 0, obligatoriamente.
+  - Ante cualquier otro problema -> salir distinto de 0 (fail-closed): PostgreSQL reintentara.
+
+Por que Python y no shell
+-------------------------
+El comando anterior era:
+
+    test ! -f DEST && cp %p DEST && sync DEST
+
+Dos defectos:
+
+1. Devolvia 1 SIEMPRE que el destino existiera, aunque el contenido fuese identico. Eso podia
+   atascar el archiver de forma permanente tras una caida, con pg_wal creciendo hasta un PANIC
+   por disco lleno.
+2. Ubuntu 26.04 sustituyo GNU coreutils por uutils (rust-coreutils 0.8.0). Su `sync FICHERO`
+   NO hace fsync(2): abre el fichero y llama a sync() global. Verificado con strace el
+   2026-08-01. Ademas devolvio codigo 0 sincronizando un fichero que el usuario ni siquiera
+   podia abrir, asi que su codigo de salida no sirve para afirmar durabilidad.
+
+No hay GNU coreutils en el sistema (el paquete `coreutils` es un meta-paquete sobre
+`rust-coreutils`), y cambiar el userland del servidor por esto seria desproporcionado. Python 3
+si expone os.fsync(2) real, sobre fichero y sobre directorio, y propaga los errores.
+
+Si python3 faltase o fallase, el script no llega a ejecutarse o termina distinto de cero:
+PostgreSQL reintenta y no se pierde WAL (fail-closed).
+
+Codigos de salida
+-----------------
+  0  archivado (o rearchivado identico) y persistido
+  1  uso incorrecto: argumentos o nombre de destino invalido
+  2  conflicto: el destino existe con contenido distinto
+  3  error copiando el origen al temporal
+  4  error de durabilidad: fsync de fichero o de directorio fallo
+  5  error de entorno: directorio ausente, origen ausente, destino no regular
+
+Uso: recetas-postgres-archive-wal <ruta_origen (%p)> <nombre_destino (%f)>
+"""
+
+import os
+import signal
+import sys
+import syslog
+import tempfile
+
+# Constante deliberada: NO se lee del entorno. Una variable heredada por el proceso de
+# PostgreSQL podria redirigir el archivo en silencio. Las pruebas usan una copia del script
+# con esta linea sustituida.
+ARCHIVE_DIR = "/var/backups/recetas-postgres/wal"
+
+EXIT_OK = 0
+EXIT_USO = 1
+EXIT_CONFLICTO = 2
+EXIT_COPIA = 3
+EXIT_DURABILIDAD = 4
+EXIT_ENTORNO = 5
+
+BLOQUE = 1 << 20  # 1 MiB
+
+
+def _log(prioridad, mensaje):
+    try:
+        syslog.openlog("recetas-archive-wal", syslog.LOG_PID, syslog.LOG_DAEMON)
+        syslog.syslog(prioridad, mensaje)
+        syslog.closelog()
+    except Exception:
+        pass
+
+
+def info(mensaje):
+    """Registro de exito. Es lo que permite demostrar que el archiver ejecuto ESTE script."""
+    _log(syslog.LOG_INFO, mensaje)
+
+
+def error(mensaje):
+    _log(syslog.LOG_ERR, mensaje)
+    print("recetas-archive-wal: %s" % mensaje, file=sys.stderr)
+
+
+def salir(codigo, mensaje):
+    error(mensaje)
+    sys.exit(codigo)
+
+
+def fsync_fichero(ruta):
+    """fsync(2) real sobre el fichero. Distinto de `sync FICHERO` de uutils."""
+    fd = os.open(ruta, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def fsync_directorio(ruta):
+    """fsync(2) del directorio.
+
+    Sin esto, la entrada nueva puede no sobrevivir a un corte aunque los datos del fichero si:
+    fsync de un fichero no persiste la entrada de su directorio.
+    """
+    fd = os.open(ruta, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def contenido_identico(ruta_a, ruta_b):
+    """Compara byte a byte. Devuelve True/False; propaga OSError al llamador."""
+    if os.path.getsize(ruta_a) != os.path.getsize(ruta_b):
+        return False
+    with open(ruta_a, "rb") as fa, open(ruta_b, "rb") as fb:
+        while True:
+            ba = fa.read(BLOQUE)
+            bb = fb.read(BLOQUE)
+            if ba != bb:
+                return False
+            if not ba:
+                return True
+
+
+def persistir_y_salir(destino, motivo, nombre):
+    """Unico camino de salida exitosa. Sin durabilidad demostrada no se devuelve 0."""
+    try:
+        fsync_fichero(destino)
+    except OSError as exc:
+        salir(EXIT_DURABILIDAD, "fsync del fichero fallo (%s): %s" % (destino, exc))
+    try:
+        fsync_directorio(ARCHIVE_DIR)
+    except OSError as exc:
+        salir(EXIT_DURABILIDAD, "fsync del directorio fallo (%s): %s" % (ARCHIVE_DIR, exc))
+    info("%s: %s" % (nombre, motivo))
+    sys.exit(EXIT_OK)
+
+
+def destino_preexistente(origen, destino, nombre):
+    """El destino ya existe. Decide entre rearchivado legitimo y conflicto."""
+    # Un symlink a fichero regular pasaria una comprobacion ingenua: el script compararia y
+    # sincronizaria su objetivo, que puede estar fuera del repositorio de WAL.
+    if os.path.islink(destino):
+        salir(EXIT_ENTORNO, "el destino es un symlink: %s" % destino)
+    if not os.path.isfile(destino):
+        salir(EXIT_ENTORNO, "el destino existe y no es un fichero regular: %s" % destino)
+    try:
+        identico = contenido_identico(origen, destino)
+    except OSError as exc:
+        salir(EXIT_ENTORNO, "no se pudo comparar %s con %s: %s" % (origen, destino, exc))
+    if identico:
+        persistir_y_salir(destino, "rearchivado con contenido identico", nombre)
+    salir(EXIT_CONFLICTO,
+          "CONFLICTO: %s ya existe con contenido DISTINTO; no se sobrescribe" % destino)
+
+
+def main(argv):
+    # SIGXFSZ mataria el proceso al superar RLIMIT_FSIZE. Ignorandola, la escritura devuelve
+    # EFBIG y se sale por el camino controlado (EXIT_COPIA) en vez de por señal.
+    try:
+        signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+    except (ValueError, AttributeError, OSError):
+        pass
+
+    if len(argv) != 3:
+        salir(EXIT_USO, "uso: %s <origen> <nombre>" % argv[0])
+    origen, nombre = argv[1], argv[2]
+
+    if not nombre or "/" in nombre or nombre in (".", ".."):
+        salir(EXIT_USO, "nombre de destino invalido: %r" % nombre)
+    if not os.path.isdir(ARCHIVE_DIR):
+        salir(EXIT_ENTORNO, "el directorio de archivo no existe: %s" % ARCHIVE_DIR)
+    if os.path.islink(origen) or not os.path.isfile(origen):
+        salir(EXIT_ENTORNO, "el origen no existe o no es un fichero regular: %s" % origen)
+
+    destino = os.path.join(ARCHIVE_DIR, nombre)
+
+    if os.path.lexists(destino):
+        destino_preexistente(origen, destino, nombre)
+
+    # Destino nuevo: copia a temporal en el mismo directorio, fsync, publicacion con link(2).
+    try:
+        fd, temporal = tempfile.mkstemp(prefix="." + nombre + ".", dir=ARCHIVE_DIR)
+    except OSError as exc:
+        salir(EXIT_COPIA, "no se pudo crear el temporal en %s: %s" % (ARCHIVE_DIR, exc))
+
+    try:
+        try:
+            escritos = 0
+            with open(origen, "rb") as fuente:
+                while True:
+                    bloque = fuente.read(BLOQUE)
+                    if not bloque:
+                        break
+                    escritos += os.write(fd, bloque)
+            os.fsync(fd)
+        except OSError as exc:
+            salir(EXIT_COPIA, "fallo copiando %s a %s: %s" % (origen, temporal, exc))
+        finally:
+            os.close(fd)
+
+        # Escritura parcial silenciosa: comprobar tamaños en vez de fiarse del bucle.
+        try:
+            if os.path.getsize(temporal) != os.path.getsize(origen):
+                salir(EXIT_COPIA,
+                      "copia incompleta de %s: %d bytes escritos de %d"
+                      % (origen, os.path.getsize(temporal), os.path.getsize(origen)))
+        except OSError as exc:
+            salir(EXIT_COPIA, "no se pudo verificar el tamaño de la copia: %s" % exc)
+
+        # link(2) falla con EEXIST si el destino existe de cualquier forma. `mv`/rename(2)
+        # sobrescribiria en silencio, y `ln` sin -T publicaria DENTRO si el destino fuese un
+        # directorio, devolviendo 0 sin haber archivado nada (comprobado en este VPS).
+        try:
+            os.link(temporal, destino)
+        except FileExistsError:
+            # Carrera: alguien publico el destino entre la comprobacion inicial y ahora.
+            destino_preexistente(origen, destino, nombre)
+        except OSError as exc:
+            salir(EXIT_COPIA, "no se pudo publicar %s: %s" % (destino, exc))
+    finally:
+        try:
+            os.unlink(temporal)
+        except OSError:
+            pass
+
+    persistir_y_salir(destino, "archivado", nombre)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
