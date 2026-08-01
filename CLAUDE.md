@@ -474,6 +474,27 @@ La interfaz debe sentirse:
 - Errores explicados en lenguaje claro.
 - Accesibilidad real, no decorativa.
 
+## Herramienta de diseno: plugin `impeccable`
+
+Plugin instalado a nivel de usuario (`impeccable@impeccable`, v4.0.4, marketplace `pbakaus/impeccable`, scope `user`), disponible en este proyecto y en cualquier otro.
+
+Invocar `/impeccable <subcomando> [target]` cuando el sprint toque pantallas, componentes o experiencia de usuario en Android Compose, iOS Compose Multiplatform o Desktop JavaFX:
+
+- `shape` antes de escribir codigo de una pantalla nueva.
+- `critique` y `audit` para revision UX, accesibilidad, responsive y rendimiento de UI.
+- `polish`, `harden`, `onboard` antes de dar por cerrada una pantalla.
+- `animate`, `layout`, `typeset`, `colorize` para aplicar la seccion `ANIMACIONES Y FEEDBACK UX` de este documento.
+- `clarify` para textos de error, etiquetas y estados vacios en lenguaje claro.
+- `adapt` para tamaños de pantalla y diferencias entre plataformas.
+
+Reglas de uso en este proyecto:
+
+- `impeccable` asesora sobre diseno; no sustituye a `/VibeSec`, `/security-review` ni al escaneo Semgrep + TruffleHog.
+- Sus recomendaciones se subordinan a `CLAUDE.md`, a la paleta y al lenguaje visual ya definidos aqui. Si contradice el estilo existente, gana `CLAUDE.md`.
+- No aplica a backend, base de datos, infraestructura ni sincronizacion.
+- Aplicar cambios de forma quirurgica: no reescribir pantallas estables por sugerencia del plugin.
+- Sus hooks `PostToolUse` y `Stop` corren un detector local en Node (requiere Node >= 22). Los subcomandos con egreso de red (`live`, generacion de conceptos o imagenes) no se usan sobre datos familiares reales sin consentimiento explicito.
+
 ---
 
 # PRINCIPIOS GENERALES

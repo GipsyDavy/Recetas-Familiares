@@ -96,6 +96,13 @@ Apoyo IA recomendado:
 - Usuario de aplicacion: `recetas_app`.
 - No documentar passwords reales en archivos versionables. Usar variables de entorno, parametros locales o secretos no versionados.
 
+### Plugins de Claude Code (scope `user`, aplican a todos los proyectos)
+- `superpowers@claude-plugins-official`: skills de proceso, paso 0 obligatorio del protocolo pre-tarea.
+- `security-guidance@claude-plugins-official`: revision de patrones de vulnerabilidad en ediciones.
+- `owasp-compliance-checker@claude-code-plugins-plus`: `/owasp` en cierres y auditorias.
+- `code-review@claude-plugins-official`: revision de cambios y PRs.
+- `impeccable@impeccable` (v4.0.4, instalado 2026-08-01): diseno e interfaz. Skill `/impeccable <subcomando> [target]` con 23 subcomandos (`shape`, `critique`, `audit`, `polish`, `harden`, `onboard`, `animate`, `layout`, `typeset`, `colorize`, `clarify`, `adapt`, `optimize`, `live`, entre otros). Detalle de uso y limites en la seccion `EXPERIENCIA VISUAL` de `CLAUDE.md`. Requiere Node >= 22 en PATH para sus hooks.
+
 ---
 
 ## 5. Arranque Dev

@@ -389,3 +389,22 @@ Una mejora UI/UX se considera terminada solo si:
 - es accesible por teclado o lector donde aplique,
 - mantiene coherencia con las otras plataformas,
 - fue validada con build o justificada si no se pudo validar.
+
+---
+
+## 14. Herramienta De Apoyo De Diseno
+
+Plugin `impeccable` (`impeccable@impeccable`, v4.0.4, scope `user` en Claude Code, instalado 2026-08-01). Disponible en todos los proyectos.
+
+Uso recomendado sobre este documento:
+- `/impeccable shape <pantalla>` antes de construir una pantalla nueva.
+- `/impeccable critique <pantalla>` para revision UX contra las secciones 1-6.
+- `/impeccable audit <pantalla>` para accesibilidad (seccion 8) y responsive.
+- `/impeccable animate <pantalla>` para aplicar la seccion 7.
+- `/impeccable clarify <pantalla>` para copy de errores y estados vacios (seccion 9).
+- `/impeccable polish` y `/impeccable harden` antes de aplicar la seccion 13.
+
+Limites:
+- Este documento manda. Si `impeccable` propone paleta, tipografia o patron que contradiga las secciones 2-6, gana `Interfaz.md`.
+- Sus sugerencias no sustituyen validacion con build ni los criterios de aceptacion de la seccion 13.
+- No usar subcomandos con egreso de red sobre datos familiares reales sin consentimiento explicito.
