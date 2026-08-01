@@ -4670,3 +4670,131 @@ ssh root@167.233.213.242 'wg set wg0 peer "/PBRk+zF/9uJHVabGkEH38KjzCeEfI5f5TJcc
   vera en el proximo parche de kernel.
 - La regla nueva de purga de WAL solo se ha ejecutado una vez en real. Su comportamiento en estado
   estacionario, cuando la retencion de 21 dias empiece a eliminar copias base, no se ha observado.
+
+---
+
+### Sprint PITR desde offsite + retirada del peer VPN — CERRADO 2026-08-01 (Claude Code)
+
+Cierra el primer riesgo residual del runbook de PostgreSQL, abierto desde el 11/07: **un PITR
+partiendo unicamente del repositorio offsite cifrado nunca se habia ensayado**. Y retira el peer
+WireGuard `10.10.0.2`, pendiente de accion desde el sprint del 31/07.
+
+**Agente lider:** Claude Code (Opus 5).
+**Skills de proceso:** `superpowers:writing-plans` (plan en
+`docs/superpowers/plans/2026-08-01-pitr-offsite-y-peer-vpn.md`) y `superpowers:executing-plans`
+(ejecucion en linea, sin subagentes: todo el sprint comparte una sesion SSH con estado acumulado).
+Sin worktree: los cambios reales viven en el VPS; el repositorio solo cambia en documentacion.
+
+**Apoyo multi-IA.** Codex reviso el plan en **tres rondas**, todas en solo lectura y antes de tocar
+el VPS:
+
+| Ronda | Sobre | Hallazgos | Incorporados |
+|---|---|---|---|
+| 1 | v1 | 4 bloqueantes, 9 importantes, 4 menores | 4/4, 8/9, 4/4 |
+| 2 | v2 | 5 bloqueantes **nuevos, creados por la reescritura**, 9 importantes, 3 menores | todos |
+| 3 | v3 (acotada a limpieza, WireGuard y aislamiento) | 8 bloqueantes, 3 importantes, 1 menor | 6/8, 3/3, 1/1 |
+
+**Gemini: NO DISPONIBLE** (sin cuota, indicado por el usuario). La revision de coherencia
+documental la asumio Claude Code. Queda como limitacion de este cierre.
+
+Hallazgos de Codex no incorporados, con motivo: (a) parser con allowlist y `flock` para el fichero
+de estado — se tomo la parte con impacto real y se descarto el resto por YAGNI; (b) sandbox de red
+`PrivateNetwork=yes` para el cluster de ensayo — desproporcionado, queda como riesgo residual
+explicito; (c) rediseño del `archive_command` de produccion — fuera de alcance por separacion de
+riesgos, anotado como defecto latente.
+
+#### Resultado del ensayo
+
+`recovery stopping before commit of transaction 13685, time 2026-07-31 23:45:15.833301+00`
+
+El cluster recuperado —alimentado **exclusivamente** con ficheros restaurados desde restic—
+contenia `marker-a` y **no** `marker-b` ni el filler posterior. Timeline 2, `pg_is_in_recovery()=f`.
+Datos de la aplicacion: `users=14 families=10 recipes=58`, 26 tablas, identicos a produccion.
+Produccion intacta durante todo el ensayo: `failed_count=0` antes y despues, ambos servicios
+activos, health `{"status":"UP"}`.
+
+Snapshot usado: `a12df0f8...` (fijado por ID, no `latest`), 364 segmentos WAL, 5.665 GiB
+restaurados en 11 s. Copia base `base_20260726T042419Z`, es decir ~6 dias de WAL reproducidos.
+
+#### Peer WireGuard `10.10.0.2` retirado
+
+Identidad verificada contra `wg show` antes de tocar nada: clave
+`/PBRk+zF/9uJHVabGkEH38KjzCeEfI5f5TJccU8/WXE=`, handshake `0`, sin endpoint. El peer del PC
+(`i6Y0xNui...`, `10.10.0.3/32`) quedo intacto y con handshake fresco. Bloque eliminado con un parser
+`awk` anclado en la clave publica —no por numeros de linea—, con asercion de que el diff **solo**
+contiene eliminaciones. Cambio en vivo con `wg set peer remove` e instalacion del fichero con
+`mv -T` atomico. Sin `reload` ni `restart`. Tunel del PC verificado despues: `10.10.0.1:5432`
+alcanzable. Backups conservados: `wg0.conf.bak-20260731-235144` y `wg0.live.bak-20260731-235144`.
+
+Esta vez el clasificador de permisos **no** bloqueo la operacion, a diferencia del 31/07.
+
+#### Seis fallos propios encontrados y corregidos
+
+Cuatro en revision, dos ejecutando. Vale la pena registrarlos porque comparten patron:
+
+1. **`grep`/`grep -c`/`diff` bajo `pipefail`** devuelven distinto de cero en situaciones normales y
+   abortaban el script **justo cuando la comprobacion pasaba**. Seis ocurrencias en cuatro versiones
+   del plan. Cerrado con una seccion de `Convenciones de shell` y un barrido mecanico con `grep`.
+2. **`pid_de_pgdata` no detectaba ningun postmaster.** `paste -d` no interpreta `\037` como octal
+   (solo `\n`, `\t`, `\\`, `\0`), asi que unia el cmdline con esos caracteres literales en rotacion
+   y el `case` nunca podia casar. **La guarda que impide borrar un PGDATA vivo devolvia vacio
+   siempre.** Se detecto porque se probo la funcion contra el postmaster de produccion en vez de
+   darla por buena. Reescrita con `mapfile` comparando tokens exactos, mas deteccion por `cwd`.
+3. **`source` del fichero de estado.** Guardar `TS_TARGET=2026-07-31 23:41:34.497764+00` sin
+   comillas hizo que bash asignara solo la fecha y ejecutara la hora como comando. Codex habia
+   marcado `source` como bloqueante y se rebajo argumentando que hacia falta contenido hostil: el
+   argumento era estrecho, basta un valor con un espacio. Sustituido por parser con `printf -v`.
+4. La guarda de timers exigia ejecucion **en este arranque**, y el VPS se habia reiniciado el 31/07
+   a las 17:49. Para una unidad semanal eso es un aborto sin motivo. Ademas `Result=success` es el
+   valor por defecto de una unidad que nunca ha corrido: afirmarlo a solas es un verde falso.
+   Corregido a los stamp files de `/var/lib/systemd/timers/` (`Persistent=yes`).
+5. La guarda de `pg_wal` exigia directorio vacio, pero `base.tar.gz` trae siempre `archive_status/`
+   y `summaries/`. Lo que importa es que no haya **segmentos** residuales, no que este vacio.
+6. Un nombre de variable con eñe: bash solo acepta `[A-Za-z_][A-Za-z0-9_]*`. Detectado al releer,
+   antes de ejecutarse.
+
+#### Trampas del entorno descubiertas
+
+- **Perfil AppArmor `wg-quick` en modo enforce.** Impide a la herramienta abrir configuraciones
+  fuera de `/etc/wireguard/`: un candidato en `/run` o `/root` hace fallar `wg-quick strip` con
+  `Permission denied` aunque se ejecute como root y el fichero sea legible. Reproducido en ambas
+  rutas. Por eso el candidato vive en `/etc/wireguard/wgcand.conf`, que ademas da `mv -T` atomico.
+- `postgresql.auto.conf` de produccion tiene 88 bytes y **ningun parametro**: solo la cabecera. No
+  hay ningun `ALTER SYSTEM` aplicado en el servidor.
+- El cliente SSH de restic avisa de que la conexion a la Storage Box no usa intercambio de claves
+  post-cuantico. Informativo; anotado por si Hetzner actualiza.
+
+#### Seguridad
+
+`scripts/security/run-security-scan.ps1` en modo sprint, ejecutado en esta sesion:
+**exit 0**. Semgrep 0 hallazgos (5 packs locales). TruffleHog 2 hallazgos **no verificados**, ambos
+`https://user:***@example.test` en `ServerUrlConfigTest.kt:42` y `ServerConfigTest.java:75`:
+credenciales de ejemplo en tests, no secretos. Historial omitido por `origin/main == HEAD`.
+
+`/VibeSec` y `/security-review`: **no aplican**. Cero codigo de aplicacion tocado — sin auth, sin
+ownership, sin endpoints, sin imagenes. Mismo criterio documentado en el sprint del 31/07. La
+superficie de este sprint (acceso VPN, aislamiento de un cluster, manejo de secretos en scripts) se
+reviso manualmente y en las tres rondas de Codex.
+
+Higiene de secretos durante el sprint: en ningun momento se imprimieron `PrivateKey`,
+`PresharedKey`, la passphrase de restic ni el contenido de `/etc/recetas-familiares/*.env`. De
+`postgresql.auto.conf` se listaron solo nombres de parametro.
+
+#### Estado final
+
+- Sin temporales en `/var/tmp`, sin procesos huerfanos, puerto 5433 libre.
+- `recetas_pitr_drill` eliminada; bases restantes: `postgres`, `recetas_familiares`,
+  `recetas_familiares_test`, `template0`, `template1`.
+- Ficheros de trabajo eliminados de `/root`.
+- Disco: 26 GB libres, 30% usado.
+- Archiver de produccion: `failed=0 archived=367 last=00000001000000010000006D`.
+
+#### Riesgo residual
+
+- El aislamiento de red del cluster de ensayo fue **convencion de GUCs**, no garantia del SO. Valido
+  mientras el preflight siga confirmando cero suscripciones logicas.
+- El `archive_command` podria atascarse ante un rearchivado tras caida (afirmacion de Codex, **sin
+  verificar contra la documentacion en esta sesion**). Candidato a sprint propio.
+- La copia offsite sigue dependiendo de una unica Storage Box en la misma cuenta que el VPS.
+- La passphrase de restic sigue con una unica copia fuera del VPS.
+- Sin revision de Gemini en este sprint.

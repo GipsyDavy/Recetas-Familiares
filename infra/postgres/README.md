@@ -11,9 +11,14 @@ desde el repo". Mismo patron que `infra/backend/`.
 
 | Script | Unit systemd | Cadencia | Retencion |
 |---|---|---|---|
-| `recetas-postgres-logical-backup` | `recetas-postgres-logical-backup.timer` | diaria ~03:20 UTC | 14 dias |
-| `recetas-postgres-basebackup` | `recetas-postgres-basebackup.timer` | semanal, domingo | 21 dias |
-| `recetas-postgres-offsite-backup` | `recetas-postgres-offsite-backup.timer` | diaria ~05:20 UTC | keep-daily 14 + keep-weekly 5 |
+| `recetas-postgres-logical-backup` | `recetas-postgres-logical-backup.timer` | diaria 03:15 UTC +15m | 14 dias |
+| `recetas-postgres-basebackup` | `recetas-postgres-basebackup.timer` | domingos 04:15 UTC +30m | 21 dias |
+| `recetas-postgres-offsite-backup` | `recetas-postgres-offsite-backup.timer` | diaria 05:15 UTC +10m | keep-daily 14 + keep-weekly 5 |
+
+El `+Nm` es `RandomizedDelaySec`. Los tres llevan `Persistent=true`. Para comprobar cuando se
+disparo cada uno por ultima vez, usar el `mtime` de `/var/lib/systemd/timers/stamp-<unit>.timer`:
+`ExecMainExitTimestamp` y `LastTriggerUSec` se pierden en cada reinicio, y `Result=success` es
+tambien el valor por defecto de una unidad que nunca ha corrido en el arranque actual.
 
 Destino de los backups locales: `/var/backups/recetas-postgres/{logical,base,wal}`.
 Destino offsite: repositorio restic cifrado en un Hetzner Storage Box por SFTP.

@@ -34,8 +34,14 @@ recetas-postgres-basebackup.timer
 
 Politica actual:
 
-- Backup logico diario a las 03:15 UTC con `pg_dump --format=custom`, retencion 14 dias.
-- Base backup fisico semanal los domingos a las 04:15 UTC con `pg_basebackup`, retencion 21 dias.
+- Backup logico diario, `OnCalendar=*-*-* 03:15:00` + `RandomizedDelaySec=15m`, con
+  `pg_dump --format=custom`, retencion 14 dias.
+- Base backup fisico semanal, `OnCalendar=Sun *-*-* 04:15:00` + `RandomizedDelaySec=30m`, con
+  `pg_basebackup`, retencion 21 dias.
+- Los tres timers llevan `Persistent=true`: recuperan la ejecucion perdida tras un reinicio y
+  escriben un stamp en `/var/lib/systemd/timers/`, que es la **unica** evidencia del ultimo disparo
+  que sobrevive a un reboot (`ExecMainExitTimestamp` y `LastTriggerUSec` son estado de runtime y se
+  pierden).
 - Archivado WAL activo con `archive_mode=on`, `archive_timeout=15min`. **La purga de WAL vive
   en el script diario** y conserva solo los segmentos posteriores a la copia base mas antigua en
   disco (ver abajo).
@@ -173,6 +179,55 @@ Trampas comprobadas en el ensayo:
 - Para recuperar TODO el WAL disponible (no un punto concreto), omitir `recovery_target_time`.
 - El cluster promovido queda en timeline 2; es desechable, no reutilizarlo como primario.
 
+## PITR partiendo SOLO del repositorio offsite (ensayado 2026-08-01)
+
+Cierra el riesgo residual abierto desde el 11/07. Lo ensayado el 31/07 fue restauracion **logica**
+desde offsite; esto es el PITR completo: copia base + reproduccion de WAL hasta un instante
+concreto, **sin tocar en ningun momento `/var/backups/recetas-postgres`**.
+
+Resultado del ensayo: `recovery stopping before commit of transaction 13685, time
+2026-07-31 23:45:15.833301+00`. El cluster recuperado contenia el marcador anterior al objetivo y
+**no** el posterior. Datos de la aplicacion identicos a produccion: `users=14 families=10
+recipes=58`, 26 tablas. Produccion intacta (`failed_count=0` antes y despues).
+
+Procedimiento (detalle completo en
+`docs/superpowers/plans/2026-08-01-pitr-offsite-y-peer-vpn.md`):
+
+1. **Preflight bloqueante.** Cero tablespaces de usuario (`pg_tablespace`) y cero suscripciones
+   logicas (`pg_subscription`): las primeras harian que el ensayo escribiera sobre datos reales via
+   `tablespace_map`, las segundas abririan conexiones salientes tras la promocion. Leer del primario
+   `max_connections`, `max_prepared_transactions`, `max_locks_per_transaction`, `max_wal_senders` y
+   `max_worker_processes`: la recovery aborta si el cluster de ensayo tiene alguno por debajo.
+2. **Marcadores en una base desechable** (`recetas_pitr_drill`). El WAL es del cluster entero, asi
+   que una base aparte genera el material necesario sin tocar el esquema de Flyway.
+3. **El objetivo de recuperacion se captura en una transaccion POSTERIOR al commit del marcador A**,
+   nunca como `ts_a + N segundos`. `recovery_target_time` se compara con el timestamp de **commit**
+   del WAL, no con el valor de la columna; con un margen fijo, un commit lento dejaria el objetivo
+   por delante del commit real y el marcador no apareceria.
+4. **Barrera de WAL.** Forzar una escritura, capturar `pg_walfile_name(pg_current_wal_insert_lsn())`,
+   `pg_switch_wal()` y esperar a que `pg_stat_archiver.last_archived_wal` alcance esa barrera. La
+   existencia del fichero no basta: `cp` lo crea antes de que termine el `sync`.
+5. **Fijar el snapshot restic por ID**, nunca `latest` (el timer diario puede disparar en medio), y
+   exigir que la barrera este dentro de ese snapshot: esa es la prueba de procedencia.
+6. **Restaurar solo `base/` y `wal/`** y rechazar cualquier symlink en lo restaurado — restic los
+   preserva y `test -f` los sigue, asi que un enlace al archivo local daria un verde falso.
+7. **Vaciar `postgresql.auto.conf`** del PGDATA extraido: viaja dentro de `base.tar.gz` y **tiene
+   mas precedencia que `postgresql.conf`**. Borrar tambien `*.signal` heredadas y `postmaster.pid`.
+   Exigir `tablespace_map` vacio y `pg_tblspc` vacio.
+8. **`pg_wal` sin segmentos residuales.** Cuando `restore_command` falla, PostgreSQL busca el
+   segmento en `pg_wal/`: un residuo podria suplir WAL que el offsite no tuviera. Ojo: `base.tar.gz`
+   trae siempre `archive_status/` y `summaries/` vacios, asi que la comprobacion correcta es
+   "cero ficheros `[0-9A-F]{24}`", no "directorio vacio".
+9. **Afirmar la configuracion efectiva con `postgres -C` ANTES de arrancar**, por igualdad literal y
+   no por comodines: un `restore_command` que ademas contuviera un fallback al WAL local pasaria un
+   filtro laxo. Se comprueban 19 GUCs, incluidos `archive_mode=off`, `listen_addresses=''`,
+   `primary_conninfo=''`, `max_logical_replication_workers=0` y `shared_preload_libraries=''`.
+10. **Arrancar en el puerto 5433 con socket propio**, validar `pg_is_in_recovery()=f`, comprobar los
+    marcadores y confirmar que no hay listener TCP en 5433.
+
+Limitacion asumida: el aislamiento de red del cluster de ensayo es **convencion de GUCs**, no
+garantia del sistema operativo. No se uso `PrivateNetwork` ni namespace propio.
+
 ## Backups Offsite Cifrados (implementado 2026-07-11)
 
 Estado: operativo. Copia diaria cifrada de `/var/backups/recetas-postgres` (logical + base + wal) a una Hetzner Storage Box mediante `restic` sobre SFTP.
@@ -189,7 +244,7 @@ Unidades:
 ```bash
 /usr/local/sbin/recetas-postgres-offsite-backup        # 0700 root
 /etc/systemd/system/recetas-postgres-offsite-backup.service
-/etc/systemd/system/recetas-postgres-offsite-backup.timer   # diario 05:15 UTC (tras logico 03:15 y basebackup dominical 04:31)
+/etc/systemd/system/recetas-postgres-offsite-backup.timer   # diario 05:15 UTC +10m (tras logico 03:15+15m y basebackup dominical 04:15+30m)
 ```
 
 El script hace `restic backup` (tag `scheduled`), `restic forget --keep-daily 14 --keep-weekly 5 --prune` y `restic check`. Falla cerrado: si el destino no responde, los backups locales siguen intactos.
@@ -277,9 +332,18 @@ basebackup. El estado estacionario es de ~6-7 GB sobre 38 GB de disco.
 
 ## Riesgos Residuales
 
-- Lo ensayado el 2026-07-31 desde el repositorio offsite fue una **restauracion logica**
-  (`restic restore` de un dump + `pg_restore`), no un PITR completo. Un PITR partiendo solo del
-  offsite —copia base + reproduccion de WAL hasta un instante concreto— sigue sin ensayarse.
+- ~~Un PITR partiendo solo del offsite sigue sin ensayarse.~~ **CERRADO el 2026-08-01**: PITR
+  completo desde el repositorio offsite validado con precision de transaccion. Ver la seccion
+  `PITR partiendo SOLO del repositorio offsite`.
+- El aislamiento del cluster de ensayo se apoya en GUCs (`listen_addresses=''`,
+  `max_logical_replication_workers=0`, `shared_preload_libraries=''`) y no en un namespace de red
+  del sistema operativo. Suficiente mientras el preflight siga confirmando cero suscripciones
+  logicas; si algun dia existieran, hay que aislar por SO antes de repetir el ensayo.
+- El `archive_command` actual (`test ! -f ... && cp ... && sync`) se niega a rearchivar un segmento
+  ya presente. Segun revision externa (Codex, 2026-08-01), ante un rearchivado tras una caida esto
+  podria atascar el archiver de forma permanente. **No verificado contra la documentacion en esta
+  sesion**; anotado como defecto latente candidato a sprint propio. Hoy funciona: `failed_count=0`,
+  367 segmentos archivados.
 - La copia offsite depende de una unica Storage Box; si Hetzner pierde VPS y Storage Box a la vez (misma cuenta/proveedor), no hay tercera copia.
 - La passphrase restic tiene una unica copia fuera del VPS (carpeta local del usuario); si se pierden ambas, el repositorio offsite es irrecuperable.
 - El backend ya esta desplegado en VPS/API publica HTTPS temporal; falta dominio propio estable y estrategia de rollback/CI-CD.
