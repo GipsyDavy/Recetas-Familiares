@@ -35,7 +35,7 @@ class ImageCacheTest {
         server = new MockWebServer();
         server.start();
         client = new ApiClient(session, server.url("/").toString());
-        cache = new ImageCache(client, 8);
+        cache = new ImageCache(client, 8, 1024);
     }
 
     @AfterEach
@@ -94,6 +94,36 @@ class ImageCacheTest {
         cache.fetch(url);
         cache.clearCache();
         cache.fetch(url);
+
+        assertEquals(2, server.getRequestCount());
+    }
+
+    @Test
+    void expulsaLoMasViejoCuandoSeAgotaElPresupuestoDeMemoria() throws Exception {
+        // El presupuesto es de 1024 bytes: la segunda imagen de 700 no cabe con la primera.
+        String grande = "x".repeat(700);
+        server.enqueue(new MockResponse().setBody(grande));
+        server.enqueue(new MockResponse().setBody(grande));
+        server.enqueue(new MockResponse().setBody(grande));
+        String primera = server.url("/uploads/primera.jpg").toString();
+        String segunda = server.url("/uploads/segunda.jpg").toString();
+
+        cache.fetch(primera);
+        cache.fetch(segunda);
+        cache.fetch(primera); // La primera ya fue expulsada: vuelve a bajar.
+
+        assertEquals(3, server.getRequestCount());
+    }
+
+    @Test
+    void devuelveLaImagenQueNoCabeEnElPresupuestoSinCachearla() throws Exception {
+        String enorme = "y".repeat(2048);
+        server.enqueue(new MockResponse().setBody(enorme));
+        server.enqueue(new MockResponse().setBody(enorme));
+        String url = server.url("/uploads/enorme.jpg").toString();
+
+        assertArrayEquals(enorme.getBytes(StandardCharsets.UTF_8), cache.fetch(url));
+        assertArrayEquals(enorme.getBytes(StandardCharsets.UTF_8), cache.fetch(url));
 
         assertEquals(2, server.getRequestCount());
     }

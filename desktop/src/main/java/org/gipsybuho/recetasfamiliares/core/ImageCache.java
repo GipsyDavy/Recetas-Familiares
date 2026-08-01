@@ -1,6 +1,5 @@
 package org.gipsybuho.recetasfamiliares.core;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -22,20 +21,35 @@ public final class ImageCache {
     /** Marca de fallo: se cachea para no reintentar una URL rota en cada scroll. */
     private static final byte[] FAILED = new byte[0];
 
-    /** Por encima de esto la imagen se devuelve pero no se retiene en memoria. */
-    private static final int MAX_CACHED_BYTES = 2 * 1024 * 1024;
-
     private final ApiClient apiClient;
-    private final Map<String, byte[]> cache;
+    private final long maxTotalBytes;
 
-    public ImageCache(ApiClient apiClient, int maxEntries) {
+    /**
+     * Acceso siempre bajo synchronized(cache): la expulsion por presupuesto necesita
+     * recorrer el mapa, y eso no lo cubre un synchronizedMap por si solo.
+     */
+    private final LinkedHashMap<String, byte[]> cache;
+    private long totalBytes;
+
+    /**
+     * @param maxEntries    techo de entradas (incluye los fallos, que ocupan 0 bytes)
+     * @param maxTotalBytes presupuesto de memoria. Una portada sin thumbnail cae a la
+     *                      imagen original, que puede pesar varios MB: sin este limite
+     *                      un catalogo de fotos grandes agota la memoria del cliente.
+     */
+    public ImageCache(ApiClient apiClient, int maxEntries, long maxTotalBytes) {
         this.apiClient = apiClient;
-        this.cache = Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+        this.maxTotalBytes = maxTotalBytes;
+        this.cache = new LinkedHashMap<>(16, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
-                return size() > maxEntries;
+                if (size() > maxEntries) {
+                    totalBytes -= eldest.getValue().length;
+                    return true;
+                }
+                return false;
             }
-        });
+        };
     }
 
     /** Bytes de la imagen, o null si no se pudo descargar. Los fallos tambien se cachean. */
@@ -43,29 +57,57 @@ public final class ImageCache {
         if (url == null || url.isBlank()) {
             return null;
         }
-        byte[] cached = cache.get(url);
-        if (cached != null) {
-            return cached == FAILED ? null : cached;
+        synchronized (cache) {
+            byte[] cached = cache.get(url);
+            if (cached != null) {
+                return cached == FAILED ? null : cached;
+            }
         }
+        byte[] bytes;
         try {
-            byte[] bytes = apiClient.fetchImage(url);
-            if (bytes == null) {
-                cache.put(url, FAILED);
-                return null;
-            }
-            if (bytes.length <= MAX_CACHED_BYTES) {
-                cache.put(url, bytes);
-            }
-            return bytes;
+            bytes = apiClient.fetchImage(url);
         } catch (Exception e) {
             // Sin log: la URL puede identificar una foto familiar concreta.
-            cache.put(url, FAILED);
-            return null;
+            bytes = null;
+        }
+        store(url, bytes);
+        return bytes;
+    }
+
+    private void store(String url, byte[] bytes) {
+        synchronized (cache) {
+            if (bytes == null) {
+                cache.put(url, FAILED);
+                return;
+            }
+            if (bytes.length > maxTotalBytes) {
+                // No cabe ni sola: se devuelve al llamante pero no se retiene.
+                return;
+            }
+            byte[] previous = cache.put(url, bytes);
+            totalBytes += bytes.length - (previous == null ? 0 : previous.length);
+            evictUntilWithinBudget(url);
+        }
+    }
+
+    /** Expulsa las entradas menos usadas hasta caber en el presupuesto, salvo la recien puesta. */
+    private void evictUntilWithinBudget(String keepUrl) {
+        var iterator = cache.entrySet().iterator();
+        while (totalBytes > maxTotalBytes && iterator.hasNext()) {
+            Map.Entry<String, byte[]> eldest = iterator.next();
+            if (eldest.getKey().equals(keepUrl)) {
+                continue;
+            }
+            totalBytes -= eldest.getValue().length;
+            iterator.remove();
         }
     }
 
     /** Vacia la cache. Obligatorio al cambiar de familia: no deben quedar fotos ajenas. */
     public void clearCache() {
-        cache.clear();
+        synchronized (cache) {
+            cache.clear();
+            totalBytes = 0;
+        }
     }
 }

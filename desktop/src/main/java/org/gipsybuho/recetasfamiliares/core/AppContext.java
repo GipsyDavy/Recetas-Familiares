@@ -38,7 +38,7 @@ public final class AppContext {
     private AppContext() {
         session = new AppSession();
         apiClient = new ApiClient(session);
-        imageCache = new ImageCache(apiClient, 200);
+        imageCache = new ImageCache(apiClient, 200, 32L * 1024 * 1024);
         authRepository = new AuthRepository(apiClient, session);
         userRepository = new UserRepository(apiClient, session);
         familyRepository = new FamilyRepository(apiClient, session);
