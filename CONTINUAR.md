@@ -4938,3 +4938,115 @@ Backup logico completo ejecutado despues: `Result=success`. Servicios activos. H
 - El codigo 2 (conflicto) no se distingue en `failed_count`: solo aparece en
   `journalctl -t recetas-archive-wal`. Si algun dia se monta alerta de backups, ese es el sitio.
 - Sin revision de Gemini.
+
+---
+
+## Cierre de sesion 2026-08-01 — dos sprints de infraestructura, backlog de riesgos agotado
+
+Sesion cerrada a peticion del usuario. Estado verificado **en esta sesion**, no de memoria.
+
+**Agente lider:** Claude Code (Opus 5), en solitario.
+**Gemini: NO DISPONIBLE** en toda la sesion (sin cuota). La revision de coherencia documental la
+asumio Claude Code en ambos sprints. Es la limitacion principal de este cierre.
+**Codex:** cuatro rondas de revision en total, todas en solo lectura y antes de tocar produccion.
+
+### Commits publicados
+
+| Commit | Contenido |
+|---|---|
+| `7e4021d` | PITR desde el repositorio offsite ensayado; peer WireGuard `10.10.0.2` retirado |
+| `8e69e9f` | `archive_command` cumpliendo el contrato de rearchivado; defecto del `sync` de uutils |
+
+`main` = `origin/main`, arbol limpio. **CI no se disparo en ninguno de los dos, y es correcto:**
+`Backend CI/CD` filtra por `backend/**`, `infra/backend/**` y `scripts/backend/**`; `infra/postgres/`
+queda fuera a proposito porque no hay nada que construir ni desplegar. Verificado contra la API de
+GitHub, no supuesto. `Dependency Audit` es semanal por cron.
+
+### Estado operativo del VPS al cierre
+
+- `archive_command = /usr/local/sbin/recetas-postgres-archive-wal %p %f`
+- Archiver: `archived=378 failed=0 last=000000010000000100000078`, sin `.ready` pendientes.
+- Bases: `postgres`, `recetas_familiares`, `recetas_familiares_test`, `template0`, `template1`.
+  Sin restos del ensayo PITR.
+- WireGuard: un unico peer, `10.10.0.3/32` (el PC del usuario), con handshake activo.
+- `postgresql@18-main`, `recetas-backend.service` y `wg-quick@wg0`: `active`.
+- Disco: 25 GB libres, 31% usado. Sin temporales en `/var/tmp` ni en el directorio de WAL.
+- Health de produccion: `{"status":"UP"}` (07:13:50 UTC).
+
+**Ficheros de rollback conservados a proposito** (no borrar sin motivo):
+
+```
+/root/archive-rollback.env  +  /root/archive-rollback.sha
+/etc/postgresql/18/main/conf.d/recetas-archive.conf.bak-20260801-064636
+/etc/wireguard/wg0.conf.bak-20260731-235144
+/etc/wireguard/wg0.live.bak-20260731-235144
+```
+
+### Lo que cierra esta sesion
+
+Los **dos riesgos residuales** que el runbook de PostgreSQL arrastraba desde el 11 de julio quedan
+cerrados con evidencia:
+
+1. **PITR partiendo solo del offsite.** Nunca se habia ensayado; lo probado el 31/07 era
+   restauracion logica. Ahora validado con precision de transaccion:
+   `recovery stopping before commit of transaction 13685`.
+2. **`archive_command` ante rearchivado.** Era un defecto latente real, confirmado contra §25.3.1.
+
+Y aparecio un tercero que nadie buscaba: **el `sync` añadido al `archive_command` el 31/07 nunca
+hizo `fsync(2)`**, porque este servidor usa uutils y no GNU coreutils. Llevaba un dia documentado
+como una mejora de durabilidad real. Corregido.
+
+### Dos trampas del entorno que conviene no olvidar
+
+- **Ubuntu 26.04 no tiene GNU coreutils.** `sync`, `ln`, `cat`, `mktemp` y `stat` son uutils
+  (`rust-coreutils 0.8.0`); `cp` y `cmp` siguen siendo GNU. `sync FICHERO` **no hace `fsync(2)`** y
+  su codigo de salida no es fiable. Comprobar `--version` antes de apoyarse en semantica fina.
+- **Perfil AppArmor `wg-quick` en modo enforce.** Impide a la herramienta abrir configuraciones
+  fuera de `/etc/wireguard/`: un candidato en `/run` o `/root` hace fallar `wg-quick strip` con
+  `Permission denied` aunque se ejecute como root.
+
+### Punto de retoma: no queda sprint de infraestructura pendiente
+
+Ningun riesgo de perdida de datos abierto. El backlog restante es funcional o de deuda, sin
+prioridad fijada por el usuario:
+
+- **Deuda:** 5 tests `UploadControllerTest` en rojo en local por contaminacion de la BD de test
+  compartida. CI no afectado (Postgres efimero).
+- **UX (7):** las cards de listado no muestran portada de receta ni en Android ni en Desktop; el
+  detalle si. Alcance acotado.
+- **UX-14:** ayuda contextual completa en Desktop y Android. Sprint grande, multi-fase, sin spec.
+- **(23):** pulido visual del sidebar Desktop. Idea suelta, sin spec.
+- **Prueba manual pendiente:** badge de avisos de actividad con dos cuentas/dispositivos. Bloqueada
+  para el agente en este entorno.
+- **iOS:** deuda de compilacion y paridad. Bloqueado sin macOS.
+- **(8)/(16)** buscar/comparar recetas en internet con IA: DESCARTADOS por el usuario el 2026-07-12.
+
+### Riesgo residual acumulado (infraestructura)
+
+- `ENOSPC` y `EIO` reales no ensayados contra el `archive_command`. La bateria cubre escritura
+  truncada con `RLIMIT_FSIZE`; los fallos de dispositivo no.
+- Dependencia nueva de `python3` en el camino de archivado. Fail-closed: si falla, PostgreSQL
+  reintenta y no se pierde WAL.
+- El codigo de salida 2 del archivado (conflicto de contenido) **no se distingue en
+  `failed_count`**. Solo aparece en `journalctl -t recetas-archive-wal`. Si algun dia se montan
+  alertas de backup, ese es el sitio a vigilar.
+- El aislamiento de red del cluster de ensayo PITR fue convencion de GUCs, no garantia del SO.
+  Valido mientras el preflight siga confirmando cero suscripciones logicas.
+- La copia offsite depende de una **unica** Storage Box, en la misma cuenta Hetzner que el VPS.
+- La passphrase de restic tiene **una unica copia** fuera del VPS (`herztner/`, no versionado).
+  Si se pierden ambas, el repositorio offsite es irrecuperable.
+- Dominio propio sigue aplazado; `sslip.io` es DNS de terceros sin SLA.
+
+### Honestidad operativa de esta sesion
+
+Se corrigieron **ocho fallos propios** antes de que llegaran a produccion: seis en el sprint del
+PITR (cuatro detectados en revision, dos ejecutando) y dos en el del `archive_command`. El patron
+dominante fue el mismo — verificaciones que no verificaban — y aparecio seis veces en la misma
+forma: `grep`, `grep -c` y `diff` devuelven distinto de cero en situaciones normales y, bajo
+`pipefail`, abortaban o aprobaban justo al reves de lo pretendido. La mitigacion que funciono no fue
+mas revision, sino un barrido mecanico con `grep` de las formas prohibidas.
+
+Dos hallazgos de Codex que se habian rebajado con argumentos propios resultaron correctos al
+verificarlos: el `source` del fichero de estado (bastaba un valor con un espacio, no hacia falta
+contenido hostil) y el contrato del `archive_command` (el ejemplo canonico de la documentacion es
+incompleto respecto a lo que ella misma exige).
