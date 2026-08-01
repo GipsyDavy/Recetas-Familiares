@@ -86,18 +86,7 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             if (familyId == null) flowOf(emptyList())
             else container.database.recipePhotoDao().observeCovers(familyId)
         }
-        .map { photos ->
-            // La consulta llega ordenada por position ascendente: la primera foto de cada
-            // receta es su portada. associateBy conservaria la ultima, asi que se pliega
-            // a mano quedandose con la primera.
-            buildMap {
-                photos.forEach { photo ->
-                    if (!containsKey(photo.recipeId)) {
-                        preferredCoverUrl(photo.thumbnailUrl, photo.url)?.let { put(photo.recipeId, it) }
-                    }
-                }
-            }
-        }
+        .map { photos -> coversByRecipeId(photos) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val stockItems: StateFlow<List<StockItemEntity>> = container.stockRepository.stockItems

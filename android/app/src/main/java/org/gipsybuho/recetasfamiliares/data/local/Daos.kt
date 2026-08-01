@@ -253,7 +253,7 @@ interface RecipePhotoDao {
         SELECT rp.* FROM recipe_photos rp
         INNER JOIN recipes r ON r.id = rp.recipeId
         WHERE r.familyId = :familyId AND rp.deleted = 0 AND r.deleted = 0
-        ORDER BY rp.recipeId ASC, rp.position ASC
+        ORDER BY rp.recipeId ASC, rp.position ASC, rp.id ASC
     """)
     fun observeCovers(familyId: String): Flow<List<RecipePhotoEntity>>
 
