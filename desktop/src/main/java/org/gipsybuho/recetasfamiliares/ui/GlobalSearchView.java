@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.ui;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
@@ -66,7 +67,7 @@ public class GlobalSearchView extends VBox {
                     if (!meta.isEmpty()) meta.append("  ·  ");
                     meta.append(r.difficulty());
                 }
-                results.getChildren().add(resultRow(r.title(), meta.toString(), "recipes"));
+                results.getChildren().add(recipeResultRow(r.title(), meta.toString(), r.coverThumbnailUrl()));
             }
         }
 
@@ -117,6 +118,22 @@ public class GlobalSearchView extends VBox {
         btn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         btn.getStyleClass().add("search-result-row");
         btn.setOnAction(e -> onNavigate.accept(viewKey));
+        return btn;
+    }
+
+    /**
+     * Fila de resultado de receta: identica a las demas, con la miniatura de portada
+     * delante. Se construye sobre resultRow para no duplicar estilos ni navegacion.
+     */
+    private Button recipeResultRow(String title, String meta, String coverUrl) {
+        Button btn = resultRow(title, meta, "recipes");
+        Node texts = btn.getGraphic();
+        RecipeThumbnail thumb = new RecipeThumbnail(context, RecipeThumbnail.LIST_SIZE);
+        thumb.show(coverUrl);
+        HBox row = new HBox(12, thumb, texts);
+        row.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(texts, Priority.ALWAYS);
+        btn.setGraphic(row);
         return btn;
     }
 

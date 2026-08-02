@@ -3,6 +3,7 @@ package org.gipsybuho.recetasfamiliares.ui;
 import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
@@ -326,6 +327,7 @@ public class DashboardView extends ScrollPane {
         HBox card = new HBox(16);
         card.getStyleClass().add("dashboard-recipe-card");
         card.setPadding(new Insets(12, 16, 12, 16));
+        card.setAlignment(Pos.CENTER_LEFT);
         card.setOnMouseEntered(e -> animateRecipeCard(card, 1.02));
         card.setOnMouseExited(e -> animateRecipeCard(card, 1.0));
 
@@ -349,7 +351,9 @@ public class DashboardView extends ScrollPane {
             info.getChildren().add(desc);
         }
 
-        card.getChildren().add(info);
+        RecipeThumbnail thumb = new RecipeThumbnail(context, RecipeThumbnail.LIST_SIZE);
+        thumb.show(recipe.coverThumbnailUrl());
+        card.getChildren().addAll(thumb, info);
         return card;
     }
 

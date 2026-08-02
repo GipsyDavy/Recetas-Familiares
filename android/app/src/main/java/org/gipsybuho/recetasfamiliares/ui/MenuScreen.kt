@@ -62,6 +62,7 @@ import java.util.Locale
 fun MenuScreen(
     menuItems: List<MenuItemEntity>,
     recipes: List<RecipeEntity>,
+    recipeCovers: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
@@ -139,6 +140,7 @@ fun MenuScreen(
                 DayMenuCard(
                     date = "$dayName, ${date.format(dateFmt)}",
                     dayItems = byDay[dateKey] ?: emptyList(),
+                    recipeCovers = recipeCovers,
                     isToday = date == today,
                     onAssign = {
                         assignToDate = dateKey
@@ -201,6 +203,7 @@ fun MenuScreen(
 private fun DayMenuCard(
     date: String,
     dayItems: List<MenuItemEntity>,
+    recipeCovers: Map<String, String>,
     isToday: Boolean,
     onAssign: () -> Unit,
     onMealTap: (MenuItemEntity) -> Unit
@@ -242,14 +245,16 @@ private fun DayMenuCard(
                 )
             } else {
                 Spacer(Modifier.height(Spacing.xs))
-                dayItems.forEach { item -> MealRow(item, onClick = { onMealTap(item) }) }
+                dayItems.forEach { item ->
+                    MealRow(item, recipeCovers[item.recipeId], onClick = { onMealTap(item) })
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MealRow(item: MenuItemEntity, onClick: () -> Unit) {
+private fun MealRow(item: MenuItemEntity, coverUrl: String?, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -258,6 +263,7 @@ private fun MealRow(item: MenuItemEntity, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
+        RecipeThumb(coverUrl = coverUrl, size = 48.dp)
         Text(
             text = mealTypeLabel(item.mealType),
             style = MaterialTheme.typography.labelSmall,

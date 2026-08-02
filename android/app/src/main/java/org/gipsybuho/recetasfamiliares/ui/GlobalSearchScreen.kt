@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import org.gipsybuho.recetasfamiliares.data.local.FamilyNoteEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
@@ -25,6 +26,7 @@ import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
 internal fun GlobalSearchScreen(
     query: String,
     recipes: List<RecipeEntity>,
+    recipeCovers: Map<String, String>,
     stockItems: List<StockItemEntity>,
     notes: List<FamilyNoteEntity>,
     modifier: Modifier,
@@ -63,6 +65,7 @@ internal fun GlobalSearchScreen(
                         recipe.prepMinutes?.let { "$it min" },
                         recipe.difficulty
                     ).joinToString("  ·  "),
+                    leading = { RecipeThumb(coverUrl = recipeCovers[recipe.id], size = 56.dp) },
                     onClick = { onNavigate(MainTab.RECIPES) }
                 )
             }
@@ -109,12 +112,18 @@ private fun SearchSectionHeader(label: String, count: Int) {
 }
 
 @Composable
-private fun SearchResultRow(title: String, meta: String, onClick: () -> Unit) {
+private fun SearchResultRow(
+    title: String,
+    meta: String,
+    leading: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit
+) {
     ListItem(
         headlineContent = { Text(title, style = MaterialTheme.typography.bodyLarge) },
         supportingContent = if (meta.isNotBlank()) {
             { Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else null,
+        leadingContent = leading,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
