@@ -5,8 +5,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.FileChooser;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
@@ -119,9 +117,12 @@ public class WeeklyMenuView extends ScrollPane {
         buildWeeklyStructure();
         statusLabel.setText("Cargando...");
 
+        boolean recipeCacheEmpty = context.getRecipeRepository().getCache().isEmpty();
         Thread.ofVirtual().start(() -> {
             try {
-                ensureRecipeCacheLoaded();
+                if (recipeCacheEmpty) {
+                    loadRecipeCachePage();
+                }
                 List<SyncDtos.MenuDtos.MenuItemDto> items =
                         context.getMenuRepository().loadForWeek(weekStart);
                 Platform.runLater(() -> {
@@ -137,17 +138,15 @@ public class WeeklyMenuView extends ScrollPane {
     /**
      * La cache de recetas y la de imagenes se vacian juntas en
      * AppContext.clearFamilyScopedCaches(), asi que abrir el menu sin pasar antes por
-     * "Recetas" dejaria todas las celdas sin miniatura. Se repuebla una sola vez, y
-     * solo cuando hace falta.
+     * "Recetas" dejaria todas las celdas sin miniatura. refresh() comprueba si la cache
+     * esta vacia en el hilo de FX, antes de lanzar el hilo virtual, y solo llama aqui
+     * cuando hace falta repoblarla.
      *
      * NUNCA llamar desde el JavaFX Application Thread: hace red. Un fallo aqui no debe
      * impedir que el menu se pinte, asi que la excepcion se traga: el usuario ve los
      * titulos con placeholder, que es la degradacion prevista.
      */
-    private void ensureRecipeCacheLoaded() {
-        if (!context.getRecipeRepository().getCache().isEmpty()) {
-            return;
-        }
+    private void loadRecipeCachePage() {
         String familyAtStart = context.getSession().getFamilyId();
         try {
             var page = context.getRecipeRepository().loadPage(familyAtStart, 0, RECIPE_CACHE_PAGE_SIZE);

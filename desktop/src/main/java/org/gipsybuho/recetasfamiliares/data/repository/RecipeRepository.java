@@ -52,7 +52,7 @@ public class RecipeRepository {
      *
      * Devuelve null si la receta no esta cacheada, esta borrada o no tiene portada:
      * el llamante pinta el placeholder. No hace red: si la cache esta vacia hay que
-     * repoblarla antes (ver WeeklyMenuView.ensureRecipeCacheLoaded).
+     * repoblarla antes (ver WeeklyMenuView.loadRecipeCachePage).
      */
     public String coverUrlFor(String recipeId) {
         if (recipeId == null || recipeId.isBlank()) {
