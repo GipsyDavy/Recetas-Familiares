@@ -263,9 +263,7 @@ private fun MealRow(item: MenuItemEntity, coverUrl: String?, onClick: () -> Unit
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        if (item.recipeId != null) {
-            RecipeThumb(coverUrl = coverUrl, size = 48.dp)
-        }
+        RecipeThumb(coverUrl = coverUrl, size = 48.dp)
         Text(
             text = mealTypeLabel(item.mealType),
             style = MaterialTheme.typography.labelSmall,
