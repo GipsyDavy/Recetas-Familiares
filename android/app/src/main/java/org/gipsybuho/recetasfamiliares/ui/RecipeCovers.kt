@@ -74,7 +74,7 @@ fun RecipeThumb(coverUrl: String?, size: Dp, modifier: Modifier = Modifier) {
             tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.30f)
         )
         Crossfade(targetState = coverUrl, label = "recipeThumbCover") { url ->
-            if (url != null) {
+            if (!url.isNullOrBlank()) {
                 AsyncImage(
                     model = url,
                     contentDescription = null,
