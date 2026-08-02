@@ -28,7 +28,6 @@ public class WeeklyMenuView extends ScrollPane {
     private static final String[] MEAL_TYPES   = {"BREAKFAST", "LUNCH", "DINNER", "SNACK"};
     private static final String[] DAY_NAMES    = {"Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"};
 
-    private static final double MENU_THUMB_SIZE = 40;
     private static final int RECIPE_CACHE_PAGE_SIZE = 100;
 
     private final AppContext context;
@@ -117,12 +116,9 @@ public class WeeklyMenuView extends ScrollPane {
         buildWeeklyStructure();
         statusLabel.setText("Cargando...");
 
-        boolean recipeCacheEmpty = context.getRecipeRepository().getCache().isEmpty();
         Thread.ofVirtual().start(() -> {
             try {
-                if (recipeCacheEmpty) {
-                    loadRecipeCachePage();
-                }
+                loadRecipeCachePage();
                 List<SyncDtos.MenuDtos.MenuItemDto> items =
                         context.getMenuRepository().loadForWeek(weekStart);
                 Platform.runLater(() -> {
@@ -138,9 +134,11 @@ public class WeeklyMenuView extends ScrollPane {
     /**
      * La cache de recetas y la de imagenes se vacian juntas en
      * AppContext.clearFamilyScopedCaches(), asi que abrir el menu sin pasar antes por
-     * "Recetas" dejaria todas las celdas sin miniatura. refresh() comprueba si la cache
-     * esta vacia en el hilo de FX, antes de lanzar el hilo virtual, y solo llama aqui
-     * cuando hace falta repoblarla.
+     * "Recetas" dejaria todas las celdas sin miniatura. refresh() llama aqui en cada
+     * apertura del menu para tener siempre una copia reciente de las recetas
+     * disponible. El merge es no destructivo (mergeById), asi que repetir esta llamada
+     * no pisa una pagina mas grande que otra vista (p.ej. Recetas con "Cargar más")
+     * haya dejado en la misma cache compartida.
      *
      * NUNCA llamar desde el JavaFX Application Thread: hace red. Un fallo aqui no debe
      * impedir que el menu se pinte, asi que la excepcion se traga: el usuario ve los
@@ -154,8 +152,8 @@ public class WeeklyMenuView extends ScrollPane {
                 if (!java.util.Objects.equals(familyAtStart, context.getSession().getFamilyId())) {
                     return;
                 }
-                context.getRecipeRepository().getCache().replaceAll(
-                        page.items().stream().filter(r -> !r.deleted()).toList());
+                context.getRecipeRepository().getCache().mergeById(
+                        page.items(), RecipeDtos.RecipeDto::id, RecipeDtos.RecipeDto::deleted);
             });
         } catch (Exception ignored) {
             // Sin miniaturas, pero el menu se pinta igual.
@@ -368,7 +366,7 @@ public class WeeklyMenuView extends ScrollPane {
         titleLabel.setWrapText(true);
         titleLabel.setMaxWidth(Double.MAX_VALUE);
 
-        RecipeThumbnail thumb = new RecipeThumbnail(context, MENU_THUMB_SIZE);
+        RecipeThumbnail thumb = new RecipeThumbnail(context, RecipeThumbnail.MENU_SIZE);
         thumb.show(context.getRecipeRepository().coverUrlFor(item.recipeId()));
         HBox titleRow = new HBox(8, thumb, titleLabel);
         titleRow.setAlignment(Pos.CENTER_LEFT);
