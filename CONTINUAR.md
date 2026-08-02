@@ -5160,3 +5160,149 @@ URL de producción restaurada en las preferencias de la app.
   pull no se refresca hasta que se toque la receta. Aceptado: Android usa sus propias fotos y
   Desktop reconstruye su caché desde el listado REST.
 - **iOS fuera de alcance**, sigue bloqueado.
+
+---
+
+## Punto de retoma — cierre de sesión del 2026-08-01 (noche)
+
+**No hay nada a medias.** `main` = `origin/main` en `b142d30`, árbol limpio, rama
+`feat/portada-recetas-listado` fusionada y borrada, producción desplegada (CI run `30718609901`)
+y con health UP en `/api/v1/health`. El sprint de portada está cerrado **con** su validación
+manual, que era lo único que quedaba abierto.
+
+### Lo que cambió hoy y afecta a cómo trabajar de aquí en adelante
+
+- **La automatización de la GUI ya no está bloqueada.** Este documento y las notas de julio decían
+  que los clics de UI los tenía que dar el usuario. Es falso desde hoy: se pilota Desktop desde
+  PowerShell con `user32.dll` (`SetCursorPos` + `mouse_event` para clic y rueda, `MoveWindow` para
+  redimensionar) y se captura con `CopyFromScreen`. Esto desbloquea pruebas manuales que llevaban
+  meses aparcadas.
+- **El health público es `/api/v1/health`**, no `/actuator/health` (ese responde 401).
+- Para levantar el backend contra la BD de test:
+  `DB_URL=$DB_TEST_URL DB_USERNAME=$DB_TEST_USERNAME DB_PASSWORD=$DB_TEST_PASSWORD JWT_SECRET=<32+ bytes> UPLOAD_DIR=./uploads-manual mvn spring-boot:run`
+  desde `backend/`. Nunca apuntarlo a `recetas_familiares`.
+
+### Candidatos para el siguiente sprint, ordenados
+
+Ninguno está fijado por el usuario. Por orden de relación coste/valor:
+
+1. **Portada en el resto de listados (recomendado).** Hoy la portada solo llega al listado
+   principal de recetas. Siguen sin ella: favoritos, menús semanales y búsqueda global, en Android
+   y en Desktop. Reutiliza todo lo construido hoy — `coverUrlsByRecipeId` en backend, `RecipeCovers`
+   en Android, `ImageCache` en Desktop — así que es sobre todo trabajo de UI. Alcance acotado y
+   riesgo bajo. Empezar por inventariar qué pantallas listan recetas y cuáles ya reciben
+   `coverThumbnailUrl`.
+2. **Prueba manual del badge de avisos de actividad.** Lleva desde el 25/07 documentada como
+   "bloqueada para el agente" por necesitar dos cuentas y clics de UI. Ya no lo está: se puede
+   pilotar Desktop con la técnica de hoy y Android por `adb`. Barato y cierra una deuda vieja.
+3. **Elegir manualmente qué foto es la portada.** Hoy siempre gana la de menor `position`. Requiere
+   decisión de producto (¿marcar una foto como portada, o reordenar?) y toca contrato + los tres
+   clientes. Empezar por `superpowers:brainstorming`.
+4. **(23) pulido visual del sidebar de Desktop.** Idea suelta sin spec, valor estético.
+5. **UX-14 ayuda contextual completa.** Sprint grande y multi-fase, sin spec.
+6. **iOS**: sigue bloqueado sin macOS. No planificar.
+
+### Deuda real que sigue abierta
+
+- Sin tests de UI automatizados en Desktop ni en Android (`COD-8` parcial). La técnica de pilotaje
+  de hoy es manual y no está en CI; convertirla en smoke test automatizado sería un sprint propio.
+- Sync: si solo cambia una foto, el `coverThumbnailUrl` del pull no se refresca hasta que se toque
+  la receta. Aceptado y documentado; ningún cliente depende de esa vía.
+
+---
+
+## Sprint portada de receta en el resto de listados — CERRADO 2026-08-02 (Claude Code)
+
+Continuación directa del sprint del 01/08. La portada llega ahora a **búsqueda global** (Android y
+Desktop), **"Recetas recientes" del dashboard** de Desktop y **menú semanal** de ambas plataformas.
+Sprint 100 % cliente: ni un archivo bajo `backend/`, `ios/` o `database/`, sin cambios de contrato,
+migración ni sincronización.
+
+Spec: `docs/superpowers/specs/2026-08-02-portada-resto-listados-design.md`.
+Plan: `docs/superpowers/plans/2026-08-02-portada-resto-listados.md` (7 tareas, ejecutadas con
+`subagent-driven-development`: implementador y revisor por tarea, más revisión final de rama).
+
+### Corrección al backlog
+
+`CONTINUAR.md` proponía "favoritos, menús semanales y búsqueda global". **No existe ninguna pantalla
+de favoritos**, ni en Android ni en Desktop: es un botón de alternar en el detalle de la receta
+(`RecipeDetailView.java:46`, `RecipeScreens.kt:502`) y un repositorio contra `/favorite-recipes`,
+sin listado que mostrar. En cambio aparecieron dos listados que el candidato no mencionaba: las
+recetas recientes del dashboard y los selectores de receta, estos últimos dejados fuera de alcance.
+
+### Qué se construyó
+
+- **Desktop `RecipeThumbnail`** (`ui/RecipeThumbnail.java`, nuevo): nodo reutilizable con el guard
+  de reciclado (`pendingUrl`), la descarga en hilo virtual contra `ImageCache`, el fade sujeto a
+  `MotionPreferences` y las constantes de tamaño `LIST_SIZE = 56` / `MENU_SIZE = 40`. `RecipeCell`
+  migró a él, quedando una sola implementación del guard en vez de las cuatro copias que este sprint
+  habría creado.
+- **Desktop `RecipeRepository.coverUrlFor(recipeId)`**: única lógica pura del sprint, con 5 tests.
+  Resuelve la portada para las vistas que manejan `MenuItemDto` y no tienen el `RecipeDto` a mano.
+- **Android `RecipeThumb`** (en `RecipeCovers.kt`): composable de miniatura, 56 dp en búsqueda y
+  48 dp en la fila de comida. Android no necesitó lógica nueva: `viewModel.recipeCovers` ya era un
+  `StateFlow` por familia alimentado por Room, y las pantallas nuevas solo lo consumen.
+
+### Defecto encontrado por la revisión final, y corregido (commit `4cbf2cd`)
+
+El más valioso del sprint. `WeeklyMenuView` repoblaba la caché de recetas **solo si estaba vacía**,
+pero `RecipeListView` escribe en esa misma caché compartida un `replaceAll` de `PAGE_SIZE` en cada
+navegación a "Recetas". En el camino normal — abrir la app, ir a Recetas, ir a Menú — la caché
+quedaba **parcial pero no vacía**, la repoblación se saltaba, y toda receta fuera de esa página
+aparecía sin portada en el menú. Corregido con `mergeById` (no destructivo e idempotente) y
+eliminando la guarda de vacío, lo que además cierra una carrera por la que la respuesta lenta del
+menú podía pisar la paginación del listado y duplicar filas.
+
+**Por qué la validación visual no lo detectó:** se probó "abrir el menú sin pasar por Recetas", que
+es justamente el único camino donde la guarda funcionaba. Además la siembra tenía 29 recetas, por
+debajo del `PAGE_SIZE` de 30. Lección: sembrar por encima del tamaño de página al validar cualquier
+cosa que dependa de esa caché compartida.
+
+Otro hallazgo de la misma revisión: Android omitía el hueco de la miniatura cuando la entrada de
+menú no tenía receta, mientras Desktop sí pintaba el placeholder — única divergencia real de
+comportamiento entre plataformas, corregida en `c1e3338`.
+
+### Validación ejecutada en esta sesión
+
+| Comando | Resultado |
+|---|---|
+| `mvn -f desktop/pom.xml test` | **60 tests, 0 fallos** (55 previos + 5 de `RecipeCoverLookupTest`) |
+| `gradlew testDebugUnitTest` en `android/` | **82 tests, 0 fallos** en 13 clases |
+| `gradlew assembleDebug` | BUILD SUCCESSFUL |
+| `run-security-scan.ps1 -Mode sprint` | Semgrep 0; TruffleHog 2 no verificados (falsos positivos conocidos); **exit 0** |
+| `/security-review` y `/VibeSec` | Sin hallazgos de confianza alta |
+
+**Validación visual pilotada, ambas plataformas.** Backend local contra `recetas_familiares_test`
+(comprobado en el log de Flyway antes de sembrar), 24 recetas cuya portada lleva su número en
+grande, una de cada seis sin foto, menú semanal de 14 entradas y una segunda familia.
+
+- **Desktop** (pilotado con `user32.dll`): listado principal tras migrar `RecipeCell`, scroll rápido
+  sin fotos cruzadas, dashboard, búsqueda global, menú semanal, menú con caché fría sin pasar por
+  Recetas, y cambio de familia. Los 7 correctos.
+- **Android** (emulador + `adb`): listado, búsqueda global con sus 11 resultados y menú semanal, con
+  el número correcto en cada fila y placeholder exacto donde tocaba.
+
+### Trampa de entorno que costó una hora — anotar para la próxima
+
+En el emulador, las portadas **no se ven** si el backend local arranca con su `UPLOAD_BASE_URL` por
+defecto: firma las URLs como `http://localhost:8080/...` (`application.yml:61`) y, dentro del
+emulador, `localhost` es el propio emulador. Parece un defecto de la aplicación y no lo es. `adb
+reverse` tampoco lo arregla, porque Coil ya ha cacheado los fallos de carga.
+
+**Arrancar siempre así para validar Android:** `UPLOAD_BASE_URL=http://10.0.2.2:8080`.
+
+El diagnóstico se cerró extrayendo la base de Room del emulador y consultándola: 29 recetas, **20
+filas en `recipe_photos`**, y la consulta de `observeCovers` devolvía las 20. Es decir, la capa de
+datos era correcta desde el principio. Cómo extraerla, porque no es evidente: el pipe de PowerShell
+corrompe binarios, `run-as` no puede escribir en `/sdcard` y la imagen del emulador no admite `adb
+root`; funciona `adb exec-out run-as <pkg> base64 databases/recetas-familiares.db` y decodificar en
+el host. El emulador no trae `sqlite3`.
+
+### Riesgo residual
+
+- **Sin tests de UI automatizados** en ninguna de las dos plataformas: no hay TestFX, Robolectric ni
+  Compose UI Test. Las cinco pantallas se sostienen en la validación visual, que es manual.
+- En el menú de Desktop, una receta fuera de las 100 que carga `loadRecipeCachePage` seguirá sin
+  miniatura hasta que otra vista la traiga a la caché.
+- `AppSession.familyId` es un `String` sin `volatile` ni sincronización, leído desde hilos de fondo
+  en toda la aplicación. Preexistente, no introducido aquí; arreglarlo es un sprint propio.
