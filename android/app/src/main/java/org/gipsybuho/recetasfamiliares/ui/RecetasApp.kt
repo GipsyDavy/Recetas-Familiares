@@ -343,6 +343,7 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     var initialConversation by remember { mutableStateOf<PrivateConversationDto?>(null) }
     val privateChatUnread by viewModel.privateChatUnread.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
+    val recipeCovers by viewModel.recipeCovers.collectAsState()
     val filteredRecipes by viewModel.filteredRecipes.collectAsState()
     val filterByStock by viewModel.filterByStock.collectAsState()
     val stockItems by viewModel.stockItems.collectAsState()
@@ -566,6 +567,7 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
             GlobalSearchScreen(
                 query = searchQuery.trim(),
                 recipes = recipes,
+                recipeCovers = recipeCovers,
                 stockItems = stockItems,
                 notes = notes,
                 modifier = Modifier.padding(padding),

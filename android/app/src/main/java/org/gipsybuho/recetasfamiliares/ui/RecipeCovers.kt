@@ -1,5 +1,22 @@
 package org.gipsybuho.recetasfamiliares.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
 
 /**
@@ -30,6 +47,41 @@ fun coversByRecipeId(photos: List<RecipePhotoEntity>): Map<String, String> {
     return buildMap {
         bestPhotoByRecipeId.forEach { (recipeId, photo) ->
             preferredCoverUrl(photo.thumbnailUrl, photo.url)?.let { put(recipeId, it) }
+        }
+    }
+}
+
+/**
+ * Miniatura cuadrada de portada, para los listados donde la card grande no cabe:
+ * busqueda global y filas de comida del menu. Misma receta visual que RecipeCard,
+ * en pequeno.
+ *
+ * Con coverUrl nulo deja el placeholder: nunca un hueco vacio, porque los titulos
+ * quedarian en dos margenes distintos y el ojo pierde la columna al hacer scroll.
+ */
+@Composable
+fun RecipeThumb(coverUrl: String?, size: Dp, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Icon(
+            Icons.Outlined.Restaurant,
+            contentDescription = null,
+            modifier = Modifier.size(size / 2).align(Alignment.Center),
+            tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.30f)
+        )
+        Crossfade(targetState = coverUrl, label = "recipeThumbCover") { url ->
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }
