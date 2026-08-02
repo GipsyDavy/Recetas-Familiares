@@ -1,6 +1,5 @@
 package org.gipsybuho.recetasfamiliares.ui;
 
-import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -8,15 +7,12 @@ import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
-import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 
 public class RecipeListView extends ScrollPane {
@@ -260,38 +256,16 @@ public class RecipeListView extends ScrollPane {
 
         private static final double THUMB_SIZE = 56;
 
-        private final ImageView thumb = new ImageView();
-        private final Region placeholder = new Region();
-        private final StackPane thumbHolder = new StackPane(placeholder, thumb);
+        private final RecipeThumbnail thumb = new RecipeThumbnail(context, THUMB_SIZE);
         private final Label title = new Label();
         private final Label meta = new Label();
         private final HBox root;
 
-        /** Url de la carga en curso: si la celda se recicla, el resultado viejo se descarta. */
-        private String pendingUrl;
-
         RecipeCell() {
-            thumb.setFitWidth(THUMB_SIZE);
-            thumb.setFitHeight(THUMB_SIZE);
-            thumb.setPreserveRatio(true);
-            thumb.setSmooth(true);
-            Rectangle clip = new Rectangle(THUMB_SIZE, THUMB_SIZE);
-            clip.setArcWidth(12);
-            clip.setArcHeight(12);
-            thumb.setClip(clip);
-
-            placeholder.setPrefSize(THUMB_SIZE, THUMB_SIZE);
-            placeholder.setMinSize(THUMB_SIZE, THUMB_SIZE);
-            placeholder.setMaxSize(THUMB_SIZE, THUMB_SIZE);
-            placeholder.getStyleClass().add("recipe-cell-thumb-placeholder");
-
-            thumbHolder.setPrefSize(THUMB_SIZE, THUMB_SIZE);
-            thumbHolder.setMinSize(THUMB_SIZE, THUMB_SIZE);
-
             title.getStyleClass().add("recipe-cell-title");
             meta.getStyleClass().add("recipe-cell-meta");
             VBox texts = new VBox(3, title, meta);
-            root = new HBox(10, thumbHolder, texts);
+            root = new HBox(10, thumb, texts);
             root.getStyleClass().add("recipe-cell");
             HBox.setHgrow(texts, Priority.ALWAYS);
         }
@@ -300,7 +274,7 @@ public class RecipeListView extends ScrollPane {
         protected void updateItem(RecipeDtos.RecipeDto recipe, boolean empty) {
             super.updateItem(recipe, empty);
             if (empty || recipe == null) {
-                pendingUrl = null;
+                thumb.clear();
                 setText(null);
                 setGraphic(null);
                 return;
@@ -309,41 +283,7 @@ public class RecipeListView extends ScrollPane {
             meta.setText(buildMeta(recipe));
             setGraphic(root);
             setText(null);
-            loadCover(recipe.coverThumbnailUrl());
-        }
-
-        private void loadCover(String url) {
-            pendingUrl = url;
-            thumb.setImage(null);
-            thumb.setOpacity(0);
-            if (url == null || url.isBlank()) {
-                return;
-            }
-            Thread.ofVirtual().start(() -> {
-                byte[] bytes = context.getImageCache().fetch(url);
-                if (bytes == null) {
-                    return;
-                }
-                Image image = new Image(new ByteArrayInputStream(bytes),
-                        THUMB_SIZE * 2, THUMB_SIZE * 2, true, true);
-                Platform.runLater(() -> {
-                    // La celda pudo reciclarse mientras bajaba la imagen: si ya no
-                    // corresponde a esta url, se descarta en vez de pintar la foto
-                    // de otra receta.
-                    if (!java.util.Objects.equals(pendingUrl, url) || image.isError()) {
-                        return;
-                    }
-                    thumb.setImage(image);
-                    if (MotionPreferences.isReducedMotion()) {
-                        thumb.setOpacity(1);
-                    } else {
-                        FadeTransition fade = new FadeTransition(Duration.millis(150), thumb);
-                        fade.setFromValue(0);
-                        fade.setToValue(1);
-                        fade.play();
-                    }
-                });
-            });
+            thumb.show(recipe.coverThumbnailUrl());
         }
 
         private String buildMeta(RecipeDtos.RecipeDto r) {
