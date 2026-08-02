@@ -27,6 +27,7 @@ import org.gipsybuho.recetasfamiliares.api.dto.SyncDtos;
 public class DashboardView extends ScrollPane {
 
     private static final String CARD_SCALE_TRANSITION_KEY = "dashboardCardScaleTransition";
+    private static final double THUMB_SIZE = 56;
     private final AppContext context;
     private final VBox recipesSection  = new VBox(8);
     private final VBox stockSection    = new VBox(6);
@@ -349,7 +350,9 @@ public class DashboardView extends ScrollPane {
             info.getChildren().add(desc);
         }
 
-        card.getChildren().add(info);
+        RecipeThumbnail thumb = new RecipeThumbnail(context, THUMB_SIZE);
+        thumb.show(recipe.coverThumbnailUrl());
+        card.getChildren().addAll(thumb, info);
         return card;
     }
 
