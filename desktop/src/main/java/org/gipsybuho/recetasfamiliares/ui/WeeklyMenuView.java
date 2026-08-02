@@ -5,6 +5,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.FileChooser;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
@@ -27,6 +29,9 @@ public class WeeklyMenuView extends ScrollPane {
     private static final String[] MEAL_LABELS  = {"Desayuno", "Comida", "Cena", "Merienda"};
     private static final String[] MEAL_TYPES   = {"BREAKFAST", "LUNCH", "DINNER", "SNACK"};
     private static final String[] DAY_NAMES    = {"Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"};
+
+    private static final double MENU_THUMB_SIZE = 40;
+    private static final int RECIPE_CACHE_PAGE_SIZE = 100;
 
     private final AppContext context;
     private final Runnable onSync;
@@ -116,6 +121,7 @@ public class WeeklyMenuView extends ScrollPane {
 
         Thread.ofVirtual().start(() -> {
             try {
+                ensureRecipeCacheLoaded();
                 List<SyncDtos.MenuDtos.MenuItemDto> items =
                         context.getMenuRepository().loadForWeek(weekStart);
                 Platform.runLater(() -> {
@@ -126,6 +132,35 @@ public class WeeklyMenuView extends ScrollPane {
                 Platform.runLater(() -> statusLabel.setText("No se pudo cargar el menú."));
             }
         });
+    }
+
+    /**
+     * La cache de recetas y la de imagenes se vacian juntas en
+     * AppContext.clearFamilyScopedCaches(), asi que abrir el menu sin pasar antes por
+     * "Recetas" dejaria todas las celdas sin miniatura. Se repuebla una sola vez, y
+     * solo cuando hace falta.
+     *
+     * NUNCA llamar desde el JavaFX Application Thread: hace red. Un fallo aqui no debe
+     * impedir que el menu se pinte, asi que la excepcion se traga: el usuario ve los
+     * titulos con placeholder, que es la degradacion prevista.
+     */
+    private void ensureRecipeCacheLoaded() {
+        if (!context.getRecipeRepository().getCache().isEmpty()) {
+            return;
+        }
+        String familyAtStart = context.getSession().getFamilyId();
+        try {
+            var page = context.getRecipeRepository().loadPage(familyAtStart, 0, RECIPE_CACHE_PAGE_SIZE);
+            Platform.runLater(() -> {
+                if (!java.util.Objects.equals(familyAtStart, context.getSession().getFamilyId())) {
+                    return;
+                }
+                context.getRecipeRepository().getCache().replaceAll(
+                        page.items().stream().filter(r -> !r.deleted()).toList());
+            });
+        } catch (Exception ignored) {
+            // Sin miniaturas, pero el menu se pinta igual.
+        }
     }
 
     private void refreshMonth() {
@@ -333,7 +368,13 @@ public class WeeklyMenuView extends ScrollPane {
         titleLabel.getStyleClass().add("menu-cell-title");
         titleLabel.setWrapText(true);
         titleLabel.setMaxWidth(Double.MAX_VALUE);
-        cell.getChildren().add(titleLabel);
+
+        RecipeThumbnail thumb = new RecipeThumbnail(context, MENU_THUMB_SIZE);
+        thumb.show(context.getRecipeRepository().coverUrlFor(item.recipeId()));
+        HBox titleRow = new HBox(8, thumb, titleLabel);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(titleLabel, Priority.ALWAYS);
+        cell.getChildren().add(titleRow);
 
         if (item.note() != null && !item.note().isBlank()) {
             Label noteLabel = new Label(item.note());
