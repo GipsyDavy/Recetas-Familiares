@@ -599,6 +599,7 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                     MainTab.NOTES    -> NotesScreen(notes, Modifier.padding(padding), viewModel)
                     MainTab.MENU     -> MenuScreen(
                         menuItems = menuItems, recipes = recipes,
+                        recipeCovers = recipeCovers,
                         modifier = Modifier.padding(padding),
                         isRefreshing = isRefreshing, onRefresh = viewModel::refresh,
                         onAssignToMenu = { date, recipeId, mealType -> viewModel.assignToMenu(recipeId, date, mealType) },
