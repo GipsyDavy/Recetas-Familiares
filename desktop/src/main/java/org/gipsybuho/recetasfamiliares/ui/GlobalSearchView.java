@@ -15,7 +15,6 @@ import java.util.function.Consumer;
 
 public class GlobalSearchView extends VBox {
 
-    private static final double THUMB_SIZE = 56;
     private final AppContext context;
     private final Consumer<String> onNavigate;
 
@@ -129,7 +128,7 @@ public class GlobalSearchView extends VBox {
     private Button recipeResultRow(String title, String meta, String coverUrl) {
         Button btn = resultRow(title, meta, "recipes");
         Node texts = btn.getGraphic();
-        RecipeThumbnail thumb = new RecipeThumbnail(context, THUMB_SIZE);
+        RecipeThumbnail thumb = new RecipeThumbnail(context, RecipeThumbnail.LIST_SIZE);
         thumb.show(coverUrl);
         HBox row = new HBox(12, thumb, texts);
         row.setAlignment(Pos.CENTER_LEFT);

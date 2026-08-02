@@ -26,6 +26,11 @@ import java.util.Objects;
  */
 public final class RecipeThumbnail extends StackPane {
 
+    /** Tamaño usado en listados y tarjetas: dashboard, búsqueda global y lista de recetas. */
+    public static final double LIST_SIZE = 56;
+    /** Tamaño usado en las celdas del menú semanal, más compactas que un listado. */
+    public static final double MENU_SIZE = 40;
+
     private static final double CORNER_RADIUS = 12;
     private static final double FADE_MILLIS = 150;
 

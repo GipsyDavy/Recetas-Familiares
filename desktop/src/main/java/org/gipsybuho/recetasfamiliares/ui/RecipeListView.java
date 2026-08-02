@@ -254,9 +254,7 @@ public class RecipeListView extends ScrollPane {
     /** Deja de ser static: necesita el AppContext para descargar las portadas. */
     private class RecipeCell extends ListCell<RecipeDtos.RecipeDto> {
 
-        private static final double THUMB_SIZE = 56;
-
-        private final RecipeThumbnail thumb = new RecipeThumbnail(context, THUMB_SIZE);
+        private final RecipeThumbnail thumb = new RecipeThumbnail(context, RecipeThumbnail.LIST_SIZE);
         private final Label title = new Label();
         private final Label meta = new Label();
         private final HBox root;
