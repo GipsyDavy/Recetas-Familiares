@@ -46,6 +46,30 @@ public class RecipeRepository {
     public SimpleCache<RecipeDtos.RecipeIngredientDto> getIngredientCache() { return ingredientCache; }
     public SimpleCache<RecipeDtos.RecipeStepDto> getStepCache() { return stepCache; }
 
+    /**
+     * Portada de una receta ya cargada en la cache local, por id. Existe para las
+     * vistas que manejan MenuItemDto y no tienen el RecipeDto a mano.
+     *
+     * Devuelve null si la receta no esta cacheada, esta borrada o no tiene portada:
+     * el llamante pinta el placeholder. No hace red: si la cache esta vacia hay que
+     * repoblarla antes (ver WeeklyMenuView.ensureRecipeCacheLoaded).
+     */
+    public String coverUrlFor(String recipeId) {
+        if (recipeId == null || recipeId.isBlank()) {
+            return null;
+        }
+        for (RecipeDtos.RecipeDto recipe : cache.getItems()) {
+            if (recipeId.equals(recipe.id())) {
+                if (recipe.deleted()) {
+                    return null;
+                }
+                String url = recipe.coverThumbnailUrl();
+                return url != null && !url.isBlank() ? url : null;
+            }
+        }
+        return null;
+    }
+
     /** Load paginated recipes into cache. */
     public RecipeDtos.RecipePageResponse loadPage(int page, int size) throws ApiException {
         String familyId = session.getFamilyId();
