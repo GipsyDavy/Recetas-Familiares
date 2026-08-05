@@ -5474,3 +5474,74 @@ Se retira «no hay CI de clientes» del riesgo residual: ya la hay. Lo que queda
 
 Agente único: Claude Code. **No se consultó a Codex ni a Gemini**: sin segunda opinión externa.
 Skills usadas: `brainstorming`, `security-review` (aplicada a la superficie CI/CD).
+
+---
+
+## Punto de retoma — cierre de sesión del 2026-08-05 (noche)
+
+**No hay nada a medias.** `main` == `origin/main` en `375aa2c`, árbol limpio, sin ficheros sin
+trackear, sin ramas locales. Dos sprints cerrados esta sesión, ambos fusionados y pusheados, y
+**los cuatro workflows del repositorio en verde en `main`**.
+
+### Estado exacto al cerrar
+
+| | |
+|---|---|
+| `main` local y remoto | `375aa2c`, sincronizados |
+| Ramas locales | ninguna aparte de `main` |
+| Ramas remotas | `feat/chat-imagenes-ux` y `feat/migracion-postgresql`, ambas con **0 commits fuera de `main`**: son borrables cuando se quiera |
+| CI en `main` | Desktop CI ✅, Android CI ✅, Backend CI/CD ✅, Dependency Audit ✅ |
+| Tests | Desktop 96, Android 93, backend 116 (backend de sesión anterior, no reejecutado hoy) |
+| Producción | No se tocó el backend en toda la sesión: el VPS sigue como estaba |
+
+### Lo que se hizo, en orden
+
+1. **Se pusheó el sprint del 02/08**, que llevaba 16 commits solo en el disco local. Se borraron
+   5 ramas locales ya fusionadas.
+2. **Sprint COD-8**: primeros tests de lógica de pantalla. Desktop 60→96, Android 82→93, sin
+   dependencias nuevas en ninguna plataforma. Merge `cc60f15`.
+3. **Sprint CI de clientes**: `desktop-ci.yml` y `android-ci.yml`. PR #1, validada en verde antes
+   de fusionar. Merge `d493cbe`.
+
+### Por dónde seguir, ordenado por valor
+
+1. **`TokenVault` sin ningún test (recomendado).** Cifra los tokens de sesión en disco con DPAPI
+   de Windows (SEC-2) y no tiene una sola prueba. Ahora existe un runner Windows en CI que podría
+   ejercitar ese código de verdad y no lo hace, porque ningún test llega a la clase. Un test de
+   ida y vuelta (`protect` → `unprotect` devuelve el original, un valor corrupto devuelve null)
+   cubre código de seguridad real y hace que la matriz de Desktop gane su sitio. Barato y acotado.
+2. **Proteger la rama `main` para que la CI bloquee merges.** Hoy la CI informa pero no impide:
+   nada obliga a que Desktop CI y Android CI pasen antes de fusionar. Es configuración de GitHub,
+   no código, y probablemente lo tenga que hacer el usuario desde la web (Settings → Branches).
+3. **Arreglar el wrapper de Gradle.** Apunta a `file:///C:/tmp/tools/gradle-9.5.1-bin.zip`, así
+   que el repositorio no es reproducible para otro clon. Requiere verificar antes que Avast no
+   rompe la descarga desde `services.gradle.org`; si la rompe, revertir y dejarlo documentado.
+4. **Elegir manualmente qué foto es la portada.** Sigue pendiente del backlog anterior. Requiere
+   decisión de producto y toca contrato, migración y los tres clientes. Empezar por
+   `superpowers:brainstorming`.
+5. **Tests de renderizado** (TestFX, Robolectric o Compose UI Test). Sprint grande; hoy ningún
+   test comprueba que un widget se pinte o que un clic navegue.
+6. **iOS**: sigue bloqueado sin macOS. No planificar.
+
+### Cosas del entorno que conviene no reaprender
+
+- **El repositorio está en GitHub**, no en Hetzner. Hetzner aloja el backend en producción. Son
+  cosas distintas y ya se confundieron una vez.
+- **El repositorio es público**: los runners de Actions son gratis e ilimitados. No razonar sobre
+  coste de minutos de CI sin comprobar esto antes.
+- En eventos `pull_request` los filtros `paths` se evalúan contra el **diff acumulado de la PR**;
+  en `push`, por commit.
+- Para validar Android en el emulador, arrancar el backend con
+  `UPLOAD_BASE_URL=http://10.0.2.2:8080`, o las portadas no se ven y parece un fallo de la app.
+- La herramienta Bash del agente es Git Bash: los here-strings `@'...'@` de PowerShell no
+  funcionan ahí. Y `git merge -F -` no lee de stdin aunque `git commit -F -` sí.
+
+### Trazabilidad de la sesión
+
+Agente único: Claude Code. **No se consultó a Codex ni a Gemini en ninguno de los dos sprints**,
+por decisión explícita del usuario: no hubo segunda opinión externa sobre ninguna de las
+decisiones de diseño tomadas hoy.
+
+Skills usadas: `brainstorming` (los dos sprints), `test-driven-development`, `security-review`,
+`VibeSec`. Escaneo `run-security-scan.ps1 -Mode sprint` ejecutado en ambos cierres, exit 0 las dos
+veces.
