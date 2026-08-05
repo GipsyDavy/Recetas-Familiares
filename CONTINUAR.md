@@ -5489,7 +5489,7 @@ trackear, sin ramas locales. Dos sprints cerrados esta sesión, ambos fusionados
 |---|---|
 | `main` local y remoto | `375aa2c`, sincronizados |
 | Ramas locales | ninguna aparte de `main` |
-| Ramas remotas | `feat/chat-imagenes-ux` y `feat/migracion-postgresql`, ambas con **0 commits fuera de `main`**: son borrables cuando se quiera |
+| Ramas remotas | solo `main`. Se borraron `feat/chat-imagenes-ux` (`3adef78`) y `feat/migracion-postgresql` (`9e70bec`), ambas con 0 commits fuera de `main`. Los SHA quedan aquí por si alguna vez hace falta recrearlas |
 | CI en `main` | Desktop CI ✅, Android CI ✅, Backend CI/CD ✅, Dependency Audit ✅ |
 | Tests | Desktop 96, Android 93, backend 116 (backend de sesión anterior, no reejecutado hoy) |
 | Producción | No se tocó el backend en toda la sesión: el VPS sigue como estaba |
