@@ -5391,3 +5391,86 @@ Lo que sigue **sin** cubrir, ahora con precisión:
 Agente único: Claude Code. **No se consultó a Codex ni a Gemini**, por decisión explícita del
 usuario al arrancar el sprint: no hubo segunda opinión externa sobre estas decisiones de diseño.
 Skills usadas: `brainstorming`, `test-driven-development`, `security-review`, `VibeSec`.
+
+---
+
+## Sprint CI de clientes — CERRADO 2026-08-05 (Claude Code)
+
+Continuación directa del sprint COD-8, que cerró señalando esto como el candidato siguiente.
+Hasta hoy `backend-ci-cd.yml` filtraba por `paths: backend/**` y **Desktop y Android nunca se
+compilaban ni se testeaban en CI**: los 96 tests de Desktop y los 93 de Android solo corrían si
+alguien los lanzaba a mano.
+
+Spec: `docs/superpowers/specs/2026-08-05-ci-clientes-design.md`.
+PR: [#1](https://github.com/GipsyDavy/Recetas-Familiares/pull/1), validada en verde antes de
+fusionar.
+
+### Qué se montó
+
+| | `desktop-ci.yml` | `android-ci.yml` |
+|---|---|---|
+| Runner | matriz `ubuntu-latest` + `windows-latest` | `ubuntu-latest` |
+| Pasos | `mvn -B test` → `mvn -B -DskipTests compile` | `sdkmanager platforms;android-36` → `testDebugUnitTest` → `assembleDebug` |
+| Dispara | push a main, PR y `workflow_dispatch`, filtrado por `desktop/**` | ídem con `android/**` |
+
+Dos workflows separados y no uno con dos jobs, porque los filtros `paths` son por workflow:
+así un cambio en Android no dispara el build de Desktop.
+
+### El blocker que había que resolver primero
+
+`android/gradle/wrapper/gradle-wrapper.properties` apunta a
+`file:///C:/tmp/tools/gradle-9.5.1-bin.zip`, una ruta local de esta máquina. En un runner ese
+archivo no existe y `./gradlew` falla en el primer segundo.
+
+**Se descartó arreglarlo.** La caché de `dists` está vacía, así que cambiar la URL forzaría una
+descarga de Gradle en local, y en este equipo Avast intercepta TLS y ya rompió el registry de
+Semgrep. Arriesgar el entorno de desarrollo no compensaba. La CI instala Gradle con
+`gradle/actions/setup-gradle` e invoca `gradle`, no `./gradlew`. El wrapper queda intacto.
+
+### Por qué Desktop corre también en Windows
+
+Decisión revisada a mitad de sprint. La primera recomendación fue solo `ubuntu`, apoyada en el
+coste de minutos de los runners Windows. Al comprobarlo, **el repositorio es público**: los
+runners estándar no consumen cuota. Sin coste de por medio, y distribuyéndose Desktop en Windows,
+la matriz es gratis y cubre `Preferences` sobre registro y la rama DPAPI de `TokenVault`.
+
+Matiz importante: correr en Windows **no cubre DPAPI hoy**, porque ningún test llega a
+`TokenVault`. Lo que cubre es que la suite entera pase en la plataforma real.
+
+### Validación ejecutada en esta sesión
+
+| Comprobación | Resultado |
+|---|---|
+| Desktop CI en `ubuntu-latest` | `Tests run: 96, Failures: 0, Errors: 0, Skipped: 0` — 0,4 min |
+| Desktop CI en `windows-latest` | `Tests run: 96, Failures: 0, Errors: 0, Skipped: 0` — 0,5 min |
+| Android CI | `:app:testDebugUnitTest` (28 tareas ejecutadas) y `assembleDebug` OK — 4,7 min |
+| Auditoría de los workflows | Sin `pull_request_target`, sin secretos, `contents: read`, sin interpolación en `run:`, acciones pinadas por SHA |
+| `run-security-scan.ps1 -Mode sprint` | Semgrep 0; TruffleHog 2 no verificados (preexistentes); **exit 0** |
+
+Los workflows se validaron **en la PR antes de fusionar**, que es la única forma de comprobar que
+una CI funciona sin haberla metido ya en `main`. Ambos ficheros caen dentro de sus propios filtros
+`paths`, así que la PR se validaba a sí misma.
+
+Detalle que conviene recordar: en eventos `pull_request` los filtros `paths` se evalúan contra el
+**diff acumulado de la PR**, no contra el commit individual. Por eso un commit que solo tocaba
+`docs/` volvió a disparar ambos workflows, y `cancel-in-progress` canceló la tanda anterior.
+
+### Riesgo residual, actualizado
+
+Se retira «no hay CI de clientes» del riesgo residual: ya la hay. Lo que queda:
+
+- **Sin tests de renderizado** en ninguna plataforma. La CI ejecuta lo que existe, y lo que existe
+  no comprueba que un widget se pinte ni que un clic navegue.
+- **Sin tests instrumentados** de Android: no hay emulador en CI, por lento y frágil.
+- **La CI no bloquea merges.** No hay protección de rama que exija que pase. Hoy informa, no impide.
+- **`TokenVault` no tiene ni un test** (cifrado de tokens en disco, SEC-2). Es la deuda de mayor
+  valor que dejó este sprint: un test de ida y vuelta haría que el runner Windows ejercitara DPAPI
+  de verdad, en vez de solo pasar por al lado.
+- **El wrapper de Gradle sigue apuntando a un zip local**, así que el repositorio no es
+  reproducible para otro clon. Arreglarlo exige verificar antes que Avast no rompe la descarga.
+- Resto de vistas Desktop sin seam; `AppSession.familyId` sin `volatile`; iOS bloqueado sin macOS.
+
+### Trazabilidad
+
+Agente único: Claude Code. **No se consultó a Codex ni a Gemini**: sin segunda opinión externa.
+Skills usadas: `brainstorming`, `security-review` (aplicada a la superficie CI/CD).
