@@ -102,6 +102,16 @@ class RecipeListStateTest {
         assertEquals(List.of("r1", "r2", "r3"), ids(RecipeListState.appendPage(existing, page)));
     }
 
+    @Test
+    void anadirPaginaDescartaLasRecetasSinId() {
+        // Mismo guard que SimpleCache.mergeById: sin el, dos recetas sin id
+        // colapsarian en una sola entrada al deduplicar.
+        List<RecipeDtos.RecipeDto> existing = List.of(recipe(null, "Sin id", false));
+        List<RecipeDtos.RecipeDto> page = List.of(recipe(null, "Otra sin id", false), recipe("r1", "Cocido", false));
+
+        assertEquals(List.of("r1"), ids(RecipeListState.appendPage(existing, page)));
+    }
+
     // --- Filtro local ---
 
     @Test

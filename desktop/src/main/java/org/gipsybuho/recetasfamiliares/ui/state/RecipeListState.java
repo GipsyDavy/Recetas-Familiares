@@ -75,12 +75,16 @@ public final class RecipeListState {
             List<RecipeDtos.RecipeDto> existing,
             List<RecipeDtos.RecipeDto> items
     ) {
+        // Los id nulos se descartan, igual que en SimpleCache.mergeById: sin ese
+        // guard, dos recetas sin id colapsarian en una sola entrada del mapa.
         LinkedHashMap<String, RecipeDtos.RecipeDto> byId = new LinkedHashMap<>();
         for (RecipeDtos.RecipeDto recipe : existing) {
-            byId.put(recipe.id(), recipe);
+            if (recipe.id() != null) {
+                byId.put(recipe.id(), recipe);
+            }
         }
         for (RecipeDtos.RecipeDto recipe : items) {
-            if (!recipe.deleted()) {
+            if (recipe.id() != null && !recipe.deleted()) {
                 byId.putIfAbsent(recipe.id(), recipe);
             }
         }

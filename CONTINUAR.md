@@ -5306,3 +5306,88 @@ el host. El emulador no trae `sqlite3`.
   miniatura hasta que otra vista la traiga a la caché.
 - `AppSession.familyId` es un `String` sin `volatile` ni sincronización, leído desde hilos de fondo
   en toda la aplicación. Preexistente, no introducido aquí; arreglarlo es un sprint propio.
+
+---
+
+## Sprint COD-8: red de seguridad para la lógica de pantalla — CERRADO 2026-08-05 (Claude Code)
+
+Primer sprint que ataca el riesgo residual declarado como número uno en los dos cierres
+anteriores: **no existía ningún test sobre la lógica de las pantallas**. Sprint 100 % cliente,
+sin tocar `backend/`, `ios/`, `database/`, contrato, migración ni sincronización.
+
+Spec: `docs/superpowers/specs/2026-08-05-tests-logica-pantalla-design.md`.
+Plan aprobado antes de tocar código, con `brainstorming` para las decisiones de diseño y TDD en
+cada extracción.
+
+### Qué se construyó
+
+- **Desktop `ui/state/`** (paquete nuevo, clases planas sin `javafx.scene`):
+  - `RecipeListState` — paginación, contenido de página, filtro local y textos de estado,
+    extraídos de `RecipeListView`. La vista conserva hilos, `Platform.runLater` y nodos.
+  - `GlobalSearchResults` — filtrado de recetas, stock y notas, más `notePreview`.
+- **Android**: `MainDispatcherRule` y `RecetasViewModelTest`, primeros tests del ViewModel.
+  **Sin dependencias nuevas**: MockK y `kotlinx-coroutines-test` ya estaban.
+
+### Dos defectos reales encontrados y corregidos
+
+1. **La búsqueda global reventaba con notas con párrafos.** `notePreview` calculaba el límite del
+   `substring` sobre el cuerpo original y lo aplicaba a la cadena ya colapsada por
+   `replaceAll("\s+", " ")`, que es más corta. Una nota de 80 caracteres o más cuyos espacios
+   colapsaran por debajo de 80 lanzaba `StringIndexOutOfBoundsException` y tumbaba la búsqueda
+   entera. Reproducido antes de corregir: `Range [0, 80) out of bounds for length 36`.
+2. **El listado podía duplicar filas.** «Cargar más» añadía sin deduplicar sobre una caché que el
+   menú semanal también rellena, así que una receta ya traída por el menú aparecía dos veces.
+   `appendPage` deduplica por id, descartando ids nulos igual que `SimpleCache.mergeById`.
+
+### El riesgo que el plan marcaba como principal no se materializó
+
+`mockk<AppContainer>` construye `RecetasViewModel` sin invocar el constructor real, así que no
+toca Room ni necesita `Context`. No hizo falta el plan B de extraer funciones puras.
+
+Trampa que costó un fallo: en MockK **gana el último stub registrado**, y un `any()` en el helper
+de construcción pisaba los stubs específicos del test. Los específicos van después de construir el
+ViewModel; `observeCovers` no se invoca hasta que alguien colecta.
+
+### Validación ejecutada en esta sesión
+
+| Comando | Resultado |
+|---|---|
+| `mvn -f desktop/pom.xml test` | **96 tests, 0 fallos** (60 previos + 36 nuevos) |
+| `gradlew testDebugUnitTest` en `android/` | **93 tests, 0 fallos** (82 previos + 11 nuevos) |
+| `gradlew assembleDebug` | BUILD SUCCESSFUL |
+| `run-security-scan.ps1 -Mode sprint` | Semgrep 0; TruffleHog 2 no verificados (preexistentes en tests, `example.test`); **exit 0** |
+| `/security-review` y `/VibeSec` | Sin hallazgos; salió de ahí el guard de ids nulos |
+
+**Prueba de que la red detecta lo que dice detectar.** Mutando `SimpleCache.mergeById` para que se
+comporte como `replaceAll`, 3 de los 7 tests de `SimpleCacheSharingTest` fallan, incluido el que
+cubre que el menú no recorte lo que el listado ya había paginado.
+
+Corrección al plan: proponía revertir la corrección en `WeeklyMenuView`, pero esos tests no pasan
+por esa vista. El objetivo correcto de la mutación es `SimpleCache.mergeById`.
+
+Aviso para el futuro: la primera versión del test principal **no discriminaba** — la página del
+menú (100) era un superconjunto de la del listado (30), así que un `replaceAll` daba el mismo
+resultado. Se reescribió con el caso que sí discrimina: listado paginado hasta 120 con «Cargar
+más». Un test verde no prueba nada si no se comprueba que puede ponerse rojo.
+
+### Riesgo residual, actualizado
+
+Lo que sigue **sin** cubrir, ahora con precisión:
+
+- **Renderizado**: ni un test comprueba que un widget se pinte, que un clic navegue o que el
+  texto llegue a la pantalla. No hay TestFX, Monocle, Robolectric ni Compose UI Test, y este
+  sprint no los añadió deliberadamente.
+- **CI de clientes**: `backend-ci-cd.yml` filtra por `paths: backend/**`. Desktop y Android
+  **nunca** se compilan ni testean en CI. Los tests nuevos solo corren si alguien los lanza en
+  local. Montar esa CI es un sprint propio y es el candidato natural siguiente.
+- **Resto de vistas**: `WeeklyMenuView`, `MainWindow`, chat, stock, compra, notas y perfil siguen
+  con su lógica dentro de la vista, sin seam.
+- `AppSession.familyId` sin `volatile`: preexistente, sprint propio.
+- Desktop sigue reduciendo la caché a su página al volver a «Recetas»; reabrir el menú la
+  completa. Documentado y con test que lo fija.
+
+### Trazabilidad
+
+Agente único: Claude Code. **No se consultó a Codex ni a Gemini**, por decisión explícita del
+usuario al arrancar el sprint: no hubo segunda opinión externa sobre estas decisiones de diseño.
+Skills usadas: `brainstorming`, `test-driven-development`, `security-review`, `VibeSec`.
