@@ -1,0 +1,67 @@
+name: Android CI
+
+# Valida la aplicacion Android en cada push a main y en cada PR que la toque.
+# Solo tests de JVM y compilacion del APK de debug: no hay tests instrumentados
+# ni emulador, que serian mucho mas lentos y fragiles.
+#
+# Solo ubuntu: Android no tiene comportamiento dependiente del sistema operativo
+# del runner, y el SDK arranca antes en Linux.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - android/**
+      - .github/workflows/android-ci.yml
+  pull_request:
+    paths:
+      - android/**
+      - .github/workflows/android-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test android
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # El wrapper del repositorio apunta a un zip local de la maquina de
+      # desarrollo (file:///C:/tmp/tools/...), que en un runner no existe. Por eso
+      # se instala Gradle aparte y se invoca `gradle`, no `./gradlew`.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          gradle-version: "9.5.1"
+
+      # La imagen del runner ya trae el SDK, pero no necesariamente la plataforma
+      # 36 que exige compileSdk. sdkmanager es idempotente: si ya esta, no hace nada.
+      - name: Install Android SDK platform
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Unit tests
+        run: gradle testDebugUnitTest
+
+      - name: Assemble debug APK
+        run: gradle assembleDebug
