@@ -1,0 +1,58 @@
+name: Desktop CI
+
+# Valida la aplicacion JavaFX en cada push a main y en cada PR que la toque.
+# No despliega nada: Desktop se distribuye como instalador Windows generado a
+# mano con el perfil package-windows, que no forma parte de este workflow.
+#
+# Matriz ubuntu + windows: el repositorio es publico, asi que los runners no
+# consumen cuota, y Desktop se distribuye en Windows. Linux da el resultado
+# rapido; Windows verifica la plataforma real, donde Preferences va contra el
+# registro y TokenVault toma su rama DPAPI.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - desktop/**
+      - .github/workflows/desktop-ci.yml
+  pull_request:
+    paths:
+      - desktop/**
+      - .github/workflows/desktop-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Un fallo solo en Windows es informacion util: no cancelar el otro.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Test
+        run: mvn -B -f desktop/pom.xml test
+
+      - name: Compile
+        run: mvn -B -f desktop/pom.xml -DskipTests compile
