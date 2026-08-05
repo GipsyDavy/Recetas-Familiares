@@ -13,7 +13,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
-import java.util.ArrayList;
+import org.gipsybuho.recetasfamiliares.ui.state.RecipeListState;
 
 public class RecipeListView extends ScrollPane {
 
@@ -30,8 +30,7 @@ public class RecipeListView extends ScrollPane {
     private VBox skeletonPane;
     private Timeline skeletonShimmer;
     private boolean loadingRecipes;
-    private int currentPage = 0;
-    private boolean hasMore = false;
+    private final RecipeListState state = new RecipeListState();
 
     public RecipeListView(AppContext context, Runnable onSync) {
         this.context = context;
@@ -103,8 +102,7 @@ public class RecipeListView extends ScrollPane {
 
     public void refresh() {
         loadingRecipes = true;
-        currentPage = 0;
-        hasMore = false;
+        state.reset();
         updateLoadMoreBtn();
         statusLabel.setText("Cargando...");
         skeletonPane.setVisible(true);
@@ -118,8 +116,8 @@ public class RecipeListView extends ScrollPane {
                         return;
                     }
                     context.getRecipeRepository().getCache().replaceAll(
-                            page.items().stream().filter(r -> !r.deleted()).toList());
-                    hasMore = page.totalPages() > 1;
+                            RecipeListState.firstPage(page.items()));
+                    state.onFirstPageLoaded(page.totalPages());
                     loadingRecipes = false;
                     stopSkeletonShimmer();
                     updateRecipeCount();
@@ -175,7 +173,7 @@ public class RecipeListView extends ScrollPane {
 
     private void loadNextPage() {
         loadMoreBtn.setDisable(true);
-        int nextPage = currentPage + 1;
+        int nextPage = state.nextPage();
         String familyAtStart = context.getSession().getFamilyId();
         Thread.ofVirtual().start(() -> {
             try {
@@ -184,11 +182,9 @@ public class RecipeListView extends ScrollPane {
                     if (!java.util.Objects.equals(familyAtStart, context.getSession().getFamilyId())) {
                         return;
                     }
-                    var appended = new ArrayList<>(context.getRecipeRepository().getCache().getItems());
-                    page.items().stream().filter(r -> !r.deleted()).forEach(appended::add);
-                    context.getRecipeRepository().getCache().replaceAll(appended);
-                    currentPage = nextPage;
-                    hasMore = nextPage < page.totalPages() - 1;
+                    context.getRecipeRepository().getCache().replaceAll(RecipeListState.appendPage(
+                            context.getRecipeRepository().getCache().getItems(), page.items()));
+                    state.onNextPageLoaded(nextPage, page.totalPages());
                     loadMoreBtn.setDisable(false);
                     updateRecipeCount();
                     updateLoadMoreBtn();
@@ -203,10 +199,10 @@ public class RecipeListView extends ScrollPane {
     }
 
     private void updateLoadMoreBtn() {
-        boolean show = hasMore && (searchField.getText() == null || searchField.getText().isBlank());
+        boolean show = state.shouldShowLoadMore(searchField.getText());
         loadMoreBtn.setVisible(show);
         loadMoreBtn.setManaged(show);
-        if (show) loadMoreBtn.setText("Cargar más  (página " + (currentPage + 2) + " de " + "...)");
+        if (show) loadMoreBtn.setText("Cargar más  (página " + (state.currentPage() + 2) + " de " + "...)");
     }
 
     private void openNewRecipeForm() {
@@ -228,9 +224,8 @@ public class RecipeListView extends ScrollPane {
             updateLoadMoreBtn();
             return;
         }
-        String lower = query.toLowerCase();
         var filtered = context.getRecipeRepository().getCache().getItems()
-                .filtered(r -> r.title() != null && r.title().toLowerCase().contains(lower));
+                .filtered(r -> RecipeListState.matchesQuery(r, query));
         listView.setItems(filtered);
         updateRecipeCount();
         // Hide "load more" while filtering
@@ -242,13 +237,7 @@ public class RecipeListView extends ScrollPane {
         if (loadingRecipes) return;
 
         int total = context.getRecipeRepository().getCache().getItems().size();
-        String query = searchField.getText();
-        if (query == null || query.isBlank()) {
-            statusLabel.setText(total + " recetas");
-            return;
-        }
-
-        statusLabel.setText("Mostrando " + listView.getItems().size() + " de " + total);
+        statusLabel.setText(RecipeListState.statusText(total, listView.getItems().size(), searchField.getText()));
     }
 
     /** Deja de ser static: necesita el AppContext para descargar las portadas. */
