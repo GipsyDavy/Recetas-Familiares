@@ -5883,3 +5883,93 @@ la aplicación: entrar con su cuenta y ver que cargan recetas y stock.
   (`desktop/output/` no se versiona).
 - El instalador **no está firmado digitalmente**: Windows SmartScreen avisará al ejecutarlo. Firmar
   requiere un certificado de firma de código de pago.
+
+---
+
+## Punto de retoma — cierre de sesión del 2026-08-06
+
+**No hay nada a medias.** `main` == `origin/main` en `dfe53eb`, árbol limpio, sin ficheros sin
+trackear y sin ramas locales ni remotas aparte de `main`. Cuatro sprints cerrados y fusionados.
+
+Sesión ejecutada con el usuario **en remoto desde el móvil**: toda la validación la corrió el
+agente, incluidos emulador Android y GUI de Desktop.
+
+### Estado exacto al cerrar
+
+| | |
+|---|---|
+| `main` local y remoto | `dfe53eb`, sincronizados |
+| Ramas | solo `main`; las cuatro de esta sesión borradas tras fusionar |
+| Tests | Desktop **109**, Android **94**, backend 116 (backend de sesión anterior, no reejecutado hoy) |
+| Desktop CI en `main` | ✅ verde, Ubuntu y Windows |
+| Android CI en `main` | ⏳ **encolado, sin terminar** (ver más abajo) |
+| Producción | **No se tocó el backend en toda la sesión**: el VPS sigue como estaba |
+| Artefactos | `desktop/output/RecetasFamiliares-Instalador-v1.2.exe` (51,4 MB). El `v1.1` viejo sigue al lado; conviene borrarlo |
+
+### Lo que se hizo, en orden
+
+1. **PR #2 — tests de `TokenVault`**: Desktop 96 → 109. El runner Windows de la CI por fin ejercita
+   DPAPI en vez de pasar por al lado.
+2. **PR #3 — build de release de Android**: `buildTypes.release` no depurable, firma desde
+   `keystore.properties` fuera de git, R8 con reglas que preservan los DTOs de Gson. APK 16,8 → 3,0 MB.
+3. **PR #4 — fix del perfil vacío tras login**: Android 93 → 94 tests.
+4. **PR #5 — instalador de Desktop v1.2**: regenerado y con la versión en una sola fuente.
+
+### Incidencia de GitHub Actions, no confundir con un fallo del proyecto
+
+Durante la tarde/noche, **los workflows dejaron de dispararse solos** en varios merges y en una PR,
+pese a que los diffs caían dentro de sus filtros `paths`, que están bien. Además dos runs de Android
+CI acabaron `cancelled` **sin ejecutar un solo paso**, y otro se quedó `queued` más de 20 minutos.
+
+No es configuración: los cuatro workflows están `active` y el mismo código pasó en verde en el run
+de su rama. **Si vuelve a ocurrir, comprobar el estado de GitHub Actions antes de tocar nada** y
+lanzar a mano con `gh workflow run <wf>.yml --ref <rama>`.
+
+### Comprobaciones pendientes que sólo puede hacer el usuario
+
+1. **Crear el keystore de firma de Android** (`docs/android-release.md`). Es lo único que separa al
+   proyecto de tener un APK distribuible. Perder ese fichero o su contraseña impide actualizar la
+   aplicación para siempre: copia de seguridad en dos sitios.
+2. **Abrir el instalador v1.2 y entrar con su cuenta.** No se validó un login completo con el
+   binario nuevo porque la sesión guardada en la máquina está caducada y comprobarlo exigía cerrarla.
+   SmartScreen avisará: el instalador no está firmado.
+3. **Proteger la rama `main`** para que la CI bloquee merges (Settings → Branches). Hoy informa,
+   no impide.
+
+### Por dónde seguir, ordenado por valor
+
+1. **Node 20 deprecado** en `actions/checkout` y `actions/setup-java`: GitHub ya los fuerza a Node
+   24. Funciona, pero acabará rompiendo. Subir los pines por SHA es corto.
+2. **`avatarUrl` no se persiste en el login**: tras entrar se ven las iniciales hasta que algo
+   cargue `/users/me`. Pequeño, mismo patrón que el fix de la PR #4.
+3. **La rama NSIS de `build-installer.ps1` sigue sin ejercitarse**: el build usa Inno Setup.
+4. **Tests de renderizado** (TestFX, Robolectric o Compose UI Test). Sigue siendo el hueco grande:
+   ningún test comprueba que un widget se pinte o que un clic navegue.
+5. **Wrapper de Gradle** apuntando a `file:///C:/tmp/tools/gradle-9.5.1-bin.zip`: el repositorio no
+   es reproducible para otro clon. Requiere comprobar antes que Avast no rompe la descarga; mejor
+   con el usuario delante.
+6. **iOS**: sigue bloqueado sin macOS. No planificar.
+
+### Cosas del entorno que conviene no reaprender
+
+- **Conviven dos perfiles de usuario**: `C:\Users\GipsyDavy` y `C:\Users\Gipsy Dávy`. Inno Setup
+  está en el `LOCALAPPDATA` del **segundo**; buscarlo sólo en el primero lleva a concluir que no
+  está instalado.
+- **Regenerar el instalador** exige `-JdkPath "C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot"`:
+  el script busca `jdk-21` exacto.
+- **Pilotar Android en el emulador**: las capturas del `Pixel_9_Pro` son 1280x2856 pero se leen a
+  896x2000, así que hay que multiplicar las coordenadas por 1,43. El teclado tapa los botones de
+  abajo: cerrarlo con `keyevent 4` antes de pulsar.
+- **Credenciales de prueba**: crear la cuenta por API con dominio `.test` y borrarla al terminar con
+  `DELETE /api/v1/auth/account`. La contraseña exige 12 caracteres mínimo. Se hizo dos veces en esta
+  sesión y ambas cuentas quedaron eliminadas (204, y login posterior 401).
+- **MockK con `relaxed = true` devuelve `""`, no `null`,** para un `String?`.
+
+### Trazabilidad de la sesión
+
+Agente único: Claude Code. **No se consultó a Codex ni a Gemini en ningún sprint**, por decisión
+implícita del usuario: no hubo segunda opinión externa sobre ninguna de las decisiones de hoy.
+
+Skills usadas: `test-driven-development`, `writing-plans`, `security-review`, `VibeSec`. Escaneo
+`run-security-scan.ps1` ejecutado en los cuatro cierres, **exit 0 siempre**; los dos hallazgos de
+TruffleHog son los mismos falsos positivos preexistentes (`example.test` en tests).
