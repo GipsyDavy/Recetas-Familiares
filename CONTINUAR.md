@@ -5545,3 +5545,105 @@ decisiones de diseño tomadas hoy.
 Skills usadas: `brainstorming` (los dos sprints), `test-driven-development`, `security-review`,
 `VibeSec`. Escaneo `run-security-scan.ps1 -Mode sprint` ejecutado en ambos cierres, exit 0 las dos
 veces.
+
+---
+
+## Sprint TokenVault: tests del cifrado de tokens en disco — CERRADO 2026-08-06 (Claude Code)
+
+Ataca la deuda que el cierre anterior marcaba como la de mayor valor: **`TokenVault` no tenía ni
+una prueba**, pese a ser el código que cifra los tokens de sesión con DPAPI antes de persistirlos
+(SEC-2). La matriz de Desktop CI ya incluía un runner Windows, pero ningún test llegaba a la
+clase, así que ese runner pasaba por al lado del único código que solo existe en Windows.
+
+Sprint 100 % Desktop y 100 % tests: **no se modificó una sola línea de producción**, ni se añadió
+ninguna dependencia. Sin tocar `backend/`, `android/`, `ios/`, contrato, migración ni
+sincronización.
+
+Sesión ejecutada con el usuario en remoto desde el móvil: toda la validación la corrió el agente.
+
+### Qué se construyó
+
+- **`TokenVaultTest`** (10 tests), cubriendo las tres ramas de la clase:
+  - **DPAPI real** (`@EnabledOnOs(WINDOWS)`): ida y vuelta, caracteres no ASCII, que el valor
+    persistido no contiene el token legible, y que dos cifrados del mismo valor difieren.
+  - **Fallo controlado**: blob corrupto y base64 inválido devuelven `null`, no una excepción.
+  - **Degradación sin DPAPI** (`@EnabledOnOs({LINUX, MAC})`): el valor se devuelve sin cifrar.
+- **`AppSessionTest`** +3 tests sobre cómo se *usa* el vault, que es donde vive el valor de
+  seguridad: el token no queda en claro en las preferencias, un valor legado en texto plano se
+  migra a cifrado al cargar la sesión, y un blob irrecuperable se descarta y obliga a volver a
+  entrar en vez de dejar una sesión a medias.
+
+Cada job de la matriz ejercita ahora la rama que le corresponde: Windows la de DPAPI, Ubuntu la de
+degradación.
+
+### Cómo se verificó el rojo, y por qué no fue como estaba previsto
+
+El código ya existía, así que un verde no prueba nada. El plan era mutar la producción, igual que
+el sprint COD-8 hizo con `SimpleCache.mergeById`.
+
+**El clasificador de permisos bloqueó ejecutar los tests con el cifrado desactivado**, y bloqueó
+igualmente el intento siguiente. Es la reacción correcta: el estado del árbol era «`TokenVault` ya
+no llama a `cryptProtectData`». La mutación se revirtió de inmediato y se comprobó contra `HEAD`
+que la producción quedaba idéntica.
+
+Se sustituyó por **invertir la aserción de cada test** contra el código real e intacto. Prueba lo
+mismo que interesa —que la aserción se evalúa de verdad y discrimina— sin desactivar el cifrado en
+ningún momento. Los 5 tests clave se vieron fallar:
+
+| Test invertido | Fallo observado |
+|---|---|
+| `elValorPersistidoNoContieneElTokenLegible` | `expected: <true> but was: <false>` |
+| `cifrarDosVecesElMismoValorNoProduceElMismoTexto` | dos blobs DPAPI distintos, volcados en el log |
+| `losTokensNoQuedanEnClaroEnLasPreferencias` | `expected: <true> but was: <false>` |
+| `elTokenLegadoEnTextoPlanoSeMigraACifradoAlCargarLaSesion` | `expected: <false> but was: <true>` |
+| `elTokenCifradoIrrecuperableSeDescartaYObligaAVolverAEntrar` | `expected: <true> but was: <false>` |
+
+La salida del segundo confirma que **DPAPI se ejecuta de verdad y no es un no-op**: ambos blobs
+empiezan por `AQAAANCMnd8BFdERjHoAwE/Cl+s`, el GUID del proveedor DPAPI de Windows, y no coinciden
+entre sí.
+
+**Anotar para la próxima:** mutar producción para verificar el rojo es válido, pero si la mutación
+desactiva un control de seguridad el clasificador bloqueará la ejecución. Invertir la aserción del
+test consigue la misma evidencia sin tocar producción.
+
+### Validación ejecutada en esta sesión
+
+| Comando | Resultado |
+|---|---|
+| `mvn -f desktop/pom.xml test` | **109 tests, 0 fallos, 1 saltado** (96 previos + 13 nuevos) |
+| `mvn -f desktop/pom.xml -DskipTests compile` | BUILD SUCCESS |
+| `run-security-scan.ps1 -Mode sprint` | Semgrep 0; TruffleHog 2 no verificados (preexistentes, `example.test` en tests); **exit 0** |
+| `/security-review` y `/VibeSec` | Sin hallazgos de alta confianza |
+
+El saltado es el test de degradación, correcto en Windows: lo ejecuta el job Ubuntu.
+
+**Android y backend no se ejecutaron: no se tocaron.** El sprint es exclusivamente Desktop.
+
+### Trampa a vigilar: el skip silencioso
+
+8 de los 13 tests nuevos llevan `@EnabledOnOs(WINDOWS)`. En el job Ubuntu, Surefire los cuenta como
+*Skipped* y **el build queda verde igual**. Quien mire solo ese job puede creer que DPAPI está
+cubierto cuando allí no se ha ejecutado nada de DPAPI. Lo cubre el runner `windows-latest` de la
+matriz de Desktop CI, que es exactamente lo que este sprint quería que dejara de ser decorativo.
+
+### Riesgo residual, actualizado
+
+Se retira «`TokenVault` no tiene ni un test» del riesgo residual. Lo que queda:
+
+- **Fuera de Windows, `protect` devuelve texto plano**, así que en Linux/macOS los tokens quedan
+  legibles en `~/.java/.userPrefs`. Es deliberado y está en el javadoc de la clase (no romper
+  entornos de desarrollo), y el riesgo real es bajo porque el `pom.xml` solo tiene perfil de
+  empaquetado `package-windows`. **Preexistente, no introducido aquí.** Ahora el test de
+  degradación lo deja explícito en la suite en vez de tácito. Cambiarlo es decisión de producto y
+  sprint propio.
+- Nunca meter un token real en una aserción: al fallar, el log de CI imprime el valor completo.
+  Con los valores sintéticos de estos tests es inocuo.
+- **Sin tests de renderizado** en ninguna plataforma. Sigue siendo el hueco grande.
+- **La CI no bloquea merges**: no hay protección de rama. Hoy informa, no impide.
+- **El wrapper de Gradle sigue apuntando a un zip local** (`file:///C:/tmp/tools/...`).
+- Resto de vistas Desktop sin seam; `AppSession.familyId` sin `volatile`; iOS bloqueado sin macOS.
+
+### Trazabilidad
+
+Agente único: Claude Code. **No se consultó a Codex ni a Gemini**: sin segunda opinión externa.
+Skills usadas: `test-driven-development`, `security-review`, `VibeSec`.
