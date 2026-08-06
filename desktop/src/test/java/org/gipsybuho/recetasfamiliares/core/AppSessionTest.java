@@ -3,6 +3,8 @@ package org.gipsybuho.recetasfamiliares.core;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.util.UUID;
 import java.util.prefs.BackingStoreException;
@@ -96,5 +98,44 @@ class AppSessionTest {
         AppSession reloaded = new AppSession(prefs);
         assertEquals("fam-1", reloaded.getFamilyId());
         assertEquals("2026-07-05T10:00:00Z", reloaded.getLastSyncTime());
+    }
+
+    // --- SEC-2: cifrado de tokens en disco ---
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void losTokensNoQuedanEnClaroEnLasPreferencias() {
+        new AppSession(prefs).setTokens("access-token", "refresh-token");
+
+        String storedAccess = prefs.get("accessToken", null);
+        String storedRefresh = prefs.get("refreshToken", null);
+
+        assertTrue(storedAccess.startsWith("dpapi:"));
+        assertTrue(storedRefresh.startsWith("dpapi:"));
+        assertFalse(storedAccess.contains("access-token"));
+        assertFalse(storedRefresh.contains("refresh-token"));
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void elTokenLegadoEnTextoPlanoSeMigraACifradoAlCargarLaSesion() {
+        prefs.put("accessToken", "token-legado-en-claro");
+
+        AppSession session = new AppSession(prefs);
+
+        assertEquals("token-legado-en-claro", session.getAccessToken());
+        assertTrue(prefs.get("accessToken", null).startsWith("dpapi:"));
+        assertFalse(prefs.get("accessToken", null).contains("token-legado-en-claro"));
+    }
+
+    @Test
+    void elTokenCifradoIrrecuperableSeDescartaYObligaAVolverAEntrar() {
+        prefs.put("accessToken", "dpapi:blob-de-otra-maquina-no-descifrable!!!");
+
+        AppSession session = new AppSession(prefs);
+
+        assertFalse(session.isLoggedIn());
+        assertNull(session.getAccessToken());
+        assertNull(prefs.get("accessToken", null));
     }
 }
