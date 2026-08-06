@@ -22,6 +22,11 @@ backend/uploads/
 *.aab
 *.dex
 local.properties
+
+# Firma de release: NUNCA versionar keystores ni sus credenciales
+*.jks
+*.keystore
+keystore.properties
 captures/
 .externalNativeBuild/
 .cxx/
