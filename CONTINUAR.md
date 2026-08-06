@@ -5755,3 +5755,57 @@ procedimiento está en `docs/android-release.md`. El agente sólo usó un keysto
 
 Agente único: Claude Code. **No se consultó a Codex ni a Gemini**: sin segunda opinión externa.
 Skills usadas: `writing-plans`. Escaneo `run-security-scan.ps1 -Mode sprint` con exit 0.
+
+---
+
+## Fix: el perfil se quedaba vacío tras iniciar sesión — CERRADO 2026-08-06 (Claude Code)
+
+Bug detectado en la validación del sprint anterior y arreglado aquí. Tras un login, el perfil
+mostraba `—` en nombre y email **hasta que se reiniciaba la aplicación**.
+
+### Causa
+
+`RecetasViewModel` (`ui/RecetasViewModel.kt:122-128`) inicializa `_displayName`, `_email` y
+`_avatarUrl` leyendo `sessionStore` **en el constructor**, y no son reactivos — a diferencia de
+`familyIdFlow` y `familyRoleFlow`, que sí son `StateFlow` del propio `SessionStore` y por eso
+nunca dieron problemas.
+
+El ViewModel se construye en la pantalla de login, cuando la sesión está vacía. `login()` llamaba a
+`authRepository.login()` y a `refresh()`, pero **ninguno de los dos toca esos tres flujos**: los
+únicos sitios que los tocaban eran limpiezas (logout, cambio y reset de la URL de servidor). El
+dato sí se persistía —`AuthRepository.login` guarda `displayName` y `email` en la sesión
+(`Repositories.kt:136-137`)—, sólo faltaba releerlo.
+
+### Arreglo
+
+Tres líneas en `login()`, releyendo la sesión justo después de que el repositorio la haya
+rellenado. No se tocó `SessionStore` ni se convirtieron los campos en flujos reactivos: habría sido
+una reforma mayor para un fallo de refresco, y `familyId`/`familyRole` ya cubren el caso que de
+verdad necesita reactividad.
+
+### Validación ejecutada en esta sesión
+
+Test primero, y **visto en rojo por la razón correcta** antes de tocar producción:
+`expected:<Emma> but was:<null>` en `RecetasViewModelTest`.
+
+| Comprobación | Resultado |
+|---|---|
+| `gradle :app:testDebugUnitTest` | **94 tests, 0 fallos** (93 previos + 1 nuevo) |
+| `run-security-scan.ps1 -Mode quick` | Semgrep 0; TruffleHog 2 no verificados preexistentes; exit 0 |
+
+**Verificado en el emulador contra producción**, que es donde se detectó: login real y perfil
+abierto **sin reiniciar la aplicación**, mostrando iniciales, nombre y email donde antes había `—`.
+Cuenta desechable creada por API y borrada al terminar (`DELETE /auth/account` → 204, login
+posterior → 401).
+
+Trampa anotada para futuros tests del ViewModel: **MockK con `relaxed = true` devuelve `""`, no
+`null`, para un `String?`**. El primer intento del test falló con `expected null, but was:<>` en el
+aserto de partida; hay que stubear el estado inicial explícitamente.
+
+### Riesgo residual
+
+- **`avatarUrl` no se persiste en el login**: `AuthRepository.login` guarda `displayName` y `email`,
+  pero no el avatar, así que tras entrar se ven las iniciales hasta que algo cargue `/users/me`. Es
+  el comportamiento que ya había y no lo cambia este fix.
+- El mismo patrón (flujo no reactivo inicializado en el constructor) podría reaparecer si se añade
+  otro campo de perfil. La alternativa de fondo sería exponerlos como `StateFlow` en `SessionStore`.

@@ -25,6 +25,7 @@ import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -253,6 +254,38 @@ class RecetasViewModelTest {
             advanceUntilIdle()
 
             assertFalse(viewModel.isLoggedIn.value)
+        }
+
+    // --- Perfil tras iniciar sesion ---
+
+    @Test
+    fun `tras iniciar sesion el perfil muestra el usuario sin reiniciar la aplicacion`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // El ViewModel se construye en la pantalla de login, con la sesion aun
+            // vacia: es ahi donde _displayName y _email toman su valor inicial.
+            every { sessionStore.displayName } returns null
+            every { sessionStore.email } returns null
+
+            val viewModel = buildViewModel(loggedIn = false)
+            assertNull(viewModel.displayName.value)
+            assertNull(viewModel.email.value)
+
+            // AuthRepository.login persiste el usuario en la sesion (Repositories.kt).
+            coEvery { authRepository.login(any(), any()) } answers {
+                every { sessionStore.displayName } returns "Emma"
+                every { sessionStore.email } returns "emma@example.test"
+                Unit
+            }
+
+            viewModel.login("emma@example.test", "clave-de-prueba") {}
+            advanceUntilIdle()
+
+            assertEquals(
+                "El perfil no puede quedarse vacio hasta que se reinicie la aplicacion",
+                "Emma",
+                viewModel.displayName.value
+            )
+            assertEquals("emma@example.test", viewModel.email.value)
         }
 
     @Test

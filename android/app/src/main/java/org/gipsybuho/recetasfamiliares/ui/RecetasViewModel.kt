@@ -177,6 +177,13 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
                 // la sesion nueva: si no, podria borrar datos recien sincronizados.
                 wipeJob?.join()
                 container.authRepository.login(email, password)
+                // El repositorio acaba de persistir el usuario en la sesion. Estos
+                // tres flujos toman su valor en el constructor y no son reactivos
+                // (a diferencia de familyIdFlow), asi que hay que releerlos: si no,
+                // el perfil se queda vacio hasta que se reinicie la aplicacion.
+                _displayName.value = container.sessionStore.displayName
+                _email.value = container.sessionStore.email
+                _avatarUrl.value = container.sessionStore.avatarUrl
                 _isLoggedIn.value = true
                 refresh()
             }.onFailure { onError(it.message ?: "No se pudo iniciar sesion") }
