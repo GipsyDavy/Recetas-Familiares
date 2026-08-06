@@ -23,7 +23,7 @@ $ErrorActionPreference = "Stop"
 # ── Configuración ──────────────────────────────────────────────────────────────
 $AppName        = "RecetasFamiliares"
 $AppDisplayName = "Recetas Familiares"
-$AppVersion     = "1.1"
+$AppVersion     = "1.2"
 $MainJar        = "RecetasFamiliares.jar"
 $MainClass      = "org.gipsybuho.recetasfamiliares.Launcher"
 $JavaFxModules  = "javafx.controls,javafx.fxml,javafx.base,javafx.graphics"
@@ -34,7 +34,8 @@ $ModsDir        = "$InputDir\mods"
 $OutputDir      = "$ProjectDir\output"
 $IcoPath        = "$ProjectDir\installer\recetas.ico"
 $PngPath        = "$ProjectDir\src\main\resources\brand\gipsy-buho-logo.png"
-$ShadedJar      = "$TargetDir\recetas-familiares-desktop-1.1.jar"
+# Derivado de $AppVersion: debe coincidir con <version> del pom.xml.
+$ShadedJar      = "$TargetDir\recetas-familiares-desktop-$AppVersion.jar"
 
 # ── Rutas de herramientas ─────────────────────────────────────────────────────
 $NSIS = "C:\Program Files (x86)\NSIS\makensis.exe"
@@ -468,7 +469,7 @@ if ($hasInno) {
     # Compilar con NSIS (la ruta del .nsi debe ser relativa a donde esta el .nsi)
     Push-Location $ProjectDir
     try {
-        & $NSIS "$ProjectDir\installer.nsi"
+        & $NSIS "/DAPP_VERSION=$AppVersion" "$ProjectDir\installer.nsi"
         if ($LASTEXITCODE -ne 0) {
             Write-Fail "NSIS fallo con codigo $LASTEXITCODE"
             exit 1

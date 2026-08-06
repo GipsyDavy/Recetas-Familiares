@@ -5809,3 +5809,77 @@ aserto de partida; hay que stubear el estado inicial explícitamente.
   el comportamiento que ya había y no lo cambia este fix.
 - El mismo patrón (flujo no reactivo inicializado en el constructor) podría reaparecer si se añade
   otro campo de perfil. La alternativa de fondo sería exponerlos como `StateFlow` en `SessionStore`.
+
+---
+
+## Instalador de Desktop v1.2 — CERRADO 2026-08-06 (Claude Code)
+
+El instalador vigente era el `v1.1` del **25 de julio**: no incluía la portada de receta en los
+listados (sprints del 1 y 2 de agosto) ni la corrección de la búsqueda global que reventaba con
+notas con párrafos. Regenerado y **subido a 1.2**.
+
+### Por qué se subió la versión en vez de regenerar como v1.1
+
+El proyecto llevaba varias regeneraciones distintas publicadas todas como `v1.1`. Dos binarios con
+el mismo número de versión y contenido diferente son imposibles de distinguir después, en el disco
+o en «Agregar o quitar programas». Con 1.2 hay una referencia real.
+
+### Cambios
+
+| Archivo | Qué |
+|---|---|
+| `desktop/pom.xml` | `<version>` 1.1 → 1.2 |
+| `desktop/build-installer.ps1` | `$AppVersion` = 1.2; `$ShadedJar` ahora se **deriva** de `$AppVersion` en vez de llevar `1.1` escrito a mano |
+| `desktop/installer.nsi` | versión parametrizada con `!define APP_VERSION`, que el script inyecta con `/DAPP_VERSION`. Antes tenía `1.1` escrito en **7 sitios** |
+| `desktop/installer.iss` | actualizado el `#ifndef` de respaldo |
+
+El `.iss` ya recibía `/DMyAppVersion` correctamente; el `.nsi` no recibía nada y por eso se
+desincronizaba. Ahora la versión sale de un único sitio: `$AppVersion` en el script.
+
+### Herramienta usada: Inno Setup, no NSIS
+
+Corrección a una comprobación previa de esta sesión: Inno Setup **sí** está instalado, en
+`C:\Users\Gipsy Dávy\AppData\Local\Programs\Inno Setup 6\ISCC.exe`. La primera comprobación miró
+sólo `Program Files` y el `$LOCALAPPDATA` del **otro** perfil (`GipsyDavy`), y concluyó que no
+estaba. Conviven dos perfiles de usuario en esta máquina y es una trampa recurrente.
+
+Consecuencia: el build usó `installer.iss`. **La rama NSIS del script no se ejercitó**, así que los
+cambios de `installer.nsi` están escritos pero no probados.
+
+### Validación ejecutada en esta sesión
+
+| Comprobación | Resultado |
+|---|---|
+| `mvn -f desktop/pom.xml test` con la versión nueva | **109 tests, 0 fallos, 1 saltado** |
+| `build-installer.ps1 -JdkPath <jdk-21.0.11>` | BUILD COMPLETADO |
+| Instalador | `RecetasFamiliares-Instalador-v1.2.exe`, **51,4 MB**, `VersionInfo` 1.2.0.0 |
+| App-image | `ProductVersion` 1.2, runtime JDK 21.0.11 LTS embebido |
+| Arranque real de la app empaquetada | ventana «Recetas Familiares» abierta, sidebar y dashboard renderizados |
+
+El arranque además demuestra que **DPAPI funciona en el runtime empaquetado**: la aplicación
+mostró «¡Bienvenido de vuelta!», es decir, descifró con `TokenVault` la sesión guardada en las
+Preferences de esta máquina.
+
+Hay que pasar `-JdkPath` a mano: el script busca `Eclipse Adoptium\jdk-21` exacto y aquí el
+directorio es `jdk-21.0.11.10-hotspot`.
+
+### Lo que NO se pudo validar, y por qué
+
+**No se probó un login completo con el binario nuevo.** La sesión guardada en esta máquina está
+caducada: el dashboard muestra «Sin recetas», «No se pudo cargar el stock» y «No se pudieron cargar
+tus familias», y pulsar «Sincronizar ahora» no lo cambia. Es coherente con tokens vencidos, no con
+un fallo del empaquetado — la aplicación arranca y ejecuta su lógica con normalidad.
+
+Validarlo exigía pulsar «Cerrar sesión», que **destruiría la sesión del usuario en su propio
+equipo**, y no se hizo sin permiso. Queda como comprobación pendiente para cuando el usuario abra
+la aplicación: entrar con su cuenta y ver que cargan recetas y stock.
+
+### Riesgo residual
+
+- **Login del binario v1.2 sin verificar** (lo anterior). Riesgo bajo: mismo código que pasa 109
+  tests y que ya se validó visualmente en sprints anteriores.
+- **La rama NSIS de `build-installer.ps1` no se ejercitó**: sus cambios están sin probar.
+- El instalador `v1.1` antiguo sigue en `desktop/output/`. Conviene borrarlo para no confundirlos
+  (`desktop/output/` no se versiona).
+- El instalador **no está firmado digitalmente**: Windows SmartScreen avisará al ejecutarlo. Firmar
+  requiere un certificado de firma de código de pago.

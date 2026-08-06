@@ -1,7 +1,14 @@
 ; ==============================================================
-; installer.nsi — Instalador NSIS para Recetas Familiares v1.1
+; installer.nsi — Instalador NSIS para Recetas Familiares
 ; NSIS 3.x + Modern UI 2
 ; ==============================================================
+
+; La version la inyecta build-installer.ps1 con /DAPP_VERSION=x.y para que
+; exista una sola fuente de verdad. El valor de aqui solo actua de red de
+; seguridad si alguien compila el .nsi a mano.
+!ifndef APP_VERSION
+    !define APP_VERSION "1.2"
+!endif
 
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
@@ -9,7 +16,7 @@
 
 ; ── Configuracion general ──────────────────────────────────────
 Name              "Recetas Familiares"
-OutFile           "output\RecetasFamiliares-Instalador-v1.1.exe"
+OutFile           "output\RecetasFamiliares-Instalador-v${APP_VERSION}.exe"
 InstallDir        "$LOCALAPPDATA\RecetasFamiliares"
 InstallDirRegKey  HKCU "Software\RecetasFamiliares" "InstallDir"
 RequestExecutionLevel user
@@ -32,11 +39,11 @@ SetCompressorDictSize 32
 !define MUI_HEADERIMAGE_RIGHT
 
 ; ── Textos ─────────────────────────────────────────────────────
-!define MUI_WELCOMEPAGE_TITLE "Recetas Familiares 1.1"
+!define MUI_WELCOMEPAGE_TITLE "Recetas Familiares ${APP_VERSION}"
 !define MUI_WELCOMEPAGE_TEXT "Bienvenido al instalador de Recetas Familiares.$\r$\n$\r$\nTu recetario familiar digital: guarda recetas, gestiona ingredientes, planifica menus y comparte la memoria culinaria de tu familia.$\r$\n$\r$\nNo necesitas instalar Java. La aplicacion incluye todo lo necesario.$\r$\n$\r$\nHaz clic en Siguiente para continuar."
 
 !define MUI_FINISHPAGE_TITLE "Instalacion completada"
-!define MUI_FINISHPAGE_TEXT "Recetas Familiares v1.1 se ha instalado correctamente.$\r$\n$\r$\nSe han creado accesos directos en el escritorio y el menu de inicio.$\r$\n$\r$\nNecesitas el backend en ejecucion para conectarte (ver documentacion).$\r$\n$\r$\nHaz clic en Finalizar para cerrar el instalador."
+!define MUI_FINISHPAGE_TEXT "Recetas Familiares v${APP_VERSION} se ha instalado correctamente.$\r$\n$\r$\nSe han creado accesos directos en el escritorio y el menu de inicio.$\r$\n$\r$\nNecesitas el backend en ejecucion para conectarte (ver documentacion).$\r$\n$\r$\nHaz clic en Finalizar para cerrar el instalador."
 !define MUI_FINISHPAGE_RUN      "$INSTDIR\RecetasFamiliares.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Abrir Recetas Familiares ahora"
 
@@ -55,12 +62,12 @@ SetCompressorDictSize 32
 !insertmacro MUI_LANGUAGE "Spanish"
 
 ; ── Version info embebida en el .exe ──────────────────────────
-VIProductVersion "1.1.0.0"
+VIProductVersion "${APP_VERSION}.0.0"
 VIAddVersionKey /LANG=0 "ProductName"     "Recetas Familiares"
-VIAddVersionKey /LANG=0 "ProductVersion"  "1.1"
+VIAddVersionKey /LANG=0 "ProductVersion"  "${APP_VERSION}"
 VIAddVersionKey /LANG=0 "CompanyName"     "Gipsybuho"
 VIAddVersionKey /LANG=0 "FileDescription" "Instalador de Recetas Familiares"
-VIAddVersionKey /LANG=0 "FileVersion"     "1.1.0.0"
+VIAddVersionKey /LANG=0 "FileVersion"     "${APP_VERSION}.0.0"
 VIAddVersionKey /LANG=0 "LegalCopyright"  "(C) 2026 Gipsybuho"
 
 ; ── Detectar version anterior ─────────────────────────────────
@@ -91,7 +98,7 @@ Section "Aplicacion" SecMain
 
     ; Registro
     WriteRegStr HKCU "Software\RecetasFamiliares" "InstallDir" "$INSTDIR"
-    WriteRegStr HKCU "Software\RecetasFamiliares" "Version"    "1.1"
+    WriteRegStr HKCU "Software\RecetasFamiliares" "Version"    "${APP_VERSION}"
 
     ; Desinstalador
     WriteUninstaller "$INSTDIR\Desinstalar.exe"
@@ -102,7 +109,7 @@ Section "Aplicacion" SecMain
         "DisplayName" "Recetas Familiares"
     WriteRegStr HKCU \
         "Software\Microsoft\Windows\CurrentVersion\Uninstall\RecetasFamiliares" \
-        "DisplayVersion" "1.1"
+        "DisplayVersion" "${APP_VERSION}"
     WriteRegStr HKCU \
         "Software\Microsoft\Windows\CurrentVersion\Uninstall\RecetasFamiliares" \
         "Publisher" "Gipsybuho"
