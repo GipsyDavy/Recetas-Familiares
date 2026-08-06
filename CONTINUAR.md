@@ -345,6 +345,14 @@ Funcionalidad futura documentada:
 
 ## 8. Bloqueantes Recomendados Para Sprint Siguiente
 
+> **AVISO (2026-08-06): esta sección quedó obsoleta y engaña.** Su prioridad 1 («apuntar clientes a
+> producción») está **resuelta**: verificado en código que Desktop (`ServerConfig.java:11`), Android
+> (`build.gradle.kts:18`) e iOS (`ServerUrlPreference.kt:6`) usan por defecto
+> `https://recetas.167.233.213.242.sslip.io/` con URL configurable y validación de esquema. También
+> está resuelto `NUEVO-1`: `desktop/.../SyncRepository.java` ya pagina con `limit` y aplica
+> `familyNotes` y `recipePhotos`. Y el SMTP dejó de ser pendiente el 2026-07-12.
+> **Para el estado real, leer los sprints del final del documento**, no esta sección.
+
 Estado actualizado el 2026-07-11:
 - Chat imagenes UX ya esta implementado, validado visualmente Desktop<->Android, integrado y publicado en `main`.
 - PostgreSQL en Hetzner, migracion de datos, operacion base de backups locales y backend/API publica HTTPS temporal quedaron integrados en `main` desde `feat/migracion-postgresql`.
@@ -5647,3 +5655,103 @@ Se retira «`TokenVault` no tiene ni un test» del riesgo residual. Lo que queda
 
 Agente único: Claude Code. **No se consultó a Codex ni a Gemini**: sin segunda opinión externa.
 Skills usadas: `test-driven-development`, `security-review`, `VibeSec`.
+
+---
+
+## Sprint build de release de Android — CERRADO 2026-08-06 (Claude Code)
+
+Primer sprint que ataca la **distribución** en vez de la funcionalidad. Hasta hoy el módulo Android
+no tenía bloque `buildTypes`, así que el único artefacto posible era el APK **debug**: depurable y
+sin ofuscar. Cualquiera con el móvil en la mano podía adjuntar un depurador y leer la memoria del
+proceso, tokens incluidos, dejando de adorno el cifrado de `EncryptedSharedPreferences`.
+
+Plan: `docs/superpowers/plans/2026-08-06-android-release-build.md`.
+Procedimiento para el usuario: `docs/android-release.md`.
+
+Sesión con el usuario en remoto desde el móvil: toda la validación la ejecutó el agente.
+
+### Qué se construyó
+
+| | |
+|---|---|
+| `.gitignore` | `*.jks`, `*.keystore`, `keystore.properties` — **primer commit del sprint**, antes de que existiera ningún keystore, porque el repositorio es público |
+| `buildTypes.release` | no depurable, `versionName` 0.1.0 → 1.0.0 |
+| `buildTypes.debug` | `applicationIdSuffix = ".debug"` para que convivan la de desarrollo y la real |
+| `signingConfigs.release` | lee `android/keystore.properties`, fuera de git; **si falta, el build no falla**: produce APK sin firmar (caso CI y de cualquier clon) |
+| `app/proguard-rules.pro` | fichero nuevo; R8 + `shrinkResources` activados |
+
+**APK de 16,8 MB → 3,0 MB** (−82 %).
+
+### El riesgo real del sprint, y por qué compilar no lo detecta
+
+`data/remote/dto/ApiDtos.kt` tiene **78 `data class` y ni un solo `@SerializedName`**: Gson mapea
+por el nombre del campo. Si R8 los renombra a `a`, `b`, `c`, la aplicación **compila, instala y
+arranca** — y falla al primer contacto con el servidor. Ningún warning en el build.
+
+Lo evitan `-keep class ...data.remote.dto.** { *; }` y `-keepattributes Signature` (sin esta
+última, `List<RecipeDto>` se deserializa como `List<LinkedTreeMap>` y revienta al castear).
+
+Verificado sobre el `mapping.txt`, no por confianza: **78 clases del paquete `dto` presentes, 0
+renombradas** — clases y campos.
+
+### Validación ejecutada en esta sesión
+
+| Comprobación | Resultado |
+|---|---|
+| `gradle :app:assembleRelease` sin `keystore.properties` | BUILD SUCCESSFUL, APK `-unsigned` (caso CI) |
+| `gradle :app:assembleRelease` con `keystore.properties` | firmado; `apksigner verify` imprime el certificado |
+| `aapt2 dump badging` | **sin `application-debuggable`** |
+| `mapping.txt` | 78 clases dto, 0 renombradas |
+| `gradle :app:testDebugUnitTest --rerun-tasks` | **93 tests, 0 fallos, 0 saltados** |
+| `run-security-scan.ps1 -Mode sprint` | Semgrep 0; TruffleHog 2 no verificados preexistentes; **exit 0**, sin rastro del keystore |
+
+**Validación en emulador contra producción real**, que es la única que prueba lo que importa:
+APK de release firmado instalado en `Pixel_9_Pro`, login real contra
+`https://recetas.167.233.213.242.sslip.io/` y recorrido de recetas, stock, lista, notas, menú y
+perfil. Cero `JsonSyntaxException`, `ClassNotFoundException` o `FATAL` en logcat.
+
+La prueba concluyente: el listado mostró **las 5 recetas semilla con título, descripción, `60m`,
+`Difícil` y `4 porciones`**. Si R8 hubiera renombrado los campos, esos valores saldrían vacíos o a
+cero. El perfil deserializó `/stats` (5 recetas, 1 miembro, última actividad).
+
+Se usó una cuenta desechable creada por API (`claude.release.20260806@example.test`), **borrada al
+terminar**: `DELETE /api/v1/auth/account` devolvió 204 y el login posterior devolvió 401.
+
+### Bug preexistente encontrado de paso (NO lo introduce R8)
+
+Tras un login, el perfil muestra `—` en nombre y email hasta que se reinicia la aplicación.
+
+Confirmado preexistente **comparando con el APK debug sin R8, que hace exactamente lo mismo**;
+posible gracias al `applicationIdSuffix` nuevo, que permite tener las dos instaladas a la vez.
+
+Causa localizada: `RecetasViewModel.login()` (línea 173) llama a `authRepository.login()` y
+`refresh()`, pero **no actualiza `_displayName`, `_email` ni `_avatarUrl`**. Esos flujos sólo se
+inicializan en el constructor del ViewModel, que ya existía antes del login. Al reiniciar la
+aplicación aparecen correctamente, así que el dato sí se persiste: sólo falta refrescar el estado.
+Arreglo pequeño, sprint propio.
+
+### Lo que falta para poder distribuir, y sólo lo puede hacer el usuario
+
+**Crear el keystore de firma.** Es la identidad de la aplicación para siempre: si se pierde el
+fichero o la contraseña, no hay forma de volver a actualizarla en ningún dispositivo. El
+procedimiento está en `docs/android-release.md`. El agente sólo usó un keystore **desechable** de
+30 días, fuera del repositorio y ya eliminado, que no sirve para distribuir.
+
+### Riesgo residual, actualizado
+
+- **Sin keystore de producción no hay APK distribuible.** Es el único bloqueante que queda para que
+  la aplicación llegue a un usuario final en Android.
+- **Guardar el `mapping.txt` de cada APK distribuido** (`app/build/outputs/mapping/release/`). Sin
+  él, las trazas de fallo de esa versión son ilegibles. Se regenera en cada build.
+- **Si se añade un DTO fuera de `data.remote.dto`, hay que ampliar la regla de R8**, o Gson fallará
+  en runtime sin avisar en el build.
+- El instalador de Desktop sigue siendo el `v1.1` del 25 de julio: no incluye nada de agosto.
+- La CI no compila `assembleRelease`, sólo `assembleDebug`: R8 no se ejercita en CI.
+- Mensajes de error técnicos en el login (`HTTP 401` en crudo), contra la regla de errores en
+  lenguaje claro de `CLAUDE.md`. Preexistente.
+- iOS bloqueado sin macOS; `AppSession.familyId` sin `volatile`; sin tests de renderizado.
+
+### Trazabilidad
+
+Agente único: Claude Code. **No se consultó a Codex ni a Gemini**: sin segunda opinión externa.
+Skills usadas: `writing-plans`. Escaneo `run-security-scan.ps1 -Mode sprint` con exit 0.
