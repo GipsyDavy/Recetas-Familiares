@@ -5973,3 +5973,133 @@ implícita del usuario: no hubo segunda opinión externa sobre ninguna de las de
 Skills usadas: `test-driven-development`, `writing-plans`, `security-review`, `VibeSec`. Escaneo
 `run-security-scan.ps1` ejecutado en los cuatro cierres, **exit 0 siempre**; los dos hallazgos de
 TruffleHog son los mismos falsos positivos preexistentes (`example.test` en tests).
+
+---
+
+## Sprint avatar tras iniciar sesión — CERRADO 2026-08-07 (Claude Code)
+
+**Agente líder:** Claude Code (Opus 5). Skill de proceso: `superpowers:test-driven-development`.
+**Gemini: NO DISPONIBLE** (sin cuota, indicado por el usuario). **Codex: no solicitado.** La
+revisión la asumió Claude Code. Es la limitación principal de este cierre.
+
+PR [#6](https://github.com/GipsyDavy/Recetas-Familiares/pull/6), commit de merge `65f0f44`.
+
+### El defecto era mayor de lo que decía el punto de retoma
+
+La nota del 06/08 decía "se ven las iniciales hasta que algo cargue `/users/me`". En Desktop es
+exacto; **en Android era falso, y el fallo era peor**.
+
+`AuthUserResponse` del backend solo devuelve `id`, `email`, `displayName` y `emailVerified`: el
+login **nunca trae el avatar**. Y en Android `UserRepository.me()` devolvía el perfil sin persistir
+`avatarUrl`, mientras `loadAccountStatus()` solo leía `emailVerified`. Es decir: el único camino
+que escribía `avatar_url` en la sesión era `uploadAvatar`. **Un usuario con avatar veía sus
+iniciales en cualquier dispositivo donde no lo hubiera subido, y reiniciar no lo arreglaba.**
+
+En Desktop `fetchMe()` sí persiste, pero `LoginView` no lo llamaba: la barra lateral se quedaba con
+las iniciales hasta abrir el perfil, que es lo único que consulta `/users/me`.
+
+### La solución, sin tocar el contrato
+
+Se descartó añadir `avatarUrl` a `AuthUserResponse`: obligaría a desplegar backend y a tocar los
+tres clientes por un fallo de refresco. En su lugar:
+
+- `UserRepository.me()` (Android) guarda `avatarUrl` en la sesión, como ya hacían
+  `updateDisplayName` y `uploadAvatar`.
+- `RecetasViewModel.loadAccountStatus()` publica el avatar junto al estado de verificación.
+- `LoginView` (Desktop) llama a `fetchMe()` tras `detectAndSaveRole()`, tolerante a fallo.
+
+**Sin peticiones nuevas en Android**: `/users/me` ya se consultaba al abrir el perfil.
+
+### Validación
+
+Los tres tests se vieron en rojo por la razón correcta antes del arreglo: `no-se-escribio-nada`
+donde se esperaba la URL, y `null` en el ViewModel. **Android 94 → 97 tests**, 0 fallos, 0
+saltados. Desktop 109, 0 fallos, 1 saltado (DPAPI en Windows). Ambas CI en verde en la PR y en
+`main`.
+
+### Revisión propia: una sospecha que resultó infundada
+
+Se sospechó que el avatar del usuario A podía sobrevivir al login del usuario B en un dispositivo
+compartido. **Comprobado y descartado**, y conviene no repetir el análisis:
+
+- Android: `TokenRefreshAuthenticator` llama a `sessionStore.clear()` en sus cuatro caminos de
+  sesión inválida, y `clear()` borra `avatar_url`. La pantalla de login solo aparece con
+  `accessToken`/`familyId` vacíos, cosa que solo ocurre tras un `clear()`.
+- Desktop: igual en `ApiClient` (401 doble y refresh fallido), `AuthRepository.logout()`,
+  `deleteAccount()` y el cambio de servidor. `AppSession.setAvatarUrl(null)` hace `prefs.remove`,
+  no conserva el valor anterior.
+
+### Riesgo residual
+
+- **El cambio de Desktop no tiene test automático.** `LoginView` es una vista JavaFX sin seam y el
+  proyecto no tiene tests de renderizado. Crear el seam por cuatro líneas sería desproporcionado.
+- **Sin validación en ejecución en ninguna de las dos plataformas.** Queda comprobarlo entrando en
+  la aplicación y mirando si la foto aparece de inmediato.
+
+---
+
+## Sprint acciones de GitHub en Node 24 — CERRADO 2026-08-07 (Claude Code)
+
+PR [#7](https://github.com/GipsyDavy/Recetas-Familiares/pull/7), commit de merge `15cfce6`.
+
+### El punto de retoma apuntaba a la solución equivocada
+
+Decía "subir los pines por SHA es corto". **Ya estaban todas ancladas por SHA.** Anclar no evita
+nada aquí: lo que avisa GitHub es que la *versión* anclada declara `runs.using: node20`. Había que
+subir de versión, conservando el anclaje.
+
+Se comprobó el `runs.using` del `action.yml` en el SHA viejo y en el nuevo, no solo las notas de la
+release:
+
+| Acción | Antes | Ahora |
+|---|---|---|
+| `actions/checkout` | v4.4.0 | v7.0.1 |
+| `actions/setup-java` | v4.8.0 | v5.7.0 |
+| `actions/cache` | v4.3.0 | v6.1.0 |
+| `actions/upload-artifact` | v4.6.2 | v7.0.1 |
+
+Ninguna ruptura afecta a este uso: `upload-artifact` v7 solo añade `archive` (por defecto sigue
+comprimiendo) y `cache` v6 es una migración a ESM sin cambio de API.
+
+**Prueba directa, leída de los logs de las dos ramas:** en `fix/avatar-tras-login` aparece
+`Node.js 20 is deprecated... actions/checkout@11d5960a, actions/setup-java@c1e32368`; en
+`ci/acciones-node24` no hay ninguna coincidencia. `Dependency Audit` se lanzó a mano sobre la rama
+para ejercitar `cache` y `upload-artifact`: restauración y subida correctas en los dos jobs.
+
+### Queda fuera `backend-ci-cd.yml`, a propósito
+
+Su filtro `paths` **incluye el propio fichero**, así que fusionar un cambio ahí dispara el job
+`deploy` con `environment: production`. Se hará en una ventana acordada con el usuario. Ahí además
+hay que subir `download-artifact` v4 → v8, cuyo v8 pasa a **fallar** ante un desajuste de hash en
+vez de avisar (más seguro, pero es un cambio de comportamiento).
+
+`gradle/actions/setup-gradle` es una acción compuesta: no tiene runtime propio que actualizar.
+
+### Hallazgo NUEVO y no relacionado: CVE en Tomcat, con producción afectada
+
+El `Dependency Audit` lanzado en este sprint **falló, y no por el cambio de acciones** (los pasos
+de cache y subida pasaron):
+
+```
+CVE-2026-66299 (CVSS 7.5) — tomcat-embed-core 10.1.57   ← rompe el umbral de 7.0, bloquea el audit
+CVE-2026-66010            — DOMPurify 3.4.11 dentro de swagger-ui 5.32.8   ← solo aviso
+```
+
+**Es nuevo**: la ejecución programada del 2026-08-03 sobre `main` salió en verde. El CVE se publicó
+entre el 3 y el 7 de agosto.
+
+`backend/pom.xml:24` fija `<tomcat.version>10.1.57</tomcat.version>` a mano, sobrescribiendo la de
+Spring Boot 3.5.15: el arreglo es subir esa propiedad. **No se ha verificado qué versión de Tomcat
+corrige el CVE** — hay que leer el aviso de Apache antes de tocar nada. El VPS corre esa versión
+ahora mismo.
+
+Candidato claro a siguiente sprint, junto con `backend-ci-cd.yml`: mismo despliegue, un solo viaje
+a producción.
+
+### Seguridad de la sesión
+
+`run-security-scan.ps1` en modo sprint: **exit 0**. Semgrep 0 hallazgos (5 packs locales).
+TruffleHog 2 hallazgos no verificados, los mismos falsos positivos preexistentes
+(`https://user:***@example.test` en `ServerUrlConfigTest.kt:42` y `ServerConfigTest.java:75`).
+`/VibeSec` y `/security-review`: no aplican. Cero código de auth, ownership o endpoints tocado; el
+cambio de Android solo persiste una URL que ya devolvía el servidor, en almacenamiento cifrado.
