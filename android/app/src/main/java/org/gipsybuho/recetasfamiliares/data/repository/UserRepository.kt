@@ -18,8 +18,14 @@ class UserRepository(
     private val api: RecetasApi,
     private val sessionStore: SessionStore
 ) {
-    /** Perfil propio con el estado de verificacion del correo (CRIT-2). */
-    suspend fun me(): UserResponseDto = api.getMe()
+    /** Perfil propio con el estado de verificacion del correo (CRIT-2).
+     *  Guarda el avatar en la sesion: la respuesta del login no lo trae, asi que
+     *  sin esto solo se veria en el dispositivo donde se subio. */
+    suspend fun me(): UserResponseDto {
+        val response = api.getMe()
+        sessionStore.avatarUrl = response.avatarUrl
+        return response
+    }
 
     suspend fun updateDisplayName(newName: String): UserResponseDto {
         val response = api.updateMe(UpdateUserRequestDto(newName.trim()))

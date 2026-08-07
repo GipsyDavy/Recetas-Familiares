@@ -20,9 +20,11 @@ import org.gipsybuho.recetasfamiliares.data.local.RecipeIngredientEntity
 import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoDao
 import org.gipsybuho.recetasfamiliares.data.local.RecipePhotoEntity
 import org.gipsybuho.recetasfamiliares.data.local.StockItemEntity
+import org.gipsybuho.recetasfamiliares.data.remote.dto.UserResponseDto
 import org.gipsybuho.recetasfamiliares.data.repository.AuthRepository
 import org.gipsybuho.recetasfamiliares.data.repository.RecipeRepository
 import org.gipsybuho.recetasfamiliares.data.repository.StockRepository
+import org.gipsybuho.recetasfamiliares.data.repository.UserRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -49,6 +51,7 @@ class RecetasViewModelTest {
     private val recipeRepository = mockk<RecipeRepository>(relaxed = true)
     private val stockRepository = mockk<StockRepository>(relaxed = true)
     private val authRepository = mockk<AuthRepository>(relaxed = true)
+    private val userRepository = mockk<UserRepository>(relaxed = true)
     private val photoDao = mockk<RecipePhotoDao>(relaxed = true)
     private val ingredientDao = mockk<RecipeIngredientDao>(relaxed = true)
 
@@ -289,6 +292,36 @@ class RecetasViewModelTest {
         }
 
     @Test
+    fun `el avatar del servidor llega al perfil aunque no se haya subido en este dispositivo`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // Recien iniciada la sesion, avatar_url esta vacio en la sesion local:
+            // el login no lo trae (AuthUserResponse no lo incluye) y solo lo escribia
+            // uploadAvatar. Quien lo sabe es /users/me.
+            every { sessionStore.avatarUrl } returns null
+
+            val viewModel = buildViewModel()
+            assertNull(viewModel.avatarUrl.value)
+
+            every { container.userRepository } returns userRepository
+            coEvery { userRepository.me() } returns UserResponseDto(
+                id = "u1",
+                email = "emma@example.test",
+                displayName = "Emma",
+                avatarUrl = AVATAR_URL,
+                emailVerified = true
+            )
+
+            viewModel.loadAccountStatus()
+            advanceUntilIdle()
+
+            assertEquals(
+                "El perfil no puede mostrar iniciales cuando el usuario ya tiene avatar",
+                AVATAR_URL,
+                viewModel.avatarUrl.value
+            )
+        }
+
+    @Test
     fun `un cambio de familia normal no cierra la sesion`() = runTest(mainDispatcherRule.dispatcher) {
         val viewModel = buildViewModel(loggedIn = true)
         backgroundScope.launch { viewModel.isLoggedIn.collect {} }
@@ -363,5 +396,6 @@ class RecetasViewModelTest {
         const val FAMILY_A = "fam-a"
         const val FAMILY_B = "fam-b"
         const val CREATED_AT = "2026-08-05T10:00:00Z"
+        const val AVATAR_URL = "https://api.example.test/uploads/avatar-u1.jpg"
     }
 }

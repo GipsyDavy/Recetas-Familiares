@@ -223,11 +223,15 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
     private val _emailVerified = MutableStateFlow<Boolean?>(null)
     val emailVerified: StateFlow<Boolean?> = _emailVerified.asStateFlow()
 
-    /** Consulta /users/me para el estado de verificacion; offline deja null. */
+    /** Consulta /users/me para el estado de verificacion y el avatar; offline
+     *  deja el estado en null y conserva el avatar guardado en la sesion. */
     fun loadAccountStatus() {
         viewModelScope.launch {
             runCatching { container.userRepository.me() }
-                .onSuccess { _emailVerified.value = it.emailVerified }
+                .onSuccess {
+                    _emailVerified.value = it.emailVerified
+                    _avatarUrl.value = it.avatarUrl
+                }
         }
     }
 
