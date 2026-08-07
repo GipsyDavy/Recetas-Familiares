@@ -6103,3 +6103,88 @@ TruffleHog 2 hallazgos no verificados, los mismos falsos positivos preexistentes
 (`https://user:***@example.test` en `ServerUrlConfigTest.kt:42` y `ServerConfigTest.java:75`).
 `/VibeSec` y `/security-review`: no aplican. Cero código de auth, ownership o endpoints tocado; el
 cambio de Android solo persiste una URL que ya devolvía el servidor, en almacenamiento cifrado.
+
+---
+
+## Punto de retoma — cierre de sesión del 2026-08-07
+
+**No hay nada a medias.** `main` == `origin/main` en `2107d8c`, árbol limpio, sin ficheros sin
+trackear y sin ramas locales ni remotas aparte de `main`. Dos sprints cerrados y fusionados en esta
+sesión (PR #6 y #7), ambos con CI verde en `main`.
+
+### Estado exacto al cerrar
+
+| | |
+|---|---|
+| `main` local y remoto | `2107d8c`, sincronizados |
+| Tests | Android **97**, Desktop **109** (1 saltado), backend 116 de sesión anterior |
+| Android CI / Desktop CI en `main` | ✅ verdes las dos |
+| `Dependency Audit` | ❌ **en rojo**, y con motivo real: ver abajo |
+| Producción | **Backend no tocado en toda la sesión**: el VPS sigue como estaba |
+
+### Lo primero al retomar: el CVE de Tomcat
+
+**`CVE-2026-66299`, CVSS 7.5, en `tomcat-embed-core` 10.1.57, que corre en producción.** Rompe el
+umbral de 7.0 y deja el `Dependency Audit` en rojo. Apareció entre el 3 y el 7 de agosto: el run
+programado del 03/08 fue verde.
+
+Sprint propuesto, en este orden:
+
+1. **Leer el aviso de Apache** y averiguar qué versión de Tomcat 10.1.x lo corrige. No está
+   verificado: no darlo por supuesto.
+2. Subir `<tomcat.version>` en `backend/pom.xml:24` (está fijada a mano, sobrescribe la de Spring
+   Boot 3.5.15).
+3. Tests de backend. **Necesitan la contraseña de `recetas_app`, que el agente no tiene**: pedirla
+   o usar `herztner/recetas_app.env`.
+4. En el mismo viaje, subir las acciones de `backend-ci-cd.yml` a Node 24, incluido
+   `download-artifact` v4 → v8 (ojo: v8 **falla** ante desajuste de hash, antes solo avisaba).
+5. **Fusionar despliega a producción.** El filtro `paths` de ese workflow incluye el propio fichero
+   y el job `deploy` usa `environment: production`. Autorización explícita del usuario antes.
+
+Aviso menor del mismo informe, por debajo del umbral y sin bloquear: `CVE-2026-66010` en DOMPurify
+3.4.11, empaquetado dentro de swagger-ui 5.32.8.
+
+### Comprobaciones que sólo puede hacer el usuario
+
+Las tres del cierre del 06/08 **siguen pendientes**, más una nueva:
+
+1. **Crear el keystore de firma de Android** (`docs/android-release.md`). Es lo único que separa al
+   proyecto de tener un APK distribuible. Perder el fichero o su contraseña impide actualizar la
+   aplicación para siempre: copia en dos sitios.
+2. **Abrir el instalador `v1.2` y entrar con su cuenta.** SmartScreen avisará: no está firmado.
+3. **Proteger la rama `main`** (Settings → Branches) para que la CI bloquee merges. Hoy informa, no
+   impide.
+4. **NUEVO: comprobar que el avatar aparece nada más entrar**, en Android y en Desktop. El fix de
+   hoy no se validó en ejecución en ninguna plataforma.
+
+### Por dónde seguir después, ordenado por valor
+
+1. CVE de Tomcat + `backend-ci-cd.yml` (arriba). Lo primero.
+2. **Tests de renderizado** (TestFX, Robolectric o Compose UI Test). Sigue siendo el hueco grande, y
+   esta sesión lo ha vuelto a tocar: el cambio de `LoginView` se fusionó sin test porque la vista
+   JavaFX no tiene seam.
+3. **Wrapper de Gradle** apuntando a `file:///C:/tmp/tools/gradle-9.5.1-bin.zip`: el repositorio no
+   es reproducible para otro clon. Mejor con el usuario delante, por lo de Avast.
+4. **UX-14**: ayuda contextual completa en Desktop y Android. Sprint grande, sin spec.
+5. **(23)**: pulido visual del sidebar de Desktop. Idea suelta, sin spec.
+6. **iOS**: sigue bloqueado sin macOS. No planificar.
+
+### Dos cosas aprendidas que conviene no reaprender
+
+- **El punto de retoma anterior se equivocaba en los dos sprints de hoy**, y en ambos casos la
+  premisa se cayó al mirar el código: el avatar no era un problema de refresco, y las acciones ya
+  estaban ancladas por SHA. Verificar la premisa antes de planificar sobre ella.
+- **Un run `cancelled` de Actions sin ejecutar un solo paso aparece como `failure`** en
+  `gh run list`. Mirar los jobs antes de concluir que el código falla. Pasó con el run del 06/08 en
+  `main`, que no era ningún fallo de código.
+
+### Trazabilidad de la sesión
+
+Agente único: **Claude Code (Opus 5)**. **Gemini: sin cuota**, confirmado por el usuario a mitad de
+sesión; se preparó el bloque de revisión y no llegó a usarse. **Codex: no solicitado.** No hubo
+segunda opinión externa sobre ninguna decisión de hoy: es la limitación principal del cierre. La
+revisión del diff la hizo Claude Code sobre sus propios cambios, con una sospecha de privacidad
+levantada y descartada con evidencia.
+
+Skill de proceso: `superpowers:test-driven-development`. Escaneo `run-security-scan.ps1` en modo
+sprint: **exit 0**.
