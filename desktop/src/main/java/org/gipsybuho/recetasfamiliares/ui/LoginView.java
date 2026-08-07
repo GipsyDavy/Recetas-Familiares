@@ -264,6 +264,14 @@ public class LoginView extends ScrollPane {
                     context.getAuthRepository().login(email, password);
                 }
                 context.getFamilyRepository().detectAndSaveRole();
+                // El login no devuelve el avatar (AuthUserResponse no lo incluye), asi
+                // que la barra lateral se quedaria con las iniciales hasta abrir el
+                // perfil. fetchMe lo guarda en la sesion; si falla, se sigue entrando.
+                try {
+                    context.getUserRepository().fetchMe();
+                } catch (Exception ignored) {
+                    // Sin conexion al perfil: iniciales. No es motivo para fallar el login.
+                }
                 Platform.runLater(onLoginSuccess);
             } catch (Exception ex) {
                 Platform.runLater(() -> {
