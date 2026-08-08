@@ -27,10 +27,18 @@
         Low; el 7.5 es la puntuacion generica del NVD, que asocia el CVE a
         cualquier artefacto con version de Tomcat afectada.
 
-        Comprobado el 2026-08-08 sobre el jar real: tomcat-embed-core-10.1.57
-        no contiene la webapp "examples" ni el ejemplo de chat. Una aplicacion
-        Spring Boot con Tomcat embebido nunca ha desplegado esa webapp, que es
-        justo la mitigacion que recomienda Apache.
+        Comprobado el 2026-08-08 sobre los dos jars reales: ni
+        tomcat-embed-core-10.1.57 ni tomcat-embed-websocket-10.1.57 contienen la
+        webapp "examples" ni el ejemplo de chat. El de websocket trae la API
+        jakarta.websocket y la implementacion del servidor, no ejemplos. Una
+        aplicacion Spring Boot con Tomcat embebido nunca ha desplegado esa
+        webapp, que es justo la mitigacion que recomienda Apache.
+
+        OJO: el NVD asocia este CVE a los DOS artefactos por coincidencia de CPE
+        (cpe:2.3:a:apache:tomcat:10.1.57). Suprimir solo tomcat-embed-core dejaba
+        el audit rojo por tomcat-embed-websocket, comprobado en el run
+        31273636712. Si algun dia se anade otro artefacto tomcat-embed-*, habra
+        que ampliar esta regex igual.
 
         La version que lo corrige (10.1.58) NO estaba publicada el 2026-08-08:
         ni en la pagina de seguridad de Apache ("not yet released") ni en Maven
@@ -39,7 +47,7 @@
         AL CADUCAR: comprobar si ya existe 10.1.58 y, si existe, subir
         <tomcat.version> en pom.xml y BORRAR esta supresion en vez de renovarla.
         ]]></notes>
-        <gav regex="true">^org\.apache\.tomcat\.embed:tomcat-embed-core:10\.1\.57$</gav>
+        <gav regex="true">^org\.apache\.tomcat\.embed:tomcat-embed-(core|websocket):10\.1\.57$</gav>
         <cve>CVE-2026-66299</cve>
     </suppress>
 </suppressions>
