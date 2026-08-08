@@ -6246,3 +6246,80 @@ si la rota o no.**
 - **Guardar el `mapping.txt` junto a cada APK que reparta.** Se regenera en cada build y solo
   sirve para el APK con el que salió; sin él, una traza de esa versión es ilegible.
 - Los scripts auxiliares de `%USERPROFILE%\claves\recetas-familiares\` pueden borrarse.
+
+---
+
+## Punto de retoma — cierre de sesión del 2026-08-08
+
+`main` está en `2222d80` y **no ha cambiado en este sprint**. El trabajo vive en la rama
+`security/cve-tomcat-y-ci-backend`, publicada, con **PR [#8](https://github.com/GipsyDavy/Recetas-Familiares/pull/8) abierta y sin fusionar**.
+
+**Sesión cortada por cuota, a propósito y en el punto seguro.** Las tareas 1-3 del plan están
+hechas; la 4 —fusionar, desplegar, verificar producción— es la única con riesgo y queda para
+mañana. Desplegar sin margen para diagnosticar y revertir habría sido la peor decisión del sprint.
+
+Plan completo, paso a paso: `docs/superpowers/plans/2026-08-08-cve-tomcat-y-ci-backend.md`.
+
+### El CVE no era lo que parecía
+
+Lo presenté el 07/08 como urgente y con producción afectada. **No lo está**, y conviene no volver a
+asustarse con ello:
+
+- `CVE-2026-66299` afecta al **ejemplo de chat WebSocket de la webapp `examples`** de Tomcat.
+  Apache lo clasifica **Low**. El **7.5 es la puntuación genérica del NVD**, que asocia el CVE a
+  cualquier artefacto cuya versión encaje por CPE sin mirar si el componente vulnerable está.
+- Apache, textual: *"Users who followed the security guidance to remove the examples web
+  application are not affected."* Spring Boot con Tomcat embebido **nunca** ha desplegado esa webapp.
+- Comprobado sobre los jars reales, no deducido: ni `tomcat-embed-core-10.1.57` ni
+  `tomcat-embed-websocket-10.1.57` contienen la webapp `examples` ni el ejemplo de chat.
+- **La versión que lo corrige, 10.1.58, NO existe**: "not yet released" en la página de Apache, y
+  la última 10.1.x de Maven Central es la 10.1.57. **Subir la versión era imposible**, que era el
+  plan que yo mismo había propuesto el día anterior.
+
+Por eso el sprint pasó a ser "documentar por qué no aplica, con fecha de caducidad", no "actualizar
+y desplegar".
+
+### Lo hecho, con lo que enseñó
+
+| Commit | Qué |
+|---|---|
+| `c7f9274` | Supresión de `CVE-2026-66299` con la justificación verificada, `until=2026-11-01` |
+| `f6f469f` | `backend-ci-cd.yml` a Node 24 (checkout v7.0.1, setup-java v5.7.0, upload-artifact v7.0.1, **download-artifact v8.0.1**) |
+| (tercero) | La supresión tenía que cubrir **también** `tomcat-embed-websocket` |
+
+**El primer intento dejó el audit rojo, y es la lección del sprint**: la supresión funcionó para
+`tomcat-embed-core`, pero el NVD asocia el mismo CVE a **los dos** artefactos por coincidencia de
+CPE. Al callar uno, saltó el otro (run `31273636712`). Si algún día se añade otro `tomcat-embed-*`,
+hay que ampliar la misma regex.
+
+**Verificado en la PR, y merece recordarse:** `Backend CI/CD` salió en verde con
+`Deploy backend: skipped`. La guarda `if: github.event_name == 'push'` protege de verdad: **una PR
+no despliega**. El `merge` sí.
+
+### Mañana, en este orden
+
+1. **Confirmar el `Dependency Audit`** del run `31273795093` (lanzado sobre la rama al cierre, sin
+   verificar todavía). Debe salir **verde en los dos jobs**. Si sigue rojo, leer qué artefacto
+   nuevo aparece: el patrón ya se conoce.
+2. `curl -s https://recetas.167.233.213.242.sslip.io/api/v1/health` → guardar el `{"status":"UP"}`
+   **de antes**.
+3. **Pedir autorización explícita al usuario**: fusionar la PR #8 **despliega a producción**
+   (`backend/**` cae en el filtro `paths`, y el job `deploy` corre en `push` a `main` con
+   `environment: production`).
+4. Fusionar, seguir el run de `Backend CI/CD`, y volver a comprobar el `health`. Un health verde no
+   prueba que sirva datos: entrar con la aplicación y abrir una receta.
+5. Escaneo de seguridad, cierre en este documento.
+
+### Riesgo residual
+
+- **La supresión caduca el 2026-11-01** y el audit volverá a rojo ese día si nadie mira. Es
+  deliberado. La nota dice qué hacer: comprobar si ya existe 10.1.58, subir `<tomcat.version>` y
+  **borrar** la supresión en vez de renovarla.
+- `CVE-2026-66010` (DOMPurify dentro de swagger-ui 5.32.8) seguirá saliendo como aviso. No bloquea,
+  y `application-prod.yml:12-16` desactiva `api-docs` y `swagger-ui` en producción.
+- El despliegue reconstruye e instala un jar **funcionalmente idéntico**. El riesgo no es el
+  cambio: es el acto de desplegar.
+- **Sin Codex ni Gemini** (sin cuota) en todo el sprint: ninguna segunda opinión externa sobre el
+  razonamiento de no exposición, que es lo que sostiene la supresión.
+- La ejecución no usó `superpowers:executing-plans`: el plan se había escrito minutos antes y
+  estaba entero en contexto. Decisión consciente por la restricción de cuota del usuario.
