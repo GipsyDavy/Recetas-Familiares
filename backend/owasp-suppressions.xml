@@ -9,8 +9,37 @@
         Maven Central has no Spring Security 6.5.x release newer than 6.5.11;
         the available fixed line would require a Spring Security 7.x / Spring
         Boot major upgrade. Revisit when a compatible 6.5.x/Boot 3.5 fix exists.
+
+        2026-08-08: el informe la marca como "zero matches". spring-security-web
+        SIGUE siendo 6.5.11 (verificado con dependency:tree): lo que ha cambiado
+        son los datos del NVD, que ya no asocian ese CVE a esta version. Se deja
+        hasta que caduque sola el 2026-10-01; borrarla ahora solo adelanta que
+        vuelva a saltar si el NVD se corrige otra vez.
         ]]></notes>
         <gav regex="true">^org\.springframework\.security:spring-security-web:6\.5\.11$</gav>
         <cve>CVE-2026-47838</cve>
+    </suppress>
+
+    <suppress until="2026-11-01Z">
+        <notes><![CDATA[
+        CVE-2026-66299 afecta al ejemplo de chat WebSocket de la webapp
+        "examples" de Tomcat, no al servidor embebido. Apache lo clasifica como
+        Low; el 7.5 es la puntuacion generica del NVD, que asocia el CVE a
+        cualquier artefacto con version de Tomcat afectada.
+
+        Comprobado el 2026-08-08 sobre el jar real: tomcat-embed-core-10.1.57
+        no contiene la webapp "examples" ni el ejemplo de chat. Una aplicacion
+        Spring Boot con Tomcat embebido nunca ha desplegado esa webapp, que es
+        justo la mitigacion que recomienda Apache.
+
+        La version que lo corrige (10.1.58) NO estaba publicada el 2026-08-08:
+        ni en la pagina de seguridad de Apache ("not yet released") ni en Maven
+        Central, cuya ultima 10.1.x era la 10.1.57. Actualizar era imposible.
+
+        AL CADUCAR: comprobar si ya existe 10.1.58 y, si existe, subir
+        <tomcat.version> en pom.xml y BORRAR esta supresion en vez de renovarla.
+        ]]></notes>
+        <gav regex="true">^org\.apache\.tomcat\.embed:tomcat-embed-core:10\.1\.57$</gav>
+        <cve>CVE-2026-66299</cve>
     </suppress>
 </suppressions>
