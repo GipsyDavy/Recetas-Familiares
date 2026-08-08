@@ -6148,9 +6148,9 @@ Aviso menor del mismo informe, por debajo del umbral y sin bloquear: `CVE-2026-6
 
 Las tres del cierre del 06/08 **siguen pendientes**, más una nueva:
 
-1. **Crear el keystore de firma de Android** (`docs/android-release.md`). Es lo único que separa al
-   proyecto de tener un APK distribuible. Perder el fichero o su contraseña impide actualizar la
-   aplicación para siempre: copia en dos sitios.
+1. ~~**Crear el keystore de firma de Android**~~ — **HECHO el 2026-08-08**. Ver la sección al final
+   del documento. Queda pendiente **hacer las dos copias de seguridad del `.jks`**: sigue siendo lo
+   único irreemplazable del proyecto.
 2. **Abrir el instalador `v1.2` y entrar con su cuenta.** SmartScreen avisará: no está firmado.
 3. **Proteger la rama `main`** (Settings → Branches) para que la CI bloquee merges. Hoy informa, no
    impide.
@@ -6188,3 +6188,61 @@ levantada y descartada con evidencia.
 
 Skill de proceso: `superpowers:test-driven-development`. Escaneo `run-security-scan.ps1` en modo
 sprint: **exit 0**.
+
+---
+
+## Keystore de firma creado y primer APK distribuible — 2026-08-08 (Claude Code)
+
+Cierra la comprobación número 1 pendiente desde el 06/08: **era lo único que separaba al proyecto
+de poder repartir la aplicación.** Todo con herramientas gratuitas: `keytool` viene con el JDK y el
+certificado es autofirmado, que es lo que Android pide.
+
+El procedimiento y la huella del certificado están en `docs/android-release.md`, actualizado en
+esta sesión con lo que se aprendió haciéndolo de verdad.
+
+### Resultado verificado
+
+`app/build/outputs/apk/release/app-release.apk`, **3,04 MB**, `versionCode=1`,
+`versionName=1.0.0`, `minSdk 26`. Las cuatro comprobaciones pasaron:
+
+| Comprobación | Resultado |
+|---|---|
+| Firmado con la clave correcta | `CN=Recetas Familiares, O=Gipsybuho, C=ES`, SHA-256 idéntico al del keystore |
+| Depurable | No |
+| R8 y los DTO | `AuthResponseDto -> AuthResponseDto`, sin renombrar |
+| Nombre del fichero | `app-release.apk`, sin `unsigned` |
+
+Clave RSA 4096 (el documento decía 2048), válida hasta el **24 de diciembre de 2053**.
+
+### Lo que costó tiempo, para no repetirlo
+
+- **Pegar un comando largo en el chat no lo ejecuta**, y al pegarlo se partió por la mitad. Lo que
+  sí funcionó a la primera fue **un `.cmd` con doble clic**: en esta máquina es la vía fiable para
+  cualquier cosa que pida escribir una contraseña por teclado.
+- **`keytool` moderno crea PKCS12, no JKS**, aunque el fichero acabe en `.jks`. Store y clave
+  comparten contraseña obligatoriamente.
+- En un `.properties`, `\` es carácter de escape: `storeFile` va con barras normales.
+- Un script con `$ErrorActionPreference = 'Stop'` que captura la salida de un `.exe` con `2>&1`
+  puede abortar de golpe y cerrar la ventana antes del `pause`, sin dejar rastro. La segunda
+  versión escribía un `paso.log` desde la primera línea: eso es lo que hay que hacer cuando no
+  puedes ver la pantalla del usuario.
+
+### Riesgo asumido, documentado a propósito
+
+Todo el procedimiento se montó para que la contraseña no pasara por el chat: se teclea a ciegas y
+va a `keytool` por entrada estándar, nunca como argumento. **Aun así acabó expuesta**, porque el
+sistema mostró automáticamente el contenido de `keystore.properties` al escribirse el fichero.
+
+La clave de firma **no está comprometida**: el `.jks` no salió del disco. Se informó al usuario y
+se le dio el remedio (`keytool -storepasswd`, que cambia la contraseña **sin** alterar certificado
+ni huellas, así que las instalaciones existentes se siguen actualizando). **Decisión del usuario
+si la rota o no.**
+
+### Pendiente del usuario
+
+- **Dos copias de seguridad del `.jks`, en sitios distintos, y la contraseña guardada aparte.**
+  Es lo único irrecuperable: sin ese fichero no hay forma de actualizar la aplicación en ningún
+  dispositivo donde esté instalada.
+- **Guardar el `mapping.txt` junto a cada APK que reparta.** Se regenera en cada build y solo
+  sirve para el APK con el que salió; sin él, una traza de esa versión es ilegible.
+- Los scripts auxiliares de `%USERPROFILE%\claves\recetas-familiares\` pueden borrarse.
