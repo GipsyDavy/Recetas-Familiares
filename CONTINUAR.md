@@ -6298,9 +6298,8 @@ no despliega**. El `merge` sí.
 
 ### Mañana, en este orden
 
-1. **Confirmar el `Dependency Audit`** del run `31273795093` (lanzado sobre la rama al cierre, sin
-   verificar todavía). Debe salir **verde en los dos jobs**. Si sigue rojo, leer qué artefacto
-   nuevo aparece: el patrón ya se conoce.
+1. ~~Confirmar el `Dependency Audit`~~ — **HECHO**: run `31273795093`, **verde en los dos jobs**.
+   La supresión ampliada funciona. Nada que revisar aquí.
 2. `curl -s https://recetas.167.233.213.242.sslip.io/api/v1/health` → guardar el `{"status":"UP"}`
    **de antes**.
 3. **Pedir autorización explícita al usuario**: fusionar la PR #8 **despliega a producción**
