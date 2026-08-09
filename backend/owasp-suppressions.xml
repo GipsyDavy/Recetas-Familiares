@@ -24,21 +24,28 @@
         <notes><![CDATA[
         CVE-2026-66299 afecta al ejemplo de chat WebSocket de la webapp
         "examples" de Tomcat, no al servidor embebido. Apache lo clasifica como
-        Low; el 7.5 es la puntuacion generica del NVD, que asocia el CVE a
-        cualquier artefacto con version de Tomcat afectada.
+        Low. El 7.5 que rompe el umbral NO es una valoracion del NIST (el NVD
+        publica su propio analisis como N/A): lo aporta CISA-ADP.
 
-        Comprobado el 2026-08-08 sobre los dos jars reales: ni
-        tomcat-embed-core-10.1.57 ni tomcat-embed-websocket-10.1.57 contienen la
-        webapp "examples" ni el ejemplo de chat. El de websocket trae la API
-        jakarta.websocket y la implementacion del servidor, no ejemplos. Una
-        aplicacion Spring Boot con Tomcat embebido nunca ha desplegado esa
-        webapp, que es justo la mitigacion que recomienda Apache.
+        SI, ESTA APLICACION USA WEBSOCKET. El chat familiar corre sobre STOMP de
+        Spring (chat/WebSocketConfig.java) encima de tomcat-embed-websocket. Eso
+        NO cambia la conclusion: el codigo vulnerable es ChatAnnotation.java, de
+        la aplicacion de EJEMPLO que Apache distribuye en webapps/examples, no de
+        la implementacion del contenedor que usa Spring. Comprobado el 2026-08-08
+        sobre los dos jars reales: ni tomcat-embed-core-10.1.57 ni
+        tomcat-embed-websocket-10.1.57 contienen la webapp "examples" ni ese
+        ejemplo. El de websocket trae la API jakarta.websocket y la
+        implementacion del servidor. Una aplicacion Spring Boot con Tomcat
+        embebido nunca ha desplegado esa webapp, que es justo la mitigacion que
+        recomienda Apache.
 
-        OJO: el NVD asocia este CVE a los DOS artefactos por coincidencia de CPE
-        (cpe:2.3:a:apache:tomcat:10.1.57). Suprimir solo tomcat-embed-core dejaba
-        el audit rojo por tomcat-embed-websocket, comprobado en el run
-        31273636712. Si algun dia se anade otro artefacto tomcat-embed-*, habra
-        que ampliar esta regex igual.
+        OJO: quien asocia este CVE a los DOS artefactos es Dependency-Check, al
+        mapear el CPE generico de Tomcat (cpe:2.3:a:apache:tomcat:10.1.57) sobre
+        cada jar tomcat-embed-*. Suprimir solo tomcat-embed-core dejaba el audit
+        rojo por tomcat-embed-websocket, comprobado en el run 31273636712. El
+        arbol trae tambien tomcat-embed-el 10.1.57, que queda fuera de la regex
+        a proposito porque no recibio este CVE; si algun dia lo recibe, o si se
+        anade otro tomcat-embed-*, hay que ampliar la regex igual.
 
         La version que lo corrige (10.1.58) NO estaba publicada el 2026-08-08:
         ni en la pagina de seguridad de Apache ("not yet released") ni en Maven
