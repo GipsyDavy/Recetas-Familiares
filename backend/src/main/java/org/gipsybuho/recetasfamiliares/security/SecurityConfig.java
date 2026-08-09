@@ -67,6 +67,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/health",
+                                // Version recomendada de cada cliente: se consulta al arrancar,
+                                // antes de iniciar sesion, y no devuelve ningun dato personal.
+                                "/api/v1/app-version",
                                 "/brand/**",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
