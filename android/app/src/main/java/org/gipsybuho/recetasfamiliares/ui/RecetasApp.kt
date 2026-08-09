@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
@@ -58,6 +57,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -143,6 +143,14 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
         )
     }
 
+    // Sin este Surface la pantalla se pintaba sobre el blanco crudo de la ventana
+    // en vez de sobre el fondo del tema, y el texto que se escribia en las cajas
+    // se veia lavado en todos los temas. MainShell no tenia el problema porque
+    // Scaffold ya aplica el fondo.
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(Spacing.xxl),
         verticalArrangement = Arrangement.Center,
@@ -173,21 +181,32 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        // Color del texto fijado a onSurface en vez del valor por defecto: es lo
+        // que garantiza contraste en los dieciseis temas, tambien cuando el campo
+        // no tiene el foco.
+        val camposLegibles = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+        )
+
         Spacer(Modifier.height(Spacing.xxl))
         OutlinedTextField(
             value = email, onValueChange = { email = it },
-            label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+            label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            colors = camposLegibles
         )
         Spacer(Modifier.height(Spacing.lg))
         OutlinedTextField(
             value = password, onValueChange = { password = it },
             label = { Text("Contraseña") }, visualTransformation = PasswordVisualTransformation(),
-            singleLine = true, modifier = Modifier.fillMaxWidth()
+            singleLine = true, modifier = Modifier.fillMaxWidth(),
+            colors = camposLegibles
         )
         Spacer(Modifier.height(Spacing.lg))
         OutlinedTextField(
             value = serverUrl, onValueChange = { serverUrl = it },
-            label = { Text("Servidor") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+            label = { Text("Servidor") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            colors = camposLegibles
         )
         error?.let {
             Spacer(Modifier.height(Spacing.lg))
@@ -221,6 +240,7 @@ private fun LoginScreen(viewModel: RecetasViewModel) {
         ) {
             Text("¿Has olvidado tu contraseña?")
         }
+    }
     }
 }
 
@@ -462,28 +482,10 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                             modifier = Modifier.semantics { heading() }
                         )
                     },
+                    // La paleta y la ayuda vivian aqui. Se han movido a Perfil, con
+                    // sus apartados: la barra de arriba tenia cinco iconos y en un
+                    // movil eso es una fila de simbolos sin nombre.
                     actions = {
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = { PlainTooltip { Text("Ayuda") } },
-                            state = rememberTooltipState()
-                        ) {
-                            IconButton(onClick = { showHelp = true }) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.HelpOutline,
-                                    contentDescription = "Ayuda de esta pantalla"
-                                )
-                            }
-                        }
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = { PlainTooltip { Text("Tema") } },
-                            state = rememberTooltipState()
-                        ) {
-                            IconButton(onClick = { showThemePicker = true }) {
-                                Icon(Icons.Filled.Palette, contentDescription = "Cambiar tema")
-                            }
-                        }
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                             tooltip = { PlainTooltip { Text("Chat familiar") } },
@@ -682,7 +684,8 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                                 initialConversation = conversation
                                 conversationsOpen = true
                             }
-                        }
+                        },
+                        onOpenAppearance = { showThemePicker = true }
                     )
                 }
             }
