@@ -67,6 +67,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -547,6 +548,31 @@ internal fun ProfileScreen(
             )
         ) {
             Text("Eliminar cuenta")
+        }
+
+        Spacer(Modifier.height(Spacing.xl))
+
+        // ── Version instalada y busqueda de actualizaciones ──────────────────
+        Text(
+            "Aplicación",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() }
+        )
+        Spacer(Modifier.height(Spacing.md))
+        Text(
+            "Versión instalada: ${org.gipsybuho.recetasfamiliares.BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(Modifier.height(Spacing.md))
+        OutlinedButton(
+            onClick = {
+                viewModel.checkForUpdateManually(
+                    org.gipsybuho.recetasfamiliares.BuildConfig.VERSION_NAME
+                )
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Buscar actualizaciones")
         }
 
         Spacer(Modifier.height(Spacing.xl))

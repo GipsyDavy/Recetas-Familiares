@@ -79,8 +79,13 @@ final class HelpDialog {
         Dialog<Void> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle("Ayuda");
-        ButtonType closeType = new ButtonType("Cerrar", ButtonBar.ButtonData.CANCEL_CLOSE);
-        ButtonType guideType = new ButtonType("Ver guía de bienvenida", ButtonBar.ButtonData.HELP);
+        // "Cerrar" va a la derecha y es el boton por defecto; la guia de bienvenida,
+        // a la izquierda. Con la disposicion anterior la guia caia en la posicion
+        // donde se espera "Aceptar", asi que se pulsaba por inercia: la ayuda
+        // desaparecia y salia la bienvenida, dando la impresion de que la ayuda no
+        // funcionaba.
+        ButtonType closeType = new ButtonType("Cerrar", ButtonBar.ButtonData.OK_DONE);
+        ButtonType guideType = new ButtonType("Ver guía de bienvenida", ButtonBar.ButtonData.LEFT);
         dialog.getDialogPane().getButtonTypes().addAll(guideType, closeType);
 
         Label emojiLabel = new Label(topic.emoji());
@@ -105,10 +110,14 @@ final class HelpDialog {
         DialogStyler.apply(dialog);
 
         Button guideBtn = (Button) dialog.getDialogPane().lookupButton(guideType);
+        guideBtn.getStyleClass().add("action-button-secondary");
         guideBtn.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
             OnboardingDialog.showAgain(owner);
             e.consume();
         });
+
+        Button closeBtn = (Button) dialog.getDialogPane().lookupButton(closeType);
+        closeBtn.setDefaultButton(true);
 
         if (MotionPreferences.isReducedMotion()) {
             dialog.getDialogPane().setOpacity(1.0);

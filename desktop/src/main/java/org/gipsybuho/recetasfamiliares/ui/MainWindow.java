@@ -1348,7 +1348,7 @@ public class MainWindow {
                 {"Creador", "Gipsybuho"},
                 {"Ano", "2026"},
                 {"Tecnologia", "JavaFX + Maven"},
-                {"Base de datos", "MySQL mediante backend API"}
+                {"Base de datos", "PostgreSQL mediante backend API"}
         };
 
         String[][] scopeRows = {
@@ -1365,6 +1365,24 @@ public class MainWindow {
         HBox.setHgrow(cards.getChildren().get(0), Priority.ALWAYS);
         HBox.setHgrow(cards.getChildren().get(1), Priority.ALWAYS);
 
+        Label updateStatus = new Label("");
+        updateStatus.getStyleClass().add("settings-muted");
+        updateStatus.setWrapText(true);
+        Button updateBtn = new Button("Buscar actualizaciones");
+        updateBtn.getStyleClass().add("action-button-secondary");
+        updateBtn.setOnAction(e -> {
+            updateBtn.setDisable(true);
+            UpdateNotificationService.checkNow(context, stage, message -> {
+                updateStatus.setText(message);
+                setStatus(message);
+                if (!message.startsWith("Buscando")) {
+                    updateBtn.setDisable(false);
+                }
+            });
+        });
+        HBox updateRow = new HBox(12, updateBtn, updateStatus);
+        updateRow.setAlignment(Pos.CENTER_LEFT);
+
         Button onboardingBtn = new Button("Ver guía de bienvenida");
         onboardingBtn.getStyleClass().add("action-button-secondary");
         onboardingBtn.setOnAction(e -> OnboardingDialog.showAgain(stage));
@@ -1372,7 +1390,16 @@ public class MainWindow {
         helpRow.setAlignment(Pos.CENTER_LEFT);
 
         VBox content = new VBox(18, headerCard, cards,
-                configPanel("Ayuda", "Vuelve a ver la guia de primeros pasos cuando quieras.", helpRow));
+                configPanel("Actualizaciones",
+                        "Comprueba si hay una version mas nueva publicada. La descarga se abre en el "
+                                + "navegador; la aplicacion no instala nada por su cuenta.",
+                        updateRow),
+                // No se llama "Ayuda" a proposito: la ayuda de verdad es el boton
+                // del sidebar y F1. Dos entradas con el mismo nombre confundian.
+                configPanel("Guia de primeros pasos",
+                        "Vuelve a ver la guia de bienvenida cuando quieras. Para la ayuda de cada "
+                                + "pantalla, usa el boton Ayuda del menu lateral o pulsa F1.",
+                        helpRow));
         content.getStyleClass().add("settings-tab-content");
         return settingsScroll(content);
     }

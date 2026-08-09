@@ -2,6 +2,7 @@ package org.gipsybuho.recetasfamiliares.ui;
 
 import java.awt.Desktop;
 import java.net.URI;
+import java.util.function.Consumer;
 import java.util.prefs.Preferences;
 
 import javafx.application.Platform;
@@ -59,6 +60,38 @@ public final class UpdateNotificationService {
                 // Sin red, sin servidor o con una respuesta rara: no se avisa de nada.
                 // Enterarse de una actualizacion es opcional; molestar por un fallo
                 // de red, no.
+            }
+        });
+    }
+
+    /**
+     * Comprobacion pedida por el usuario desde Ajustes. A diferencia del aviso
+     * automatico, ignora la version descartada —si la pide a mano, la quiere ver—
+     * y siempre responde algo, aunque sea "ya estas al dia".
+     *
+     * @param report recibe el mensaje para la barra de estado, en el hilo de JavaFX
+     */
+    public static void checkNow(AppContext context, Stage owner, Consumer<String> report) {
+        report.accept("Buscando actualizaciones...");
+        Thread.ofVirtual().start(() -> {
+            AppVersionDtos.PlatformRelease desktop;
+            try {
+                AppVersionDtos.AppVersionResponse response = context.getApiClient()
+                        .getPublic(ENDPOINT_PATH, AppVersionDtos.AppVersionResponse.class);
+                desktop = response == null ? null : response.desktop();
+            } catch (Exception sinRed) {
+                Platform.runLater(() -> report.accept(
+                        "No se pudo comprobar si hay actualizaciones. Revisa tu conexión."));
+                return;
+            }
+            if (UpdateCheck.shouldNotify(desktop, AppVersion.current(), "")) {
+                Platform.runLater(() -> {
+                    report.accept("Hay una versión nueva: " + desktop.latestVersion());
+                    show(desktop, owner);
+                });
+            } else {
+                Platform.runLater(() -> report.accept(
+                        "Ya tienes la última versión (" + AppVersion.current() + ")."));
             }
         });
     }
