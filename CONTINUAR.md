@@ -6657,3 +6657,82 @@ empaquetado y posicionamiento de ventanas—, y ninguno se podía ver sin ejecut
 sprint de interfaz no está terminado hasta que alguien la abre.
 
 Desktop: **124 tests**, 0 fallos (1 saltado).
+
+---
+
+## Release v1.3 publicada: aviso en las dos plataformas — 2026-08-09 (Claude Code)
+
+`main` en `61b45c1`. **Primera release del proyecto**: `v1.3` en GitHub Releases con instalador de
+Windows y APK. A partir de aquí, publicar una versión hace que las aplicaciones avisen solas.
+
+### Android ya avisa
+
+El endpoint existía desde el sprint anterior pero ninguna pantalla lo consultaba. `RecetasApp`
+pregunta al arrancar y, si hay versión más nueva, muestra un **snackbar indefinido con acción
+«Descargar»** que abre el navegador con `Intent.ACTION_VIEW`. No descarga ni instala nada.
+
+La decisión vive en `core/AppUpdate`, aparte de la interfaz, con **10 tests**. El rojo se verificó
+neutralizando `isNewer`: caían 4 por el motivo correcto.
+
+**Diferencia deliberada con Desktop:** en Android **no hay «no volver a avisar de esta versión»**. Se
+descarta con un gesto y reaparece al siguiente arranque hasta actualizar. En móvil es lo esperable y
+evita guardar estado que YAGNI no justifica.
+
+**Trampa que costó una compilación:** el campo JSON `android` se mapea a `androidApp` con
+`@SerializedName`. Llamarlo `android` a secas choca con el nombre del paquete al resolver el tipo.
+
+### Versiones unificadas en 1.3
+
+| | Antes | Ahora |
+|---|---|---|
+| Desktop (`pom.xml` y `build-installer.ps1`) | 1.2 | **1.3** |
+| Android `versionName` | 1.0.0 | **1.3** |
+| Android `versionCode` | 1 | **2** |
+
+`versionCode` es lo único que mira Android para tratar un APK como actualización; `versionName` es lo
+que ve la gente. La familia verá el mismo número en las dos plataformas.
+
+### Lo publicado, verificado
+
+| Comprobación | Resultado |
+|---|---|
+| Instalador | `RecetasFamiliares-Instalador-v1.3.exe`, 53.951.019 bytes |
+| APK | `RecetasFamiliares-v1.3.apk`, 3.045.217 bytes |
+| APK: versión y depurabilidad | `versionCode=2`, `versionName=1.3`, **no depurable** |
+| Firma del APK | SHA-256 `cb929326…bd3ee7`, **idéntica a la de `docs/android-release.md`** |
+| Descargas de la release | HTTP **200** las dos |
+| Endpoint `app-version` en producción | anuncia 1.3 para las dos plataformas |
+| `health` | `UP` |
+| Tests | Android **107**, Desktop **124**, backend 226 |
+
+Que la firma coincida es lo que permite instalar el APK encima del anterior sin desinstalar.
+
+**Verificado en ejecución** que la 1.3 **no** muestra aviso estando al día: el caso «no molestar a
+quien ya está actualizado», que es el que arruinaría la funcionalidad, funciona.
+
+### Lo que hay que saber al repartir
+
+- **La 1.3 hay que instalarla a mano una última vez.** El aviso solo llega a quien ya tenga una
+  versión que lo lleve dentro, y ni la Desktop 1.2 ni ningún APK anterior lo tienen.
+- **Ni Windows ni Android exigen desinstalar**: se instala encima y se conservan datos y sesión.
+  SmartScreen avisará en Windows porque el instalador no está firmado.
+- **El `mapping.txt` del APK 1.3 está en `android/app/build/outputs/mapping/release/mapping.txt`** y
+  **hay que guardarlo fuera del repositorio**, junto al APK repartido. Se regenera en cada build y
+  sin él una traza de esta versión es ilegible.
+
+### Riesgo residual
+
+- **El aviso de Android no se ha visto en un dispositivo.** La lógica tiene tests y el endpoint
+  responde, pero nadie ha abierto el APK 1.3 en un móvil con una versión mayor publicada. El de
+  Desktop sí se verificó en pantalla ayer con una 99.0 de prueba.
+- **Publicar sigue siendo manual**: compilar, subir a la release y actualizar cuatro variables en el
+  VPS. Automatizarlo en la CI es un sprint pendiente.
+- **Sin Codex ni Gemini** en este sprint.
+- El instalador sigue sin firmar.
+
+### Trazabilidad
+
+Agente único: **Claude Code (Opus 5)**. Skill: `superpowers:test-driven-development`. No se invocó
+`/VibeSec` ni `/security-review`: el cambio de Android replica una decisión ya revisada ayer (solo
+`https`, sin descargar ni ejecutar) y no toca autenticación, ownership ni datos personales. El
+backend no se tocó: solo se cambiaron cuatro variables de entorno en el VPS.
