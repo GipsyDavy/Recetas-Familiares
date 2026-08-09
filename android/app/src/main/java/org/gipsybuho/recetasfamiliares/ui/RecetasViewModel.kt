@@ -1573,6 +1573,26 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /**
+     * Comprobacion pedida a mano desde Perfil. A diferencia de la automatica,
+     * siempre responde algo: si no hay nada nuevo lo dice, y si falla la red lo
+     * dice tambien. Callar aqui pareceria que el boton no hace nada.
+     */
+    fun checkForUpdateManually(currentVersion: String) {
+        viewModelScope.launch {
+            val release = container.updateRepository.latestAndroidRelease()
+            when {
+                AppUpdate.shouldNotify(release, currentVersion) -> {
+                    _updateAvailable.value = release
+                }
+                release == null -> _userMessage.emit(
+                    "No se pudo comprobar si hay actualizaciones. Revisa tu conexión."
+                )
+                else -> _userMessage.emit("Ya tienes la última versión ($currentVersion).")
+            }
+        }
+    }
+
     /** Descartado por el usuario: no se vuelve a mostrar hasta el proximo arranque. */
     fun dismissUpdate() {
         _updateAvailable.value = null
