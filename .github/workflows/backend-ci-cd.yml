@@ -9,12 +9,13 @@ on:
       - infra/backend/**
       - scripts/backend/**
       - .github/workflows/backend-ci-cd.yml
+  # Sin filtro paths a proposito: este check es obligatorio para fusionar en
+  # main. Con filtro, una PR que no tocara backend/ dejaba el check "expected"
+  # para siempre y la PR no se podia fusionar nunca.
+  #
+  # OJO: el filtro del push de arriba NO se toca. Es lo que impide que un
+  # commit ajeno al backend dispare el job deploy contra produccion.
   pull_request:
-    paths:
-      - backend/**
-      - infra/backend/**
-      - scripts/backend/**
-      - .github/workflows/backend-ci-cd.yml
   workflow_dispatch:
 
 permissions:

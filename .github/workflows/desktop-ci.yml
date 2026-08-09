@@ -16,10 +16,11 @@ on:
     paths:
       - desktop/**
       - .github/workflows/desktop-ci.yml
+  # Sin filtro paths a proposito: este check es obligatorio para fusionar en
+  # main. Con filtro, una PR que no tocara desktop/ dejaba el check "expected"
+  # para siempre y la PR no se podia fusionar nunca. El push de arriba si
+  # conserva el filtro.
   pull_request:
-    paths:
-      - desktop/**
-      - .github/workflows/desktop-ci.yml
   workflow_dispatch:
 
 permissions:
