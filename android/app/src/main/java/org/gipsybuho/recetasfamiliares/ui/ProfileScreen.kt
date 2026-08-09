@@ -26,6 +26,9 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
@@ -44,6 +47,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -81,7 +85,8 @@ import java.util.Locale
 internal fun ProfileScreen(
     viewModel: RecetasViewModel,
     modifier: Modifier = Modifier,
-    onMessageMember: (FamilyMemberDto) -> Unit = {}
+    onMessageMember: (FamilyMemberDto) -> Unit = {},
+    onOpenAppearance: () -> Unit = {}
 ) {
     val displayName by viewModel.displayName.collectAsState()
     val email       by viewModel.email.collectAsState()
@@ -559,34 +564,38 @@ internal fun ProfileScreen(
 
         Spacer(Modifier.height(Spacing.xl))
 
-        // ── Version instalada y busqueda de actualizaciones ──────────────────
+        // ── Ajustes de la aplicacion ─────────────────────────────────────────
+        // Una fila por opcion, con icono y texto: la version anterior gastaba
+        // tres pantallazos en titulo, descripcion y boton ancho para cada una.
+        // La paleta y la ayuda vivian en la barra de arriba como iconos sin
+        // nombre; aqui se entiende que hacen.
         Text(
-            "Aplicación",
+            "Ajustes",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.semantics { heading() }
         )
-        Spacer(Modifier.height(Spacing.md))
-        Text(
-            "Versión instalada: ${org.gipsybuho.recetasfamiliares.BuildConfig.VERSION_NAME}",
-            style = MaterialTheme.typography.bodyMedium
+        Spacer(Modifier.height(Spacing.xs))
+
+        ProfileOptionRow(
+            icon = Icons.Filled.Palette,
+            label = "Tema, sonido y hápticos",
+            onClick = onOpenAppearance
         )
-        Spacer(Modifier.height(Spacing.md))
-        OutlinedButton(
+        ProfileOptionRow(
+            icon = Icons.AutoMirrored.Filled.HelpOutline,
+            label = "Centro de ayuda",
+            onClick = { showHelpCenter = true }
+        )
+        ProfileOptionRow(
+            icon = Icons.Filled.Refresh,
+            label = "Buscar actualizaciones",
+            trailing = "Versión ${org.gipsybuho.recetasfamiliares.BuildConfig.VERSION_NAME}",
             onClick = {
                 viewModel.checkForUpdateManually(
                     org.gipsybuho.recetasfamiliares.BuildConfig.VERSION_NAME
                 )
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Buscar actualizaciones")
-        }
-        OutlinedButton(
-            onClick = { showHelpCenter = true },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Centro de ayuda")
-        }
+            }
+        )
 
         Spacer(Modifier.height(Spacing.xl))
 
@@ -1316,4 +1325,45 @@ private fun InviteMemberDialog(onDismiss: () -> Unit, onConfirm: (String, String
             OutlinedButton(onClick = onDismiss) { Text("Cancelar") }
         }
     )
+}
+
+/**
+ * Una opcion de ajustes en una sola fila: icono, texto y, si hace falta, un
+ * dato a la derecha. Compacta a proposito: tres de estas ocupan menos que un
+ * solo apartado con titulo, descripcion y boton ancho.
+ */
+@Composable
+private fun ProfileOptionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    trailing: String? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.size(Spacing.md))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        if (trailing != null) {
+            Text(
+                trailing,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+    HorizontalDivider()
 }
