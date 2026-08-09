@@ -25,8 +25,8 @@ android {
         applicationId = "org.gipsybuho.recetasfamiliares"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.3"
 
         buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://recetas.167.233.213.242.sslip.io/\"")
     }

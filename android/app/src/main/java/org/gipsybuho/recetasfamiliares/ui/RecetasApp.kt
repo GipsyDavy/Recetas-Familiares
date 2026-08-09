@@ -368,6 +368,33 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
         }
     }
 
+    // Aviso de version nueva. Una sola consulta por arranque; si el servidor no
+    // responde o no hay nada publicado, no se muestra nada.
+    val updateContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.checkForUpdate(org.gipsybuho.recetasfamiliares.BuildConfig.VERSION_NAME)
+    }
+    val availableUpdate by viewModel.updateAvailable.collectAsState()
+    LaunchedEffect(availableUpdate) {
+        val release = availableUpdate ?: return@LaunchedEffect
+        val url = release.downloadUrl ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Hay una versión nueva: ${release.latestVersion}",
+            actionLabel = "Descargar",
+            withDismissAction = true,
+            duration = androidx.compose.material3.SnackbarDuration.Indefinite
+        )
+        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+            // Solo abre el navegador: la aplicacion no descarga ni instala nada.
+            runCatching {
+                updateContext.startActivity(
+                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                )
+            }
+        }
+        viewModel.dismissUpdate()
+    }
+
     LaunchedEffect(Unit) {
         if (initialRecipeId != null) {
             tab = MainTab.RECIPES
