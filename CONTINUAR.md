@@ -6964,3 +6964,69 @@ Aunque funcionen, **estos tests comprueban que la pantalla se compone y muestra 
 pixeles ni recortes de texto**. De los fallos de esta jornada habrian cazado que un dialogo no abra o
 que una fila desaparezca; no el texto truncado, ni el fondo del login, ni el error 32. La
 verificacion ejecutando la aplicacion sigue siendo necesaria.
+
+---
+
+## Punto de retoma — cierre de sesión del 2026-08-09
+
+`main` en `92c93e2`, árbol limpio, **sin ramas ni PRs abiertas**. Nada a medias.
+
+Jornada larga: **once PR fusionadas**, tres despliegues a producción autorizados y verificados en
+caliente, y **tres releases publicadas** (v1.3, v1.4 y v1.4.1).
+
+### Estado ahora mismo
+
+| | |
+|---|---|
+| Release publicada y anunciada | **v1.4.1** |
+| Producción | `health` en `UP`, endpoint de versión sirviendo 1.4.1 |
+| Tests | backend 226, Desktop **141**, Android **121** |
+| Semgrep + TruffleHog, modo sprint | **exit 0** |
+| Escritorio del usuario | tiene la 1.4.1 instalada y funcionando |
+
+### Lo verificado al final, con evidencia
+
+**Los sonidos de Android suenan de verdad.** Comprobado en el emulador leyendo el registro del
+sistema de audio, no la aplicación: con el nivel «Todos», `AudioTrack` del PID de la app entrega
+**9800 frames** (unos 222 ms a 44,1 kHz, que casa con los 200 ms configurados para el sonido de
+guardado). Con «Silencio», la misma acción entrega **0 frames**.
+
+Esa pareja es la prueba que vale: que suena **y** que el interruptor silencia de verdad.
+
+### Lo primero al retomar
+
+**Repartir la v1.4.1 a la familia.** Es la primera versión completa: ayuda dentro de la aplicación,
+sonido configurable y actualizaciones que avisan solas de aquí en adelante. Guardar el `mapping.txt`
+del APK fuera del repositorio, junto al APK repartido.
+
+### Lo que sigue sin probarse, y conviene no olvidar
+
+- **El timbre de cada sonido.** Se sabe que sale audio y cuánto dura, no si el error suena a error.
+  Eso lo juzga un oído humano.
+- **Los sonidos de Desktop**, que van por otro camino (`javax.sound`) y no se han verificado.
+- **Tests de renderizado**: el intento con Robolectric fracasó, ver la sección anterior con las
+  cuatro alternativas ordenadas por coste. Sigue siendo el hueco grande del proyecto.
+
+### Deuda viva, por valor
+
+1. Tests de renderizado (arriba).
+2. Mover los cinco secretos de despliegue al environment `production`, que no tiene reglas de
+   protección. Hallazgo de Codex, no explotable hoy.
+3. Automatizar la publicación en CI: hoy son tres pasos manuales.
+4. Wrapper de Gradle apuntando a `file:///C:/tmp/tools/...`: el repositorio no es reproducible.
+5. `CVE-2026-66010` (DOMPurify en swagger-ui) sigue como aviso; en producción está desactivado.
+6. La supresión del CVE de Tomcat **caduca el 2026-11-01**: al caducar, comprobar si existe 10.1.58,
+   subir `<tomcat.version>` y **borrar** la supresión en vez de renovarla.
+7. iOS bloqueado sin macOS.
+
+### Trazabilidad de la sesión
+
+Agente único: **Claude Code (Opus 5)**. **Codex** revisó el diff del CVE de Tomcat en solo lectura
+(0 hallazgos críticos); **Gemini sin cuota** toda la jornada, su revisión documental la asumió Claude
+Code. Skills de proceso usadas: `superpowers:executing-plans`, `writing-plans`,
+`test-driven-development` y `systematic-debugging`. Seguridad: `/VibeSec` sobre el cambio de
+`AccountEmailService`, y `run-security-scan.ps1` en modo sprint con **exit 0** en el cierre.
+
+**La lección de la jornada, por si sirve de algo mañana**: todos los fallos de interfaz salieron al
+abrir la aplicación, ninguno en los tests. El enlace muerto de la ayuda, el manifiesto sin versión,
+los textos truncados, el fondo del login, el error 32 al instalar y el APK que no descargaba.
