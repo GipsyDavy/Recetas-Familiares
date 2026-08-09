@@ -67,6 +67,15 @@ android {
         buildConfig = true
         compose = true
     }
+
+    // Robolectric necesita los recursos de Android para poder pintar Compose en
+    // la JVM, sin emulador ni dispositivo: asi los tests de renderizado corren
+    // en la misma tarea que el resto y la CI los ejecuta sin cambios.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 kotlin {
@@ -115,6 +124,12 @@ dependencies {
     implementation("sh.calvin.reorderable:reorderable:2.4.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core-ktx:1.6.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.16")
