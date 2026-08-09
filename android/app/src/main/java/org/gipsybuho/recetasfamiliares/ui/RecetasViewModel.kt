@@ -31,9 +31,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.gipsybuho.recetasfamiliares.core.AppContainer
+import org.gipsybuho.recetasfamiliares.core.AppUpdate
 import org.gipsybuho.recetasfamiliares.data.remote.ChatSocket
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
+import org.gipsybuho.recetasfamiliares.data.remote.dto.PlatformReleaseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateConversationDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateInboxPingDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateMessageDto
@@ -130,6 +132,10 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _serverBaseUrl = MutableStateFlow(container.serverUrlStore.baseUrl)
     val serverBaseUrl: StateFlow<String> = _serverBaseUrl.asStateFlow()
+
+    /** Version publicada mas nueva que esta, o null si no hay nada que avisar. */
+    private val _updateAvailable = MutableStateFlow<PlatformReleaseDto?>(null)
+    val updateAvailable: StateFlow<PlatformReleaseDto?> = _updateAvailable.asStateFlow()
 
     private val _familyStats = MutableStateFlow<FamilyStatsDto?>(null)
     val familyStats: StateFlow<FamilyStatsDto?> = _familyStats.asStateFlow()
@@ -1550,6 +1556,26 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
             sample *= 2
         }
         return sample
+    }
+
+    // ── Aviso de version nueva ────────────────────────────────────────────
+
+    /**
+     * Consulta la version recomendada al arrancar. Falla en silencio: enterarse
+     * de una actualizacion es opcional, molestar por un fallo de red no.
+     */
+    fun checkForUpdate(currentVersion: String) {
+        viewModelScope.launch {
+            val release = container.updateRepository.latestAndroidRelease()
+            if (AppUpdate.shouldNotify(release, currentVersion)) {
+                _updateAvailable.value = release
+            }
+        }
+    }
+
+    /** Descartado por el usuario: no se vuelve a mostrar hasta el proximo arranque. */
+    fun dismissUpdate() {
+        _updateAvailable.value = null
     }
 }
 

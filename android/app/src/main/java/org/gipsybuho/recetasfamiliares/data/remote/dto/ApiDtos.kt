@@ -628,3 +628,18 @@ data class FamilyActivityDto(
 data class FamilyActivityPingDto(
     val section: String
 )
+
+// ── Version recomendada de cada cliente ───────────────────────────────────
+
+data class PlatformReleaseDto(
+    val latestVersion: String?,
+    val downloadUrl: String?
+)
+
+data class AppVersionDto(
+    val desktop: PlatformReleaseDto?,
+    // Llamarlo "android" a secas choca con el nombre del paquete al resolver
+    // el tipo, asi que el nombre JSON se fija con SerializedName.
+    @com.google.gson.annotations.SerializedName("android")
+    val androidApp: PlatformReleaseDto?
+)

@@ -4,6 +4,7 @@ import org.gipsybuho.recetasfamiliares.data.remote.dto.AddFavoriteRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.InviteMemberRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AssignMenuItemRequestDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.MenuItemDto
+import org.gipsybuho.recetasfamiliares.data.remote.dto.AppVersionDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.AuthResponseDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatExportDto
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatHistoryDto
@@ -74,6 +75,13 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface RecetasApi {
+
+    /**
+     * Publico: se consulta al arrancar, con la pantalla de login todavia delante.
+     * AuthInterceptor no adjunta cabecera si no hay sesion.
+     */
+    @GET("api/v1/app-version")
+    suspend fun appVersion(): AppVersionDto
 
     @GET("api/v1/users/me")
     suspend fun getMe(): UserResponseDto
