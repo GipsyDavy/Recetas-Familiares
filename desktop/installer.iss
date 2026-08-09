@@ -120,9 +120,27 @@ begin
   end;
 end;
 
+{ CloseApplications=yes usa el Restart Manager de Windows, que no pudo con
+  cuatro instancias apiladas de la aplicacion: la instalacion de la v1.4 fallo
+  con el error 32, "el archivo esta en uso". Esto es el plan B: cerrar a la
+  brava lo que quede antes de tocar ficheros. Solo mata el ejecutable propio. }
+procedure CerrarAplicacionEnMarcha();
+var
+  iResultCode: Integer;
+begin
+  Exec(ExpandConstant('{cmd}'),
+       '/C taskkill /F /IM "{#MyAppExeName}" /T',
+       '', SW_HIDE, ewWaitUntilTerminated, iResultCode);
+  { Un instante para que Windows suelte los identificadores de fichero. }
+  Sleep(1200);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if (CurStep = ssInstall) then
+  begin
+    CerrarAplicacionEnMarcha();
     if (IsUpgrade()) then
       UnInstallOldVersion();
+  end;
 end;
