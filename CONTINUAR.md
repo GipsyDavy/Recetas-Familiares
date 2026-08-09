@@ -6628,3 +6628,32 @@ Agente único: **Claude Code (Opus 5)**. Skills: `superpowers:writing-plans` y
 endpoint público y el manejo de URL, más `run-security-scan.ps1` en modo sprint con **exit 0**.
 `/security-review` no se invocó: el endpoint nuevo no toca datos de usuario, ownership ni
 autorización; solo devuelve dos cadenas de configuración.
+
+### Addendum del 2026-08-09: el aviso SÍ se ha verificado en ejecución
+
+El cierre de arriba decía que el aviso no se había visto pintado nunca. **Ya no es cierto.** Se
+configuró en el VPS una versión de prueba `99.0`, se ejecutó la aplicación de verdad contra
+producción y se restauró todo al terminar. La prueba destapó **tres fallos que ningún test unitario
+podía ver** (PR #13, `ce691fd`):
+
+1. **La ruta era `/app-version`.** En este proyecto las llamadas van **sin barra inicial y con
+   prefijo `api/v1`** (`api/v1/families`): la URL base ya termina en `/`. Salía una doble barra, el
+   backend respondía 401 y el `catch` del servicio se lo tragaba **en silencio**. Ni aviso ni una
+   línea de log. Ahora es la constante `ENDPOINT_PATH`, con un test que fija la convención.
+2. **El manifiesto del JAR nunca ha llevado `Implementation-Version`**, así que
+   `Package.getImplementationVersion()` devolvía `null`. El aviso se habría comparado siempre contra
+   el valor de reserva y **habría salido para siempre**. Fallo **preexistente**: por eso
+   `Ajustes → Acerca de` mostraba «Versión 1.1» con la aplicación en la 1.2. Se añade al transformer
+   de `maven-shade-plugin` y `MainWindow` pasa a leerlo por `AppVersion.current()`.
+3. **El aviso no se veía**: faltaba `setAlwaysOnTop(true)` —que el de caducidades sí tiene— y los
+   tres enlaces se truncaban en un `HBox` de 400px. Ahora `FlowPane` y 420px.
+
+Verificado en pantalla: el aviso sale entero, «No volver a avisar de esta versión» guarda
+`update.dismissed.version` en el registro, y al reiniciar ya no aparece. Producción quedó restaurada
+(`{"desktop":null,"android":null}`, `health` en `UP`) y la preferencia de prueba, borrada.
+
+**La lección, que es la que importa:** los tres fallos estaban en las costuras —convención de rutas,
+empaquetado y posicionamiento de ventanas—, y ninguno se podía ver sin ejecutar la aplicación. Un
+sprint de interfaz no está terminado hasta que alguien la abre.
+
+Desktop: **124 tests**, 0 fallos (1 saltado).
