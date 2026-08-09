@@ -6540,3 +6540,91 @@ Agente único: **Claude Code (Opus 5)**. Skills de proceso: `superpowers:executi
 CVE) y `superpowers:test-driven-development` (este). Seguridad: `/VibeSec` sobre el cambio de
 `AccountEmailService`, y `run-security-scan.ps1` en modo sprint con **exit 0**. `/security-review` no
 se invocó: no se tocaron endpoints, autorización ni ownership, solo el texto de dos correos.
+
+---
+
+## Cierre del sprint del aviso de versión nueva — 2026-08-09 (Claude Code)
+
+`main` en `3ebc17e`. Tercer despliegue a producción del día, autorizado explícitamente. Cierra el
+sprint 2 de los que quedaban para poder repartir Desktop.
+
+### El problema que resuelve
+
+No había ninguna forma de enterarse de que existe una versión nueva. Quien instalara la v1.2 se
+quedaba ahí para siempre, y actualizar a la familia significaba ir casa por casa.
+
+### Qué se construyó
+
+| Pieza | Qué hace |
+|---|---|
+| `GET /api/v1/app-version` | Público, sin datos personales. Versión y URL de descarga por plataforma, desde variables de entorno |
+| `core/AppVersion` | Versión propia desde el manifiesto del JAR y comparación numérica de versiones |
+| `core/UpdateCheck` | Decide si avisar. Lógica pura, **separada de la interfaz para poder testearla** |
+| `ui/UpdateNotificationService` | Aviso no modal abajo a la derecha, hermano del de caducidades |
+| `docs/publicar-una-version.md` | Procedimiento completo de publicar, con comandos exactos |
+
+Plan: `docs/superpowers/plans/2026-08-09-aviso-de-version-nueva-en-desktop.md`.
+
+**Alojamiento: GitHub Releases**, decidido con el usuario. No consume disco ni tráfico del VPS y el
+enlace es estable. La alternativa era servirlo con Caddy desde Hetzner —también gratis, hay 24 GB
+libres— pero no aporta nada frente a una release.
+
+### Decisiones que conviene no volver a discutir
+
+- **La llamada va al final del constructor de `MainWindow`, no en `showMain()`.** Ese método se
+  vuelve a llamar al iniciar sesión y al cambiar de familia: el aviso saldría repetido.
+- **El aviso no descarga ni ejecuta nada.** Abre el navegador. Que la aplicación se bajara y lanzara
+  binarios sería superficie de ataque nueva a cambio de ahorrar un clic. Se descartó a propósito.
+- **Solo se aceptan URL `https`**, comparando el esquema ya parseado y no el prefijo del texto:
+  `httpsfalso://` no cuela. Con esto, un backend comprometido no puede llevar a nadie a un `file://`
+  ni a un `http://`. Hay test de los tres casos hostiles.
+- **`getPublic` no manda `Authorization`**, igual que el `postAuth` que ya existía. El token deja de
+  viajar a un endpoint que no lo necesita.
+- **Actualizar no exige desinstalar nada.** En Windows, el `AppId` fijo de `installer.iss` hace que
+  Inno Setup actualice en sitio. En Android, misma firma y `versionCode` mayor. **Ojo: `versionCode`
+  sigue en `1` y hay que incrementarlo en cada versión** o el APK no se instala encima.
+
+### Verificación
+
+| Comprobación | Resultado |
+|---|---|
+| TDD | Rojo observado en las tres piezas antes de implementar |
+| Desktop | **123 tests**, 0 fallos (1 saltado: DPAPI fuera de Windows) |
+| Backend en CI | **226 tests**, 0 fallos |
+| Los cuatro checks de la PR #11 | verdes |
+| `health` antes / después | `UP` 09:50:13Z / `UP` 09:54:10Z |
+| Despliegue | `Deploy backend: success`, run `31306880189` |
+| Endpoint **sin token** tras desplegar | `{"desktop":null,"android":null}`, HTTP **200** |
+| Semgrep + TruffleHog, modo sprint | **exit 0** |
+
+Antes de desplegar, `/api/v1/app-version` devolvía 401: no existía. Ahora responde 200 sin
+autenticación, que es justo lo que se buscaba.
+
+### Riesgo residual
+
+- **El aviso no se ha visto pintado nunca.** Con la configuración vacía el cliente calla, que es el
+  comportamiento correcto pero no demuestra que el aviso se vea bien. Se comprobará al publicar la
+  primera versión de verdad. Atajo para verlo antes: poner `APP_UPDATE_DESKTOP_VERSION=99.0` y
+  `APP_UPDATE_DESKTOP_URL=https://github.com/GipsyDavy/Recetas-Familiares/releases` en el VPS,
+  reiniciar, abrir Desktop y quitarlo después.
+- **Android no avisa.** El endpoint ya sirve su versión, pero ninguna pantalla la consulta.
+- **Publicar sigue siendo manual**: generar, subir a la release y actualizar cuatro variables.
+- **Sin Codex ni Gemini.** Gemini sin cuota; a Codex no se le pidió por ser un cambio pequeño y con
+  tests. Ninguna segunda opinión externa.
+- Un apunte de proceso: en la Tarea 2 escribí test e implementación seguidos sin ver el rojo. Se
+  deshizo dejando el método en esqueleto y volviendo a ejecutar hasta ver los tres fallos reales.
+
+### Lo que queda para repartir Desktop
+
+1. **Validación humana del instalador v1.2** (avatar al entrar, en Desktop y Android). **Bloqueante,
+   y es lo único que queda del usuario.**
+2. **Guía de instalación para la familia** con el aviso de SmartScreen.
+3. Tests de renderizado (TestFX) y mover los secretos de despliegue al environment `production`.
+
+### Trazabilidad
+
+Agente único: **Claude Code (Opus 5)**. Skills: `superpowers:writing-plans` y
+`superpowers:test-driven-development`. Seguridad: revisión propia con el guion de `/VibeSec` sobre el
+endpoint público y el manejo de URL, más `run-security-scan.ps1` en modo sprint con **exit 0**.
+`/security-review` no se invocó: el endpoint nuevo no toca datos de usuario, ownership ni
+autorización; solo devuelve dos cadenas de configuración.
