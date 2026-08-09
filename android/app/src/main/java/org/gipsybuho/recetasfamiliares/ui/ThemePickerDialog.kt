@@ -33,6 +33,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -55,6 +56,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import org.gipsybuho.recetasfamiliares.core.SoundLevel
 import org.gipsybuho.recetasfamiliares.ui.theme.AppTheme
 import org.gipsybuho.recetasfamiliares.ui.theme.ThemeMode
 import org.gipsybuho.recetasfamiliares.ui.theme.darkColors
@@ -65,12 +67,14 @@ internal fun ThemePickerDialog(
     currentTheme: AppTheme,
     currentMode: ThemeMode,
     hapticsEnabled: Boolean,
+    currentSoundLevel: SoundLevel,
     onDismiss: () -> Unit,
-    onApply: (AppTheme, ThemeMode, Boolean) -> Unit,
+    onApply: (AppTheme, ThemeMode, Boolean, SoundLevel) -> Unit,
 ) {
     var selectedTheme by remember { mutableStateOf(currentTheme) }
     var selectedMode by remember { mutableStateOf(currentMode) }
     var hapticsOn by remember { mutableStateOf(hapticsEnabled) }
+    var selectedSound by remember { mutableStateOf(currentSoundLevel) }
     val systemDark = isSystemInDarkTheme()
 
     AlertDialog(
@@ -140,6 +144,39 @@ internal fun ThemePickerDialog(
                             }
                             Switch(checked = hapticsOn, onCheckedChange = { hapticsOn = it })
                         }
+
+                        // Tres niveles y no un interruptor: con "todo o nada",
+                        // quien silencia el ruido de navegacion pierde tambien
+                        // los avisos utiles.
+                        Text("Sonido", style = MaterialTheme.typography.labelLarge)
+                        SoundLevel.entries.forEach { level ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = selectedSound == level,
+                                        onClick = { selectedSound = level }
+                                    )
+                            ) {
+                                RadioButton(
+                                    selected = selectedSound == level,
+                                    onClick = { selectedSound = level }
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        soundLevelLabel(level),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        soundLevelDescription(level),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+
                         Text(
                             "Colecciones",
                             style = MaterialTheme.typography.labelLarge,
@@ -163,7 +200,7 @@ internal fun ThemePickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onApply(selectedTheme, selectedMode, hapticsOn) }) {
+            TextButton(onClick = { onApply(selectedTheme, selectedMode, hapticsOn, selectedSound) }) {
                 Text("Aplicar")
             }
         },
@@ -307,4 +344,17 @@ private fun ThemePreviewCard(
             )
         }
     }
+}
+
+private fun soundLevelLabel(level: SoundLevel): String = when (level) {
+    SoundLevel.SILENCIO -> "Silencio"
+    SoundLevel.IMPORTANTES -> "Solo los importantes"
+    SoundLevel.TODOS -> "Todos"
+}
+
+private fun soundLevelDescription(level: SoundLevel): String = when (level) {
+    SoundLevel.SILENCIO -> "Ningún sonido"
+    SoundLevel.IMPORTANTES ->
+        "Guardado, error, borrado, avisos, temporizador y pasos de cocina"
+    SoundLevel.TODOS -> "Además, navegación y cambios de estado"
 }

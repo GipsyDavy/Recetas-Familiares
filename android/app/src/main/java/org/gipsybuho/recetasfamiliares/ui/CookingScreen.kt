@@ -64,6 +64,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.content.res.Configuration
 import kotlinx.coroutines.delay
+import org.gipsybuho.recetasfamiliares.core.SoundEffect
+import org.gipsybuho.recetasfamiliares.core.SoundPlayer
 import org.gipsybuho.recetasfamiliares.data.local.RecipeEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,6 +102,7 @@ internal fun CookingScreen(
             }
             timerRunning = false
             if (hadTimer) if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            if (hadTimer) SoundPlayer.play(SoundEffect.TIMER)
         }
     }
     LaunchedEffect("hint") { delay(3_000L); showHint = false }
@@ -135,14 +138,17 @@ internal fun CookingScreen(
                         val n   = steps.size
                         when {
                             totalDrag < -swipeThresh && idx < n - 1 -> {
+                                SoundPlayer.play(SoundEffect.STEP)
                                 if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 currentIndexState.value = idx + 1; timerRunning = false
                             }
                             totalDrag < -swipeThresh && idx == n - 1 && n > 0 -> {
+                                SoundPlayer.play(SoundEffect.STEP)
                                 if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 currentIndexState.value = n
                             }
                             totalDrag > swipeThresh && idx > 0 -> {
+                                SoundPlayer.play(SoundEffect.STEP)
                                 if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 currentIndexState.value = idx - 1; timerRunning = false
                             }
@@ -161,9 +167,11 @@ internal fun CookingScreen(
                     android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
                         val idx = currentIndexState.value
                         if (idx < stepsSize - 1) {
+                            SoundPlayer.play(SoundEffect.STEP)
                             if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndexState.value = idx + 1
                         } else if (idx == stepsSize - 1 && stepsSize > 0) {
+                            SoundPlayer.play(SoundEffect.STEP)
                             if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndexState.value = stepsSize
                         }
@@ -172,6 +180,7 @@ internal fun CookingScreen(
                     android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
                         val idx = currentIndexState.value
                         if (idx > 0) {
+                            SoundPlayer.play(SoundEffect.STEP)
                             if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentIndexState.value = idx - 1
                         }

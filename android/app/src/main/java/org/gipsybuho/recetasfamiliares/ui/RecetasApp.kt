@@ -86,6 +86,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.work.WorkManager
 import org.gipsybuho.recetasfamiliares.R
+import org.gipsybuho.recetasfamiliares.core.SoundEffect
+import org.gipsybuho.recetasfamiliares.core.SoundPlayer
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListEntity
 import org.gipsybuho.recetasfamiliares.data.local.ShoppingListItemEntity
 import org.gipsybuho.recetasfamiliares.data.remote.dto.PrivateConversationDto
@@ -354,6 +356,7 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     val selectedTheme  by viewModel.selectedTheme.collectAsState()
     val themeMode      by viewModel.themeMode.collectAsState()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
+    val soundLevel     by viewModel.soundLevel.collectAsState()
     val chatUnread     by viewModel.chatUnread.collectAsState()
     var navigateToRecipeId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -378,6 +381,7 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     LaunchedEffect(availableUpdate) {
         val release = availableUpdate ?: return@LaunchedEffect
         val url = release.downloadUrl ?: return@LaunchedEffect
+        SoundPlayer.play(SoundEffect.ALERT)
         val result = snackbarHostState.showSnackbar(
             message = "Hay una versión nueva: ${release.latestVersion}",
             actionLabel = "Descargar",
@@ -580,11 +584,13 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                 currentTheme    = selectedTheme,
                 currentMode     = themeMode,
                 hapticsEnabled  = hapticsEnabled,
+                currentSoundLevel = soundLevel,
                 onDismiss       = { showThemePicker = false },
-                onApply         = { theme, mode, haptics ->
+                onApply         = { theme, mode, haptics, sound ->
                     viewModel.setTheme(theme)
                     viewModel.setThemeMode(mode)
                     viewModel.setHapticsEnabled(haptics)
+                    viewModel.setSoundLevel(sound)
                     showThemePicker = false
                 }
             )
