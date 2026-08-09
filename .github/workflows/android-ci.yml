@@ -14,10 +14,11 @@ on:
     paths:
       - android/**
       - .github/workflows/android-ci.yml
+  # Sin filtro paths a proposito: este check es obligatorio para fusionar en
+  # main. Con filtro, una PR que no tocara android/ dejaba el check "expected"
+  # para siempre y la PR no se podia fusionar nunca. El push de arriba si
+  # conserva el filtro.
   pull_request:
-    paths:
-      - android/**
-      - .github/workflows/android-ci.yml
   workflow_dispatch:
 
 permissions:
