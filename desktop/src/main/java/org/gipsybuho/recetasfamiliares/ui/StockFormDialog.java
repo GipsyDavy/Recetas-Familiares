@@ -13,6 +13,7 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
+import org.gipsybuho.recetasfamiliares.core.SoundEffect;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.time.LocalDate;
@@ -207,7 +208,7 @@ public class StockFormDialog {
                 }
                 Platform.runLater(() -> {
                     onSaved.accept(saved);
-                    SoundPlayer.playConfirm();
+                    SoundPlayer.play(SoundEffect.SUCCESS);
                     dialog.close();
                 });
             } catch (Exception ex) {

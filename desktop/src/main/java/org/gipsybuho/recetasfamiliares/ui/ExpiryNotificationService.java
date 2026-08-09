@@ -43,6 +43,9 @@ public final class ExpiryNotificationService {
 
         if (expiring.isEmpty()) return;
 
+        org.gipsybuho.recetasfamiliares.ui.SoundPlayer.play(
+                org.gipsybuho.recetasfamiliares.core.SoundEffect.ALERT);
+
         // ── Build toast ────────────────────────────────────────────────────────
         Stage toast = new Stage();
         toast.initOwner(owner);
