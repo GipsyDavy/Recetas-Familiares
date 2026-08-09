@@ -132,6 +132,14 @@
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>org.gipsybuho.recetasfamiliares.Launcher</mainClass>
+                                    <!-- Sin esto el manifiesto no lleva version y
+                                         Package.getImplementationVersion() devuelve null: la
+                                         pantalla "Acerca de" mentia y el aviso de version nueva
+                                         se compararia siempre contra el valor de reserva. -->
+                                    <manifestEntries>
+                                        <Implementation-Title>${project.artifactId}</Implementation-Title>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                    </manifestEntries>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>

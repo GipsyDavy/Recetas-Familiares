@@ -27,6 +27,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
+import org.gipsybuho.recetasfamiliares.core.AppVersion;
 import org.gipsybuho.recetasfamiliares.core.FamilyRole;
 import org.gipsybuho.recetasfamiliares.core.ServerConfig;
 
@@ -1320,8 +1321,9 @@ public class MainWindow {
     }
 
     private ScrollPane buildAboutTab() {
-        String version = getClass().getPackage().getImplementationVersion();
-        if (version == null || version.isBlank()) version = "1.1";
+        // Una sola fuente de verdad con el aviso de version nueva: si aqui se
+        // leyera de otra forma, "Acerca de" y el aviso podrian discrepar.
+        String version = AppVersion.current();
 
         Label app = new Label("Recetas Familiares");
         app.getStyleClass().add("settings-about-title");
