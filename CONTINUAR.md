@@ -6322,3 +6322,107 @@ no despliega**. El `merge` sí.
   razonamiento de no exposición, que es lo que sostiene la supresión.
 - La ejecución no usó `superpowers:executing-plans`: el plan se había escrito minutos antes y
   estaba entero en contexto. Decisión consciente por la restricción de cuota del usuario.
+
+---
+
+## Cierre del sprint del CVE de Tomcat y la CI del backend — 2026-08-09 (Claude Code)
+
+**PR [#8](https://github.com/GipsyDavy/Recetas-Familiares/pull/8) fusionada y backend desplegado a
+producción.** `main` en `28dc54b`. Release desplegada: `20260809T052129Z-28dc54bc0e7e`. Cierra la
+Tarea 4 del plan del 08/08, que era lo único que quedaba abierto.
+
+### El despliegue se autorizó explícitamente
+
+El usuario dio el sí sabiendo que el `merge` despliega. Queda anotado aquí porque el protocolo lo
+exige: `backend/**` cae en el filtro `paths` de `backend-ci-cd.yml` y el job `deploy` corre con
+`environment: production` en cada `push` a `main`.
+
+### El CVE no afectaba, y esta es la versión precisa
+
+- `CVE-2026-66299` afecta al **ejemplo de chat WebSocket** (`ChatAnnotation.java`) de la webapp
+  `examples` de Tomcat. Apache lo clasifica **Low**.
+- **El 7,5 no lo publica el NIST**: su análisis en el NVD es *N/A*. Lo aporta **CISA-ADP**. Y quien
+  asocia el CVE a los dos jars es **Dependency-Check**, al mapear el CPE genérico de Tomcat sobre
+  cada `tomcat-embed-*`. La redacción anterior se lo atribuía al NVD en los dos puntos: corregido en
+  `08df7c4`.
+- **Esta aplicación sí usa WebSocket** (chat familiar sobre STOMP, `chat/WebSocketConfig.java`) y aun
+  así no está afectada: el código vulnerable es de la aplicación de ejemplo, no de la implementación
+  del contenedor que usa Spring. La nota no lo decía y ahora sí; era el hueco más serio de la
+  justificación.
+- `tomcat-embed-el` 10.1.57 **ya estaba** en el árbol, fuera de la regex a propósito porque no
+  recibió este CVE. La nota daba a entender que no había más artefactos `tomcat-embed-*`.
+- La versión que lo corrige, **10.1.58, no existía** el 08/08. Actualizar era imposible.
+
+**La supresión caduca el 2026-11-01.** Al caducar: comprobar si ya existe 10.1.58, subir
+`<tomcat.version>` en `backend/pom.xml:24` y **borrar** la supresión, no renovarla.
+
+### Revisión externa: Codex sí, Gemini no
+
+**Codex** revisó el diff en solo lectura: **0 hallazgos Críticos, Altos ni Medios**. Verificó contra
+las fuentes, no de memoria: los cuatro SHA resuelven a los tags declarados y sus `action.yml` usan
+`node24`; `upload-artifact` v7 y `download-artifact` v8 comparten generación de `@actions/artifact`
+(6.2.0 y 6.2.1) y son compatibles aquí; la guarda `github.event_name == 'push'` es la única ruta al
+job `deploy` (no hay `workflow_run`, `pull_request_target`, `workflow_call` ni
+`repository_dispatch`); `permissions: contents: read` deja el resto en `none`; la regex casa solo con
+`core` y `websocket` en 10.1.57; y `until="2026-11-01Z"` es formato válido.
+
+Sus dos hallazgos **Bajos**: la atribución imprecisa del 7,5 (corregida, arriba) y que los cinco
+secretos de despliegue viven a nivel de repositorio en vez del environment `production` — **deuda
+preexistente, no de este diff**, y hoy no explotable porque ningún job fuera de `deploy` los
+referencia.
+
+**Gemini seguía sin cuota**, así que su revisión —razonamiento y documentación— la hice yo. Es una
+limitación real del cierre: nadie externo auditó el argumento que sostiene la supresión. Codex sí
+validó la parte verificable de ese argumento contra los jars y el commit de Apache.
+
+### Verificación del despliegue
+
+| Comprobación | Resultado |
+|---|---|
+| `health` ANTES | `{"status":"UP"}` a las 04:54:34Z |
+| Backend CI en la PR tras el commit de documentación | `Build and test backend: success`, `Deploy backend: skipped` |
+| `Dependency Audit` sobre la rama (run `31296294000`) | verde en backend y desktop |
+| Despliegue (run `31296416826`) | `Deploy backend: success` |
+| `health` DESPUÉS | `{"status":"UP"}` a las 05:22:20Z |
+| Producción sirve datos de verdad | 5 recetas listadas, receta abierta HTTP 200 |
+| Escaneo `run-security-scan.ps1 -Mode sprint` | **exit 0**: Semgrep 0 hallazgos, TruffleHog 2 no verificados (los `example.test` conocidos de los tests) |
+
+La comprobación de datos se hizo con **dos cuentas desechables `@example.test` creadas por API y
+borradas al terminar** (`204`, y el login posterior devolvió `401`). Un `health` verde no prueba que
+la aplicación sirva datos: por eso se abrió una receta.
+
+### Riesgo residual
+
+- **La supresión caduca el 2026-11-01** y el audit volverá a rojo ese día si nadie mira. Deliberado.
+- `CVE-2026-66010` (DOMPurify dentro de swagger-ui 5.32.8) sigue como aviso, sin bloquear.
+  `application-prod.yml:12-16` desactiva `api-docs` y `swagger-ui` en producción.
+- **Los secretos de despliegue a nivel de repositorio** (hallazgo de Codex). Va junto a proteger
+  `main`, que sigue pendiente del usuario.
+- **Sin revisión externa del razonamiento** (Gemini sin cuota).
+- El despliegue no se validó desde las aplicaciones cliente reales, solo por API.
+
+### Sigue pendiente del usuario
+
+1. **Dos copias de seguridad del `.jks`**, en sitios distintos, y la contraseña aparte.
+2. **Abrir el instalador `v1.2`, entrar y comprobar que el avatar sale nada más entrar**, en Desktop
+   y en Android.
+3. **Proteger la rama `main`** (Settings → Branches) para que la CI bloquee merges.
+
+### Por dónde seguir
+
+1. **Tests de renderizado** (TestFX, Robolectric o Compose UI Test). El hueco grande.
+2. **Wrapper de Gradle** apuntando a `file:///C:/tmp/tools/gradle-9.5.1-bin.zip`: el repositorio no
+   es reproducible para otro clon.
+3. **Mover los secretos de despliegue al environment `production`** y proteger `main`, en el mismo
+   sprint.
+4. **UX-14**: ayuda contextual en Desktop y Android. Sprint grande, sin spec.
+5. **iOS**: bloqueado sin macOS.
+
+### Trazabilidad
+
+Agente líder: **Claude Code (Opus 5)**. Apoyo: **Codex** (revisión técnica del diff, solo lectura).
+**Gemini: sin cuota**, revisión documental asumida por Claude Code. Skill de proceso:
+`superpowers:executing-plans` sobre el plan del 08/08. `/VibeSec` y `/security-review` **no
+aplicaban**: el diff no toca autenticación, endpoints, ownership ni manejo de ficheros; son
+comentarios de supresión y versiones de acciones de CI. Escaneo Semgrep + TruffleHog en modo sprint:
+**exit 0**.
