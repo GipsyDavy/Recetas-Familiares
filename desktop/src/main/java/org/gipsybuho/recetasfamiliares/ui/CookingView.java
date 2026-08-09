@@ -12,6 +12,7 @@ import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
+import org.gipsybuho.recetasfamiliares.core.SoundEffect;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
 
 import java.util.List;
@@ -272,12 +273,14 @@ public class CookingView {
     private void prevStep() {
         if (currentIndex > 0) {
             stopTimer();
+            SoundPlayer.play(SoundEffect.STEP);
             renderStep(currentIndex - 1);
         }
     }
 
     private void nextStep() {
         stopTimer();
+        SoundPlayer.play(SoundEffect.STEP);
         renderStep(currentIndex < steps.size() - 1 ? currentIndex + 1 : steps.size());
     }
 
@@ -313,7 +316,7 @@ public class CookingView {
                     "-fx-background-color: #FDECEA; -fx-background-radius: 16; " +
                     "-fx-border-color: #D4837A; -fx-border-radius: 16; -fx-border-width: 1;");
                 toggleTimerBtn.setText("↺  Reiniciar");
-                SoundPlayer.playTimerComplete();
+                SoundPlayer.play(SoundEffect.TIMER);
             }
         }));
         countdownTimer.setCycleCount(timerSecondsLeft);

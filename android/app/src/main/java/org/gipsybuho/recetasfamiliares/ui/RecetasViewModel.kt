@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -32,6 +33,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.gipsybuho.recetasfamiliares.core.AppContainer
 import org.gipsybuho.recetasfamiliares.core.AppUpdate
+import org.gipsybuho.recetasfamiliares.core.SoundEffect
+import org.gipsybuho.recetasfamiliares.core.SoundLevel
+import org.gipsybuho.recetasfamiliares.core.SoundPlayer
 import org.gipsybuho.recetasfamiliares.data.remote.ChatSocket
 import org.gipsybuho.recetasfamiliares.data.remote.dto.ChatMessageDto
 import org.gipsybuho.recetasfamiliares.data.repository.CHAT_MAX_BODY_LENGTH
@@ -734,6 +738,19 @@ class RecetasViewModel(private val container: AppContainer) : ViewModel() {
 
     fun setHapticsEnabled(enabled: Boolean) {
         viewModelScope.launch { container.themePreference.setHapticsEnabled(enabled) }
+    }
+
+    val soundLevel: StateFlow<SoundLevel> = container.themePreference.soundLevel
+        .onEach { SoundPlayer.setLevel(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SoundLevel.SILENCIO)
+
+    fun setSoundLevel(level: SoundLevel) {
+        viewModelScope.launch {
+            container.themePreference.setSoundLevel(level)
+            // Se aplica al instante y suena, para oir lo que se acaba de activar.
+            SoundPlayer.setLevel(level)
+            SoundPlayer.play(SoundEffect.SUCCESS)
+        }
     }
 
     fun createRecipe(

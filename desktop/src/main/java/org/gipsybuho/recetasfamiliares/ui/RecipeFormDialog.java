@@ -14,6 +14,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeCreateDtos;
 import org.gipsybuho.recetasfamiliares.api.dto.RecipeDtos;
+import org.gipsybuho.recetasfamiliares.core.SoundEffect;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.util.ArrayList;
@@ -306,7 +307,7 @@ public class RecipeFormDialog {
 
                 Platform.runLater(() -> {
                     onSaved.accept(saved);
-                    SoundPlayer.playConfirm();
+                    SoundPlayer.play(SoundEffect.SUCCESS);
                     dialog.close();
                 });
             } catch (Exception ex) {

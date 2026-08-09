@@ -15,6 +15,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.dto.StockDtos;
+import org.gipsybuho.recetasfamiliares.core.SoundEffect;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 
 import java.util.function.Consumer;
@@ -268,7 +269,7 @@ public class StockView extends ScrollPane {
                     refreshDisplay();
                     statusLabel.setText("Item eliminado.");
                     onStatusUpdate.accept("Ítem eliminado");
-                    SoundPlayer.playDelete();
+                    SoundPlayer.play(SoundEffect.DELETE);
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> statusLabel.setText("Error al eliminar: " + ex.getMessage()));

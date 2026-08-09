@@ -111,6 +111,7 @@ public final class UpdateNotificationService {
         // Igual que el aviso de caducidades: sin esto queda detras de cualquier
         // otra ventana y no se ve.
         toast.setAlwaysOnTop(true);
+        SoundPlayer.play(org.gipsybuho.recetasfamiliares.core.SoundEffect.ALERT);
 
         Label title = new Label("Hay una versión nueva: " + release.latestVersion());
         title.getStyleClass().add("expiry-toast-title");

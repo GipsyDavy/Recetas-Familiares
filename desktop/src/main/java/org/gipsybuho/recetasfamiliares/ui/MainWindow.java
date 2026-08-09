@@ -28,6 +28,8 @@ import javafx.util.Duration;
 import org.gipsybuho.recetasfamiliares.api.ApiException;
 import org.gipsybuho.recetasfamiliares.core.AppContext;
 import org.gipsybuho.recetasfamiliares.core.AppVersion;
+import org.gipsybuho.recetasfamiliares.core.SoundEffect;
+import org.gipsybuho.recetasfamiliares.core.SoundLevel;
 import org.gipsybuho.recetasfamiliares.core.FamilyRole;
 import org.gipsybuho.recetasfamiliares.core.ServerConfig;
 
@@ -574,6 +576,9 @@ public class MainWindow {
     }
 
     private void navigateTo(String view) {
+        if (!view.equals(activeView)) {
+            SoundPlayer.play(SoundEffect.NAVIGATE);
+        }
         navigating = true;
         activeView = view;
         globalSearch.clear();
@@ -768,6 +773,7 @@ public class MainWindow {
     }
 
     private void showAlert(String title, String message) {
+        SoundPlayer.play(SoundEffect.ERROR);
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(null);
@@ -777,9 +783,6 @@ public class MainWindow {
     }
 
     private VBox buildSettingsView() {
-        CheckBox cbSounds = new CheckBox("Efectos de sonido");
-        cbSounds.setSelected(SoundPlayer.isSoundEnabled());
-
         String requestedTabKey = activeSettingsTab;
         if (profileSettingsTab == null) {
             profileSettingsTab = settingsTab("Perfil y cuenta", SETTINGS_TAB_PROFILE, profileView);
@@ -788,7 +791,7 @@ public class MainWindow {
         }
         List<Tab> settingsTabs = new ArrayList<>();
         Tab appearanceTab = settingsTab(
-                "Apariencia", SETTINGS_TAB_APPEARANCE, buildAppearanceTab(cbSounds));
+                "Apariencia", SETTINGS_TAB_APPEARANCE, buildAppearanceTab());
         settingsTabs.add(appearanceTab);
         settingsTabs.add(profileSettingsTab);
         if (context.getSession().isAdmin()) {
@@ -861,6 +864,20 @@ public class MainWindow {
                 : activeView;
     }
 
+    /** Una opcion de nivel de sonido. Al elegirla suena, para que se oiga lo que se activa. */
+    private RadioButton soundLevelOption(
+            ToggleGroup group, SoundLevel level, String label, String description) {
+        RadioButton option = new RadioButton(label + " — " + description);
+        option.setToggleGroup(group);
+        option.setSelected(SoundPlayer.getLevel() == level);
+        option.setOnAction(e -> {
+            SoundPlayer.setLevel(level);
+            SoundPlayer.play(SoundEffect.SUCCESS);
+            setStatus("Sonido: " + label.toLowerCase(java.util.Locale.ROOT));
+        });
+        return option;
+    }
+
     private HBox settingsHeader(String heading, String description) {
         Label title = new Label(heading);
         title.getStyleClass().add("settings-title");
@@ -876,12 +893,19 @@ public class MainWindow {
         return header;
     }
 
-    private ScrollPane buildAppearanceTab(CheckBox cbSounds) {
-        cbSounds.setOnAction(e -> {
-            Preferences.userRoot().node("recetas").putBoolean("sound", cbSounds.isSelected());
-            setStatus(cbSounds.isSelected() ? "Sonido activado" : "Sonido desactivado");
-        });
-        HBox soundRow = new HBox(cbSounds);
+    private ScrollPane buildAppearanceTab() {
+        // Tres niveles y no un interruptor: "todo o nada" hacia que quien
+        // desactivaba el ruido de navegacion perdiera tambien los avisos utiles.
+        ToggleGroup soundGroup = new ToggleGroup();
+        RadioButton soundNone = soundLevelOption(
+                soundGroup, SoundLevel.SILENCIO, "Silencio", "Ningún sonido.");
+        RadioButton soundImportant = soundLevelOption(soundGroup, SoundLevel.IMPORTANTES,
+                "Solo los importantes",
+                "Guardado, error, borrado, avisos, temporizador y pasos de cocina.");
+        RadioButton soundAll = soundLevelOption(soundGroup, SoundLevel.TODOS,
+                "Todos", "Además, navegación y cambios de estado.");
+
+        VBox soundRow = new VBox(6, soundNone, soundImportant, soundAll);
         soundRow.setAlignment(Pos.CENTER_LEFT);
 
         CheckBox reduceMotion = new CheckBox("Reducir movimiento");
