@@ -120,6 +120,11 @@ public class MainWindow {
         } else {
             showLogin();
         }
+
+        // Una sola vez por arranque, y no dentro de showMain(), que se vuelve a
+        // llamar al iniciar sesion y al cambiar de familia. El endpoint es
+        // publico, asi que tambien avisa con la pantalla de login delante.
+        UpdateNotificationService.checkInBackground(context, stage);
     }
 
     // ── Login ────────────────────────────────────────────────────────────────

@@ -60,6 +60,19 @@ public class ApiClient {
         return execute(request, responseType);
     }
 
+    /**
+     * GET a un endpoint publico: sin cabecera Authorization. Para llamadas que
+     * tienen sentido antes de iniciar sesion, como consultar la version
+     * recomendada de la aplicacion.
+     */
+    public <T> T getPublic(String path, Class<T> responseType) throws ApiException {
+        Request request = new Request.Builder()
+                .url(url(path))
+                .get()
+                .build();
+        return execute(request, responseType);
+    }
+
     public <T> T post(String path, Object body, Class<T> responseType) throws ApiException {
         RequestBody rb = RequestBody.create(gson.toJson(body), JSON);
         Request request = new Request.Builder()
