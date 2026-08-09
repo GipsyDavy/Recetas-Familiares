@@ -13,80 +13,32 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
-import java.util.List;
-import java.util.Map;
+import org.gipsybuho.recetasfamiliares.core.HelpContent;
 
 /**
- * Ayuda contextual MVP: diálogo modal con consejos según la vista activa.
- * Se abre con F1 o con el botón Ayuda del sidebar.
+ * Ayuda de la pantalla en la que estas. Se abre con F1 o con el boton Ayuda del
+ * menu lateral.
+ *
+ * El texto vive en {@link HelpContent}, que no depende de JavaFX y tiene tests.
+ * Desde aqui se llega al centro de ayuda y a la guia de bienvenida.
  */
 final class HelpDialog {
-
-    private record Topic(String emoji, String title, List<String> tips) {}
-
-    private static final Map<String, Topic> TOPICS = Map.ofEntries(
-        Map.entry("dashboard", new Topic("🏠", "Inicio", List.of(
-            "Resumen de tu familia: recetas recientes, stock próximo a caducar y menú de hoy.",
-            "Pulsa \"Sincronizar ahora\" para traer los últimos cambios de tu familia.",
-            "Usa la búsqueda global (Ctrl+F) para encontrar lo que necesites en cualquier momento."))),
-        Map.entry("recipes", new Topic("📖", "Recetas", List.of(
-            "Crea recetas con ingredientes, pasos, fotos y tiempo de preparación.",
-            "Pulsa \"Cocinar\" en una receta para el modo cocina a pantalla completa.",
-            "En el modo cocina, usa las flechas ← y → para avanzar o retroceder, la barra espaciadora para el temporizador y Esc para salir.",
-            "Marca favoritas para encontrarlas antes."))),
-        Map.entry("stock", new Topic("🧂", "Stock", List.of(
-            "Controla tu despensa: cantidades, unidades y fechas de caducidad.",
-            "Los artículos próximos a caducar se muestran en la pantalla de Inicio.",
-            "Define umbral mínimo para no quedarte sin lo esencial."))),
-        Map.entry("menu", new Topic("📅", "Menú semanal", List.of(
-            "Asigna recetas a cada comida del día para planificar la semana.",
-            "Desde el menú puedes generar la lista de la compra.",
-            "Los cambios se sincronizan con toda la familia."))),
-        Map.entry("shopping", new Topic("🛒", "Lista de la compra", List.of(
-            "Añade artículos a mano o genera la lista desde el menú semanal.",
-            "Marca lo comprado; la lista se comparte con tu familia.",
-            "Los artículos comprados pueden añadirse directamente a tu stock."))),
-        Map.entry("notes", new Topic("📝", "Notas familiares", List.of(
-            "Apunta trucos, recuerdos y secretos de cocina de tu familia.",
-            "Las notas se sincronizan entre todos los dispositivos.",
-            "Usa la búsqueda global (Ctrl+F) para encontrarlas."))),
-        Map.entry("members", new Topic("👨‍👩‍👧", "Miembros", List.of(
-            "Gestiona quién pertenece a tu familia y su rol.",
-            "El propietario y los administradores pueden cambiar roles o expulsar miembros.",
-            "Los datos familiares solo son visibles para los miembros."))),
-        Map.entry("settings", new Topic("⚙", "Ajustes", List.of(
-            "Perfil y cuenta está disponible para todos los usuarios junto con Apariencia y Acerca de.",
-            "Cambia tema de color, modo oscuro, tipografía y sonidos.",
-            "Accede a Ajustes rápidamente con Ctrl + Coma (Ctrl+,).",
-            "Los administradores también pueden revisar el servidor y el diagnóstico."))),
-        Map.entry("profile", new Topic("👤", "Ajustes > Perfil y cuenta", List.of(
-            "Cambia tu foto y tu nombre, que serán visibles para toda la familia.",
-            "Consulta tu familia, tu rol y la actividad compartida.",
-            "Verifica tu correo o gestiona la eliminación de tu propia cuenta desde la sección Cuenta.",
-            "Desde aquí puedes volver a ver la guía de bienvenida.")))
-    );
-
-    private static final Topic FALLBACK = new Topic("❓", "Ayuda", List.of(
-        "Navega con el menú lateral entre recetas, stock, menú y lista de compra.",
-        "Busca en todo con Ctrl+F.",
-        "Pulsa F1 en cualquier pantalla para ver consejos de esa vista."));
 
     private HelpDialog() {}
 
     static void show(Window owner, String viewKey) {
-        Topic topic = TOPICS.getOrDefault(viewKey, FALLBACK);
+        HelpContent.Topic topic = HelpContent.topicOrGeneral(viewKey);
 
         Dialog<Void> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle("Ayuda");
-        // "Cerrar" va a la derecha y es el boton por defecto; la guia de bienvenida,
-        // a la izquierda. Con la disposicion anterior la guia caia en la posicion
-        // donde se espera "Aceptar", asi que se pulsaba por inercia: la ayuda
-        // desaparecia y salia la bienvenida, dando la impresion de que la ayuda no
-        // funcionaba.
+        // "Cerrar" a la derecha y por defecto. Con la disposicion anterior, la
+        // guia de bienvenida caia donde se espera "Aceptar" y se pulsaba por
+        // inercia: la ayuda desaparecia y salia la bienvenida.
         ButtonType closeType = new ButtonType("Cerrar", ButtonBar.ButtonData.OK_DONE);
-        ButtonType guideType = new ButtonType("Ver guía de bienvenida", ButtonBar.ButtonData.LEFT);
-        dialog.getDialogPane().getButtonTypes().addAll(guideType, closeType);
+        ButtonType centerType = new ButtonType("Todos los temas", ButtonBar.ButtonData.LEFT);
+        ButtonType guideType = new ButtonType("Guía de bienvenida", ButtonBar.ButtonData.LEFT);
+        dialog.getDialogPane().getButtonTypes().addAll(centerType, guideType, closeType);
 
         Label emojiLabel = new Label(topic.emoji());
         emojiLabel.setStyle("-fx-font-size: 40px;");
@@ -99,17 +51,28 @@ final class HelpDialog {
         for (String tip : topic.tips()) {
             Label tipLabel = new Label("•  " + tip);
             tipLabel.setWrapText(true);
-            tipLabel.setMaxWidth(420);
+            tipLabel.setMaxWidth(440);
             tipsBox.getChildren().add(tipLabel);
         }
 
         VBox content = new VBox(14, headerRow, tipsBox);
         content.setPadding(new Insets(20, 28, 12, 28));
-        content.setPrefWidth(480);
+        content.setPrefWidth(540);
         dialog.getDialogPane().setContent(content);
         DialogStyler.apply(dialog);
 
+        Button centerBtn = (Button) dialog.getDialogPane().lookupButton(centerType);
+        // Sin esto, ButtonBar iguala el ancho de todos los botones al del mas
+        // ancho y los textos largos se truncan a "Guia de bienve...".
+        ButtonBar.setButtonUniformSize(centerBtn, false);
+        centerBtn.getStyleClass().add("action-button-secondary");
+        centerBtn.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+            HelpCenterDialog.show(owner);
+            e.consume();
+        });
+
         Button guideBtn = (Button) dialog.getDialogPane().lookupButton(guideType);
+        ButtonBar.setButtonUniformSize(guideBtn, false);
         guideBtn.getStyleClass().add("action-button-secondary");
         guideBtn.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
             OnboardingDialog.showAgain(owner);
