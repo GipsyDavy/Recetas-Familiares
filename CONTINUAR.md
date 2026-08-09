@@ -6918,3 +6918,49 @@ tiempo del fichero antes de instalar.
 - Sigue sin haber tests de renderizado. Hoy, otra vez, todos los fallos de interfaz salieron al
   ejecutar: el enlace muerto de la ayuda, el manifiesto sin version, los textos truncados, el fondo
   del login y el error 32.
+
+---
+
+## Intento fallido de tests de renderizado — 2026-08-09 (Claude Code)
+
+**No se consiguieron.** Se documenta para no repetir el mismo camino.
+
+### Lo que se intento
+
+Compose UI Test sobre **Robolectric 4.14.1**, que corre en la JVM sin emulador y encaja en
+`testDebugUnitTest`, la tarea que la CI ya ejecuta. Cuatro tests de `HelpSheet`: que la ayuda de una
+pantalla muestre su titulo y sus consejos, que se llegue al indice, que con clave nula se abra el
+indice, y que al tocar una seccion se vea su contenido y se pueda volver.
+
+Dependencias anadidas: `androidx.compose.ui:ui-test-junit4`, `ui-test-manifest`,
+`org.robolectric:robolectric:4.14.1`, `androidx.test:core-ktx`, mas
+`testOptions.unitTests.isIncludeAndroidResources = true`.
+
+### Por que fallo
+
+1. En local: `SunCertPathBuilderException`. Robolectric descarga sus jars de Android al arrancar y
+   **Avast intercepta el TLS**, el mismo problema que obliga a usar snapshots locales de Semgrep.
+2. Se probo `javax.net.ssl.trustStoreType=Windows-ROOT`: pasa a `NoSuchAlgorithmException`.
+3. Se subio a una PR para que lo verificara la CI, que corre en Ubuntu limpio sin Avast.
+   **Fallo igual, con el mismo `NoSuchAlgorithmException`.**
+
+Es decir: **el problema no era Avast**, sino una incompatibilidad del propio Robolectric en este
+entorno (JDK 21 con SDK 34). La PR #26 se cerro sin fusionar y la rama se borro; `main` sigue verde.
+
+### Alternativas para el proximo intento, por orden de coste
+
+1. **Fijar `@Config(sdk = [33])`** o subir a una version mas nueva de Robolectric. Es lo mas barato y
+   lo primero que habria que probar.
+2. **Ejecutar el paso de tests con JDK 17** en lugar del 21. Robolectric ha ido por detras de las
+   versiones nuevas del JDK; exige tocar `android-ci.yml`.
+3. **Tests instrumentados en `androidTest`** con un emulador en la CI. Es lo que de verdad renderiza,
+   pero cada ejecucion tarda varios minutos y complica el workflow.
+4. **Desktop con TestFX y Monocle en modo headless**, que es un camino independiente y no depende de
+   nada de esto. No se llego a intentar.
+
+### Lo que hay que tener claro antes de volver
+
+Aunque funcionen, **estos tests comprueban que la pantalla se compone y muestra lo que debe, no
+pixeles ni recortes de texto**. De los fallos de esta jornada habrian cazado que un dialogo no abra o
+que una fila desaparezca; no el texto truncado, ni el fondo del login, ni el error 32. La
+verificacion ejecutando la aplicacion sigue siendo necesaria.
