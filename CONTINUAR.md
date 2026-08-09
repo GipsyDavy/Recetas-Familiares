@@ -6736,3 +6736,79 @@ Agente único: **Claude Code (Opus 5)**. Skill: `superpowers:test-driven-develop
 `/VibeSec` ni `/security-review`: el cambio de Android replica una decisión ya revisada ayer (solo
 `https`, sin descargar ni ejecutar) y no toca autenticación, ownership ni datos personales. El
 backend no se tocó: solo se cambiaron cuatro variables de entorno en el VPS.
+
+---
+
+## La ayuda no estaba rota, y sonidos por niveles — 2026-08-09 (Claude Code)
+
+`main` en `6bc084c`. Dos sprints cortos, ninguno toca backend: **nada de esto se ha desplegado ni
+esta en la v1.3 publicada**. Vive solo en `main` hasta que se saque una v1.4.
+
+### La ayuda: no habia bug, habia una trampa de diseno (PR #17)
+
+Reproducido en la aplicacion con la sesion real. Pulsar **«❓ Ayuda»** abre el dialogo con el tema de
+la pantalla activa; hay **9 temas** y F1 tambien funciona. `onboardingSeen = true` en el registro, asi
+que la bienvenida tampoco saltaba sola.
+
+**Lo que fallaba:** «Ver guia de bienvenida» ocupaba la posicion de la derecha, donde se espera
+«Aceptar»/«Cerrar». Se pulsaba por inercia, la ayuda desaparecia y salia la bienvenida. De ahi la
+sensacion de que la ayuda estaba desactivada. Y en Ajustes habia un panel llamado **«Ayuda»** cuyo
+unico boton reabria la bienvenida: dos entradas con el mismo nombre.
+
+Ahora «Cerrar» va a la derecha y es el boton por defecto, la guia queda a la izquierda como
+secundaria, y el panel se llama **«Guia de primeros pasos»**.
+
+**Leccion, que ya van dos veces hoy:** el codigo estaba bien y el problema era de colocacion. No se
+habria detectado sin abrir la aplicacion.
+
+### Buscar actualizaciones a mano (PR #17)
+
+Desktop: panel en Acerca de. Responde siempre —version nueva, «ya tienes la ultima» o fallo de red— e
+**ignora la version descartada**: si se pide a mano, se quiere ver. Android: Perfil muestra la version
+instalada y tiene el mismo boton.
+
+De paso, Acerca de decia «MySQL» cuando la base es PostgreSQL desde julio.
+
+### Sonidos por niveles en las dos plataformas (PR #18)
+
+El interruptor de Desktop era todo o nada: quien silenciaba el ruido perdia tambien los avisos.
+Android no tenia sonido ninguno. Ahora hay tres niveles compartidos:
+
+| Nivel | Que suena |
+|---|---|
+| **Silencio** | nada — por defecto |
+| **Solo los importantes** | guardado, error, borrado, avisos, temporizador y pasos de cocina |
+| **Todos** | ademas, navegacion y cambios de estado |
+
+El paso de receta en modo cocina es **importante a proposito**: se cocina con las manos ocupadas.
+
+`core/SoundEffect` y `core/SoundLevel` son espejo en Java y Kotlin, con **7 tests por plataforma**,
+incluido uno que comprueba que las dos clasifican igual los nueve efectos. Sin ficheros de audio:
+Desktop sintetiza tonos y Android usa `ToneGenerator`, que se crea y libera en cada uso para no
+reservar el canal de audio. La preferencia booleana antigua **se migra sola** a «Solo los
+importantes».
+
+**Se pidio sonido en cada interaccion y no se hizo por defecto**: esta disponible en el nivel «Todos».
+Una aplicacion que pita en cada clic se desactiva entera en dos dias, y con ella los avisos utiles.
+Queda dicho por si se quiere cambiar el valor inicial: es una linea.
+
+### Verificacion
+
+| Comprobacion | Resultado |
+|---|---|
+| Dialogo de ayuda | visto: «Cerrar» a la derecha en verde, guia a la izquierda |
+| «Buscar actualizaciones» | visto: «Ya tienes la ultima version (1.3).» |
+| Selector de sonido en Desktop | visto: tres niveles, Silencio activo |
+| Tests | Desktop **131**, Android **114**, backend 226 |
+| Semgrep + TruffleHog | exit 0 |
+
+**No verificado:** el sonido no se puede comprobar por captura, y ninguna pantalla de Android se ha
+visto en un dispositivo.
+
+### Riesgo residual
+
+- **Deuda de release**: la v1.3 no lleva nada de esto. Hay que sacar una v1.4. Sera la primera
+  actualizacion que la familia reciba avisada por la propia aplicacion.
+- Sin Codex ni Gemini en estos dos sprints.
+- El avatar se vio pintado en el sidebar, pero desde sesion ya restaurada: no prueba el camino de
+  login en un dispositivo nuevo.
