@@ -10,7 +10,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Screen;
@@ -34,6 +34,13 @@ public final class UpdateNotificationService {
     private static final String PREF_NODE = "org/gipsybuho/recetasfamiliares";
     private static final String PREF_KEY = "update.dismissed.version";
 
+    /**
+     * Sin barra inicial y con el prefijo api/v1, como el resto de llamadas del
+     * proyecto: la URL base ya termina en "/". Escribirlo como "/app-version"
+     * produce una doble barra y un 401 que este servicio se traga en silencio.
+     */
+    static final String ENDPOINT_PATH = "api/v1/app-version";
+
     private UpdateNotificationService() {}
 
     /** Consulta en segundo plano. Cualquier fallo se traga: el aviso es opcional. */
@@ -41,7 +48,7 @@ public final class UpdateNotificationService {
         Thread.ofVirtual().start(() -> {
             try {
                 AppVersionDtos.AppVersionResponse response = context.getApiClient()
-                        .getPublic("/app-version", AppVersionDtos.AppVersionResponse.class);
+                        .getPublic(ENDPOINT_PATH, AppVersionDtos.AppVersionResponse.class);
                 AppVersionDtos.PlatformRelease desktop =
                         response == null ? null : response.desktop();
                 if (!UpdateCheck.shouldNotify(desktop, AppVersion.current(), dismissedVersion())) {
@@ -68,6 +75,9 @@ public final class UpdateNotificationService {
         Stage toast = new Stage();
         toast.initOwner(owner);
         toast.initStyle(StageStyle.TRANSPARENT);
+        // Igual que el aviso de caducidades: sin esto queda detras de cualquier
+        // otra ventana y no se ve.
+        toast.setAlwaysOnTop(true);
 
         Label title = new Label("Hay una versión nueva: " + release.latestVersion());
         title.getStyleClass().add("expiry-toast-title");
@@ -91,13 +101,16 @@ public final class UpdateNotificationService {
         Hyperlink later = new Hyperlink("Más tarde");
         later.setOnAction(e -> toast.close());
 
-        HBox actions = new HBox(12, download, dismiss, later);
+        // FlowPane y no HBox: los textos son largos y varian con el dominio y el
+        // numero de version. En un HBox se truncaban a "Descargar desde gi...".
+        FlowPane actions = new FlowPane(12, 2, download, dismiss, later);
         actions.setAlignment(Pos.CENTER_LEFT);
 
         VBox content = new VBox(6, title, detail, actions);
         content.getStyleClass().add("expiry-toast");
         content.setPadding(new Insets(12, 16, 12, 16));
-        content.setMaxWidth(400);
+        content.setPrefWidth(420);
+        content.setMaxWidth(420);
 
         Scene scene = new Scene(content);
         scene.setFill(Color.TRANSPARENT);
@@ -107,7 +120,7 @@ public final class UpdateNotificationService {
         // Abajo a la derecha, igual que el aviso de caducidades. A diferencia de
         // aquel, este NO se cierra solo: tiene enlaces que hay que poder pulsar.
         var bounds = Screen.getPrimary().getVisualBounds();
-        toast.setX(bounds.getMaxX() - 420);
+        toast.setX(bounds.getMaxX() - 460);
         toast.setY(bounds.getMaxY() - 170);
         toast.show();
     }
