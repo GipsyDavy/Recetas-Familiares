@@ -52,6 +52,16 @@ app:
   mail:
     enabled: ${MAIL_ENABLED:false}
     from: ${MAIL_FROM:no-reply@recetas.local}
+  # Version recomendada de cada cliente, que se sirve en /api/v1/app-version.
+  # Vacio mientras no haya release publicada: el cliente entonces no avisa de
+  # nada. La URL debe ser https o Desktop la ignora. Ver docs/publicar-una-version.md
+  update:
+    desktop:
+      version: ${APP_UPDATE_DESKTOP_VERSION:}
+      url: ${APP_UPDATE_DESKTOP_URL:}
+    android:
+      version: ${APP_UPDATE_ANDROID_VERSION:}
+      url: ${APP_UPDATE_ANDROID_URL:}
   account:
     password-reset-token-ttl-minutes: ${PASSWORD_RESET_TOKEN_TTL_MINUTES:30}
     email-verification-token-ttl-hours: ${EMAIL_VERIFICATION_TOKEN_TTL_HOURS:24}
