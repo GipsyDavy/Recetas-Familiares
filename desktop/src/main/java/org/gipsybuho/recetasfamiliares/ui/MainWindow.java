@@ -1407,10 +1407,14 @@ public class MainWindow {
         HBox updateRow = new HBox(12, updateBtn, updateStatus);
         updateRow.setAlignment(Pos.CENTER_LEFT);
 
+        Button helpCenterBtn = new Button("Abrir el centro de ayuda");
+        helpCenterBtn.getStyleClass().add("action-button-secondary");
+        helpCenterBtn.setOnAction(e -> HelpCenterDialog.show(stage));
+
         Button onboardingBtn = new Button("Ver guía de bienvenida");
         onboardingBtn.getStyleClass().add("action-button-secondary");
         onboardingBtn.setOnAction(e -> OnboardingDialog.showAgain(stage));
-        HBox helpRow = new HBox(onboardingBtn);
+        HBox helpRow = new HBox(12, helpCenterBtn, onboardingBtn);
         helpRow.setAlignment(Pos.CENTER_LEFT);
 
         VBox content = new VBox(18, headerCard, cards,
@@ -1418,11 +1422,9 @@ public class MainWindow {
                         "Comprueba si hay una version mas nueva publicada. La descarga se abre en el "
                                 + "navegador; la aplicacion no instala nada por su cuenta.",
                         updateRow),
-                // No se llama "Ayuda" a proposito: la ayuda de verdad es el boton
-                // del sidebar y F1. Dos entradas con el mismo nombre confundian.
-                configPanel("Guia de primeros pasos",
-                        "Vuelve a ver la guia de bienvenida cuando quieras. Para la ayuda de cada "
-                                + "pantalla, usa el boton Ayuda del menu lateral o pulsa F1.",
+                configPanel("Ayuda",
+                        "El centro de ayuda reune todos los temas. Para la ayuda de la pantalla en "
+                                + "la que estes, usa el boton Ayuda del menu lateral o pulsa F1.",
                         helpRow));
         content.getStyleClass().add("settings-tab-content");
         return settingsScroll(content);
