@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
@@ -340,6 +341,7 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var showThemePicker by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
     var chatOpen by remember { mutableStateOf(false) }
     var conversationsOpen by remember { mutableStateOf(false) }
     var initialConversation by remember { mutableStateOf<PrivateConversationDto?>(null) }
@@ -463,6 +465,18 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
                     actions = {
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = { PlainTooltip { Text("Ayuda") } },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(onClick = { showHelp = true }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.HelpOutline,
+                                    contentDescription = "Ayuda de esta pantalla"
+                                )
+                            }
+                        }
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                             tooltip = { PlainTooltip { Text("Tema") } },
                             state = rememberTooltipState()
                         ) {
@@ -579,7 +593,25 @@ private fun MainShell(viewModel: RecetasViewModel, initialRecipeId: String? = nu
             }
         }
     ) { padding ->
-        if (showThemePicker) {
+        if (showHelp) {
+        HelpSheet(
+            screenKey = when {
+                chatOpen -> "chat"
+                conversationsOpen -> "conversations"
+                else -> when (tab) {
+                    MainTab.RECIPES -> "recipes"
+                    MainTab.STOCK -> "stock"
+                    MainTab.SHOPPING -> "shopping"
+                    MainTab.NOTES -> "notes"
+                    MainTab.MENU -> "menu"
+                    MainTab.PROFILE -> "profile"
+                }
+            },
+            onDismiss = { showHelp = false }
+        )
+    }
+
+    if (showThemePicker) {
             ThemePickerDialog(
                 currentTheme    = selectedTheme,
                 currentMode     = themeMode,
