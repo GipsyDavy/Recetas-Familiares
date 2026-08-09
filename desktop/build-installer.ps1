@@ -23,7 +23,7 @@ $ErrorActionPreference = "Stop"
 # ── Configuración ──────────────────────────────────────────────────────────────
 $AppName        = "RecetasFamiliares"
 $AppDisplayName = "Recetas Familiares"
-$AppVersion     = "1.3"
+$AppVersion     = "1.4"
 $MainJar        = "RecetasFamiliares.jar"
 $MainClass      = "org.gipsybuho.recetasfamiliares.Launcher"
 $JavaFxModules  = "javafx.controls,javafx.fxml,javafx.base,javafx.graphics"
