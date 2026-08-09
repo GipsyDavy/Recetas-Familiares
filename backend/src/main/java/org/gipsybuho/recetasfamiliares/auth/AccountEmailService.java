@@ -11,7 +11,6 @@ import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class AccountEmailService {
@@ -22,20 +21,17 @@ public class AccountEmailService {
     private final boolean enabled;
     private final String smtpHost;
     private final String from;
-    private final String publicUrl;
 
     public AccountEmailService(
             ObjectProvider<JavaMailSender> mailSenderProvider,
             @Value("${app.mail.enabled:false}") boolean enabled,
             @Value("${spring.mail.host:}") String smtpHost,
-            @Value("${app.mail.from:no-reply@recetas.local}") String from,
-            @Value("${app.public-url:http://localhost:8080}") String publicUrl
+            @Value("${app.mail.from:no-reply@recetas.local}") String from
     ) {
         this.mailSenderProvider = mailSenderProvider;
         this.enabled = enabled;
         this.smtpHost = smtpHost;
         this.from = from;
-        this.publicUrl = publicUrl;
     }
 
     @PostConstruct
@@ -59,11 +55,15 @@ public class AccountEmailService {
                 """
                 Hemos recibido una solicitud para restablecer tu contraseña.
 
-                Usa este enlace durante los próximos minutos:
+                Tu código de recuperación es:
+
                 %s
 
+                Cópialo entero y pégalo en Recetas Familiares: pulsa "¿Has olvidado tu
+                contraseña?" y luego "Ya tengo el código". Caduca en unos minutos.
+
                 Si no lo has pedido tú, puedes ignorar este mensaje.
-                """.formatted(link("/reset-password", token)),
+                """.formatted(token),
                 AccountActionTokenType.PASSWORD_RESET
         );
     }
@@ -75,11 +75,14 @@ public class AccountEmailService {
                 """
                 Confirma que este email pertenece a tu cuenta de Recetas Familiares.
 
-                Usa este enlace:
+                Tu código de verificación es:
+
                 %s
 
+                Cópialo entero y pégalo en la aplicación, en Perfil y cuenta.
+
                 Si no has creado esta cuenta, puedes ignorar este mensaje.
-                """.formatted(link("/verify-email", token)),
+                """.formatted(token),
                 AccountActionTokenType.EMAIL_VERIFICATION
         );
     }
@@ -105,13 +108,5 @@ public class AccountEmailService {
         } catch (MailException exception) {
             log.warn("Account email delivery failed for userId={} type={}", user.getId(), type, exception);
         }
-    }
-
-    private String link(String path, String token) {
-        return UriComponentsBuilder.fromUriString(publicUrl)
-                .path(path)
-                .queryParam("token", token)
-                .build()
-                .toUriString();
     }
 }
