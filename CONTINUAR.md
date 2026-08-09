@@ -6812,3 +6812,109 @@ visto en un dispositivo.
 - Sin Codex ni Gemini en estos dos sprints.
 - El avatar se vio pintado en el sidebar, pero desde sesion ya restaurada: no prueba el camino de
   login en un dispositivo nuevo.
+
+---
+
+## Ayuda completa, release v1.4 y el error 32 — 2026-08-09 (Claude Code)
+
+`main` en `7de7eb7`. Dos releases publicadas hoy: **v1.4** y, tras fallar la instalacion,
+**v1.4.1**. El servidor anuncia la 1.4.1.
+
+### Ayuda completa en las dos plataformas
+
+Indice aprobado en `docs/ayuda-indice-propuesto.md`, aplicando sus seis recomendaciones: sin
+buscador, contenido embebido, FAQ si y glosario no, sin capturas, un texto para las dos plataformas
+y tono de tu.
+
+- **Desktop**: 11 temas contextuales (uno por pantalla navegable) y **centro de ayuda con 13
+  secciones**, indice a la izquierda y contenido a la derecha. El indice proponia 14 temas: modo
+  cocina, detalle de receta y busqueda global no son vistas navegables, asi que su contenido vive en
+  el centro de ayuda.
+- **Android**: mismas 13 secciones en hoja inferior, con indice y detalle en dos pasos porque en un
+  movil no cabe el indice lateral. Ocho temas contextuales.
+
+El texto vive en `core/HelpContent` en las dos plataformas, sin dependencias de interfaz, con tests
+que exigen que cada pantalla tenga tema y que ninguna seccion quede vacia. **En Android hay uno que
+prohibe mencionar Ctrl+F, F1 o "menu lateral"**: evita que se copie literalmente el texto de Desktop.
+
+### La barra de arriba tenia cinco iconos sin nombre
+
+La ayuda se puso primero como icono arriba y despues se intento como septima pestana abajo. Ninguna
+de las dos vale: Material 3 disena esa barra para 3-5 destinos y **la ayuda no es un destino**, abre
+una hoja y vuelve.
+
+Solucion: la paleta y la ayuda pasan a Perfil, en un apartado **Ajustes** con **tres filas de icono y
+texto**, una linea cada una. Ocupa un tercio de lo que ocupaban tres bloques con titulo, descripcion
+y boton ancho.
+
+### El texto del login se veia lavado, y no era el tema
+
+`LoginScreen` pintaba su columna **sin `Surface`**, asi que el fondo era el blanco crudo de la
+ventana en vez del del tema. `MainShell` no lo sufria porque `Scaffold` ya aplica el fondo. Se
+envuelve en un `Surface` con el color del tema y se fija el texto de los tres campos a `onSurface`,
+que es lo que da contraste **tambien sin foco**.
+
+### El error 32 al instalar la v1.4
+
+Instalar en Windows fallaba con **error 32: "el archivo esta en uso"**. Causa comprobada: **cuatro
+instancias de `RecetasFamiliares.exe`** corriendo desde la carpeta que el instalador sobrescribe.
+`CloseApplications=yes` ya estaba puesto; el Restart Manager de Windows no pudo con ellas.
+
+Se descarto primero lo obvio: los binarios publicados son **byte a byte identicos** a los
+compilados, mismo SHA-256.
+
+Arreglado en dos capas:
+
+1. **Instancia unica** (`core/SingleInstance`): `FileLock` en `LOCALAPPDATA`; la segunda instancia
+   sale de inmediato. Cuatro tests. El sistema suelta el bloqueo si el proceso muere de golpe, asi
+   que un cierre forzado no deja la aplicacion inarrancable.
+2. **El instalador cierra lo que quede**: `taskkill` del propio ejecutable en `CurStepChanged`, con
+   pausa para que Windows libere los identificadores.
+
+**Un intento descartado, para no repetirlo**: un aviso "ya esta abierto" con Swing. No llegaba a
+pintarse y dejaba un JVM de 110 MB vivo reteniendo los ficheros, que es exactamente el problema.
+Ahora la segunda instancia sale en silencio.
+
+Verificado en el equipo: instalar con la aplicacion abierta termina en codigo 0, y abrir dos veces
+deja un solo proceso.
+
+### El APK se quedaba congelado en "Descargando"
+
+El aviso abria el **enlace directo al APK** con `ACTION_VIEW`. La URL servia bien (302 a la CDN
+firmada, `Content-Length` correcto y `Content-Type` de APK), pero un binario lanzado asi desde una
+app se le atraganta al gestor de descargas.
+
+Arreglado **sin tocar codigo**: `APP_UPDATE_ANDROID_URL` apunta ahora a la **pagina de la release**,
+no al asset. Confirmado por el usuario: ya descarga. Desktop sigue apuntando al `.exe` directo,
+que funciona.
+
+### Trampa de Gradle que costo tiempo
+
+`:app:assembleRelease` daba **`packageRelease UP-TO-DATE` con el APK borrado del disco**, asi que el
+emulador probaba builds viejos y las verificaciones no valian. **Cuando se toque la interfaz de
+Android y haya que probar el APK, usar `:app:clean :app:assembleRelease`** y comprobar la marca de
+tiempo del fichero antes de instalar.
+
+### Verificacion
+
+| Comprobacion | Resultado |
+|---|---|
+| Ayuda de Desktop | vista en pantalla: contextual y centro con 13 secciones |
+| Ayuda de Android | vista en el emulador: hoja contextual, indice, seccion y vuelta |
+| Perfil de Android | visto: tres filas compactas y version instalada |
+| Login de Android | visto: fondo del tema y texto legible |
+| Instalacion con la app abierta | codigo 0, queda la 1.4.1 |
+| Doble arranque | un solo proceso |
+| Descarga del APK en movil | confirmada por el usuario |
+| Tests | Desktop **141**, Android **121**, backend 226 |
+| Semgrep + TruffleHog | exit 0 |
+
+### Riesgo residual
+
+- **Los sonidos no se han oido.** Una captura no los prueba.
+- La v1.4 quedo publicada con el instalador que fallaba. Se deja como esta: la corrige la v1.4.1 y
+  nadie mas la habia descargado.
+- **Sin Codex ni Gemini** en toda la jornada desde el sprint del CVE.
+- Sigue sin haber tests de renderizado. Hoy, otra vez, todos los fallos de interfaz salieron al
+  ejecutar: el enlace muerto de la ayuda, el manifiesto sin version, los textos truncados, el fondo
+  del login y el error 32.
