@@ -96,6 +96,7 @@ internal fun ProfileScreen(
     var showVerifyCode by remember { mutableStateOf(false) }
     var showDeleteAccount by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
+    var showHelpCenter by remember { mutableStateOf(false) }
     var showFamilySelector by remember { mutableStateOf(false) }
     var showCreateFamily by remember { mutableStateOf(false) }
     var memberRoleChange by remember { mutableStateOf<MemberRoleChange?>(null) }
@@ -108,6 +109,12 @@ internal fun ProfileScreen(
     val haptic      = LocalHapticFeedback.current
     val hapticsEnabled = LocalHapticsEnabled.current
     val myUserId    = viewModel.myUserId
+
+    if (showHelpCenter) {
+        // screenKey nulo: se abre directamente en el indice, no en la ayuda de Perfil,
+        // que ya esta a un toque en el icono de la barra de arriba.
+        HelpSheet(screenKey = null, onDismiss = { showHelpCenter = false })
+    }
 
     if (showVerifyCode) {
         VerifyEmailCodeDialog(
@@ -573,6 +580,12 @@ internal fun ProfileScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Buscar actualizaciones")
+        }
+        OutlinedButton(
+            onClick = { showHelpCenter = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Centro de ayuda")
         }
 
         Spacer(Modifier.height(Spacing.xl))
