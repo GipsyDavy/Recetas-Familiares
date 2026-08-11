@@ -42,71 +42,80 @@ import org.gipsybuho.recetasfamiliares.core.HelpContent
 @Composable
 internal fun HelpSheet(screenKey: String?, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        HelpSheetBody(screenKey)
+    }
+}
+
+// Separado de HelpSheet para poder probar el contenido sin el Popup del
+// ModalBottomSheet: bajo Robolectric ese Popup se queda en 40x44px y en
+// coordenadas negativas, y nunca crece para alojar el contenido (ver
+// CONTINUAR.md, "Segundo muro").
+@Composable
+internal fun HelpSheetBody(screenKey: String?) {
     // null = indice; una seccion = su contenido; "topic" = ayuda contextual.
     var openSection by remember { mutableStateOf<HelpContent.Section?>(null) }
     var showingTopic by remember { mutableStateOf(screenKey != null) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.xl)
-                .padding(bottom = Spacing.xxl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)
-        ) {
-            when {
-                showingTopic && screenKey != null -> {
-                    val topic = HelpContent.topicOrGeneral(screenKey)
-                    Text(
-                        "${topic.emoji}  ${topic.title}",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.semantics { heading() }
-                    )
-                    topic.tips.forEach { Bullet(it) }
-                    HorizontalDivider()
-                    TextButton(onClick = { showingTopic = false }) {
-                        Text("Ver todos los temas")
-                    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.xl)
+            .padding(bottom = Spacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+    ) {
+        when {
+            showingTopic && screenKey != null -> {
+                val topic = HelpContent.topicOrGeneral(screenKey)
+                Text(
+                    "${topic.emoji}  ${topic.title}",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() }
+                )
+                topic.tips.forEach { Bullet(it) }
+                HorizontalDivider()
+                TextButton(onClick = { showingTopic = false }) {
+                    Text("Ver todos los temas")
                 }
+            }
 
-                openSection != null -> {
-                    val section = openSection!!
-                    Text(
-                        "${section.emoji}  ${section.title}",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.semantics { heading() }
-                    )
-                    section.blocks.forEach { Bullet(it) }
-                    HorizontalDivider()
-                    TextButton(onClick = { openSection = null }) {
-                        Text("Volver al índice")
-                    }
+            openSection != null -> {
+                val section = openSection!!
+                Text(
+                    "${section.emoji}  ${section.title}",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() }
+                )
+                section.blocks.forEach { Bullet(it) }
+                HorizontalDivider()
+                TextButton(onClick = { openSection = null }) {
+                    Text("Volver al índice")
                 }
+            }
 
-                else -> {
-                    Text(
-                        "Centro de ayuda",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.semantics { heading() }
-                    )
-                    LazyColumn {
-                        items(HelpContent.sections()) { section ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { openSection = section }
-                                    .padding(vertical = Spacing.md)
-                            ) {
-                                Text(
-                                    "${section.emoji}  ${section.title}",
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                            HorizontalDivider()
+            else -> {
+                Text(
+                    "Centro de ayuda",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() }
+                )
+                LazyColumn {
+                    items(HelpContent.sections()) { section ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { openSection = section }
+                                .padding(vertical = Spacing.md)
+                        ) {
+                            Text(
+                                "${section.emoji}  ${section.title}",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
                         }
+                        HorizontalDivider()
                     }
-                    Spacer(Modifier.height(Spacing.md))
                 }
+                Spacer(Modifier.height(Spacing.md))
             }
         }
     }
