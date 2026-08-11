@@ -3,6 +3,8 @@ package org.gipsybuho.recetasfamiliares.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import org.gipsybuho.recetasfamiliares.core.HelpContent
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,8 +31,44 @@ class HelpSheetRenderTest {
     /** Con clave nula se abre directamente el indice, que es como entra desde Perfil. */
     @Test
     fun sinPantallaSeAbreDirectamenteElIndice() {
-        compose.setContent { HelpSheet(screenKey = null, onDismiss = {}) }
+        compose.setContent { HelpSheetBody(screenKey = null) }
 
+        compose.onNodeWithText("Centro de ayuda").assertIsDisplayed()
+    }
+
+    @Test
+    fun laAyudaDeUnaPantallaMuestraSuTituloYSusConsejos() {
+        compose.setContent { HelpSheetBody(screenKey = "recipes") }
+
+        val topic = HelpContent.topic("recipes")!!
+        compose.onNodeWithText(topic.title, substring = true).assertIsDisplayed()
+        compose.onNodeWithText(topic.tips.first(), substring = true).assertIsDisplayed()
+    }
+
+    /** El paso de la ayuda de la pantalla al indice completo. */
+    @Test
+    fun desdeLaAyudaSeLlegaAlIndiceCompleto() {
+        compose.setContent { HelpSheetBody(screenKey = "recipes") }
+
+        compose.onNodeWithText("Ver todos los temas").performClick()
+
+        compose.onNodeWithText("Centro de ayuda").assertIsDisplayed()
+        // Solo la primera seccion: el resto del indice es un LazyColumn y en la
+        // pantalla pequena de Robolectric no llega a componerse.
+        compose.onNodeWithText(HelpContent.sections().first().title, substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun alTocarUnaSeccionSeVeSuContenidoYSePuedeVolver() {
+        compose.setContent { HelpSheetBody(screenKey = null) }
+
+        val seccion = HelpContent.sections().first()
+        compose.onNodeWithText(seccion.title, substring = true).performClick()
+
+        compose.onNodeWithText(seccion.blocks.first(), substring = true).assertIsDisplayed()
+
+        compose.onNodeWithText("Volver al índice").performClick()
         compose.onNodeWithText("Centro de ayuda").assertIsDisplayed()
     }
 }
