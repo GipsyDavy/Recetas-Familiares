@@ -6936,16 +6936,80 @@ Dependencias anadidas: `androidx.compose.ui:ui-test-junit4`, `ui-test-manifest`,
 `org.robolectric:robolectric:4.14.1`, `androidx.test:core-ktx`, mas
 `testOptions.unitTests.isIncludeAndroidResources = true`.
 
-### Por que fallo
+### Por que fallo — DIAGNOSTICO CORREGIDO EL 2026-08-10
 
-1. En local: `SunCertPathBuilderException`. Robolectric descarga sus jars de Android al arrancar y
-   **Avast intercepta el TLS**, el mismo problema que obliga a usar snapshots locales de Semgrep.
-2. Se probo `javax.net.ssl.trustStoreType=Windows-ROOT`: pasa a `NoSuchAlgorithmException`.
-3. Se subio a una PR para que lo verificara la CI, que corre en Ubuntu limpio sin Avast.
-   **Fallo igual, con el mismo `NoSuchAlgorithmException`.**
+La conclusion que se escribio aqui («incompatibilidad del propio Robolectric con
+JDK 21 y SDK 34») **era falsa**. El log de la CI decia:
 
-Es decir: **el problema no era Avast**, sino una incompatibilidad del propio Robolectric en este
-entorno (JDK 21 con SDK 34). La PR #26 se cerro sin fusionar y la rama se borro; `main` sigue verde.
+    java.security.KeyStoreException at KeyStore.java:879
+        Caused by: java.security.NoSuchAlgorithmException at GetInstance.java:159
+
+`KeyStore.java:879` es `KeyStore.getInstance(type)`. La cadena real: Robolectric
+instancia la `Application` del manifiesto antes de cada test -> `RecetasApplication`
+construye `AppContainer` -> su primer campo es `SessionStore` -> `MasterKey` pide
+`KeyStore.getInstance("AndroidKeyStore")`, proveedor que Robolectric no registra.
+
+**Robolectric arrancaba bien**: descargo sus jars, acepto SDK 34 y JDK 21,
+instrumento y ejecuto. Lo que reventaba era el arranque de la aplicacion. Ni el
+TLS de Avast ni la version del JDK tenian nada que ver con el fallo de la CI.
+
+Se arregla en `android/app/src/test/resources/robolectric.properties`: `sdk=34`
+(4.14.1 no llega al 36 del proyecto) y `application=android.app.Application`.
+
+**La leccion**: se dio por buena una hipotesis plausible sin leer el traza de la
+excepcion hasta el final. Media hora de log habria ahorrado el cierre en falso.
+
+### Segundo muro, no previsto por el diagnostico original — 2026-08-10
+
+Arreglado el arranque de la `Application`, los tres tests que interactuan con
+`HelpSheet` (todo menos el que solo comprueba el indice con clave nula) seguian
+fallando con "is not displayed", aunque el nodo SI existia en el arbol. Volcado
+del arbol de Compose: la ventana visible ocupaba (0,0)-(320,470)px y el `Popup`
+en el que Material3 pinta el `ModalBottomSheet` quedaba en 40x44px, en
+coordenadas negativas, disjunto de la ventana visible. `waitForIdle()` no
+cambiaba nada.
+
+Se descarto que fuera el tamano de pantalla **con evidencia**, no por intuicion:
+se probaron tres resoluciones distintas via `qualifiers` en
+`robolectric.properties` (320x470, 411x891 y 822x1782 px). La ventana visible
+escalaba bien en los tres casos; el `Popup` del `ModalBottomSheet` se quedaba
+siempre en un tamano minimo y en coordenadas negativas, sin crecer nunca para
+alojar el contenido. Es un fallo de posicionamiento de Compose+Robolectric al
+recalcular el `Popup` tras una recomposicion que cambia de rama el `when`, no
+un problema de tamano de pantalla.
+
+El usuario autorizo explicitamente la Contingencia B del plan: extraer el
+contenido de `HelpSheet.kt` a un composable nuevo, `HelpSheetBody`, y dejar
+`HelpSheet` como envoltorio de tres lineas que solo pone el `ModalBottomSheet`
+alrededor. Es un movimiento de codigo, no un cambio de comportamiento: se
+verifico en revision, linea a linea, que el bloque movido es equivalente al
+original. Los cuatro tests pasan a componer `HelpSheetBody` directamente, sin
+el `Popup` de por medio.
+
+Que cubren y que no, con esto: los cuatro tests comprueban que la pantalla se
+compone y muestra lo que debe (indice, tema de una pantalla, navegacion entre
+ambos, contenido de una seccion y vuelta). **No** cubren el envoltorio
+`HelpSheet` ni el `ModalBottomSheet` en si, que quedan fuera de la suite. Por
+eso abrir la aplicacion en el emulador siguio siendo obligatorio antes de
+cerrar el sprint, y se hizo: se navego el centro de ayuda desde Perfil (indice
+-> seccion -> contenido -> "Volver al indice") y no hubo sorpresas frente a lo
+que predecian los tests, el `ModalBottomSheet` se posiciona bien y no hay
+crash en el logcat.
+
+**Hallazgo aparte, no introducido por este sprint**: revisando el codigo para
+preparar esa verificacion se vio que el segundo punto de entrada a la ayuda que
+describe el propio `HelpSheetBody` en su KDoc -el icono de ayuda contextual de
+cada pantalla, que abriria directamente el tema de esa pantalla con
+`screenKey` distinto de null- no tiene ningun disparador en la interfaz real:
+`showHelp` en `RecetasApp.kt` se declara y se lee, pero nunca se pone a
+`true` en ningun sitio del archivo. El unico llamador de `HelpSheet` que se
+alcanza tocando la aplicacion es el de `ProfileScreen.kt`, y siempre pasa
+`screenKey = null`. La rama `showingTopic && screenKey != null` de
+`HelpSheetBody` -la que cubre el test `laAyudaDeUnaPantallaMuestraSuTituloYSusConsejos`-
+esta probada por Robolectric pero no es alcanzable desde ningun boton de la
+aplicacion instalada. No se ha tocado produccion para arreglarlo: no es
+alcance de este sprint y hace falta decidir si se re-conecta el icono o se
+retira el codigo muerto.
 
 ### Alternativas para el proximo intento, por orden de coste
 
