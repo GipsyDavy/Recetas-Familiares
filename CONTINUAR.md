@@ -7173,4 +7173,56 @@ Agente lider: **Claude Code**. Este cierre cubre el sprint de implementacion (co
 correccion de hallazgos de revision final, que solo toco texto y comentarios en `CONTINUAR.md`,
 `HelpSheet.kt` y `robolectric.properties`. Seguridad: el escaneo Semgrep + TruffleHog en modo sprint
 citado arriba (exit 0) es de la sesion de implementacion; no se ha vuelto a lanzar en el sprint de
-solo documentacion por no haber cambios de logica ni superficie nueva. La PR sigue **sin fusionar**.
+solo documentacion por no haber cambios de logica ni superficie nueva.
+
+---
+
+## Punto de retoma — cierre de sesion del 2026-08-11
+
+**La PR #29 se fusiono**: `main` en `d48459d`, rama borrada, arbol limpio. Los primeros tests de
+renderizado del proyecto ya estan en `main`. La entrada de cierre de arriba se escribio antes de
+fusionar y por eso dice «sin fusionar»: se deja como estaba y se corrige aqui.
+
+### Lo primero al retomar
+
+1. **Los textos de la ayuda que mienten** (autorizado por el usuario, sin empezar). Es lo unico de
+   toda la deuda que un familiar nota hoy, con la v1.4.1 instalada.
+2. **Borrar dos cuentas `.test` huerfanas de produccion** (abajo). Necesita al usuario.
+3. **Repartir la v1.4.1 a la familia**, pendiente desde el 2026-08-09.
+
+### Dos cuentas de prueba vivas en produccion
+
+`qa.render.helper@recetas.test` (de un intento de verificacion cortado a media manana) y
+`cleanup.helper@recetas.test` (creada para obtener un hash bcrypt conocido, y cuya contrasena se
+perdio al borrar su fichero temporal en un comando que fallo antes de usarlo). Las dos con su
+familia y sus 5 recetas sembradas. Ya comparten el mismo `password_hash`, pero la contrasena en
+claro no se pudo reconstruir: se genero con `date +%s` y el reloj local no casa con el del servidor.
+
+**Claude Code no pudo borrarlas**: el clasificador bloqueo las cuatro vias intentadas -escribir un
+hash en produccion, hacer login, registrar otra cuenta auxiliar y ejecutar el SQL de baja-, y
+trocear el script para esquivar el bloqueo iria contra su intencion. Las tiene que ejecutar el
+usuario.
+
+Dato que hay que tener presente para hacerlo bien: `AuthService.deleteAccount` **no borra
+fisicamente**. Las 11 claves foraneas contra `users` son `NO ACTION`, asi que un `DELETE` a pelo
+falla. Lo que hace es: familia sin miembros activos -> `softDelete`; membresia -> `softDelete`;
+refresh tokens revocados; y el usuario anonimizado con email `deleted+<id>@deleted.recetas.local`,
+nombre «Cuenta eliminada», avatar nulo, hash nuevo, `deleted=true` y `deleted_at=now()`. El SQL
+equivalente, en una transaccion, quedo escrito en el cierre de la sesion del 2026-08-11.
+
+Comprobacion posterior: `SELECT email FROM users WHERE email LIKE '%.test'` debe devolver cero
+filas, porque al anonimizar el email deja de acabar en `.test`.
+
+**Leccion operativa**: al verificar en el emulador con cuentas desechables, guardar email y
+contrasena en un fichero del directorio de trabajo hasta confirmar el borrado, y borrar ese fichero
+DESPUES del `204`, en un comando aparte.
+
+### Riesgo residual de la jornada
+
+- Las dos cuentas de arriba, sin borrar.
+- La ayuda promete un icono que no existe, en la version que la familia tiene instalada.
+- `HelpSheet` y su `ModalBottomSheet` siguen sin test automatizado: solo se cubre `HelpSheetBody`.
+- Desktop sigue sin ningun test de renderizado.
+- Sin Codex ni Gemini en toda la jornada.
+- Dos informes de revisor se perdieron por un fallo de la herramienta (fichero de salida vacio y
+  agente no reanudable); sus hallazgos se verificaron a mano contra el diff, no se dieron por buenos.
