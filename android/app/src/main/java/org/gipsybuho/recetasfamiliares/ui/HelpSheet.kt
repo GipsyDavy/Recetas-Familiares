@@ -48,9 +48,9 @@ internal fun HelpSheet(screenKey: String?, onDismiss: () -> Unit) {
 }
 
 // Separado de HelpSheet para poder probar el contenido sin el Popup del
-// ModalBottomSheet: Robolectric lo posiciona mal tras un cambio de rama del
-// when (ventana desconectada de la visible), y los tests que hacen click ahi
-// no encuentran nada visible.
+// ModalBottomSheet: bajo Robolectric ese Popup se queda en 40x44px y en
+// coordenadas negativas, y nunca crece para alojar el contenido (ver
+// CONTINUAR.md, "Segundo muro").
 @Composable
 internal fun HelpSheetBody(screenKey: String?) {
     // null = indice; una seccion = su contenido; "topic" = ayuda contextual.

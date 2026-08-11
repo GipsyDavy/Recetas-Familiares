@@ -6921,9 +6921,12 @@ tiempo del fichero antes de instalar.
 
 ---
 
-## Intento fallido de tests de renderizado — 2026-08-09 (Claude Code)
+## Cronica del primer intento de tests de renderizado: fallo el 2026-08-09 con un diagnostico falso, se consiguieron el 2026-08-11 (Claude Code)
 
-**No se consiguieron.** Se documenta para no repetir el mismo camino.
+**El intento del 2026-08-09 fallo**, y el diagnostico que se escribio entonces sobre la causa **era
+falso**. Se documenta igual, porque sigue siendo la cronica real de por que fallo y que se aprendio.
+Los tests **si se consiguieron despues, el 2026-08-11** (ver el cierre de sprint al final de este
+fichero).
 
 ### Lo que se intento
 
@@ -6998,7 +7001,7 @@ crash en el logcat.
 
 **Hallazgo aparte, no introducido por este sprint**: revisando el codigo para
 preparar esa verificacion se vio que el segundo punto de entrada a la ayuda que
-describe el propio `HelpSheetBody` en su KDoc -el icono de ayuda contextual de
+describe el propio `HelpSheet` en su KDoc -el icono de ayuda contextual de
 cada pantalla, que abriria directamente el tema de esa pantalla con
 `screenKey` distinto de null- no tiene ningun disparador en la interfaz real:
 `showHelp` en `RecetasApp.kt` se declara y se lee, pero nunca se pone a
@@ -7011,16 +7014,21 @@ aplicacion instalada. No se ha tocado produccion para arreglarlo: no es
 alcance de este sprint y hace falta decidir si se re-conecta el icono o se
 retira el codigo muerto.
 
-### Alternativas para el proximo intento, por orden de coste
+### Ideas descartadas por el diagnostico corregido
 
-1. **Fijar `@Config(sdk = [33])`** o subir a una version mas nueva de Robolectric. Es lo mas barato y
-   lo primero que habria que probar.
-2. **Ejecutar el paso de tests con JDK 17** en lugar del 21. Robolectric ha ido por detras de las
-   versiones nuevas del JDK; exige tocar `android-ci.yml`.
-3. **Tests instrumentados en `androidTest`** con un emulador en la CI. Es lo que de verdad renderiza,
-   pero cada ejecucion tarda varios minutos y complica el workflow.
-4. **Desktop con TestFX y Monocle en modo headless**, que es un camino independiente y no depende de
-   nada de esto. No se llego a intentar.
+Aqui habia dos alternativas para el «proximo intento» que partian del diagnostico que resulto
+**falso**: fijar `@Config(sdk = [33])` o subir de version de Robolectric, y ejecutar el paso de tests
+con JDK 17. Ninguna de las dos hace falta: Robolectric funcionaba bien con SDK 34 y JDK 21: la causa
+real era el `KeyStore` sin registrar, y ya esta resuelta en `robolectric.properties`.
+
+### Otros caminos de tests de interfaz, sin intentar
+
+Dos caminos independientes que no dependen de nada de lo de arriba y siguen sin probarse:
+
+1. **Tests instrumentados en `androidTest`** con un emulador en la CI. Es lo que de verdad renderiza
+   pixeles, pero cada ejecucion tarda varios minutos y complica el workflow.
+2. **Desktop con TestFX y Monocle en modo headless**, un camino independiente para Desktop que no
+   depende de nada de Android ni de Robolectric.
 
 ### Lo que hay que tener claro antes de volver
 
@@ -7094,3 +7102,75 @@ Code. Skills de proceso usadas: `superpowers:executing-plans`, `writing-plans`,
 **La lección de la jornada, por si sirve de algo mañana**: todos los fallos de interfaz salieron al
 abrir la aplicación, ninguno en los tests. El enlace muerto de la ayuda, el manifiesto sin versión,
 los textos truncados, el fondo del login, el error 32 al instalar y el APK que no descargaba.
+
+---
+
+## Cierre del sprint de tests de renderizado en Android — 2026-08-11 (Claude Code)
+
+Rama `test/renderizado-android-robolectric`, **PR #29 abierta, sin fusionar**
+(`GipsyDavy/Recetas-Familiares#29`, `mergeable`). Seis commits: `8601351` (primer test con la
+Application vacia), `f1db5c8` (cita el segundo RED en `robolectric.properties`), `da83477` (extrae
+`HelpSheetBody`), `917f2d1` (los tres tests de navegacion restantes), `b731f7c` (plan versionado y
+limites documentados) y `1b569f9` (el segundo muro y el hallazgo del icono muerto). Esta entrada la
+cierra un sprint aparte, de solo texto y comentarios, que corrigio contradicciones y comentarios
+inexactos detectados en revision final antes de fusionar; no toco codigo de produccion ni tests.
+
+### Que se consiguio
+
+Los primeros tests de renderizado del proyecto: Compose UI Test sobre Robolectric 4.14.1, en la JVM,
+dentro de `testDebugUnitTest`, sin emulador. Dos obstaculos reales, documentados arriba con su
+diagnostico corregido: el `KeyStore` de `AndroidKeyStore` que Robolectric no registra (resuelto en
+`robolectric.properties`), y el `Popup` del `ModalBottomSheet` que bajo Robolectric nunca crece para
+alojar contenido (resuelto extrayendo `HelpSheetBody`, autorizado por el usuario).
+
+### Que cubren los tests y que NO
+
+Los cuatro tests de `HelpSheetRenderTest` comprueban que `HelpSheetBody` se compone y muestra lo que
+debe: el indice directo con clave nula, titulo y consejos de la ayuda de una pantalla, el salto al
+indice completo, y abrir una seccion y volver. **No cubren el envoltorio `HelpSheet` ni el
+`ModalBottomSheet` en si** -se prueba el contenido, no el contenedor que lo posiciona en pantalla-, y
+**no comprueban pixeles, contraste ni texto recortado**, que es donde estuvieron varios de los
+fallos de la jornada del 2026-08-09.
+
+### Verificacion
+
+| Comprobacion | Resultado |
+|---|---|
+| Suite Android | **125 tests, 0 fallos** |
+| `assembleDebug` | compila |
+| CI de la PR #29 | verde: Android, Backend, Desktop (ubuntu y windows) |
+| `Dependency Audit` | no aparece como check de la PR: es cron semanal de los lunes, no un check ausente |
+| Semgrep + TruffleHog, modo sprint | exit 0; Semgrep 0 hallazgos; TruffleHog 2 no verificados, fixtures de test preexistentes |
+| Navegacion de la ayuda en el emulador | indice -> seccion -> contenido -> "Volver al indice", sin sorpresas frente a los tests, `ModalBottomSheet` bien posicionado, sin crash en logcat |
+
+Los numeros de la tabla son los de la sesion de implementacion (commits `8601351`..`1b569f9`), no se
+han vuelto a ejecutar en esta sesion de correccion de hallazgos porque no se toco codigo ni tests.
+Lo que si se repitio en esta sesion: `gh pr checks 29`, con el mismo resultado -Android, Backend y
+Desktop en verde-, y `:app:testDebugUnitTest --tests HelpSheetRenderTest` tras editar el comentario
+de `HelpSheet.kt`, para confirmar que el cambio de texto no rompe la compilacion (ver el comando y
+su salida en el informe de este sprint,
+`.superpowers/sdd/2026-08-10-tests-renderizado-android/final-fix-report.md`).
+
+### Riesgo residual
+
+- **Cuenta de prueba huerfana en produccion.** Un intento anterior de esta misma jornada creo una
+  cuenta de prueba en produccion; sus credenciales, correctamente, no se guardaron en ningun fichero,
+  y **no se pudo localizar ni borrar**. La cuenta usada en la verificacion final del emulador si se
+  creo y borro de forma trazable: registro `201`, borrado `204`.
+- **`HelpSheet` y su `ModalBottomSheet` siguen sin test automatizado.** Solo `HelpSheetBody` esta
+  cubierto; el envoltorio se comprobo una vez a mano en el emulador, no de forma repetible en CI.
+- **Sigue sin haber tests de renderizado en Desktop.** El camino sin intentar sigue siendo TestFX +
+  Monocle en modo headless.
+- **Icono de ayuda contextual muerto** (`RecetasApp.kt` / `HelpContent.kt`): hallazgo de producto
+  detectado durante este sprint pero fuera de su alcance; decision pendiente del usuario en otro
+  sprint. No se ha tocado ninguno de los dos ficheros.
+- Sin Codex ni Gemini en el sprint de correccion de hallazgos.
+
+### Trazabilidad
+
+Agente lider: **Claude Code**. Este cierre cubre el sprint de implementacion (commits `8601351` a
+`1b569f9`, con Claude Code como coautor de tres de ellos segun sus trailers) y el sprint posterior de
+correccion de hallazgos de revision final, que solo toco texto y comentarios en `CONTINUAR.md`,
+`HelpSheet.kt` y `robolectric.properties`. Seguridad: el escaneo Semgrep + TruffleHog en modo sprint
+citado arriba (exit 0) es de la sesion de implementacion; no se ha vuelto a lanzar en el sprint de
+solo documentacion por no haber cambios de logica ni superficie nueva. La PR sigue **sin fusionar**.
