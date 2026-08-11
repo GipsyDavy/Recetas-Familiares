@@ -19,6 +19,11 @@ import org.robolectric.RobolectricTestRunner
  * estuvieron varios de los fallos de la jornada del 2026-08-09. Abrir la
  * aplicacion sigue siendo necesario.
  *
+ * Los cuatro tests componen [HelpSheetBody] directamente, no [HelpSheet]: bajo
+ * Robolectric el `Popup` del `ModalBottomSheet` queda fuera de la ventana visible
+ * (ver comentario en HelpSheet.kt). Por eso el envoltorio `HelpSheet` y el propio
+ * `ModalBottomSheet` quedan sin cubrir por esta suite.
+ *
  * La configuracion comun (SDK y Application vacia) vive en
  * src/test/resources/robolectric.properties.
  */
